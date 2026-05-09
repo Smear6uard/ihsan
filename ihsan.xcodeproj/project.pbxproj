@@ -9,6 +9,9 @@
 /* Begin PBXBuildFile section */
 		428FEEC72FAF30000097E665 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEC82FAF30000097E665 /* IhsanPrayerTimes */; };
 		428FEECB2FAF30000097E665 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEECC2FAF30000097E665 /* IhsanCore */; };
+		428FEED02FAF30000097E665 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED12FAF30000097E665 /* IhsanIntents */; };
+		428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED42FAF30000097E665 /* IhsanLocation */; };
+		428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED72FAF30000097E665 /* IhsanDesignSystem */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -59,6 +62,9 @@
 			files = (
 				428FEEC72FAF30000097E665 /* IhsanPrayerTimes in Frameworks */,
 				428FEECB2FAF30000097E665 /* IhsanCore in Frameworks */,
+				428FEED02FAF30000097E665 /* IhsanIntents in Frameworks */,
+				428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */,
+				428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -121,6 +127,9 @@
 			packageProductDependencies = (
 				428FEEC82FAF30000097E665 /* IhsanPrayerTimes */,
 				428FEECC2FAF30000097E665 /* IhsanCore */,
+				428FEED12FAF30000097E665 /* IhsanIntents */,
+				428FEED42FAF30000097E665 /* IhsanLocation */,
+				428FEED72FAF30000097E665 /* IhsanDesignSystem */,
 			);
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
@@ -207,6 +216,9 @@
 			packageReferences = (
 				428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */,
 				428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */,
+				428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */,
+				428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */,
+				428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428FEE9E2FAF234A0097E665 /* Products */;
@@ -411,6 +423,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -455,6 +468,7 @@
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -638,6 +652,18 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/IhsanCore;
 		};
+		428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanIntents;
+		};
+		428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanLocation;
+		};
+		428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanDesignSystem;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -650,6 +676,21 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */;
 			productName = IhsanCore;
+		};
+		428FEED12FAF30000097E665 /* IhsanIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */;
+			productName = IhsanIntents;
+		};
+		428FEED42FAF30000097E665 /* IhsanLocation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */;
+			productName = IhsanLocation;
+		};
+		428FEED72FAF30000097E665 /* IhsanDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */;
+			productName = IhsanDesignSystem;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
