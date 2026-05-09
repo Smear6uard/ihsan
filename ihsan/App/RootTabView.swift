@@ -14,7 +14,7 @@ struct RootTabView: View {
                 .tabItem { Label("Today", systemImage: "calendar") }
                 .tag(Tab.today)
 
-            ComingSoonScreen(title: "Trajectory")
+            TrajectoryScreen()
                 .tabItem { Label("Trajectory", systemImage: "chart.dots.scatter") }
                 .tag(Tab.trajectory)
 
