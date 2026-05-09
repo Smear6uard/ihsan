@@ -6,6 +6,11 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		428FEEC72FAF30000097E665 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEC82FAF30000097E665 /* IhsanPrayerTimes */; };
+		428FEECB2FAF30000097E665 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEECC2FAF30000097E665 /* IhsanCore */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		428FEEAB2FAF234C0097E665 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +57,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				428FEEC72FAF30000097E665 /* IhsanPrayerTimes in Frameworks */,
+				428FEECB2FAF30000097E665 /* IhsanCore in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +119,8 @@
 			);
 			name = ihsan;
 			packageProductDependencies = (
+				428FEEC82FAF30000097E665 /* IhsanPrayerTimes */,
+				428FEECC2FAF30000097E665 /* IhsanCore */,
 			);
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
@@ -195,6 +204,10 @@
 			);
 			mainGroup = 428FEE942FAF234A0097E665;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */,
+				428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428FEE9E2FAF234A0097E665 /* Products */;
 			projectDirPath = "";
@@ -615,6 +628,30 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanPrayerTimes;
+		};
+		428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		428FEEC82FAF30000097E665 /* IhsanPrayerTimes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */;
+			productName = IhsanPrayerTimes;
+		};
+		428FEECC2FAF30000097E665 /* IhsanCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */;
+			productName = IhsanCore;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 428FEE952FAF234A0097E665 /* Project object */;
 }
