@@ -154,6 +154,10 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
     }
 
     public func headingUpdates() async throws -> AsyncStream<Double> {
+        #if os(macOS)
+        // macOS has no magnetometer; CLHeading APIs are unavailable.
+        throw LocationError.headingUnavailable
+        #else
         guard CLLocationManager.headingAvailable() else {
             throw LocationError.headingUnavailable
         }
@@ -174,6 +178,7 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
                 }
             }
         }
+        #endif
     }
 
     private func requestLocation(timeout: TimeInterval) async throws -> CLLocation {
@@ -326,6 +331,7 @@ extension CoreLocationCoordinator: CLLocationManagerDelegate {
         }
     }
 
+    #if !os(macOS)
     public func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
         guard newHeading.headingAccuracy >= 0 else { return }
         let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
@@ -341,4 +347,5 @@ extension CoreLocationCoordinator: CLLocationManagerDelegate {
     public func locationManagerShouldDisplayHeadingCalibration(_ manager: CLLocationManager) -> Bool {
         true
     }
+    #endif
 }

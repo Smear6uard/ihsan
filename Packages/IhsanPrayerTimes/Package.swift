@@ -6,7 +6,9 @@ let package = Package(
     name: "IhsanPrayerTimes",
     platforms: [
         .iOS(.v26),
-        .watchOS(.v26)
+        .macOS(.v26),
+        .watchOS(.v26),
+        .visionOS(.v26)
     ],
     products: [
         .library(

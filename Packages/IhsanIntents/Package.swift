@@ -5,9 +5,10 @@ import PackageDescription
 let package = Package(
     name: "IhsanIntents",
     platforms: [
-        .macOS(.v15),
         .iOS(.v26),
-        .watchOS(.v26)
+        .macOS(.v26),
+        .watchOS(.v26),
+        .visionOS(.v26)
     ],
     products: [
         .library(
