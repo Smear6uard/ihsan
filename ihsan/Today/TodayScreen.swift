@@ -8,6 +8,7 @@ import IhsanPrayerTimes
 struct TodayScreen: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: TodayViewModel?
+    @State private var presentingQibla = false
 
     var body: some View {
         ZStack {
@@ -29,6 +30,11 @@ struct TodayScreen: View {
             }
             await viewModel?.bootstrap()
         }
+        .sheet(isPresented: $presentingQibla) {
+            QiblaScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     @ViewBuilder
@@ -40,7 +46,11 @@ struct TodayScreen: View {
             TodayNeedsLocationView { Task { await viewModel?.bootstrap() } }
         case .ready(let snapshot):
             if let viewModel {
-                TodayReadyView(snapshot: snapshot, viewModel: viewModel)
+                TodayReadyView(
+                    snapshot: snapshot,
+                    viewModel: viewModel,
+                    onQibla: { presentingQibla = true }
+                )
             }
         case .error(let message):
             TodayErrorView(message: message) { Task { await viewModel?.bootstrap() } }
@@ -115,6 +125,7 @@ private struct TodayErrorView: View {
 private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
     let viewModel: TodayViewModel
+    let onQibla: () -> Void
 
     var body: some View {
         ScrollView {
@@ -122,7 +133,7 @@ private struct TodayReadyView: View {
                 TodayHeader(
                     cityName: snapshot.place.cityName ?? "Current Location",
                     date: .now,
-                    qiblaAction: {},
+                    qiblaAction: onQibla,
                     masjidAction: {}
                 )
 
