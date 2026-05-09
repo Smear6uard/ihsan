@@ -9,6 +9,7 @@ struct TodayScreen: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: TodayViewModel?
     @State private var presentingQibla = false
+    @State private var presentingMasjids = false
 
     var body: some View {
         ZStack {
@@ -35,6 +36,11 @@ struct TodayScreen: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $presentingMasjids) {
+            MasjidFinderScreen()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
 
     @ViewBuilder
@@ -49,7 +55,8 @@ struct TodayScreen: View {
                 TodayReadyView(
                     snapshot: snapshot,
                     viewModel: viewModel,
-                    onQibla: { presentingQibla = true }
+                    onQibla: { presentingQibla = true },
+                    onMasjids: { presentingMasjids = true }
                 )
             }
         case .error(let message):
@@ -126,6 +133,7 @@ private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
     let viewModel: TodayViewModel
     let onQibla: () -> Void
+    let onMasjids: () -> Void
 
     var body: some View {
         ScrollView {
@@ -134,7 +142,7 @@ private struct TodayReadyView: View {
                     cityName: snapshot.place.cityName ?? "Current Location",
                     date: .now,
                     qiblaAction: onQibla,
-                    masjidAction: {}
+                    masjidAction: onMasjids
                 )
 
                 TodayHeroSection(snapshot: snapshot)
