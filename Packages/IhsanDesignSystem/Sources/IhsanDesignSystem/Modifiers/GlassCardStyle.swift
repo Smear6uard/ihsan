@@ -8,15 +8,18 @@ public struct GlassCardStyle: ViewModifier {
     public let intensity: GlassIntensity
     public let padding: CGFloat
     public let cornerRadius: CGFloat
+    public let isActive: Bool
 
     public init(
         intensity: GlassIntensity = .regular,
         padding: CGFloat = IhsanSpacing.md,
-        cornerRadius: CGFloat = IhsanSpacing.cardRadius
+        cornerRadius: CGFloat = IhsanSpacing.cardRadius,
+        isActive: Bool = false
     ) {
         self.intensity = intensity
         self.padding = padding
         self.cornerRadius = cornerRadius
+        self.isActive = isActive
     }
 
     public func body(content: Content) -> some View {
@@ -27,7 +30,8 @@ public struct GlassCardStyle: ViewModifier {
                     cornerRadius: cornerRadius,
                     style: .continuous
                 ),
-                intensity: intensity
+                intensity: intensity,
+                isActive: isActive
             )
     }
 }
@@ -36,13 +40,15 @@ public extension View {
     func glassCardStyle(
         intensity: GlassIntensity = .regular,
         padding: CGFloat = IhsanSpacing.md,
-        cornerRadius: CGFloat = IhsanSpacing.cardRadius
+        cornerRadius: CGFloat = IhsanSpacing.cardRadius,
+        isActive: Bool = false
     ) -> some View {
         modifier(
             GlassCardStyle(
                 intensity: intensity,
                 padding: padding,
-                cornerRadius: cornerRadius
+                cornerRadius: cornerRadius,
+                isActive: isActive
             )
         )
     }

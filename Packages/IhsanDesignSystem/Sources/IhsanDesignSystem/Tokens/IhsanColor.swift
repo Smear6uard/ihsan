@@ -3,13 +3,16 @@ import SwiftUI
 /// Type-safe color tokens. The consuming app must NEVER use inline
 /// `Color(red:green:blue:)` literals — every color routes through this enum.
 ///
-/// The visual identity locks one rule: the dark ground stays constant across
-/// every screen at every time of day. Time of day is expressed only through
-/// how Liquid Glass surfaces refract the adaptive tint — never by changing
-/// the background.
+/// The visual identity is anchored by a single deep ultramarine ground.
+/// Above that anchor, `AdaptiveBackground` layers a subtle atmospheric
+/// gradient and a very low-opacity wash of the adaptive time-of-day tint,
+/// and the glass surfaces themselves carry the hour as iridescence. The
+/// ground colour itself never changes; what changes is what light it
+/// catches.
 public enum IhsanColor {
-    /// The single dark ground used across every screen at every time of day.
-    /// Approximate: deep ultramarine-near-black, #0E1428.
+    /// The anchor: deep ultramarine `#0E1428`. Used as the base layer of
+    /// `AdaptiveBackground` and as the contrast reference for every text
+    /// opacity tier below.
     public static let ground = Color(
         red: 0x0E / 255.0,
         green: 0x14 / 255.0,
