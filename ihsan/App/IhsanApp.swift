@@ -25,7 +25,7 @@ struct IhsanApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootTabView()
+            RootGate()
                 .preferredColorScheme(.dark)
                 .task {
                     // Pre-warm the location coordinator so authorization and
@@ -34,5 +34,73 @@ struct IhsanApp: App {
                 }
         }
         .modelContainer(modelContainer)
+    }
+}
+
+/// Decides which top-level scene to present based on whether the user
+/// has completed the first-launch flow. The OnboardingFlow is shown
+/// as a full-screen cover over the RootTabView so:
+///   - the gate flips automatically when SwiftData publishes the
+///     `hasCompletedOnboarding = true` write at the end of step 5,
+///   - the user cannot dismiss the cover by gesture (onboarding is
+///     non-skippable as a whole; only individual permission rationale
+///     screens within it are skippable),
+///   - cold-launching mid-flow lands on the welcome step every time
+///     because the OnboardingFlow owns its own view model.
+private struct RootGate: View {
+    @Environment(\.modelContext) private var modelContext
+    @Query private var allSettings: [UserSettings]
+
+    /// True until SwiftData publishes the singleton settings row. Used
+    /// to suppress a one-frame flash of onboarding on cold launches
+    /// where the existing user already finished setup.
+    @State private var didResolveInitialSettings = false
+
+    var body: some View {
+        ZStack {
+            RootTabView()
+                .opacity(didResolveInitialSettings ? 1 : 0)
+        }
+        .fullScreenCover(isPresented: shouldPresentOnboarding) {
+            OnboardingFlow()
+                .interactiveDismissDisabled(true)
+        }
+        .task {
+            ensureSingletonExists()
+            didResolveInitialSettings = true
+        }
+    }
+
+    /// Driven by the persisted flag. Setter is a no-op because the
+    /// flag flips only via OnboardingViewModel.commit(...). Without
+    /// the no-op the system would try to dismiss the cover when the
+    /// user swipes down, which we don't want for a non-skippable
+    /// flow.
+    private var shouldPresentOnboarding: Binding<Bool> {
+        Binding(
+            get: { didResolveInitialSettings && !hasCompletedOnboarding },
+            set: { _ in }
+        )
+    }
+
+    private var hasCompletedOnboarding: Bool {
+        allSettings.first?.hasCompletedOnboarding ?? false
+    }
+
+    /// SwiftData lazily creates the UserSettings singleton when first
+    /// fetched. We force that read on launch so the `@Query` above
+    /// resolves before we make a gate decision; otherwise the empty
+    /// array on first frame would briefly look like "onboarding not
+    /// completed" for an existing user who has it completed.
+    private func ensureSingletonExists() {
+        do {
+            _ = try UserSettings.fetchOrCreate(in: modelContext)
+            try modelContext.save()
+        } catch {
+            // If we can't resolve the singleton, the gate falls open
+            // to onboarding, which is the safer default — better to
+            // re-show setup once than to hide it from a brand new
+            // install.
+        }
     }
 }
