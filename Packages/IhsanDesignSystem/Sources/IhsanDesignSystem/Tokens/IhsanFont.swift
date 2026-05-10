@@ -55,4 +55,35 @@ public enum IhsanFont {
     public static let tabBar: Font = .system(
         size: 10, weight: .medium, design: .default
     )
+
+    // MARK: - Manuscript serif variants
+    //
+    // Today screen uses the system serif (New York on iOS 26) for prayer
+    // names, hero countdown labels, and major page headings — the serif
+    // honors the illuminated-manuscript reference. Body text and tabular
+    // numerals continue to use SF Pro / SF Rounded so legibility is not
+    // compromised.
+
+    /// Refined serif at hero scale — prayer name above the countdown.
+    public static let heroPrayerName: Font = .system(
+        size: 24, weight: .medium, design: .serif
+    )
+
+    /// Refined serif at body scale — prayer name in list rows.
+    public static let rowPrayerName: Font = .system(
+        size: 18, weight: .semibold, design: .serif
+    )
+
+    /// Small caps inscription — page header location, "UNTIL ASR", section
+    /// labels in the manuscript aesthetic. Letter-spaced via `.tracking()`
+    /// at the call site so each surface can tune the spacing for its scale.
+    public static let inscription: Font = .system(
+        size: 13, weight: .semibold, design: .default
+    ).smallCaps()
+
+    /// Larger inscriptional small caps — for the location label in the
+    /// page header.
+    public static let inscriptionLarge: Font = .system(
+        size: 15, weight: .semibold, design: .default
+    ).smallCaps()
 }

@@ -38,15 +38,14 @@ public struct IhsanSkyGradient: View {
         let top = IhsanColor.skyTopColor(at: date)
         let bottom = IhsanColor.skyBottomColor(at: date)
 
-        // The horizon band sits at ~78% so the lower 22% is the warm
-        // pole of the gradient — gives prayer rows a warm layer to
-        // float above without smearing the warm across the whole screen.
+        // Smooth top-to-bottom gradient for the manuscript-page aesthetic:
+        // a uniform colour field with subtle vertical variation, never a
+        // hard "horizon band". The keyframe pair already encodes the
+        // dominant page colour and a subtly different bottom — pulling
+        // the bottom stop to 100% lets the eye read the page as one
+        // considered surface rather than as a literal sky.
         LinearGradient(
-            stops: [
-                .init(color: top, location: 0.0),
-                .init(color: bottom, location: 0.78),
-                .init(color: bottom, location: 1.0)
-            ],
+            colors: [top, bottom],
             startPoint: .top,
             endPoint: .bottom
         )

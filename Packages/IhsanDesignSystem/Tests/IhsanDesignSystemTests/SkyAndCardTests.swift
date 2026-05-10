@@ -32,11 +32,14 @@ private func contrastRatio(_ a: IhsanColor.RGB, _ b: IhsanColor.RGB) -> Double {
     return (lighter + 0.05) / (darker + 0.05)
 }
 
+// Canonical text colours from the manuscript palette.
+//   inkDeep   = #1A1F2E (dark text on light panels)
+//   boneCream = #F5EBD5 (light text on dark panels — same hex as panelDay)
 private let textInkRGB: IhsanColor.RGB = (
     red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x2E / 255.0
 )
 private let textBoneRGB: IhsanColor.RGB = (
-    red: 0xE8 / 255.0, green: 0xDF / 255.0, blue: 0xC9 / 255.0
+    red: 0xF5 / 255.0, green: 0xEB / 255.0, blue: 0xD5 / 255.0
 )
 
 // MARK: - Sky stops
@@ -80,21 +83,22 @@ func skyBottomWrapsAroundMidnight() {
 }
 
 @Test
-func skyAtMidnightIsDeepUltramarine() {
-    // Both top and bottom should hit the static `ground` colour at
-    // local midnight.
+func skyAtMidnightIsPersianIndigo() {
+    // Both top and bottom should hit the canonical `nightPage` colour
+    // (`#1A1F4A`) at local midnight — the page reads as one saturated
+    // indigo, not a flat black.
     let top = IhsanColor.interpolatedRGB(
         stops: IhsanColor.skyTopStops, at: 0.0
     )
     let bottom = IhsanColor.interpolatedRGB(
         stops: IhsanColor.skyBottomStops, at: 0.0
     )
-    #expect(abs(top.red - 0x0E / 255.0) < 0.001)
-    #expect(abs(top.green - 0x14 / 255.0) < 0.001)
-    #expect(abs(top.blue - 0x28 / 255.0) < 0.001)
-    #expect(abs(bottom.red - 0x0E / 255.0) < 0.001)
-    #expect(abs(bottom.green - 0x14 / 255.0) < 0.001)
-    #expect(abs(bottom.blue - 0x28 / 255.0) < 0.001)
+    #expect(abs(top.red - 0x1A / 255.0) < 0.001)
+    #expect(abs(top.green - 0x1F / 255.0) < 0.001)
+    #expect(abs(top.blue - 0x4A / 255.0) < 0.001)
+    #expect(abs(bottom.red - 0x1A / 255.0) < 0.001)
+    #expect(abs(bottom.green - 0x1F / 255.0) < 0.001)
+    #expect(abs(bottom.blue - 0x4A / 255.0) < 0.001)
 }
 
 @Test
@@ -140,15 +144,23 @@ func skyShiftsVisiblyAcrossTheDay() {
 }
 
 @Test
-func skyBottomIsWarmerThanTopAtNoon() {
-    // At Dhuhr the bottom of the gradient should sit closer to cream
-    // while the top sits in pale neutral — the gradient reads as
-    // "horizon below, sky above" rather than as a flat panel.
+func skyBottomIsMoreGoldSaturatedThanTopAtNoon() {
+    // At Dhuhr the bottom of the gradient sits closer to amber-gold
+    // (#D9C9A0/#C9B584 family) while the top sits in lighter cream
+    // (#E8DCC0/#D9C9A0 family) — the gradient reads as "horizon below,
+    // sky above". "Warmer" in the manuscript palette means a higher
+    // red-to-blue ratio, not raw red — both top and bottom carry less
+    // pure-red than the old honey-cream did, but the bottom is more
+    // saturated toward gold.
     let p = IhsanColor.dayProgress(for: makeDate(hour: 12))
     let top = IhsanColor.interpolatedRGB(stops: IhsanColor.skyTopStops, at: p)
     let bottom = IhsanColor.interpolatedRGB(stops: IhsanColor.skyBottomStops, at: p)
-    // Bottom red channel should exceed top red channel — warmer.
-    #expect(bottom.red > top.red)
+    let topRatio = top.red / max(top.blue, 0.001)
+    let bottomRatio = bottom.red / max(bottom.blue, 0.001)
+    #expect(
+        bottomRatio > topRatio,
+        "noon top R/B \(topRatio) should be lower than bottom R/B \(bottomRatio)"
+    )
 }
 
 // MARK: - Card surface
@@ -204,25 +216,27 @@ func cardSurfaceIsDarkThroughDeepNight() {
 // MARK: - Foreground contrast on cards
 
 @Test
-func darkInkOnCreamCardMeetsWCAGAA() {
-    // Dark ink on the cream card surface (#E8DFC9) should comfortably
-    // exceed the 4.5:1 normal-text threshold.
-    let cream: IhsanColor.RGB = (
-        red: 0xE8 / 255.0, green: 0xDF / 255.0, blue: 0xC9 / 255.0
+func darkInkOnPanelDayMeetsWCAGAAA() {
+    // Dark ink on the panelDay surface (#F5EBD5) should comfortably
+    // exceed the 7.0:1 AAA threshold — it's the dominant text pair on
+    // the Today screen.
+    let panelDay: IhsanColor.RGB = (
+        red: 0xF5 / 255.0, green: 0xEB / 255.0, blue: 0xD5 / 255.0
     )
-    let ratio = contrastRatio(textInkRGB, cream)
-    #expect(ratio >= 4.5, "ink-on-cream contrast was \(ratio), expected ≥ 4.5")
+    let ratio = contrastRatio(textInkRGB, panelDay)
+    #expect(ratio >= 7.0, "ink-on-panelDay contrast was \(ratio), expected ≥ 7.0")
 }
 
 @Test
-func boneCreamOnAmberCardMeetsWCAGAA() {
-    // Bone cream on the amber-night card surface (#3D3328) should
-    // comfortably exceed 4.5:1.
-    let amber: IhsanColor.RGB = (
+func boneCreamOnPanelNightMeetsWCAGAAA() {
+    // Bone cream on the panelNight surface (#3D3328) should clear 7.0:1
+    // AAA — the night-side pair must read at least as cleanly as the
+    // day-side one.
+    let panelNight: IhsanColor.RGB = (
         red: 0x3D / 255.0, green: 0x33 / 255.0, blue: 0x28 / 255.0
     )
-    let ratio = contrastRatio(textBoneRGB, amber)
-    #expect(ratio >= 4.5, "bone-on-amber contrast was \(ratio), expected ≥ 4.5")
+    let ratio = contrastRatio(textBoneRGB, panelNight)
+    #expect(ratio >= 7.0, "bone-on-panelNight contrast was \(ratio), expected ≥ 7.0")
 }
 
 @Test
@@ -273,40 +287,43 @@ func cardStopsWrapAroundMidnight() {
 // MARK: - Accent
 
 @Test
-func warmAccentIsRoseGoldNearMaghrib() {
-    // The maghrib window should resolve to rose-gold so the now-marker
-    // and active surface pull warmer there.
-    let p = IhsanColor.dayProgress(for: makeDate(hour: 19))
-    #expect(p >= 0.74 && p <= 0.84, "maghrib progress was \(p)")
+func warmAccentIsBrassAtEveryHour() {
+    // Post-manuscript redirect, the warm accent unifies on brass at
+    // every hour of the day. Previous versions returned rose-gold in
+    // the maghrib window — the redirect removes that variant so the
+    // brass illumination border and the active-prayer accent stay in
+    // one chromatic key from Fajr through Isha.
+    for hour in 0..<24 {
+        let date = makeDate(hour: hour)
+        #expect(IhsanColor.accentWarm(at: date) == IhsanColor.brass)
+    }
 }
 
 @Test
-func warmAccentIsBrassAtNoonAndMidnight() {
-    // Outside the maghrib window the accent stays steady on brass —
-    // the now-marker should never flash bright orange at unexpected
-    // moments.
-    let noonP = IhsanColor.dayProgress(for: makeDate(hour: 12))
-    let midnightP = IhsanColor.dayProgress(for: makeDate(hour: 0))
-    #expect(!(noonP >= 0.74 && noonP <= 0.84))
-    #expect(!(midnightP >= 0.74 && midnightP <= 0.84))
+func maghribWindowMapsToExpectedProgressRange() {
+    // 19:00 should sit in [0.74, 0.84] — the canonical maghrib window
+    // used by other time-of-day calculations (sunset image opacity,
+    // arc dot positions, etc.).
+    let p = IhsanColor.dayProgress(for: makeDate(hour: 19))
+    #expect(p >= 0.74 && p <= 0.84, "maghrib progress was \(p)")
 }
 
 // MARK: - Sky foreground (header text directly on the sky)
 
 @Test
 func skyForegroundIsBoneCreamAtMidnight() {
-    // The midnight sky is deep ultramarine — ink dark would disappear,
-    // bone cream is the only correct choice.
+    // The midnight sky is Persian indigo (#1A1F4A) — ink dark would
+    // disappear, bone cream is the only correct choice.
     let picked = IhsanColor.skyForegroundPrimary(at: makeDate(hour: 0))
-    #expect(picked == IhsanColor.textBoneCream)
+    #expect(picked == IhsanColor.boneCream)
 }
 
 @Test
 func skyForegroundIsInkDarkAtNoon() {
-    // The noon sky top is pale neutral cream — bone cream would
+    // The noon sky top is pale parchment — bone cream would
     // disappear, ink dark is the only correct choice.
     let picked = IhsanColor.skyForegroundPrimary(at: makeDate(hour: 12))
-    #expect(picked == IhsanColor.textInkDark)
+    #expect(picked == IhsanColor.inkDeep)
 }
 
 @Test
@@ -322,10 +339,10 @@ func skyForegroundPicksBetterContrastAtEveryHour() {
         let creamContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textBoneLuminance)
         let picked = IhsanColor.skyForegroundPrimary(at: date)
         if inkContrast >= creamContrast {
-            #expect(picked == IhsanColor.textInkDark,
+            #expect(picked == IhsanColor.inkDeep,
                     "hour \(hour):30 picked the wrong foreground")
         } else {
-            #expect(picked == IhsanColor.textBoneCream,
+            #expect(picked == IhsanColor.boneCream,
                     "hour \(hour):30 picked the wrong foreground")
         }
     }
@@ -333,8 +350,8 @@ func skyForegroundPicksBetterContrastAtEveryHour() {
 
 @Test
 func skyForegroundContrastClearsLargeTextThresholdAtEveryHour() {
-    // The header is small caps semibold at 13 pt and sits over a small
-    // text shadow (see TodayHeader). We assert that the picked
+    // The header is small caps semibold at 13–15 pt and sits over a
+    // small text shadow (see TodayHeader). We assert that the picked
     // foreground's raw contrast against the sky top clears 3.0:1 (WCAG
     // AA for large text) at every half-hour sample — with the shadow
     // included, effective legibility climbs into the 4.5:1 zone for

@@ -13,14 +13,14 @@ struct TodayScreen: View {
 
     var body: some View {
         content
-            // Time-adaptive sky. The gradient endpoints drift through
-            // the day so the screen reads as morning, afternoon, or
-            // night without the user having to check a clock. The
-            // photographic sunrise / maghrib assets live INSIDE the
-            // hero countdown card now (see `TodayHeroSection`), not
-            // across the whole background — keeps the warmth focused
-            // where the user's eye lands.
-            .ihsanSkyBackground()
+            // Time-adaptive manuscript page. The gradient endpoints drift
+            // through the day so the screen reads as Persian indigo by
+            // night, parchment cream by day, and vermillion through the
+            // maghrib window — saturated and considered, never flat
+            // black or muddy brown. The photographic sunrise / maghrib
+            // assets live INSIDE the hero countdown card (see
+            // `TodayHeroSection`), not across the whole background.
+            .ihsanManuscriptPage()
             .task {
                 if viewModel == nil {
                     viewModel = TodayViewModel(modelContext: modelContext)
