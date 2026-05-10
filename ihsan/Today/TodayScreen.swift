@@ -154,9 +154,13 @@ private struct TodayReadyView: View {
 
                 TodayHeroSection(snapshot: snapshot)
 
-                DayArc(
+                // Sun-arc visualisation — the visual signature element of
+                // the Today screen. Sits between the hero countdown and
+                // the prayer list, providing "where am I in the day"
+                // context as a single curved horizontal element.
+                PrayerArc(
                     prayerMarks: snapshot.dayTimes.allFardh.map {
-                        DayArc.PrayerMark(prayer: $0.prayer, time: $0.scheduledTime)
+                        PrayerArc.PrayerMark(prayer: $0.prayer, time: $0.scheduledTime)
                     }
                 )
 
