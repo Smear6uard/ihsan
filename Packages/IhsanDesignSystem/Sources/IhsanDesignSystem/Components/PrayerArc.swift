@@ -303,13 +303,17 @@ private struct NowMarker: View {
                 .frame(width: 30, height: 30)
                 .blur(radius: 4)
 
-            // Inner solid gold star — the visible marker.
+            // Inner iridescent gold star — the visible marker. The
+            // radial gradient samples the brass palette so the star
+            // reads as "gold leaf catching light" rather than a flat
+            // gold disc. The brass rim outline anchors the silhouette
+            // against the parchment surface beneath.
             EightPointedStar()
-                .fill(IhsanColor.gold)
+                .fill(IhsanIridescence.goldOrnament())
                 .frame(width: 14, height: 14)
                 .overlay {
                     EightPointedStar()
-                        .stroke(IhsanColor.brassLight.opacity(0.65), lineWidth: 0.6)
+                        .stroke(IhsanColor.brassDark.opacity(0.70), lineWidth: 0.6)
                 }
                 .shadow(color: IhsanColor.gold.opacity(0.75), radius: 6, x: 0, y: 0)
                 .shadow(color: IhsanColor.gold.opacity(0.40), radius: 14, x: 0, y: 0)

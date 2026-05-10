@@ -106,6 +106,41 @@ public enum IhsanColor {
     /// saturated than brass.
     public static let gold = Color(hex: 0xD4A574)
 
+    // MARK: - Iridescent brass palette
+    //
+    // Real gold leaf on a manuscript page iridesces — it shifts from
+    // honey to brass to pale champagne as light angle changes. These
+    // four anchors are sampled around the perimeter of every illuminated
+    // panel's border (via `IhsanIridescence.brassStroke`) and inside the
+    // gold ornament radial gradients so the surfaces read as a real
+    // metallic material rather than a flat brass colour.
+
+    /// Honey-gold `#D4A574` — the warm pole of the iridescent brass cycle.
+    /// Same hex as `gold`; aliased separately so call sites that thread an
+    /// iridescent gradient read in palette terms.
+    public static let brassHoney = Color(hex: 0xD4A574)
+
+    /// Mid brass `#C9A876` — the neutral pole of the iridescent cycle.
+    /// Same hex as `brass`.
+    public static let brassMid = Color(hex: 0xC9A876)
+
+    /// Pale champagne `#E8D9B5` — the bright pole of the iridescent cycle.
+    /// The lightest brass tone in the palette; reads as a soft highlight
+    /// when it lands on the top edge of a panel border.
+    public static let brassPale = Color(hex: 0xE8D9B5)
+
+    /// Deep brass `#B8956A` — the shadow pole of the iridescent cycle.
+    /// Same hex as `brassText`. Anchors the warmer side of the gradient
+    /// and reads as "the side of the gold leaf facing away from the
+    /// light" when applied around a stroke.
+    public static let brassDark = Color(hex: 0xB8956A)
+
+    /// Bright gold `#E8C97A` — used for the active-state highlight on
+    /// the eight-pointed current-prayer marker and other "this is
+    /// happening right now" emphasis points. Slightly more saturated
+    /// than `gold`.
+    public static let goldBright = Color(hex: 0xE8C97A)
+
     /// Vermillion `#C73E1D`. Status indicator for missed prayers and other
     /// error states. Saturated but used sparingly so it never overwhelms.
     public static let vermillion = Color(hex: 0xC73E1D)

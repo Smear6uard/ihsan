@@ -125,9 +125,18 @@ internal struct IhsanIlluminatedPanelModifier: ViewModifier {
             style: .continuous
         )
 
+        let strokeOpacity = isActive
+            ? intensity.activeBorderOpacity
+            : intensity.borderOpacity
+        let strokeWidth = isActive
+            ? intensity.activeBorderWidth
+            : intensity.borderWidth
+
         // The Reduce-Transparency path drops the halo and shadow but keeps
         // the brass border at full strength so the panel boundary still
-        // reads unambiguously.
+        // reads unambiguously. The iridescent stroke is preserved — it's
+        // a colour treatment, not a motion effect, so it stays under
+        // Reduce Motion / Reduce Transparency.
         if reduceTransparency {
             content
                 .background {
@@ -135,7 +144,7 @@ internal struct IhsanIlluminatedPanelModifier: ViewModifier {
                 }
                 .overlay {
                     shape.strokeBorder(
-                        IhsanColor.brass.opacity(isActive ? 0.90 : 0.55),
+                        IhsanIridescence.brassStroke(opacity: isActive ? 0.90 : 0.65),
                         lineWidth: isActive ? intensity.activeBorderWidth : 1.0
                     )
                 }
@@ -170,17 +179,15 @@ internal struct IhsanIlluminatedPanelModifier: ViewModifier {
                     }
                 }
                 .overlay {
-                    // 3. The brass illumination border. The single detail
-                    //    that anchors the manuscript aesthetic.
+                    // 3. The brass illumination border — an angular
+                    //    gradient cycling honey → mid → pale → dark
+                    //    around the perimeter so the stroke reads as
+                    //    iridescent gold leaf, not flat brass paint.
+                    //    This is the single most identity-defining
+                    //    detail of the manuscript aesthetic.
                     shape.strokeBorder(
-                        IhsanColor.brass.opacity(
-                            isActive
-                                ? intensity.activeBorderOpacity
-                                : intensity.borderOpacity
-                        ),
-                        lineWidth: isActive
-                            ? intensity.activeBorderWidth
-                            : intensity.borderWidth
+                        IhsanIridescence.brassStroke(opacity: strokeOpacity),
+                        lineWidth: strokeWidth
                     )
                 }
                 .clipShape(shape)
