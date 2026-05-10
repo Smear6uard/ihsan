@@ -6,20 +6,20 @@ import IhsanNotifications
 import IhsanPrayerTimes
 import OSLog
 
-public enum PrayerActivityEndReason: Sendable {
+nonisolated public enum PrayerActivityEndReason: Sendable {
     case logged
     case timedOut
     case dismissed
     case replaced
 }
 
-struct PrayerActivitySnapshot: Equatable, Sendable {
+nonisolated struct PrayerActivitySnapshot: Equatable, Sendable {
     let id: String
     let attributes: PrayerActivityAttributes
     let state: PrayerActivityAttributes.ContentState
 }
 
-protocol PrayerActivityClient: Sendable {
+nonisolated protocol PrayerActivityClient: Sendable {
     func activeActivities() async -> [PrayerActivitySnapshot]
     func request(
         attributes: PrayerActivityAttributes,
@@ -38,7 +38,7 @@ protocol PrayerActivityClient: Sendable {
     ) async
 }
 
-enum PrayerActivityDismissal: Equatable, Sendable {
+nonisolated enum PrayerActivityDismissal: Equatable, Sendable {
     case immediate
     case `default`
 }
@@ -302,7 +302,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
     }
 }
 
-struct SystemPrayerActivityClient: PrayerActivityClient {
+nonisolated struct SystemPrayerActivityClient: PrayerActivityClient {
     func activeActivities() async -> [PrayerActivitySnapshot] {
         Activity<PrayerActivityAttributes>.activities.map {
             PrayerActivitySnapshot(

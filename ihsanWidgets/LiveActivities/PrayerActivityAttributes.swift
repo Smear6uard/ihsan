@@ -3,7 +3,7 @@ import ActivityKit
 import Foundation
 import IhsanCore
 
-public struct PrayerActivityAttributes: ActivityAttributes, Sendable {
+nonisolated public struct PrayerActivityAttributes: ActivityAttributes, Equatable, Sendable {
     public struct ContentState: Codable, Hashable, Sendable {
         public var countdownPhase: CountdownPhase
         public var hasBeenLoggedThisActivity: Bool
