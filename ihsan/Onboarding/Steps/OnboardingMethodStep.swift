@@ -8,7 +8,7 @@ import IhsanLocation
 /// Prefilled with the auto-detected method (set by the location step,
 /// falling back to a locale-derived guess when location was skipped).
 /// Tapping the card or the "Change method" link opens
-/// `CalculationMethodPicker`.
+/// `OnboardingCalculationMethodPicker`.
 struct OnboardingMethodStep: View {
     @Bindable var viewModel: OnboardingViewModel
 
@@ -45,7 +45,7 @@ struct OnboardingMethodStep: View {
             }
         }
         .sheet(isPresented: $viewModel.showMethodPicker) {
-            CalculationMethodPicker(selection: $viewModel.draftMethod)
+            OnboardingCalculationMethodPicker(selection: $viewModel.draftMethod)
         }
     }
 

@@ -8,7 +8,7 @@ import IhsanDesignSystem
 /// glass row with the method name, regional hint, and a checkmark
 /// affordance. The list is presented in the same order as
 /// `CalculationMethodChoice.allCases` so the layout is stable.
-struct CalculationMethodPicker: View {
+struct OnboardingCalculationMethodPicker: View {
     @Binding var selection: CalculationMethodChoice
     @Environment(\.dismiss) private var dismiss
 

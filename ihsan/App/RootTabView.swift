@@ -72,20 +72,3 @@ struct RootTabView: View {
         return age >= 0 && age <= 60
     }
 }
-
-private struct ComingSoonScreen: View {
-    let title: String
-
-    var body: some View {
-        VStack(spacing: IhsanSpacing.sm) {
-            Text(title)
-                .font(IhsanFont.title)
-                .foregroundStyle(IhsanColor.textPrimary)
-            Text("Coming soon")
-                .font(IhsanFont.smallCaps)
-                .foregroundStyle(IhsanColor.textMuted)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ihsanBackground()
-    }
-}
