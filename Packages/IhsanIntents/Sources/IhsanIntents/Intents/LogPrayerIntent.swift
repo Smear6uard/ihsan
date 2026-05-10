@@ -1,4 +1,7 @@
 import AppIntents
+#if canImport(ActivityKit) && os(iOS)
+import ActivityKit
+#endif
 import IhsanCore
 import OSLog
 import SwiftData
@@ -61,3 +64,7 @@ public struct LogPrayerIntent: AppIntent {
         return .result(dialog: IntentDialog("\(prayer.displayNameEnglish) logged."))
     }
 }
+
+#if canImport(ActivityKit) && os(iOS)
+extension LogPrayerIntent: LiveActivityIntent {}
+#endif

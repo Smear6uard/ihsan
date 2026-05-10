@@ -13,13 +13,15 @@ func rebuildScheduleCancelsExistingIhsanRequestsThenSchedulesRollingWindow() asy
         makeExistingRequest(identifier: "ihsan.prayer.fajr.1"),
         makeExistingRequest(identifier: "unrelated.notification")
     ])
-    let scheduler = makeScheduler(now: now, center: center)
+    let activityScheduler = MockPrayerActivityScheduler()
+    let scheduler = makeScheduler(now: now, center: center, activityScheduler: activityScheduler)
 
     try await scheduler.rebuildSchedule()
 
     let events = center.events
     #expect(events.first == .remove(["ihsan.prayer.fajr.1"]))
     #expect(events.filter(\.isAdd).count == 70)
+    #expect(activityScheduler.requests.count == 70)
 
     let pending = await center.pendingNotificationRequests()
     #expect(pending.count == 71)
@@ -50,18 +52,26 @@ func contentFallsBackToDefaultSoundButKeepsDiagnosticFileNameWhenAssetIsMissing(
 @Test
 func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     let center = MockNotificationCenter()
+    let activityScheduler = MockPrayerActivityScheduler()
     let disabledAsrSettings = NotificationScheduleSettings(
         prayerPreferences: Prayer.allCases.map {
             PrayerNotificationPreference(prayer: $0, isEnabled: $0 != .asr, soundChoice: .standardShort)
         }
     )
-    let scheduler = makeScheduler(now: fixedDate(), center: center, settings: disabledAsrSettings)
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: disabledAsrSettings,
+        activityScheduler: activityScheduler
+    )
 
     try await scheduler.rebuildSchedule()
 
     let scheduled = await scheduler.scheduledNotifications()
     #expect(scheduled.count == 56)
     #expect(!scheduled.contains { $0.prayer == .asr })
+    #expect(activityScheduler.requests.count == 56)
+    #expect(!activityScheduler.requests.contains { $0.prayer == .asr })
 }
 
 @Test
@@ -79,13 +89,15 @@ private func makeScheduler(
     center: MockNotificationCenter,
     settings: NotificationScheduleSettings = NotificationScheduleSettings(
         adhanSoundChoice: .fajrAwareLong
-    )
+    ),
+    activityScheduler: MockPrayerActivityScheduler = MockPrayerActivityScheduler()
 ) -> NotificationScheduler {
     NotificationScheduler(
         prayerTimesProvider: MockPrayerTimesProvider(),
         locationProvider: MockLocationProvider(),
         settingsProvider: MockSettingsProvider(settings: settings),
         notificationCenter: center,
+        prayerActivityScheduler: activityScheduler,
         now: { now },
         soundFileResolver: AdhanSoundFileResolver { _ in true }
     )
@@ -291,6 +303,36 @@ private final class MockNotificationCenter: UserNotificationScheduling, @uncheck
             recordedEvents.append(.remove(identifiers.sorted()))
             requests.removeAll { identifiers.contains($0.identifier) }
         }
+    }
+}
+
+private final class MockPrayerActivityScheduler: PrayerActivityScheduling, @unchecked Sendable {
+    struct Request: Equatable {
+        let prayer: Prayer
+        let scheduledTime: Date
+        let startDate: Date
+    }
+
+    private var recordedRequests: [Request] = []
+    private let lock = NSLock()
+
+    var requests: [Request] {
+        lock.withLock { recordedRequests }
+    }
+
+    func schedulePrayerActivityStart(
+        for prayerTime: PrayerTime,
+        in dayTimes: DayPrayerTimes,
+        startDate: Date
+    ) async throws {
+        lock.withLock {
+            recordedRequests.append(Request(
+                prayer: prayerTime.prayer,
+                scheduledTime: prayerTime.scheduledTime,
+                startDate: startDate
+            ))
+        }
+        _ = dayTimes
     }
 }
 
