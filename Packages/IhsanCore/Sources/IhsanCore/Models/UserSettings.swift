@@ -31,6 +31,7 @@ public final class UserSettings {
     public var madhabRaw: String = MadhabChoice.standard.rawValue
     public var highLatitudeRuleRaw: String = HighLatitudeRule.middleOfNight.rawValue
     public var notificationsEnabled: Bool = true
+    public var hasCompletedOnboarding: Bool = false
     public var prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON
     public var themeRaw: String = ThemePreference.auto.rawValue
     public var hijriCalendarOffsetDays: Int = 0
@@ -51,6 +52,7 @@ public final class UserSettings {
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
         notificationsEnabled: Bool = true,
+        hasCompletedOnboarding: Bool = false,
         prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON,
         theme: ThemePreference = .auto,
         hijriCalendarOffsetDays: Int = 0,
@@ -70,6 +72,7 @@ public final class UserSettings {
         self.madhabRaw = madhab.rawValue
         self.highLatitudeRuleRaw = highLatitudeRule.rawValue
         self.notificationsEnabled = notificationsEnabled
+        self.hasCompletedOnboarding = hasCompletedOnboarding
         self.prayerNotificationsConfigJSON = prayerNotificationsConfigJSON
         self.themeRaw = theme.rawValue
         self.hijriCalendarOffsetDays = hijriCalendarOffsetDays
