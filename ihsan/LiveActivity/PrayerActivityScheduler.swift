@@ -140,7 +140,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
                         taskKey: taskKey
                     )
                 } catch {
-                    await self.clearScheduledStartTask(taskKey)
+                    self.clearScheduledStartTask(taskKey)
                 }
             }
             return

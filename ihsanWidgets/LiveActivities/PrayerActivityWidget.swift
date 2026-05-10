@@ -228,7 +228,7 @@ private struct PrayerCountdownText: View {
             } else {
                 switch context.state.countdownPhase {
                 case .preAdhan:
-                    Text("-") + Text(context.attributes.scheduledTime, style: .timer)
+                    Text("-\(context.attributes.scheduledTime, style: .timer)")
                 case .adhanWindow:
                     Text("Now")
                 case .postAdhan:
@@ -275,9 +275,11 @@ struct DismissPrayerActivityIntent: LiveActivityIntent {
     static var description = IntentDescription("Dismisses the current prayer Live Activity.")
     static var openAppWhenRun: Bool = false
 
+    @available(iOSApplicationExtension 16.2, *)
     @Parameter(title: "Prayer")
     var prayer: PrayerEntity
 
+    @available(iOSApplicationExtension 16.2, *)
     @Parameter(title: "Scheduled Time")
     var scheduledTime: Date
 
