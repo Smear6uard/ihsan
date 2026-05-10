@@ -77,18 +77,19 @@ private struct PrayerRowComposable: View {
     @State private var showingActionDialog = false
 
     var body: some View {
-        // The foreground colours track the warm card material — dark ink
-        // during the day, bone cream at night — so every text element on
-        // the row stays WCAG AA against the surface it sits on at every
-        // hour. The same `foreground` is threaded into StatusPill and
-        // the two toggles so the whole row reads in one chromatic key.
+        // The foreground colours track the illuminated panel material —
+        // dark ink on cream panels during the day, bone cream on amber
+        // panels at night — so every text element on the row stays WCAG
+        // AAA against the surface it sits on. Brass becomes the prayer-
+        // symbol tint, the prayer-name English uses the manuscript
+        // serif, the time uses tabular monospace.
         let now = Date.now
         let foreground = IhsanColor.cardForegroundPrimary(at: now)
         let foregroundSecondary = IhsanColor.cardForegroundSecondary(at: now)
         let foregroundMuted = IhsanColor.cardForegroundMuted(at: now)
         let prayerSymbolColor = isActive
-            ? IhsanColor.accentWarm(at: now)
-            : foregroundSecondary
+            ? IhsanColor.gold
+            : IhsanColor.brass.opacity(0.70)
 
         HStack(spacing: IhsanSpacing.md) {
             PrayerSymbol(
@@ -100,10 +101,10 @@ private struct PrayerRowComposable: View {
             .frame(width: 28)
 
             VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
-                HStack(spacing: IhsanSpacing.sm) {
+                HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
                     Text(prayer.displayNameEnglish)
-                        .font(IhsanFont.bodyEnglishBold)
-                        .foregroundStyle(isActive ? foreground : foreground.opacity(0.88))
+                        .font(IhsanFont.rowPrayerName)
+                        .foregroundStyle(foreground)
                     Text(prayer.displayNameArabic)
                         .font(IhsanFont.bodyArabic)
                         .foregroundStyle(foregroundSecondary)
@@ -141,7 +142,7 @@ private struct PrayerRowComposable: View {
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm)
         .frame(minHeight: IhsanSpacing.prayerRowHeight)
-        .ihsanWarmCard(intensity: isActive ? .hero : .regular, isActive: isActive)
+        .ihsanIlluminatedPanel(intensity: .prayerRow, isActive: isActive)
         .confirmationDialog(
             prayer.displayNameEnglish,
             isPresented: $showingActionDialog,
