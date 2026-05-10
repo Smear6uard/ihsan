@@ -23,7 +23,8 @@ public enum IhsanModelContainerFactory {
         if inMemory {
             configuration = ModelConfiguration(
                 schema: schema,
-                isStoredInMemoryOnly: true
+                isStoredInMemoryOnly: true,
+                cloudKitDatabase: .none
             )
         } else {
             guard let storeURL else {

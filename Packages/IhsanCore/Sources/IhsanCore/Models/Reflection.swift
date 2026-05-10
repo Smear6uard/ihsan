@@ -3,7 +3,6 @@ import SwiftData
 
 @Model
 public final class Reflection {
-    @Attribute(.unique)
     public var id: UUID = UUID()
 
     public var kindRaw: String = ReflectionKind.daily.rawValue

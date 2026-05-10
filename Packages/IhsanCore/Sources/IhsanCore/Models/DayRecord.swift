@@ -3,7 +3,6 @@ import SwiftData
 
 @Model
 public final class DayRecord {
-    @Attribute(.unique)
     public var id: UUID = UUID()
 
     public var forDate: Date = Date.distantPast

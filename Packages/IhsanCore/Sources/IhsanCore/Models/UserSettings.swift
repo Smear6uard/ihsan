@@ -24,7 +24,6 @@ public struct PrayerNotificationConfig: Codable, Sendable {
 public final class UserSettings {
     public static let singletonID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
-    @Attribute(.unique)
     public var id: UUID = UserSettings.singletonID
 
     public var calculationMethodRaw: String = CalculationMethodChoice.isna.rawValue

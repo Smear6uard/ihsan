@@ -3,7 +3,6 @@ import SwiftData
 
 @Model
 public final class TravelInterval {
-    @Attribute(.unique)
     public var id: UUID = UUID()
 
     public var startDate: Date = Date.distantPast

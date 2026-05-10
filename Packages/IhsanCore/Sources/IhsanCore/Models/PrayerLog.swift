@@ -3,7 +3,6 @@ import SwiftData
 
 @Model
 public final class PrayerLog {
-    @Attribute(.unique)
     public var id: UUID = UUID()
 
     public var dedupKey: String = ""

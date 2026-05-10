@@ -34,7 +34,6 @@ public struct ByPrayerStat: Codable, Sendable {
 
 @Model
 public final class PeriodSummary {
-    @Attribute(.unique)
     public var id: UUID = UUID()
 
     public var periodKindRaw: String = PeriodKind.week.rawValue
