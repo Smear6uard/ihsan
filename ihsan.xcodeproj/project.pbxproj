@@ -118,6 +118,10 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		428FEE9F2FAF234A0097E665 /* ihsan */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
 			path = ihsan;
 			sourceTree = "<group>";
 		};
