@@ -10,8 +10,6 @@ final class QiblaViewModel {
     /// Smoothed device heading in degrees (0–360). Drives the dial rotation.
     var smoothedHeading: Double = 0
     /// Negative when invalid; > 20° when the magnetometer wants a figure-8.
-    /// LocationProviding's heading stream currently emits only heading values,
-    /// so this stays at -1 until accuracy is plumbed through the API.
     var headingAccuracy: Double = -1
     /// True when the device is pointed within ±3° of qibla.
     var isAligned: Bool = false
@@ -54,8 +52,9 @@ final class QiblaViewModel {
             guard let self else { return }
             do {
                 let stream = try await self.locationProvider.headingUpdates()
-                for await rawHeading in stream {
-                    self.smoothedHeading = self.smoother.smooth(rawHeading)
+                for await sample in stream {
+                    self.smoothedHeading = self.smoother.smooth(sample.preferredHeading)
+                    self.headingAccuracy = sample.accuracy
                     self.checkAlignment()
                 }
             } catch {

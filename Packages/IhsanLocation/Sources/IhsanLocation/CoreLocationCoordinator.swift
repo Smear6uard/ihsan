@@ -13,7 +13,7 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
     private var pendingAuthContinuations: [CheckedContinuation<LocationAuthorization, Error>] = []
 
     private var significantChangeContinuations: [UUID: AsyncStream<LocatedPlace>.Continuation] = [:]
-    private var headingContinuations: [UUID: AsyncStream<Double>.Continuation] = [:]
+    private var headingContinuations: [UUID: AsyncStream<HeadingSample>.Continuation] = [:]
     private var authorizationContinuations: [UUID: AsyncStream<LocationAuthorization>.Continuation] = [:]
 
     private var cachedPlace: LocatedPlace?
@@ -153,7 +153,7 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
         manager.stopMonitoringSignificantLocationChanges()
     }
 
-    public func headingUpdates() async throws -> AsyncStream<Double> {
+    public func headingUpdates() async throws -> AsyncStream<HeadingSample> {
         #if os(macOS)
         // macOS has no magnetometer; CLHeading APIs are unavailable.
         throw LocationError.headingUnavailable
@@ -333,14 +333,18 @@ extension CoreLocationCoordinator: CLLocationManagerDelegate {
 
     #if !os(macOS)
     public func locationManager(_ manager: CLLocationManager, didUpdateHeading newHeading: CLHeading) {
-        guard newHeading.headingAccuracy >= 0 else { return }
-        let heading = newHeading.trueHeading >= 0 ? newHeading.trueHeading : newHeading.magneticHeading
+        let sample = HeadingSample(
+            trueHeading: newHeading.trueHeading,
+            magneticHeading: newHeading.magneticHeading,
+            accuracy: newHeading.headingAccuracy,
+            timestamp: newHeading.timestamp
+        )
 
         let streams = lock.withLock {
             Array(headingContinuations.values)
         }
         for stream in streams {
-            stream.yield(heading)
+            stream.yield(sample)
         }
     }
 

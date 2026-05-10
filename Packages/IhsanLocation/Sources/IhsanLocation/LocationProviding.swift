@@ -49,12 +49,15 @@ public protocol LocationProviding: Sendable {
     /// Stop monitoring significant location changes.
     func stopMonitoringSignificantChanges() async
 
-    /// Stream of compass heading updates (degrees from true north,
-    /// 0-360). Used by the Qibla compass screen.
-    /// - Throws `LocationError.headingUnavailable` if the device has
-    ///   no compass.
-    /// - Pauses automatically when the consumer cancels the stream.
-    func headingUpdates() async throws -> AsyncStream<Double>
+    /// Stream of compass heading samples. Each sample carries true heading,
+    /// magnetic heading, accuracy, and timestamp.
+    ///
+    /// - Throws `LocationError.headingUnavailable` if the device has no
+    ///   compass (iPad, simulator).
+    /// - The stream pauses automatically when the consumer cancels iteration.
+    /// - For direction-critical features, check `sample.isAccuracyAcceptable`
+    ///   before trusting the value.
+    func headingUpdates() async throws -> AsyncStream<HeadingSample>
 }
 
 public extension LocationProviding {

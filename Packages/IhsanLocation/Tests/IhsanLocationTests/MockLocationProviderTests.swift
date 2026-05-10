@@ -49,9 +49,14 @@ actor MockLocationProvider: LocationProviding {
 
     nonisolated func stopMonitoringSignificantChanges() async {}
 
-    nonisolated func headingUpdates() async throws -> AsyncStream<Double> {
+    nonisolated func headingUpdates() async throws -> AsyncStream<HeadingSample> {
         AsyncStream { continuation in
-            continuation.yield(0)
+            continuation.yield(HeadingSample(
+                trueHeading: 0,
+                magneticHeading: 0,
+                accuracy: 5,
+                timestamp: .now
+            ))
             continuation.finish()
         }
     }
