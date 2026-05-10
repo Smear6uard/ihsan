@@ -157,6 +157,12 @@ private struct TodayReadyView: View {
 
                 TodayHeroSection(snapshot: snapshot)
 
+                DayArc(
+                    prayerMarks: snapshot.dayTimes.allFardh.map {
+                        DayArc.PrayerMark(prayer: $0.prayer, time: $0.scheduledTime)
+                    }
+                )
+
                 TodayPrayerList(
                     snapshot: snapshot,
                     onSetStatus: { prayer, status in
