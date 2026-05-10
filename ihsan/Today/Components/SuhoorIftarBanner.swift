@@ -46,7 +46,7 @@ struct SuhoorIftarBanner: View {
                 .padding(.horizontal, IhsanSpacing.md)
                 .ihsanGlassHero()
                 .accessibilityElement(children: .combine)
-                .accessibilityLabel("\(formatted(seconds: remaining)) until suhoor ends at Fajr")
+                .accessibilityLabel("\(spokenCountdown(seconds: remaining)) until suhoor ends at Fajr")
             }
         }
     }
@@ -57,5 +57,19 @@ struct SuhoorIftarBanner: View {
         let m = (total % 3600) / 60
         let s = total % 60
         return String(format: "−%02d:%02d:%02d", h, m, s)
+    }
+
+    /// Human-readable form for VoiceOver — "−02:34:15" otherwise reads
+    /// as "minus zero two colon..."
+    private func spokenCountdown(seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        var parts: [String] = []
+        if h > 0 { parts.append("\(h) hour\(h == 1 ? "" : "s")") }
+        if m > 0 { parts.append("\(m) minute\(m == 1 ? "" : "s")") }
+        if h == 0 { parts.append("\(s) second\(s == 1 ? "" : "s")") }
+        return parts.isEmpty ? "0 seconds" : parts.joined(separator: ", ")
     }
 }

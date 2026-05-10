@@ -47,6 +47,16 @@ struct ReflectionInputComposer: View {
 
             controlsRow
         }
+        .onChange(of: isTranscribing) { _, newValue in
+            // The recorder fires "Recording stopped" on its own; the
+            // transcribe phase starts shortly after, often after
+            // VoiceOver focus has moved on. Fire a separate
+            // announcement so the user knows the system is doing
+            // something with their audio.
+            if newValue {
+                AccessibilityNotification.Announcement("Transcribing audio").post()
+            }
+        }
     }
 
     // MARK: - Editor

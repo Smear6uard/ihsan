@@ -11,6 +11,7 @@ struct TodayHeroSection: View {
             let target = effectiveTargetTime
             let remaining = max(0, target.timeIntervalSince(context.date))
             let countdown = formatted(seconds: remaining)
+            let spokenCountdown = spokenCountdown(seconds: remaining)
             let countingDownToIftar = isCountingDownToIftar(at: context.date)
 
             VStack(spacing: IhsanSpacing.md) {
@@ -50,7 +51,7 @@ struct TodayHeroSection: View {
                     .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: remaining)
-                    .accessibilityLabel(accessibilityLabel(for: countdown, at: context.date))
+                    .accessibilityLabel(accessibilityLabel(for: spokenCountdown, at: context.date))
 
                 Text(effectiveLabel(at: context.date).uppercased())
                     .font(IhsanFont.smallCaps)
@@ -94,14 +95,29 @@ struct TodayHeroSection: View {
         return String(format: "−%02d:%02d:%02d", h, m, s)
     }
 
-    private func accessibilityLabel(for countdown: String, at date: Date) -> String {
+    /// Human-readable countdown for VoiceOver. The visible "−02:34:15"
+    /// reads as "minus zero two colon..." which is useless; this returns
+    /// "2 hours, 34 minutes, 15 seconds".
+    private func spokenCountdown(seconds: TimeInterval) -> String {
+        let total = Int(seconds)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        var parts: [String] = []
+        if h > 0 { parts.append("\(h) hour\(h == 1 ? "" : "s")") }
+        if m > 0 { parts.append("\(m) minute\(m == 1 ? "" : "s")") }
+        if h == 0 { parts.append("\(s) second\(s == 1 ? "" : "s")") }
+        return parts.isEmpty ? "0 seconds" : parts.joined(separator: ", ")
+    }
+
+    private func accessibilityLabel(for spokenCountdown: String, at date: Date) -> String {
         let prayerName = snapshot.nextPrayerTime.prayer.displayNameEnglish
         if snapshot.isWithinFajrToSunriseWindow {
-            return "\(countdown) until Fajr's window ends at sunrise"
+            return "\(spokenCountdown) until Fajr's window ends at sunrise"
         }
         if isCountingDownToIftar(at: date) {
-            return "\(countdown) until iftar at Maghrib"
+            return "\(spokenCountdown) until iftar at Maghrib"
         }
-        return "\(countdown) until \(prayerName)"
+        return "\(spokenCountdown) until \(prayerName)"
     }
 }

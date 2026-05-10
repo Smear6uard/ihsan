@@ -33,14 +33,20 @@ struct HeatmapHero: View {
                     .tracking(0.8)
                     .foregroundStyle(IhsanColor.textMuted.opacity(0.6))
             }
+            .accessibilityHidden(true)
+
+            // Single roll-up element so VoiceOver users get the headline
+            // before paging into the per-dot stops below.
+            Text(accessibilityDescription)
+                .frame(width: 0, height: 0)
+                .accessibilityElement()
+                .accessibilityLabel(accessibilityDescription)
 
             grid
                 .frame(maxWidth: .infinity, alignment: .center)
         }
         .padding(IhsanSpacing.lg)
         .ihsanGlass(intensity: .regular)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityDescription)
     }
 
     private var grid: some View {
@@ -126,6 +132,36 @@ private struct DayDot: View {
             }
             onTap()
         }
+        // Each dot is its own VoiceOver stop, since color/opacity is the
+        // only visual encoding and VO can't see it.
+        .accessibilityElement()
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityAddTraits(.isButton)
+    }
+
+    private var accessibilityLabel: String {
+        let dateText = day.date.formatted(date: .abbreviated, time: .omitted)
+        var parts: [String] = [dateText]
+        if isToday {
+            parts.append("today")
+        }
+        if day.isPaused {
+            parts.append("paused day, excluded from totals")
+        } else {
+            let count = day.onTimeCount
+            let total = day.prayerCompletions.count
+            if count == total {
+                parts.append("all \(total) prayers on time")
+            } else if count == 0 {
+                parts.append("no prayers logged on time")
+            } else {
+                parts.append("\(count) of \(total) prayers on time")
+            }
+        }
+        if day.isTraveling {
+            parts.append("traveling")
+        }
+        return parts.joined(separator: ", ")
     }
 
     private var opacity: Double {

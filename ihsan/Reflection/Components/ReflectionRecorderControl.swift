@@ -86,6 +86,13 @@ struct ReflectionRecorderControl: View {
             } else {
                 pulse = false
             }
+            // Announce the state change so VoiceOver users know the
+            // recorder started/stopped — the visual swap of mic→stop
+            // alone isn't audible.
+            let message = newValue
+                ? "Recording started"
+                : "Recording stopped"
+            AccessibilityNotification.Announcement(message).post()
         }
         .accessibilityLabel(isRecording ? "Stop recording" : "Start voice recording")
         .accessibilityValue(isRecording ? elapsedLabel : "")

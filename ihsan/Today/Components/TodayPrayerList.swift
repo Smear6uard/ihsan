@@ -94,12 +94,13 @@ private struct PrayerRowComposable: View {
                 statusContent
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(statusAccessibilityLabel)
+            .accessibilityHidden(true)
 
             JamaahToggle(
                 isJamaah: .constant(isJamaah),
                 onToggle: { onToggleJamaah() }
             )
+            .accessibilityHidden(true)
         }
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm)
@@ -115,6 +116,19 @@ private struct PrayerRowComposable: View {
             Button("Missed", role: .destructive) { setStatus(.missed) }
             Button("Qada") { setStatus(.qada) }
             Button("Cancel", role: .cancel) {}
+        }
+        // The row reads as one composite element to VoiceOver — name,
+        // scheduled time, status, jama'ah, plus active flag — and exposes
+        // the two interactive controls as custom actions on the rotor
+        // instead of as separate focus stops. This matches the
+        // spec'd "Asr, scheduled 4:32 PM, status on time, jama'ah enabled".
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rowAccessibilityLabel)
+        .accessibilityAction(named: statusActionLabel) {
+            showingActionDialog = true
+        }
+        .accessibilityAction(named: isJamaah ? "Mark as individual" : "Mark as jama'ah") {
+            onToggleJamaah()
         }
     }
 
@@ -139,9 +153,46 @@ private struct PrayerRowComposable: View {
 
     private var statusAccessibilityLabel: String {
         if let status {
-            return "Status: \(status.rawValue), tap to change"
+            return "Status: \(status.spokenLabel), tap to change"
         }
         return "Tap to log \(prayer.displayNameEnglish)"
+    }
+
+    private var statusActionLabel: String {
+        status == nil ? "Log prayer" : "Change status"
+    }
+
+    /// One spoken sentence describing the row. VoiceOver reads:
+    ///   "Asr, scheduled 4:32 PM, on time, jama'ah, active prayer."
+    private var rowAccessibilityLabel: String {
+        var parts: [String] = [prayer.displayNameEnglish]
+        let timeText = scheduledTime.formatted(date: .omitted, time: .shortened)
+        parts.append("scheduled \(timeText)")
+        if let status {
+            parts.append(status.spokenLabel)
+        } else {
+            parts.append("not yet logged")
+        }
+        if isJamaah {
+            parts.append("jama'ah")
+        }
+        if isActive {
+            parts.append("active prayer")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+private extension PrayerStatus {
+    /// Human-spoken form of the status. The raw values ("onTime",
+    /// "qada") read as one robotic word in VoiceOver; this expands them.
+    var spokenLabel: String {
+        switch self {
+        case .onTime: return "on time"
+        case .late: return "late"
+        case .missed: return "missed"
+        case .qada: return "qada, made up later"
+        }
     }
 }
 
