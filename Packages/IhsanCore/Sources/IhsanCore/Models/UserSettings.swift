@@ -36,6 +36,15 @@ public final class UserSettings {
     public var notificationsEnabled: Bool = true
     public var hasCompletedOnboarding: Bool = false
     public var prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON
+    /// Per-prayer adhan-sound toggle. When `true` the scheduled notification
+    /// plays the user's chosen adhan recording; when `false` it falls back to
+    /// the system default tone. Independent of whether the notification fires
+    /// at all (that's controlled by `prayerNotificationsConfigJSON`).
+    public var adhanEnabledFajr: Bool = true
+    public var adhanEnabledDhuhr: Bool = true
+    public var adhanEnabledAsr: Bool = true
+    public var adhanEnabledMaghrib: Bool = true
+    public var adhanEnabledIsha: Bool = true
     public var themeRaw: String = ThemePreference.dark.rawValue
     public var hijriCalendarOffsetDays: Int = 0
     public var arabicNumeralsEnabled: Bool = false
@@ -60,6 +69,11 @@ public final class UserSettings {
         notificationsEnabled: Bool = true,
         hasCompletedOnboarding: Bool = false,
         prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON,
+        adhanEnabledFajr: Bool = true,
+        adhanEnabledDhuhr: Bool = true,
+        adhanEnabledAsr: Bool = true,
+        adhanEnabledMaghrib: Bool = true,
+        adhanEnabledIsha: Bool = true,
         theme: ThemePreference = .dark,
         hijriCalendarOffsetDays: Int = 0,
         arabicNumeralsEnabled: Bool = false,
@@ -83,6 +97,11 @@ public final class UserSettings {
         self.notificationsEnabled = notificationsEnabled
         self.hasCompletedOnboarding = hasCompletedOnboarding
         self.prayerNotificationsConfigJSON = prayerNotificationsConfigJSON
+        self.adhanEnabledFajr = adhanEnabledFajr
+        self.adhanEnabledDhuhr = adhanEnabledDhuhr
+        self.adhanEnabledAsr = adhanEnabledAsr
+        self.adhanEnabledMaghrib = adhanEnabledMaghrib
+        self.adhanEnabledIsha = adhanEnabledIsha
         self.themeRaw = theme.rawValue
         self.hijriCalendarOffsetDays = hijriCalendarOffsetDays
         self.arabicNumeralsEnabled = arabicNumeralsEnabled
@@ -143,5 +162,29 @@ public extension UserSettings {
 
     var theme: ThemePreference {
         ThemePreference(rawValue: themeRaw) ?? .auto
+    }
+
+    /// Whether the configured adhan sound plays for the given prayer. When
+    /// `false`, the scheduled notification uses the system default tone
+    /// instead of the chosen adhan recording. Whether the notification
+    /// fires at all is controlled separately via `prayerNotificationsConfigJSON`.
+    func adhanEnabled(for prayer: Prayer) -> Bool {
+        switch prayer {
+        case .fajr: return adhanEnabledFajr
+        case .dhuhr: return adhanEnabledDhuhr
+        case .asr: return adhanEnabledAsr
+        case .maghrib: return adhanEnabledMaghrib
+        case .isha: return adhanEnabledIsha
+        }
+    }
+
+    func setAdhanEnabled(_ enabled: Bool, for prayer: Prayer) {
+        switch prayer {
+        case .fajr: adhanEnabledFajr = enabled
+        case .dhuhr: adhanEnabledDhuhr = enabled
+        case .asr: adhanEnabledAsr = enabled
+        case .maghrib: adhanEnabledMaghrib = enabled
+        case .isha: adhanEnabledIsha = enabled
+        }
     }
 }

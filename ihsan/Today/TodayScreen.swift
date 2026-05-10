@@ -164,6 +164,9 @@ private struct TodayReadyView: View {
                     },
                     onToggleJamaah: { prayer in
                         Task { await viewModel.toggleJamaah(for: prayer) }
+                    },
+                    onToggleAdhan: { prayer in
+                        Task { await viewModel.toggleAdhanEnabled(for: prayer) }
                     }
                 )
 

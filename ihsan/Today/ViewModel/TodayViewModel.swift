@@ -4,6 +4,7 @@ import SwiftData
 import IhsanCore
 import IhsanIntents
 import IhsanLocation
+import IhsanNotifications
 import IhsanPrayerTimes
 
 @MainActor
@@ -129,6 +130,24 @@ final class TodayViewModel {
             Haptics.impact(.light)
         } catch {
             print("toggleJamaah failed: \(error)")
+        }
+    }
+
+    /// Toggles whether the configured adhan recording plays for this
+    /// prayer. The notification still fires; it just uses the system
+    /// default tone instead. Rebuilds the pending notification window
+    /// immediately so the change takes effect for the next prayer.
+    func toggleAdhanEnabled(for prayer: Prayer) async {
+        guard let settings else { return }
+        let current = settings.adhanEnabled(for: prayer)
+        settings.setAdhanEnabled(!current, for: prayer)
+        settings.modifiedAt = .now
+        Haptics.impact(.light)
+        do {
+            try await NotificationScheduler.shared.rebuildSchedule()
+        } catch {
+            // Best-effort — the next nightly background refresh will
+            // pick up the change even if this immediate rebuild fails.
         }
     }
 

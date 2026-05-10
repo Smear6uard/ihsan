@@ -11,17 +11,25 @@ public struct PrayerNotificationPreference: Equatable, Sendable {
     public let isEnabled: Bool
     public let soundChoice: AdhanSoundCatalog?
     public let leadTimeSeconds: Int
+    /// When `false`, the scheduled notification uses the system default
+    /// tone instead of the configured adhan recording. This is the
+    /// "mute adhan for this prayer" toggle exposed in the row UI, and
+    /// is independent of `isEnabled` (which decides whether a
+    /// notification fires at all).
+    public let adhanEnabled: Bool
 
     public init(
         prayer: Prayer,
         isEnabled: Bool = true,
         soundChoice: AdhanSoundCatalog? = nil,
-        leadTimeSeconds: Int = 0
+        leadTimeSeconds: Int = 0,
+        adhanEnabled: Bool = true
     ) {
         self.prayer = prayer
         self.isEnabled = isEnabled
         self.soundChoice = soundChoice
         self.leadTimeSeconds = leadTimeSeconds
+        self.adhanEnabled = adhanEnabled
     }
 }
 
@@ -72,7 +80,8 @@ extension NotificationScheduleSettings {
                     prayer: $0.prayer,
                     isEnabled: $0.isEnabled,
                     soundChoice: soundChoice == .systemDefault ? nil : soundChoice,
-                    leadTimeSeconds: $0.leadTimeSeconds
+                    leadTimeSeconds: $0.leadTimeSeconds,
+                    adhanEnabled: userSettings.adhanEnabled(for: $0.prayer)
                 )
             }
         )
@@ -232,12 +241,17 @@ public actor NotificationScheduler {
                     continue
                 }
 
-                let soundChoice = preference.soundChoice ?? settings.adhanSoundChoice
+                // When the user has muted the adhan for this prayer, fall
+                // back to the system default tone — they still receive the
+                // notification, just without the recorded call to prayer.
+                let resolvedSoundChoice: AdhanSoundCatalog = preference.adhanEnabled
+                    ? (preference.soundChoice ?? settings.adhanSoundChoice)
+                    : .systemDefault
                 let request = makeNotificationRequest(
                     prayerTime: prayerTime,
                     notificationDate: notificationDate,
                     timeZone: place.timeZone,
-                    soundChoice: soundChoice
+                    soundChoice: resolvedSoundChoice
                 )
                 try await notificationCenter.add(request)
             }

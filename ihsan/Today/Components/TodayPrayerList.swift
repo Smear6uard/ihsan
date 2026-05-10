@@ -8,17 +8,21 @@ struct TodayPrayerList: View {
     let snapshot: TodayState.Snapshot
     let onSetStatus: (Prayer, PrayerStatus) -> Void
     let onToggleJamaah: (Prayer) -> Void
+    let onToggleAdhan: (Prayer) -> Void
 
     @Query private var todaysLogs: [PrayerLog]
+    @Query private var settingsRows: [UserSettings]
 
     init(
         snapshot: TodayState.Snapshot,
         onSetStatus: @escaping (Prayer, PrayerStatus) -> Void,
-        onToggleJamaah: @escaping (Prayer) -> Void
+        onToggleJamaah: @escaping (Prayer) -> Void,
+        onToggleAdhan: @escaping (Prayer) -> Void
     ) {
         self.snapshot = snapshot
         self.onSetStatus = onSetStatus
         self.onToggleJamaah = onToggleJamaah
+        self.onToggleAdhan = onToggleAdhan
 
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: .now)
@@ -33,6 +37,7 @@ struct TodayPrayerList: View {
         VStack(spacing: IhsanSpacing.sm) {
             ForEach(snapshot.dayTimes.allFardh, id: \.prayer) { prayerTime in
                 let log = todaysLogs.first { $0.prayer == prayerTime.prayer }
+                let adhanEnabled = settingsRows.first?.adhanEnabled(for: prayerTime.prayer) ?? true
 
                 PrayerRowComposable(
                     prayer: prayerTime.prayer,
@@ -40,8 +45,10 @@ struct TodayPrayerList: View {
                     status: log?.status,
                     isJamaah: log?.withJamaah ?? false,
                     isActive: snapshot.activePrayer == prayerTime.prayer,
+                    adhanEnabled: adhanEnabled,
                     onSetStatus: { onSetStatus(prayerTime.prayer, $0) },
-                    onToggleJamaah: { onToggleJamaah(prayerTime.prayer) }
+                    onToggleJamaah: { onToggleJamaah(prayerTime.prayer) },
+                    onToggleAdhan: { onToggleAdhan(prayerTime.prayer) }
                 )
 
                 if prayerTime.prayer == .fajr {
@@ -61,8 +68,10 @@ private struct PrayerRowComposable: View {
     let status: PrayerStatus?
     let isJamaah: Bool
     let isActive: Bool
+    let adhanEnabled: Bool
     let onSetStatus: (PrayerStatus) -> Void
     let onToggleJamaah: () -> Void
+    let onToggleAdhan: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingActionDialog = false
@@ -96,6 +105,13 @@ private struct PrayerRowComposable: View {
             .buttonStyle(.plain)
             .accessibilityHidden(true)
 
+            AdhanMuteToggle(
+                adhanEnabled: .constant(adhanEnabled),
+                accessibilityPrayerName: prayer.displayNameEnglish,
+                onToggle: { onToggleAdhan() }
+            )
+            .accessibilityHidden(true)
+
             JamaahToggle(
                 isJamaah: .constant(isJamaah),
                 onToggle: { onToggleJamaah() }
@@ -119,9 +135,8 @@ private struct PrayerRowComposable: View {
         }
         // The row reads as one composite element to VoiceOver — name,
         // scheduled time, status, jama'ah, plus active flag — and exposes
-        // the two interactive controls as custom actions on the rotor
-        // instead of as separate focus stops. This matches the
-        // spec'd "Asr, scheduled 4:32 PM, status on time, jama'ah enabled".
+        // the three interactive controls as custom actions on the rotor
+        // instead of as separate focus stops.
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(rowAccessibilityLabel)
         .accessibilityAction(named: statusActionLabel) {
@@ -129,6 +144,9 @@ private struct PrayerRowComposable: View {
         }
         .accessibilityAction(named: isJamaah ? "Mark as individual" : "Mark as jama'ah") {
             onToggleJamaah()
+        }
+        .accessibilityAction(named: adhanEnabled ? "Mute adhan for \(prayer.displayNameEnglish)" : "Unmute adhan for \(prayer.displayNameEnglish)") {
+            onToggleAdhan()
         }
     }
 
@@ -163,7 +181,7 @@ private struct PrayerRowComposable: View {
     }
 
     /// One spoken sentence describing the row. VoiceOver reads:
-    ///   "Asr, scheduled 4:32 PM, on time, jama'ah, active prayer."
+    ///   "Asr, scheduled 4:32 PM, on time, jama'ah, adhan muted, active prayer."
     private var rowAccessibilityLabel: String {
         var parts: [String] = [prayer.displayNameEnglish]
         let timeText = scheduledTime.formatted(date: .omitted, time: .shortened)
@@ -175,6 +193,9 @@ private struct PrayerRowComposable: View {
         }
         if isJamaah {
             parts.append("jama'ah")
+        }
+        if !adhanEnabled {
+            parts.append("adhan muted")
         }
         if isActive {
             parts.append("active prayer")
