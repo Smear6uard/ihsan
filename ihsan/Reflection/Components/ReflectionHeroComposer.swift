@@ -35,7 +35,7 @@ struct ReflectionHeroComposer: View {
             promptHeader
 
             Rectangle()
-                .fill(IhsanColor.atmospheric)
+                .fill(IhsanColor.brass.opacity(0.25))
                 .frame(height: IhsanSpacing.hairline)
                 .accessibilityHidden(true)
 
@@ -60,7 +60,7 @@ struct ReflectionHeroComposer: View {
         }
         .padding(IhsanSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ihsanGlass(intensity: .hero)
+        .ihsanIlluminatedPanel(intensity: .hero)
     }
 
     private var promptHeader: some View {
@@ -68,27 +68,27 @@ struct ReflectionHeroComposer: View {
             // Slim brass marginal mark — a Mushaf-style accent that makes
             // the prompt read as a passage from a book rather than a UI string.
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(IhsanColor.statusQada)
+                .fill(IhsanColor.brass.opacity(0.75))
                 .frame(width: 2)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.vertical, 4)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-                Text("REFLECTION")
-                    .font(IhsanFont.smallCaps)
-                    .tracking(1.4)
-                    .foregroundStyle(IhsanColor.textMuted)
+                Text("TODAY'S PROMPT")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.8)
+                    .foregroundStyle(IhsanColor.brassDark)
 
                 Text(prompt.promptEn)
-                    .font(IhsanFont.subtitle)
-                    .italic()
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .font(.system(size: 20, weight: .medium, design: .serif).italic())
+                    .foregroundStyle(IhsanColor.inkDeep)
+                    .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(prompt.citationEn)
                     .font(IhsanFont.citation)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

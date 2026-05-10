@@ -3,13 +3,17 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// A glass card representing one past reflection in the feed.
+/// An illuminated parchment panel representing one past reflection in the
+/// feed. The visual hierarchy follows the manuscript-redirect mockup:
 ///
-/// Shape rules:
-///   - Text-only: shows `typedText` truncated to 3 lines.
-///   - Voice-only: shows the audio pill above the transcript snippet.
-///   - Mixed: text on top, audio pill below.
-/// An optional `aiSummaryTitle` (italic) sits above the body when present.
+/// - Top row: gregorian date (refined serif) at left, Hijri date in
+///   small caps at right.
+/// - Italic prompt (refined serif italic) prefixed with an em-dash —
+///   reads as a marginal note.
+/// - Body: typed reflection text in system sans for comfortable reading.
+/// - If a voice memo is attached, an audio pill sits beneath the body.
+///
+/// Each card is its own tappable panel that opens the detail sheet.
 struct ReflectionFeedCard: View {
     let reflection: Reflection
     let isPlaybackActive: Bool
@@ -23,28 +27,18 @@ struct ReflectionFeedCard: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 metadata
 
-                if let title = reflection.aiSummaryTitle?.trimmingCharacters(in: .whitespacesAndNewlines),
-                   !title.isEmpty {
-                    Text(title)
-                        .font(IhsanFont.bodyEnglishBold)
-                        .italic()
-                        .foregroundStyle(IhsanColor.textPrimary)
-                        .fixedSize(horizontal: false, vertical: true)
+                if let prompt = displayPrompt {
+                    promptLine(prompt)
                 }
 
                 body(for: shape)
-
-                if let promptText = reflection.promptText?
-                    .trimmingCharacters(in: .whitespacesAndNewlines),
-                   !promptText.isEmpty {
-                    promptCaption(promptText)
-                }
             }
             .padding(IhsanSpacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .ihsanGlass(intensity: .regular)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .ihsanIlluminatedPanel(intensity: .regular)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityLabel)
         .accessibilityHint("Tap to read the full reflection")
@@ -103,8 +97,9 @@ struct ReflectionFeedCard: View {
         case .textOnly(let text):
             Text(text)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textPrimary)
-                .lineLimit(3)
+                .foregroundStyle(IhsanColor.inkDeep)
+                .lineSpacing(3)
+                .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
 
         case let .voiceOnly(audio, transcript):
@@ -119,8 +114,9 @@ struct ReflectionFeedCard: View {
                 if let snippet = transcript, !snippet.isEmpty {
                     Text(snippet)
                         .font(IhsanFont.bodyEnglish)
-                        .foregroundStyle(IhsanColor.textSecondary)
-                        .lineLimit(2)
+                        .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+                        .lineSpacing(3)
+                        .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -129,8 +125,9 @@ struct ReflectionFeedCard: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 Text(text)
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.textPrimary)
-                    .lineLimit(3)
+                    .foregroundStyle(IhsanColor.inkDeep)
+                    .lineSpacing(3)
+                    .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
                 ReflectionAudioPill(
                     isActive: isPlaybackActive,
@@ -146,38 +143,36 @@ struct ReflectionFeedCard: View {
                 if let transcript, !transcript.isEmpty {
                     Text(transcript)
                         .font(IhsanFont.bodyEnglish)
-                        .foregroundStyle(IhsanColor.textPrimary)
-                        .lineLimit(3)
+                        .foregroundStyle(IhsanColor.inkDeep)
+                        .lineSpacing(3)
+                        .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 Text("VOICE MEMO UNAVAILABLE ON THIS DEVICE")
-                    .font(IhsanFont.smallCaps)
-                    .tracking(0.8)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.4)
+                    .foregroundStyle(IhsanColor.brassDark.opacity(0.75))
             }
 
         case .unknown:
             Text("(empty reflection)")
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(IhsanColor.inkDeep.opacity(0.55))
         }
     }
 
     // MARK: - Metadata
 
     private var metadata: some View {
-        HStack(spacing: IhsanSpacing.sm) {
+        HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
             Text(gregorianLabel)
-                .font(IhsanFont.smallCaps)
-                .tracking(1.0)
-                .foregroundStyle(IhsanColor.textSecondary)
-            Text("·")
-                .font(IhsanFont.smallCaps)
-                .foregroundStyle(IhsanColor.textMuted)
+                .font(.system(size: 20, weight: .medium, design: .serif))
+                .foregroundStyle(IhsanColor.inkDeep)
+            Spacer(minLength: IhsanSpacing.sm)
             Text(hijriLabel)
-                .font(IhsanFont.smallCaps)
-                .tracking(1.0)
-                .foregroundStyle(IhsanColor.textMuted)
+                .font(IhsanFont.inscription)
+                .tracking(1.4)
+                .foregroundStyle(IhsanColor.brassDark)
         }
         .accessibilityElement(children: .combine)
     }
@@ -186,26 +181,38 @@ struct ReflectionFeedCard: View {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)
         formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: reflection.createdAt).uppercased()
+        formatter.dateFormat = "d MMM"
+        return formatter.string(from: reflection.createdAt)
     }
 
     private var hijriLabel: String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .islamicUmmAlQura)
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateFormat = "d MMM yyyy"
-        return "\(formatter.string(from: reflection.createdAt)) AH".uppercased()
+        HijriDateFormatter.string(from: reflection.createdAt).uppercased()
     }
 
-    // MARK: - Prompt caption
+    // MARK: - Prompt line
 
-    private func promptCaption(_ promptText: String) -> some View {
-        Text(promptText)
-            .font(IhsanFont.smallCaps)
-            .tracking(0.8)
-            .foregroundStyle(IhsanColor.textMuted)
-            .lineLimit(2)
+    /// Either the AI-generated summary title (preferred — it's a per-
+    /// entry headline) or the raw prompt text, prefixed with an em-dash
+    /// so the line reads as a marginal annotation.
+    private var displayPrompt: String? {
+        if let title = reflection.aiSummaryTitle?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !title.isEmpty {
+            return title
+        }
+        if let prompt = reflection.promptText?
+            .trimmingCharacters(in: .whitespacesAndNewlines),
+           !prompt.isEmpty {
+            return prompt
+        }
+        return nil
+    }
+
+    private func promptLine(_ text: String) -> some View {
+        Text("— \(text)")
+            .font(.system(size: 16, weight: .regular, design: .serif).italic())
+            .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+            .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
     }
 

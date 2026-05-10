@@ -40,7 +40,7 @@ struct ReflectionRecorderControl: View {
 
                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(IhsanColor.textPrimary)
+                        .foregroundStyle(IhsanColor.inkDeep)
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .frame(width: 32, height: 32)
@@ -48,27 +48,27 @@ struct ReflectionRecorderControl: View {
                 if isRecording {
                     Text(elapsedLabel)
                         .font(IhsanFont.tabular)
-                        .foregroundStyle(IhsanColor.textPrimary)
+                        .foregroundStyle(IhsanColor.inkDeep)
                         .monospacedDigit()
                         .transition(.opacity)
                 } else {
-                    Text("Record")
-                        .font(IhsanFont.smallCaps)
-                        .tracking(1.0)
-                        .foregroundStyle(IhsanColor.textSecondary)
+                    Text("RECORD")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                        .foregroundStyle(IhsanColor.brassDark)
                 }
             }
             .padding(.horizontal, IhsanSpacing.md)
             .padding(.vertical, IhsanSpacing.sm)
             .background {
                 Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(IhsanColor.inkDeep.opacity(0.06))
                     .overlay {
                         Capsule(style: .continuous)
                             .strokeBorder(
                                 isRecording
                                     ? IhsanColor.recordingPulse
-                                    : IhsanColor.atmospheric,
+                                    : IhsanColor.brass.opacity(0.40),
                                 lineWidth: isRecording ? 1.0 : 0.5
                             )
                     }
@@ -123,6 +123,8 @@ struct ReflectionRecorderControl: View {
         )
     }
     .padding()
+    .ihsanIlluminatedPanel(intensity: .regular)
+    .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

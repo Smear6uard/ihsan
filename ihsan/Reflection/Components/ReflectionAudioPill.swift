@@ -17,7 +17,7 @@ struct ReflectionAudioPill: View {
                 Image(systemName: iconName)
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 22, height: 22)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .foregroundStyle(IhsanColor.inkDeep)
                     .contentTransition(.symbolEffect(.replace))
 
                 ProgressTrack(progress: progress)
@@ -26,7 +26,7 @@ struct ReflectionAudioPill: View {
 
                 Text(displayedTimeLabel)
                     .font(IhsanFont.tabular)
-                    .foregroundStyle(IhsanColor.textSecondary)
+                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
                     .frame(minWidth: 36, alignment: .trailing)
                     .accessibilityHidden(true)
             }
@@ -34,10 +34,10 @@ struct ReflectionAudioPill: View {
             .padding(.vertical, IhsanSpacing.sm)
             .background {
                 Capsule(style: .continuous)
-                    .fill(.ultraThinMaterial)
+                    .fill(IhsanColor.inkDeep.opacity(0.06))
                     .overlay {
                         Capsule(style: .continuous)
-                            .strokeBorder(IhsanColor.atmospheric, lineWidth: 0.5)
+                            .strokeBorder(IhsanColor.brass.opacity(0.35), lineWidth: 0.5)
                     }
             }
         }
@@ -93,9 +93,9 @@ private struct ProgressTrack: View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(IhsanColor.atmospheric)
+                    .fill(IhsanColor.brass.opacity(0.25))
                 Capsule()
-                    .fill(IhsanColor.textSecondary)
+                    .fill(IhsanColor.brassDark)
                     .frame(width: max(0, geo.size.width * progress))
                     .animation(.linear(duration: 0.12), value: progress)
             }
@@ -122,6 +122,8 @@ private struct ProgressTrack: View {
         )
     }
     .padding()
+    .ihsanIlluminatedPanel(intensity: .regular)
+    .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

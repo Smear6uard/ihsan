@@ -10,62 +10,29 @@ struct ReflectionEmptyState: View {
 
     var body: some View {
         VStack(spacing: IhsanSpacing.md) {
-            // A simple drawn glyph — a thin crescent + asterisk-like sparkle —
-            // gives the empty state a more contemplative feel than a
-            // generic "no entries" icon would.
-            CrescentMark()
-                .frame(width: 48, height: 48)
-                .foregroundStyle(IhsanColor.statusQada)
+            FourPointedStar()
+                .fill(IhsanColor.brass.opacity(0.55))
+                .frame(width: 28, height: 28)
                 .accessibilityHidden(true)
 
             Text(title)
-                .font(IhsanFont.subtitle)
-                .italic()
-                .foregroundStyle(IhsanColor.textPrimary)
+                .font(.system(size: 22, weight: .medium, design: .serif).italic())
+                .foregroundStyle(IhsanColor.inkDeep)
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
 
             Text(subtitle)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
+                .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
                 .multilineTextAlignment(.center)
                 .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, IhsanSpacing.lg)
         }
-        .padding(IhsanSpacing.lg)
+        .padding(IhsanSpacing.xl)
         .frame(maxWidth: .infinity)
+        .ihsanIlluminatedPanel(intensity: .regular)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title). \(subtitle)")
-    }
-}
-
-/// Minimalist crescent glyph drawn as the difference of two circles.
-/// Looks intentional rather than generic — and matches the brass
-/// accent color used elsewhere in the design system.
-private struct CrescentMark: View {
-    var body: some View {
-        Canvas { context, size in
-            let outer = Path(
-                ellipseIn: CGRect(
-                    x: 2, y: 2,
-                    width: size.width - 4, height: size.height - 4
-                )
-            )
-            let inset: CGFloat = 6
-            let inner = Path(
-                ellipseIn: CGRect(
-                    x: 2 + inset, y: 2,
-                    width: size.width - 4, height: size.height - 4
-                )
-            )
-            context.clip(to: outer)
-            context.blendMode = .destinationOut
-            context.fill(outer, with: .color(.white))
-            context.blendMode = .normal
-            context.fill(outer, with: .color(.white.opacity(0.85)))
-            context.blendMode = .destinationOut
-            context.fill(inner, with: .color(.white))
-        }
     }
 }
 
@@ -74,6 +41,7 @@ private struct CrescentMark: View {
         title: "Begin your record.",
         subtitle: "Today's prompt is above. Write or speak whatever comes to mind. Past entries appear here."
     )
+    .padding(IhsanSpacing.md)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

@@ -36,11 +36,8 @@ struct ReflectionScreen: View {
     @FocusState private var isInputFocused: Bool
 
     var body: some View {
-        ZStack {
-            IhsanColor.ground.ignoresSafeArea()
-
-            content
-        }
+        content
+        .ihsanManuscriptPage()
         .task {
             if viewModel == nil {
                 viewModel = ReflectionViewModel(modelContext: modelContext)
@@ -122,11 +119,11 @@ struct ReflectionScreen: View {
         VStack(spacing: IhsanSpacing.md) {
             ProgressView()
                 .progressViewStyle(.circular)
-                .tint(IhsanColor.textSecondary)
-            Text("Loading reflections…")
-                .font(IhsanFont.smallCaps)
-                .tracking(1.0)
-                .foregroundStyle(IhsanColor.textMuted)
+                .tint(IhsanColor.brass)
+            Text("LOADING REFLECTIONS…")
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(IhsanColor.skyForegroundSecondary())
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -135,10 +132,10 @@ struct ReflectionScreen: View {
         VStack(spacing: IhsanSpacing.md) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(IhsanColor.brassDark)
             Text(message)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
+                .foregroundStyle(IhsanColor.skyForegroundPrimary())
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -199,14 +196,18 @@ struct ReflectionScreen: View {
 
     @ViewBuilder
     private func header(promptDate: Date) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Reflection")
-                .font(IhsanFont.title)
-                .foregroundStyle(IhsanColor.textPrimary)
-            Text(HijriDateFormatter.string(from: promptDate))
-                .font(IhsanFont.smallCaps)
-                .tracking(0.8)
-                .foregroundStyle(IhsanColor.textMuted)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("The day's quiet account")
+                .font(.system(size: 32, weight: .medium, design: .serif))
+                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+
+            Text("REFLECTION · \(HijriDateFormatter.string(from: promptDate).uppercased())")
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(IhsanColor.brass)
+
+            OrnamentalDivider()
+                .padding(.top, IhsanSpacing.xs)
         }
         .accessibilityElement(children: .combine)
     }
@@ -227,12 +228,18 @@ struct ReflectionScreen: View {
             .padding(.horizontal, IhsanSpacing.md)
         } else {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                Text("EARLIER ENTRIES")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.8)
+                    .foregroundStyle(IhsanColor.brass)
+                    .padding(.horizontal, IhsanSpacing.md)
+
                 ForEach(snapshot.sections) { section in
                     VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-                        Text(section.title)
-                            .font(IhsanFont.smallCaps)
-                            .tracking(1.2)
-                            .foregroundStyle(IhsanColor.textMuted)
+                        Text(section.title.uppercased())
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                            .foregroundStyle(IhsanColor.brassDark)
                             .padding(.horizontal, IhsanSpacing.md)
 
                         VStack(spacing: IhsanSpacing.sm) {
