@@ -11,13 +11,15 @@ import IhsanDesignSystem
 struct RadiusSelector: View {
     @Binding var radius: SearchRadius
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(SearchRadius.allCases) { option in
                 Button {
                     guard radius != option else { return }
                     Haptics.tap()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) {
                         radius = option
                     }
                 } label: {

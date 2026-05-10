@@ -64,6 +64,7 @@ private struct PrayerRowComposable: View {
     let onSetStatus: (PrayerStatus) -> Void
     let onToggleJamaah: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingActionDialog = false
 
     var body: some View {
@@ -90,22 +91,20 @@ private struct PrayerRowComposable: View {
             Button {
                 showingActionDialog = true
             } label: {
-                if let status {
-                    StatusPill(status)
-                } else {
-                    StatusPlaceholder()
-                }
+                statusContent
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(statusAccessibilityLabel)
+            .accessibilityHidden(true)
 
             JamaahToggle(
                 isJamaah: .constant(isJamaah),
                 onToggle: { onToggleJamaah() }
             )
+            .accessibilityHidden(true)
         }
         .padding(.horizontal, IhsanSpacing.md)
-        .frame(height: IhsanSpacing.prayerRowHeight)
+        .padding(.vertical, IhsanSpacing.sm)
+        .frame(minHeight: IhsanSpacing.prayerRowHeight)
         .ihsanGlass(intensity: isActive ? .hero : .regular)
         .confirmationDialog(
             prayer.displayNameEnglish,
@@ -118,6 +117,19 @@ private struct PrayerRowComposable: View {
             Button("Qada") { setStatus(.qada) }
             Button("Cancel", role: .cancel) {}
         }
+        // The row reads as one composite element to VoiceOver — name,
+        // scheduled time, status, jama'ah, plus active flag — and exposes
+        // the two interactive controls as custom actions on the rotor
+        // instead of as separate focus stops. This matches the
+        // spec'd "Asr, scheduled 4:32 PM, status on time, jama'ah enabled".
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(rowAccessibilityLabel)
+        .accessibilityAction(named: statusActionLabel) {
+            showingActionDialog = true
+        }
+        .accessibilityAction(named: isJamaah ? "Mark as individual" : "Mark as jama'ah") {
+            onToggleJamaah()
+        }
     }
 
     private func setStatus(_ status: PrayerStatus) {
@@ -125,11 +137,100 @@ private struct PrayerRowComposable: View {
         onSetStatus(status)
     }
 
+    /// Status pill / placeholder, with a subtle scale + opacity beat on
+    /// status change so the pill never hard-cuts to a new colour.
+    @ViewBuilder
+    private var statusContent: some View {
+        Group {
+            if let status {
+                StatusPill(status)
+            } else {
+                StatusPlaceholder()
+            }
+        }
+        .modifier(StatusPillBeat(trigger: status, reduceMotion: reduceMotion))
+    }
+
     private var statusAccessibilityLabel: String {
         if let status {
-            return "Status: \(status.rawValue), tap to change"
+            return "Status: \(status.spokenLabel), tap to change"
         }
         return "Tap to log \(prayer.displayNameEnglish)"
+    }
+
+    private var statusActionLabel: String {
+        status == nil ? "Log prayer" : "Change status"
+    }
+
+    /// One spoken sentence describing the row. VoiceOver reads:
+    ///   "Asr, scheduled 4:32 PM, on time, jama'ah, active prayer."
+    private var rowAccessibilityLabel: String {
+        var parts: [String] = [prayer.displayNameEnglish]
+        let timeText = scheduledTime.formatted(date: .omitted, time: .shortened)
+        parts.append("scheduled \(timeText)")
+        if let status {
+            parts.append(status.spokenLabel)
+        } else {
+            parts.append("not yet logged")
+        }
+        if isJamaah {
+            parts.append("jama'ah")
+        }
+        if isActive {
+            parts.append("active prayer")
+        }
+        return parts.joined(separator: ", ")
+    }
+}
+
+private extension PrayerStatus {
+    /// Human-spoken form of the status. The raw values ("onTime",
+    /// "qada") read as one robotic word in VoiceOver; this expands them.
+    var spokenLabel: String {
+        switch self {
+        case .onTime: return "on time"
+        case .late: return "late"
+        case .missed: return "missed"
+        case .qada: return "qada, made up later"
+        }
+    }
+}
+
+/// Briefly compresses the status pill to 0.95 / 0.65 opacity then springs
+/// back to 1.0 / 1.0 whenever the status changes. Reduce-motion users get
+/// the new pill without any motion.
+private struct StatusPillBeat: ViewModifier {
+    let trigger: PrayerStatus?
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                .keyframeAnimator(
+                    initialValue: PillBeat(),
+                    trigger: trigger
+                ) { view, value in
+                    view
+                        .scaleEffect(value.scale)
+                        .opacity(value.opacity)
+                } keyframes: { _ in
+                    KeyframeTrack(\.scale) {
+                        CubicKeyframe(0.95, duration: 0.08)
+                        SpringKeyframe(1.0, spring: .smooth(duration: 0.32))
+                    }
+                    KeyframeTrack(\.opacity) {
+                        CubicKeyframe(0.65, duration: 0.08)
+                        CubicKeyframe(1.0, duration: 0.22)
+                    }
+                }
+        }
+    }
+
+    private struct PillBeat {
+        var scale: Double = 1.0
+        var opacity: Double = 1.0
     }
 }
 

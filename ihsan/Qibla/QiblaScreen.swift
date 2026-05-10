@@ -42,9 +42,54 @@ struct QiblaScreen: View {
             permissionState
         case .ready(let snapshot):
             readyState(snapshot: snapshot)
+        case .compassUnavailable(let snapshot):
+            compassUnavailableState(snapshot: snapshot)
         case .error(let message):
             errorState(message)
         }
+    }
+
+    /// Hardware lacks a magnetometer. Show the fixed bearing + distance
+    /// without the live-rotation dial, plus a one-line explanation so the
+    /// user knows it's not a bug.
+    private func compassUnavailableState(snapshot: QiblaState.Snapshot) -> some View {
+        VStack(spacing: IhsanSpacing.lg) {
+            Spacer(minLength: IhsanSpacing.xl)
+
+            Image(systemName: "location.north.line.fill")
+                .font(.system(size: 56, weight: .light))
+                .foregroundStyle(IhsanColor.statusQada)
+                .accessibilityHidden(true)
+
+            VStack(spacing: IhsanSpacing.xs) {
+                Text("\(Int(snapshot.qiblaBearing.rounded()))° from north")
+                    .font(IhsanFont.title)
+                    .foregroundStyle(IhsanColor.textPrimary)
+                    .monospacedDigit()
+                Text(DistanceFormatter.kilometers(snapshot.distanceToMakkahKm))
+                    .font(IhsanFont.bodyEnglish)
+                    .foregroundStyle(IhsanColor.textSecondary)
+                    .monospacedDigit()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(
+                "Qibla is \(Int(snapshot.qiblaBearing.rounded())) degrees from true north, "
+                + "\(DistanceFormatter.kilometers(snapshot.distanceToMakkahKm)) away."
+            )
+
+            Text("This device doesn't have a compass — the live dial is unavailable, but the qibla bearing and distance are still accurate for your location.")
+                .font(IhsanFont.bodyEnglish)
+                .foregroundStyle(IhsanColor.textMuted)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, IhsanSpacing.xl)
+
+            Spacer()
+
+            privacyNote
+                .padding(.horizontal, IhsanSpacing.xl)
+                .padding(.bottom, IhsanSpacing.lg)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     // MARK: - States

@@ -14,10 +14,12 @@ struct TodayHeader: View {
                     .font(IhsanFont.smallCaps)
                     .foregroundStyle(IhsanColor.textSecondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
                 Text(HijriDateFormatter.string(from: date))
                     .font(IhsanFont.smallCaps)
                     .foregroundStyle(IhsanColor.textMuted)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
 
             Spacer(minLength: IhsanSpacing.sm)

@@ -7,13 +7,15 @@ import IhsanDesignSystem
 struct PeriodSelector: View {
     @Binding var period: TrajectoryPeriod
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         HStack(spacing: 0) {
             ForEach(TrajectoryPeriod.allCases) { option in
                 Button {
                     guard period != option else { return }
                     Haptics.tap()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.85)) {
                         period = option
                     }
                 } label: {

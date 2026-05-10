@@ -11,15 +11,16 @@ struct DaylightWallpaper: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
-            if reduceMotion {
-                wallpaper(at: .now)
-            } else {
-                TimelineView(.periodic(from: .now, by: 30)) { context in
-                    wallpaper(at: context.date)
-                        .animation(.easeInOut(duration: 1.0), value: context.date)
-                }
-            }
+        // Reduce Motion suppresses the cross-fade BETWEEN ticks but still
+        // re-evaluates the wallpaper opacity every 30 s — otherwise the
+        // wallpaper would freeze at the first-render time and miss the
+        // sunrise/maghrib window entirely if Reduce Motion was on at
+        // launch. The visible motion saved is the 1.0 s easeInOut fade,
+        // not the act of updating itself.
+        TimelineView(.periodic(from: .now, by: 30)) { context in
+            wallpaper(at: context.date)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 1.0),
+                           value: context.date)
         }
         .accessibilityHidden(true)
     }

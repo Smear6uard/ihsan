@@ -9,6 +9,11 @@ enum QiblaState: Equatable {
     case loading
     case needsLocationPermission
     case ready(Snapshot)
+    /// Hardware lacks a magnetometer (iPad without compass, Mac, or
+    /// some simulator configurations). Bearing + distance are still
+    /// known from the device's location; only the live heading dial
+    /// is suppressed.
+    case compassUnavailable(Snapshot)
     case error(String)
 
     struct Snapshot: Equatable {

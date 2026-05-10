@@ -15,6 +15,8 @@ struct KaabaIndicator: View {
     let alignmentGlow: Double
     var size: CGFloat = 28
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     private static let brass = Color(
         red: 0xC9 / 255.0,
         green: 0xA8 / 255.0,
@@ -28,6 +30,14 @@ struct KaabaIndicator: View {
 
     var body: some View {
         ZStack {
+            // Halo telegraphs the alignment moment. Under Reduce Motion
+            // we still fade the halo in/out via opacity (driven by the
+            // alignmentGlow value the parent passes), but the parent's
+            // own animation modifier — which is gated on Reduce Motion
+            // up in QiblaCompassDial — is what controls whether the
+            // transition itself moves. The scale lift below is the part
+            // that's pure motion, so it's clamped to 1.0 when Reduce
+            // Motion is on.
             if alignmentGlow > 0 {
                 Circle()
                     .fill(
@@ -79,7 +89,7 @@ struct KaabaIndicator: View {
                     .strokeBorder(Self.brass.opacity(0.55), lineWidth: 0.5)
             }
             .shadow(color: .black.opacity(0.45), radius: 3, x: 0, y: 1)
-            .scaleEffect(1 + 0.06 * alignmentGlow)
+            .scaleEffect(reduceMotion ? 1.0 : 1 + 0.06 * alignmentGlow)
         }
         .accessibilityLabel("Kaaba")
     }

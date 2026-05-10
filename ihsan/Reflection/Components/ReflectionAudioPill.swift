@@ -76,8 +76,13 @@ struct ReflectionAudioPill: View {
         isActive && isPlaying ? "Pause voice memo" : "Play voice memo"
     }
 
+    /// VoiceOver value: while playing, expose the current position so
+    /// users can scrub mentally; otherwise just the duration.
     private var accessibilityValue: String {
-        "\(formatted(duration)) recording"
+        if isActive && duration > 0 {
+            return "\(formatted(currentTime)) of \(formatted(duration))"
+        }
+        return "\(formatted(duration)) recording"
     }
 }
 

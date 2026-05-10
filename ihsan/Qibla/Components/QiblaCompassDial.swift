@@ -32,7 +32,22 @@ struct QiblaCompassDial: View {
         .accessibilityLabel(
             "Compass dial. Qibla bearing \(Int(qiblaBearing.rounded())) degrees from true north."
         )
-        .accessibilityValue(isAligned ? "Aligned with qibla" : "Rotate device to align with qibla")
+        .accessibilityValue(alignmentAccessibilityValue)
+    }
+
+    /// VoiceOver value for the dial — concrete guidance ("turn 12 degrees
+    /// right") rather than the abstract "rotate device to align".
+    private var alignmentAccessibilityValue: String {
+        if isAligned {
+            return "Aligned with qibla"
+        }
+        var delta = (qiblaBearing - currentHeading)
+            .truncatingRemainder(dividingBy: 360)
+        if delta > 180 { delta -= 360 }
+        if delta < -180 { delta += 360 }
+        let absDegrees = Int(abs(delta).rounded())
+        let direction = delta >= 0 ? "right" : "left"
+        return "Off by \(absDegrees) degree\(absDegrees == 1 ? "" : "s") \(direction). Turn \(direction) to align."
     }
 
     // MARK: - Layers
@@ -102,9 +117,12 @@ struct QiblaCompassDial: View {
             .offset(y: -dialDiameter / 2 + 38)
             .rotationEffect(.degrees(qiblaBearing - currentHeading))
             .animation(
+                // Standard UI spring — alignment feedback comes from the
+                // brass halo + scale lift on KaabaIndicator, not from
+                // bounce in the rotation itself.
                 reduceMotion
                     ? nil
-                    : .spring(response: 0.45, dampingFraction: 0.7),
+                    : .spring(response: 0.4, dampingFraction: 0.85),
                 value: isAligned
             )
     }

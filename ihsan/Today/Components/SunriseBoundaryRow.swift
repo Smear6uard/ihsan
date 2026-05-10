@@ -32,7 +32,8 @@ struct SunriseBoundaryRow: View {
                 .foregroundStyle(IhsanColor.textMuted)
         }
         .padding(.horizontal, IhsanSpacing.md)
-        .frame(height: 48)
+        .padding(.vertical, IhsanSpacing.sm)
+        .frame(minHeight: 48)
         .ihsanGlass(intensity: .subtle)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(

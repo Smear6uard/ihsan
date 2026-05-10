@@ -56,4 +56,48 @@ enum ReflectionAudioPaths {
         }
         return url
     }
+
+    /// Removes audio files in the voice-memos directory that aren't
+    /// referenced by any persisted Reflection. Catches orphans from
+    /// force-quit during recording (the file lives, but no Reflection
+    /// record was ever created for it).
+    ///
+    /// `minAge` is a guard against deleting files that belong to an
+    /// in-flight recording started milliseconds ago — only files
+    /// modified at least that long ago are considered for removal.
+    /// Default 5 minutes is well above any plausible recording length
+    /// AND above the time it takes to save after stopping.
+    ///
+    /// Returns the number of orphan files removed; the call is
+    /// best-effort and does not throw on individual removal failures.
+    @discardableResult
+    static func cleanupOrphans(
+        knownMemoIDs: Set<UUID>,
+        minAge: TimeInterval = 5 * 60
+    ) -> Int {
+        guard let directory = try? voiceMemosDirectory() else { return 0 }
+        let fm = FileManager.default
+        guard let contents = try? fm.contentsOfDirectory(
+            at: directory,
+            includingPropertiesForKeys: [.contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else {
+            return 0
+        }
+        let cutoff = Date.now.addingTimeInterval(-minAge)
+        var removed = 0
+        for url in contents where url.pathExtension == "m4a" {
+            let stem = url.deletingPathExtension().lastPathComponent
+            guard let id = UUID(uuidString: stem) else { continue }
+            if knownMemoIDs.contains(id) { continue }
+            if let modified = (try? url.resourceValues(forKeys: [.contentModificationDateKey]))?
+                .contentModificationDate, modified > cutoff {
+                continue
+            }
+            if (try? fm.removeItem(at: url)) != nil {
+                removed += 1
+            }
+        }
+        return removed
+    }
 }
