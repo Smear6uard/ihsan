@@ -9,12 +9,15 @@ enum Tab: Int, CaseIterable, Hashable, Identifiable {
 
     var id: Self { self }
 
+    /// Manuscript-style small caps inscription rendered beneath the
+    /// icon. Kept terse so each label fits its tab column on every
+    /// iPhone width.
     var title: String {
         switch self {
-        case .today: "Today"
-        case .trajectory: "Trajectory"
-        case .reflection: "Reflection"
-        case .settings: "Settings"
+        case .today: "TODAY"
+        case .trajectory: "PATH"
+        case .reflection: "REFLECT"
+        case .settings: "SET"
         }
     }
 
@@ -27,11 +30,28 @@ enum Tab: Int, CaseIterable, Hashable, Identifiable {
         }
     }
 
+    /// Long form spoken by VoiceOver. The visible label is small caps
+    /// shorthand ("SET") but the spoken label is the full word
+    /// ("Settings tab") so the rotor reads naturally.
     var accessibilityLabel: String {
-        "\(title) tab"
+        switch self {
+        case .today: "Today tab"
+        case .trajectory: "Trajectory tab"
+        case .reflection: "Reflection tab"
+        case .settings: "Settings tab"
+        }
     }
 }
 
+/// The bottom tab bar.
+///
+/// The container reads as iOS 26 Liquid Glass — bare `.glassEffect()`
+/// applied to a rounded rectangle so the platform's native iridescence
+/// and refraction of the manuscript page beneath comes through. The
+/// per-tab cells render an SF Symbol over a small-caps inscription
+/// (TODAY · PATH · REFLECT · SET), and the active tab is marked by a
+/// gold icon and a small brass underline that slides between cells
+/// alongside the drag gesture.
 struct CustomTabBar: View {
     @Binding var selectedTab: Tab
 
@@ -41,6 +61,8 @@ struct CustomTabBar: View {
 
     private let commitThreshold: CGFloat = 50
     private let rubberBandLimit: CGFloat = 36
+    private let underlineWidth: CGFloat = 22
+    private let underlineHeight: CGFloat = 1.5
 
     var body: some View {
         GeometryReader { proxy in
@@ -50,16 +72,25 @@ struct CustomTabBar: View {
                 itemWidth: itemWidth
             )
 
-            ZStack(alignment: .leading) {
-                selectedCapsule(itemWidth: itemWidth)
-                    .offset(x: selectedCapsuleX(itemWidth: itemWidth) + effectiveOffset)
-
+            ZStack(alignment: .topLeading) {
                 HStack(spacing: 0) {
                     ForEach(Tab.allCases) { tab in
                         tabButton(tab)
                             .frame(width: itemWidth)
                     }
                 }
+
+                // The active-tab underline. Centred horizontally on
+                // the selected cell and offset by the drag gesture so
+                // the user sees their finger move the marker before
+                // commit. Drawn last so it sits above the tab content.
+                activeUnderline
+                    .frame(width: underlineWidth, height: underlineHeight)
+                    .offset(
+                        x: underlineX(itemWidth: itemWidth) + effectiveOffset,
+                        y: underlineY
+                    )
+                    .allowsHitTesting(false)
             }
             .contentShape(RoundedRectangle(cornerRadius: IhsanSpacing.cardRadius, style: .continuous))
             .gesture(dragGesture(itemWidth: itemWidth))
@@ -77,17 +108,25 @@ struct CustomTabBar: View {
         }
         .frame(height: IhsanSpacing.tabBarHeight)
         .padding(IhsanSpacing.xs)
-        .ihsanGlass(
+        // iOS 26 native Liquid Glass — system iridescence and
+        // refraction of the manuscript page beneath. The bare
+        // `.glassEffect` (no custom tint) is intentional: chrome
+        // surfaces are the only places the platform's native glass
+        // appears, and applying our own tint here would muddy that.
+        .glassEffect(
+            .regular,
             in: RoundedRectangle(
                 cornerRadius: IhsanSpacing.cardRadius,
                 style: .continuous
-            ),
-            intensity: .regular
+            )
         )
     }
 
+    // MARK: - Tab button
+
     private func tabButton(_ tab: Tab) -> some View {
-        Button {
+        let isSelected = selectedTab == tab
+        return Button {
             committedDragOffset = 0
             guard selectedTab != tab else { return }
             Haptics.impact(.medium)
@@ -95,38 +134,58 @@ struct CustomTabBar: View {
                 selectedTab = tab
             }
         } label: {
-            VStack(spacing: IhsanSpacing.xxs) {
+            VStack(spacing: 8) {
                 Image(systemName: tab.systemImage)
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.system(size: 17, weight: .semibold))
                     .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(
+                        isSelected
+                            ? IhsanColor.gold
+                            : IhsanColor.brass.opacity(0.50)
+                    )
 
                 Text(tab.title)
-                    .font(IhsanFont.tabBar)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
+                    .foregroundStyle(
+                        isSelected
+                            ? IhsanColor.brass
+                            : IhsanColor.brass.opacity(0.45)
+                    )
             }
-            .foregroundStyle(selectedTab == tab ? IhsanColor.textPrimary : IhsanColor.textMuted)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(tab.accessibilityLabel)
-        .accessibilityAddTraits(selectedTab == tab ? [.isSelected] : [])
+        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
     }
 
-    private func selectedCapsule(itemWidth: CGFloat) -> some View {
-        RoundedRectangle(cornerRadius: IhsanSpacing.smallCardRadius, style: .continuous)
-            .fill(.clear)
-            .frame(width: max(0, itemWidth - IhsanSpacing.xs * 2), height: IhsanSpacing.tabBarHeight - IhsanSpacing.sm)
-            .ihsanGlass(
-                in: RoundedRectangle(
-                    cornerRadius: IhsanSpacing.smallCardRadius,
-                    style: .continuous
-                ),
-                intensity: .subtle
-            )
-            .allowsHitTesting(false)
+    // MARK: - Active underline
+
+    private var activeUnderline: some View {
+        Capsule(style: .continuous)
+            .fill(IhsanIridescence.brassStroke(opacity: 0.95))
     }
+
+    private func underlineX(itemWidth: CGFloat) -> CGFloat {
+        CGFloat(selectedTab.rawValue) * itemWidth + (itemWidth - underlineWidth) / 2
+    }
+
+    /// Vertical position of the underline. Tuned to sit just below
+    /// the icon row and just above the label. The constant is
+    /// stable across iPhone sizes because the tab cell's content
+    /// metrics (icon ~17pt, spacing 8pt) don't scale with width.
+    private var underlineY: CGFloat {
+        // Icon (17pt) + half of the 8pt VStack spacing + small
+        // optical adjustment so the underline reads as separating
+        // the icon from the label, not as belonging to either.
+        17 + 4
+    }
+
+    // MARK: - Drag gesture
 
     private func dragGesture(itemWidth: CGFloat) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .local)
@@ -170,10 +229,6 @@ struct CustomTabBar: View {
         }
     }
 
-    private func selectedCapsuleX(itemWidth: CGFloat) -> CGFloat {
-        CGFloat(selectedTab.rawValue) * itemWidth + IhsanSpacing.xs
-    }
-
     private func rubberBandedOffset(_ translation: CGFloat, itemWidth: CGFloat) -> CGFloat {
         let minOffset: CGFloat = selectedTab.rawValue > 0 ? -itemWidth : 0
         let maxOffset: CGFloat = selectedTab.rawValue < Tab.allCases.count - 1 ? itemWidth : 0
@@ -208,5 +263,5 @@ struct CustomTabBar: View {
             .padding()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }
