@@ -7,6 +7,7 @@ struct TodayHeroSection: View {
     let snapshot: TodayState.Snapshot
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.timeOfDayOverride) private var timeOverride
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
@@ -15,6 +16,11 @@ struct TodayHeroSection: View {
             let countdown = formatted(seconds: remaining)
             let spokenCountdown = spokenCountdown(seconds: remaining)
             let countingDownToIftar = isCountingDownToIftar(at: context.date)
+            // Source the tint from the same Date that the glass material
+            // uses, so the digit glow, divider, and label colour all sit
+            // in the same chromatic key as the surface they live on.
+            let tintReferenceDate = timeOverride ?? context.date
+            let tint = IhsanColor.adaptiveTint(at: tintReferenceDate)
 
             VStack(spacing: IhsanSpacing.md) {
                 HStack(spacing: IhsanSpacing.sm) {
@@ -42,6 +48,19 @@ struct TodayHeroSection: View {
                     }
                 }
 
+                // Thin tinted hairline separating the prayer name from
+                // the countdown. The line is the adaptive tint at 30%
+                // opacity, with a softer gradient at the ends so it
+                // doesn't read as a hard border.
+                LinearGradient(
+                    colors: [.clear, tint.opacity(0.30), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .frame(height: IhsanSpacing.hairline)
+                .frame(maxWidth: 220)
+                .accessibilityHidden(true)
+
                 Text(countdown)
                     .font(IhsanFont.heroCountdown)
                     .foregroundStyle(IhsanColor.textPrimary)
@@ -54,11 +73,18 @@ struct TodayHeroSection: View {
                     .contentTransition(.numericText())
                     .animation(reduceMotion ? nil : .snappy(duration: 0.25),
                                value: remaining)
+                    // Soft luminous halo behind the digits. The same tint
+                    // that colours the glass surface here radiates from
+                    // the numbers — the hero card reads as a vessel
+                    // catching the light of the hour rather than a
+                    // surface displaying a number.
+                    .shadow(color: tint.opacity(0.55), radius: 12, x: 0, y: 0)
+                    .shadow(color: tint.opacity(0.30), radius: 24, x: 0, y: 0)
                     .accessibilityLabel(accessibilityLabel(for: spokenCountdown, at: context.date))
 
                 Text(effectiveLabel(at: context.date).uppercased())
                     .font(IhsanFont.smallCaps)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .foregroundStyle(tint.opacity(0.65))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, IhsanSpacing.lg)
