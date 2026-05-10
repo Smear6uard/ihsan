@@ -77,22 +77,40 @@ private struct PrayerRowComposable: View {
     @State private var showingActionDialog = false
 
     var body: some View {
+        // The foreground colours track the warm card material — dark ink
+        // during the day, bone cream at night — so every text element on
+        // the row stays WCAG AA against the surface it sits on at every
+        // hour. The same `foreground` is threaded into StatusPill and
+        // the two toggles so the whole row reads in one chromatic key.
+        let now = Date.now
+        let foreground = IhsanColor.cardForegroundPrimary(at: now)
+        let foregroundSecondary = IhsanColor.cardForegroundSecondary(at: now)
+        let foregroundMuted = IhsanColor.cardForegroundMuted(at: now)
+        let prayerSymbolColor = isActive
+            ? IhsanColor.accentWarm(at: now)
+            : foregroundSecondary
+
         HStack(spacing: IhsanSpacing.md) {
-            PrayerSymbol(prayer, size: 22)
-                .frame(width: 28)
+            PrayerSymbol(
+                prayer,
+                size: 22,
+                tint: prayerSymbolColor,
+                weight: isActive ? .semibold : .regular
+            )
+            .frame(width: 28)
 
             VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
                 HStack(spacing: IhsanSpacing.sm) {
                     Text(prayer.displayNameEnglish)
                         .font(IhsanFont.bodyEnglishBold)
-                        .foregroundStyle(isActive ? IhsanColor.textPrimary : IhsanColor.textPrimary.opacity(0.85))
+                        .foregroundStyle(isActive ? foreground : foreground.opacity(0.88))
                     Text(prayer.displayNameArabic)
                         .font(IhsanFont.bodyArabic)
-                        .foregroundStyle(IhsanColor.textSecondary)
+                        .foregroundStyle(foregroundSecondary)
                 }
                 Text(scheduledTime, format: .dateTime.hour().minute())
                     .font(IhsanFont.tabular)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .foregroundStyle(foregroundMuted)
             }
 
             Spacer(minLength: IhsanSpacing.sm)
@@ -100,7 +118,7 @@ private struct PrayerRowComposable: View {
             Button {
                 showingActionDialog = true
             } label: {
-                statusContent
+                statusContent(foreground: foreground)
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
@@ -108,20 +126,22 @@ private struct PrayerRowComposable: View {
             AdhanMuteToggle(
                 adhanEnabled: .constant(adhanEnabled),
                 accessibilityPrayerName: prayer.displayNameEnglish,
-                onToggle: { onToggleAdhan() }
+                onToggle: { onToggleAdhan() },
+                tint: foreground
             )
             .accessibilityHidden(true)
 
             JamaahToggle(
                 isJamaah: .constant(isJamaah),
-                onToggle: { onToggleJamaah() }
+                onToggle: { onToggleJamaah() },
+                tint: foreground
             )
             .accessibilityHidden(true)
         }
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm)
         .frame(minHeight: IhsanSpacing.prayerRowHeight)
-        .ihsanGlass(intensity: isActive ? .hero : .regular, isActive: isActive)
+        .ihsanWarmCard(intensity: isActive ? .hero : .regular, isActive: isActive)
         .confirmationDialog(
             prayer.displayNameEnglish,
             isPresented: $showingActionDialog,
@@ -156,14 +176,17 @@ private struct PrayerRowComposable: View {
     }
 
     /// Status pill / placeholder, with a subtle scale + opacity beat on
-    /// status change so the pill never hard-cuts to a new colour.
+    /// status change so the pill never hard-cuts to a new colour. The
+    /// `foreground` colour flows from the row's surrounding warm card
+    /// material — passing it into `StatusPill` keeps the pill's text
+    /// rebased on dark ink during the day and bone cream at night.
     @ViewBuilder
-    private var statusContent: some View {
+    private func statusContent(foreground: Color) -> some View {
         Group {
             if let status {
-                StatusPill(status)
+                StatusPill(status, foreground: foreground)
             } else {
-                StatusPlaceholder()
+                StatusPlaceholder(foreground: foreground)
             }
         }
         .modifier(StatusPillBeat(trigger: status, reduceMotion: reduceMotion))
@@ -256,6 +279,8 @@ private struct StatusPillBeat: ViewModifier {
 }
 
 private struct StatusPlaceholder: View {
+    let foreground: Color
+
     var body: some View {
         HStack(spacing: IhsanSpacing.xs) {
             Image(systemName: "circle.dashed")
@@ -263,14 +288,14 @@ private struct StatusPlaceholder: View {
             Text("Log")
                 .font(IhsanFont.smallCaps)
         }
-        .foregroundStyle(IhsanColor.textMuted)
+        .foregroundStyle(foreground.opacity(0.55))
         .padding(.horizontal, IhsanSpacing.sm + 2)
         .padding(.vertical, IhsanSpacing.xs + 2)
         .background {
             Capsule()
                 .fill(.ultraThinMaterial)
                 .overlay {
-                    Capsule().strokeBorder(IhsanColor.atmospheric, lineWidth: 0.5)
+                    Capsule().strokeBorder(foreground.opacity(0.22), lineWidth: 0.5)
                 }
         }
     }

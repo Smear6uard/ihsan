@@ -12,17 +12,20 @@ public struct AdhanMuteToggle: View {
     @Binding public var adhanEnabled: Bool
     public var onToggle: (() -> Void)?
     public var accessibilityPrayerName: String
+    public var tint: Color?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         adhanEnabled: Binding<Bool>,
         accessibilityPrayerName: String,
-        onToggle: (() -> Void)? = nil
+        onToggle: (() -> Void)? = nil,
+        tint: Color? = nil
     ) {
         self._adhanEnabled = adhanEnabled
         self.accessibilityPrayerName = accessibilityPrayerName
         self.onToggle = onToggle
+        self.tint = tint
     }
 
     public var body: some View {
@@ -40,9 +43,7 @@ public struct AdhanMuteToggle: View {
                   ? "speaker.wave.2.fill"
                   : "speaker.slash.fill")
                 .font(.system(size: 15, weight: .medium))
-                .foregroundStyle(
-                    adhanEnabled ? IhsanColor.textSecondary : IhsanColor.textMuted
-                )
+                .foregroundStyle(iconColor)
                 .frame(width: 32, height: 32)
                 .background {
                     RoundedRectangle(cornerRadius: 8, style: .continuous)
@@ -58,6 +59,13 @@ public struct AdhanMuteToggle: View {
         .accessibilityValue(adhanEnabled ? "On" : "Muted")
         .accessibilityHint("Toggles whether the call to prayer recording plays for \(accessibilityPrayerName)")
         .accessibilityAddTraits(.isButton)
+    }
+
+    private var iconColor: Color {
+        if let tint {
+            return adhanEnabled ? tint.opacity(0.78) : tint.opacity(0.42)
+        }
+        return adhanEnabled ? IhsanColor.textSecondary : IhsanColor.textMuted
     }
 }
 

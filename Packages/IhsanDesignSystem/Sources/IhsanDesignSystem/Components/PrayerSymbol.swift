@@ -7,16 +7,25 @@ import IhsanCore
 public struct PrayerSymbol: View {
     public let prayer: Prayer
     public let size: CGFloat
+    public let tint: Color?
+    public let weight: Font.Weight
 
-    public init(_ prayer: Prayer, size: CGFloat = 22) {
+    public init(
+        _ prayer: Prayer,
+        size: CGFloat = 22,
+        tint: Color? = nil,
+        weight: Font.Weight = .regular
+    ) {
         self.prayer = prayer
         self.size = size
+        self.tint = tint
+        self.weight = weight
     }
 
     public var body: some View {
         Image(systemName: symbolName)
-            .font(.system(size: size, weight: .regular))
-            .foregroundStyle(IhsanColor.textSecondary)
+            .font(.system(size: size, weight: weight))
+            .foregroundStyle(tint ?? IhsanColor.textSecondary)
             .accessibilityHidden(true)
     }
 

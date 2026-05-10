@@ -11,16 +11,21 @@ struct SuhoorIftarBanner: View {
             let remaining = max(0, suhoorEnd.timeIntervalSince(context.date))
 
             if remaining > 0 {
+                let now = context.date
+                let foreground = IhsanColor.cardForegroundPrimary(at: now)
+                let foregroundSecondary = IhsanColor.cardForegroundSecondary(at: now)
+                let accent = IhsanColor.accentWarm(at: now)
+
                 HStack(spacing: IhsanSpacing.md) {
                     VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
                         Text("Suhoor ends in")
                             .font(IhsanFont.smallCaps)
-                            .foregroundStyle(IhsanColor.textSecondary)
+                            .foregroundStyle(foregroundSecondary)
 
                         Text(formatted(seconds: remaining))
                             .font(.system(size: 30, weight: .light, design: .rounded))
                             .monospacedDigit()
-                            .foregroundStyle(IhsanColor.textPrimary)
+                            .foregroundStyle(foreground)
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                             .contentTransition(.numericText())
@@ -32,22 +37,22 @@ struct SuhoorIftarBanner: View {
 
                     Text("Fajr")
                         .font(IhsanFont.smallCaps)
-                        .foregroundStyle(IhsanColor.textMuted)
+                        .foregroundStyle(foreground.opacity(0.88))
                         .padding(.horizontal, IhsanSpacing.sm + 2)
                         .padding(.vertical, IhsanSpacing.xs + 2)
                         .background {
                             Capsule()
-                                .fill(IhsanColor.textPrimary.opacity(0.07))
+                                .fill(accent.opacity(0.18))
                                 .overlay {
                                     Capsule()
-                                        .strokeBorder(IhsanColor.atmospheric, lineWidth: 0.5)
+                                        .strokeBorder(accent.opacity(0.55), lineWidth: 0.6)
                                 }
                         }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, IhsanSpacing.md)
                 .padding(.horizontal, IhsanSpacing.md)
-                .ihsanGlassHero()
+                .ihsanWarmCardHero()
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("\(spokenCountdown(seconds: remaining)) until suhoor ends at Fajr")
             }
