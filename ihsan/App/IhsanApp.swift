@@ -3,6 +3,7 @@ import SwiftData
 import IhsanCore
 import IhsanIntents
 import IhsanLocation
+import IhsanNotifications
 
 @main
 struct IhsanApp: App {
@@ -21,6 +22,12 @@ struct IhsanApp: App {
                 fatalError("Failed to create in-memory ModelContainer: \(error)")
             }
         }
+
+        #if canImport(ActivityKit) && os(iOS)
+        Task {
+            await NotificationScheduler.shared.setPrayerActivityScheduler(PrayerActivityScheduler.shared)
+        }
+        #endif
     }
 
     var body: some Scene {
@@ -50,11 +57,13 @@ struct IhsanApp: App {
 private struct RootGate: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var allSettings: [UserSettings]
+    @Query(sort: \PrayerLog.loggedAt) private var prayerLogs: [PrayerLog]
 
     /// True until SwiftData publishes the singleton settings row. Used
     /// to suppress a one-frame flash of onboarding on cold launches
     /// where the existing user already finished setup.
     @State private var didResolveInitialSettings = false
+    @State private var observedLiveActivityLogIDs: Set<UUID> = []
 
     var body: some View {
         ZStack {
@@ -69,6 +78,11 @@ private struct RootGate: View {
             ensureSingletonExists()
             didResolveInitialSettings = true
         }
+        #if canImport(ActivityKit) && os(iOS)
+        .task(id: liveActivityLogSignature) {
+            await endLiveActivitiesForNewLogs()
+        }
+        #endif
     }
 
     /// Driven by the persisted flag. Setter is a no-op because the
@@ -87,6 +101,12 @@ private struct RootGate: View {
         allSettings.first?.hasCompletedOnboarding ?? false
     }
 
+    private var liveActivityLogSignature: String {
+        prayerLogs
+            .map { "\($0.id.uuidString):\($0.modifiedAt.timeIntervalSince1970)" }
+            .joined(separator: "|")
+    }
+
     /// SwiftData lazily creates the UserSettings singleton when first
     /// fetched. We force that read on launch so the `@Query` above
     /// resolves before we make a gate decision; otherwise the empty
@@ -103,4 +123,20 @@ private struct RootGate: View {
             // install.
         }
     }
+
+    #if canImport(ActivityKit) && os(iOS)
+    private func endLiveActivitiesForNewLogs() async {
+        for log in prayerLogs where !observedLiveActivityLogIDs.contains(log.id) {
+            observedLiveActivityLogIDs.insert(log.id)
+            guard let prayer = log.prayer else {
+                continue
+            }
+            await PrayerActivityScheduler.shared.endActivity(
+                for: prayer,
+                on: log.prayerDate,
+                reason: .logged
+            )
+        }
+    }
+    #endif
 }

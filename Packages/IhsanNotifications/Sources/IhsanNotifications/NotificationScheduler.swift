@@ -83,6 +83,26 @@ public protocol NotificationSettingsProviding: Sendable {
     func currentNotificationSettings() async throws -> NotificationScheduleSettings
 }
 
+public protocol PrayerActivityScheduling: Sendable {
+    func schedulePrayerActivityStart(
+        for prayerTime: PrayerTime,
+        in dayTimes: DayPrayerTimes,
+        startDate: Date
+    ) async throws
+}
+
+public struct NoOpPrayerActivityScheduler: PrayerActivityScheduling {
+    public init() {}
+
+    public func schedulePrayerActivityStart(
+        for prayerTime: PrayerTime,
+        in dayTimes: DayPrayerTimes,
+        startDate: Date
+    ) async throws {
+        _ = (prayerTime, dayTimes, startDate)
+    }
+}
+
 public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProviding {
     public init() {}
 
@@ -108,6 +128,7 @@ public actor NotificationScheduler {
     private let locationProvider: any LocationProviding
     private let settingsProvider: any NotificationSettingsProviding
     private let notificationCenter: any UserNotificationScheduling
+    private var prayerActivityScheduler: any PrayerActivityScheduling
     private let now: @Sendable () -> Date
     private let soundFileResolver: AdhanSoundFileResolver
     private let logger = Logger(subsystem: "com.sameerstudios.ihsan", category: "NotificationScheduler")
@@ -122,6 +143,7 @@ public actor NotificationScheduler {
             locationProvider: locationProvider,
             settingsProvider: settingsProvider,
             notificationCenter: SystemUserNotificationCenter(center: .current()),
+            prayerActivityScheduler: NoOpPrayerActivityScheduler(),
             now: { Date() },
             soundFileResolver: .mainBundle
         )
@@ -132,6 +154,7 @@ public actor NotificationScheduler {
         locationProvider: any LocationProviding,
         settingsProvider: any NotificationSettingsProviding,
         notificationCenter: any UserNotificationScheduling,
+        prayerActivityScheduler: any PrayerActivityScheduling = NoOpPrayerActivityScheduler(),
         now: @escaping @Sendable () -> Date,
         soundFileResolver: AdhanSoundFileResolver
     ) {
@@ -139,8 +162,13 @@ public actor NotificationScheduler {
         self.locationProvider = locationProvider
         self.settingsProvider = settingsProvider
         self.notificationCenter = notificationCenter
+        self.prayerActivityScheduler = prayerActivityScheduler
         self.now = now
         self.soundFileResolver = soundFileResolver
+    }
+
+    public func setPrayerActivityScheduler(_ scheduler: any PrayerActivityScheduling) {
+        prayerActivityScheduler = scheduler
     }
 
     @discardableResult
@@ -185,6 +213,21 @@ public actor NotificationScheduler {
                 }
 
                 let notificationDate = prayerTime.scheduledTime.addingTimeInterval(TimeInterval(-preference.leadTimeSeconds))
+                let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(-3_600)
+                if activityStartDate > referenceDate {
+                    try await prayerActivityScheduler.schedulePrayerActivityStart(
+                        for: prayerTime,
+                        in: day,
+                        startDate: activityStartDate
+                    )
+                } else if prayerTime.scheduledTime.addingTimeInterval(30 * 60) > referenceDate {
+                    try await prayerActivityScheduler.schedulePrayerActivityStart(
+                        for: prayerTime,
+                        in: day,
+                        startDate: activityStartDate
+                    )
+                }
+
                 guard notificationDate > referenceDate else {
                     continue
                 }

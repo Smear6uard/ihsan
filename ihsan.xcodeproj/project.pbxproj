@@ -13,11 +13,13 @@
 		428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED42FAF30000097E665 /* IhsanLocation */; };
 		428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED72FAF30000097E665 /* IhsanDesignSystem */; };
 		428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEE12FAF30000097E665 /* IhsanFiqhConfig */; };
+		4F4A1C2044EF273BD83594AD /* IhsanNotifications in Frameworks */ = {isa = PBXBuildFile; productRef = 013613F2DD60853016B1DAFC /* IhsanNotifications */; };
 		4F1D5E1100000000000000B1 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C1 /* IhsanCore */; };
 		4F1D5E1100000000000000B2 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C2 /* IhsanPrayerTimes */; };
 		4F1D5E1100000000000000B3 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C3 /* IhsanIntents */; };
 		4F1D5E1100000000000000B4 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C4 /* IhsanDesignSystem */; };
 		4F1D5E1100000000000000B5 /* ihsanWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4F1D5E1100000000000000A1 /* ihsanWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		5C12E844E98374F64FD0A1BA /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B251AD43FD8E68139A77692A /* ActivityKit.framework */; };
 		5A00000000000000000B0001 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0001 /* IhsanCore */; };
 		5A00000000000000000B0002 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0002 /* IhsanPrayerTimes */; };
 		5A00000000000000000B0003 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0003 /* IhsanIntents */; };
@@ -29,6 +31,8 @@
 		6B00000000000000000B0003 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0003 /* IhsanLocation */; };
 		6B00000000000000000B0004 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0004 /* IhsanDesignSystem */; };
 		6B00000000000000000B0005 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0005 /* IhsanIntents */; };
+		ADC19F43D9CC99D8E04A514D /* PrayerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1C02685A2B52C41F7FC2B4 /* PrayerActivityAttributes.swift */; };
+		E1861EED40D9A99C7BFE9DB2 /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B251AD43FD8E68139A77692A /* ActivityKit.framework */; };
 		7C00000000000000000D0001 /* ihsanWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A00000000000000000A0002 /* ihsanWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7C00000000000000000E0001 /* ihsanWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6B00000000000000000A0002 /* ihsanWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
@@ -113,11 +117,16 @@
 		4F1D5E1100000000000000A1 /* ihsanWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ihsanWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		5A00000000000000000A0002 /* ihsanWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ihsanWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6B00000000000000000A0002 /* ihsanWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ihsanWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC1C02685A2B52C41F7FC2B4 /* PrayerActivityAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ihsanWidgets/LiveActivities/PrayerActivityAttributes.swift; sourceTree = "<group>"; };
+		B251AD43FD8E68139A77692A /* ActivityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ActivityKit.framework; path = System/Library/Frameworks/ActivityKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		428FEE9F2FAF234A0097E665 /* ihsan */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				EE86F7A60B09F5D533D6DEF5 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
 			explicitFileTypes = {
 			};
 			explicitFolders = (
@@ -166,6 +175,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		EE86F7A60B09F5D533D6DEF5 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ihsan.entitlements,
+			);
+			target = 428FEE9C2FAF234A0097E665 /* ihsan */;
+		};
 		4F1D5E1100000000000000A8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
@@ -203,6 +219,8 @@
 				428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */,
 				428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */,
 				428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */,
+				4F4A1C2044EF273BD83594AD /* IhsanNotifications in Frameworks */,
+				E1861EED40D9A99C7BFE9DB2 /* ActivityKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -228,6 +246,7 @@
 				4F1D5E1100000000000000B2 /* IhsanPrayerTimes in Frameworks */,
 				4F1D5E1100000000000000B3 /* IhsanIntents in Frameworks */,
 				4F1D5E1100000000000000B4 /* IhsanDesignSystem in Frameworks */,
+				5C12E844E98374F64FD0A1BA /* ActivityKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -315,6 +334,7 @@
 				428FEED42FAF30000097E665 /* IhsanLocation */,
 				428FEED72FAF30000097E665 /* IhsanDesignSystem */,
 				428FEEE12FAF30000097E665 /* IhsanFiqhConfig */,
+				013613F2DD60853016B1DAFC /* IhsanNotifications */,
 			);
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
@@ -459,9 +479,6 @@
 				LastSwiftUpdateCheck = 2640;
 				LastUpgradeCheck = 2640;
 				TargetAttributes = {
-					428FEE9C2FAF234A0097E665 = {
-						CreatedOnToolsVersion = 26.4.1;
-					};
 					428FEEA92FAF234C0097E665 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 428FEE9C2FAF234A0097E665;
@@ -472,6 +489,14 @@
 					};
 					4F1D5E1100000000000000A3 = {
 						CreatedOnToolsVersion = 26.4.1;
+					};
+					428FEE9C2FAF234A0097E665 = {
+						CreatedOnToolsVersion = 26.4.1;
+						SystemCapabilities = {
+							com.apple.Push = {
+								enabled = 1;
+							};
+						};
 					};
 					5A00000000000000000A0001 = {
 						CreatedOnToolsVersion = 26.4.1;
@@ -497,6 +522,7 @@
 				428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */,
 				428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */,
 				428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */,
+				30F1FBBCA800318839855141 /* XCLocalSwiftPackageReference "Packages/IhsanNotifications" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428FEE9E2FAF234A0097E665 /* Products */;
@@ -563,6 +589,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				ADC19F43D9CC99D8E04A514D /* PrayerActivityAttributes.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -754,6 +781,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsan/ihsan.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5L4XYK45U6;
@@ -765,6 +793,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Ihsan transcribes voice reflections on-device using Apple's Speech framework. No audio leaves your phone.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -801,6 +830,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsan/ihsan.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 5L4XYK45U6;
@@ -812,6 +842,7 @@
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
 				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared.";
 				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Ihsan transcribes voice reflections on-device using Apple's Speech framework. No audio leaves your phone.";
+				INFOPLIST_KEY_NSSupportsLiveActivities = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -1252,9 +1283,18 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/IhsanFiqhConfig;
 		};
+		30F1FBBCA800318839855141 /* XCLocalSwiftPackageReference "Packages/IhsanNotifications" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanNotifications;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		013613F2DD60853016B1DAFC /* IhsanNotifications */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 30F1FBBCA800318839855141 /* XCLocalSwiftPackageReference "Packages/IhsanNotifications" */;
+			productName = IhsanNotifications;
+		};
 		428FEEC82FAF30000097E665 /* IhsanPrayerTimes */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */;
