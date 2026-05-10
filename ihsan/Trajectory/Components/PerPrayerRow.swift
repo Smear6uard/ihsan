@@ -11,18 +11,18 @@ struct PerPrayerRow: View {
 
     var body: some View {
         HStack(spacing: IhsanSpacing.md) {
-            PrayerSymbol(aggregate.prayer, size: 20)
+            PrayerSymbol(aggregate.prayer, size: 20, tint: IhsanColor.brass.opacity(0.80))
                 .frame(width: 28)
 
             HStack(spacing: IhsanSpacing.sm) {
                 Text(aggregate.prayer.displayNameEnglish)
-                    .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .font(IhsanFont.rowPrayerName)
+                    .foregroundStyle(IhsanColor.inkDeep)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                 Text(aggregate.prayer.displayNameArabic)
-                    .font(.system(size: 15))
-                    .foregroundStyle(IhsanColor.textSecondary)
+                    .font(IhsanFont.bodyArabic)
+                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -33,7 +33,7 @@ struct PerPrayerRow: View {
 
             Text("\(aggregate.onTimeCount)/\(aggregate.totalActiveDays)")
                 .font(IhsanFont.tabular)
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(IhsanColor.brassDark)
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
@@ -42,7 +42,7 @@ struct PerPrayerRow: View {
         }
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm + 2)
-        .ihsanGlass(intensity: .subtle)
+        .ihsanIlluminatedPanel(intensity: .prayerRow)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(aggregate.prayer.displayNameEnglish): "
@@ -72,11 +72,11 @@ struct PerPrayerRow: View {
                 ForEach(Array(trimmed.enumerated()), id: \.offset) { _, fraction in
                     if let f = fraction {
                         Circle()
-                            .fill(IhsanColor.textPrimary.opacity(0.15 + f * 0.85))
+                            .fill(IhsanColor.brass.opacity(0.25 + f * 0.65))
                             .frame(width: dotSize, height: dotSize)
                     } else {
                         Rectangle()
-                            .fill(IhsanColor.textMuted.opacity(0.4))
+                            .fill(IhsanColor.brassDark.opacity(0.40))
                             .frame(width: dotSize * 0.7, height: 1.5)
                             .frame(width: dotSize, height: dotSize)
                     }

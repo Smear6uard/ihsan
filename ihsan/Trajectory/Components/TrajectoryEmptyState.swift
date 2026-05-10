@@ -7,24 +7,26 @@ import IhsanDesignSystem
 struct TrajectoryEmptyState: View {
     var body: some View {
         VStack(spacing: IhsanSpacing.lg) {
-            Image(systemName: "chart.dots.scatter")
-                .font(.system(size: 56, weight: .light))
-                .foregroundStyle(IhsanColor.textMuted)
+            FourPointedStar()
+                .fill(IhsanColor.brass.opacity(0.55))
+                .frame(width: 36, height: 36)
                 .accessibilityHidden(true)
 
             VStack(spacing: IhsanSpacing.sm) {
                 Text("Begin your record.")
-                    .font(IhsanFont.subtitle)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .font(.system(size: 24, weight: .medium, design: .serif))
+                    .foregroundStyle(IhsanColor.inkDeep)
                 Text("Log your first prayer on the Today screen to start your trajectory.")
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.textSecondary)
+                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, IhsanSpacing.xl)
             }
         }
-        .padding()
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(IhsanSpacing.xl)
+        .frame(maxWidth: .infinity)
+        .ihsanIlluminatedPanel(intensity: .regular)
+        .padding(.horizontal, IhsanSpacing.md)
         .accessibilityElement(children: .combine)
     }
 }

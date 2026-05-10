@@ -23,6 +23,11 @@ struct TrajectoryAggregate: Equatable, Sendable {
     let missedCount: Int
     let qadaCount: Int
 
+    /// Number of prayers within the period that were logged with
+    /// `withJamaah = true`. Surfaces on the SummaryStatsPanel as the
+    /// "JAMAʿAH" headline metric over `totalPossible`.
+    let jamaahCount: Int
+
     let perPrayer: [PrayerAggregate]
 
     struct PrayerAggregate: Equatable, Sendable {

@@ -19,13 +19,13 @@ struct InsightCard: View {
         if isAppleIntelligenceAvailable {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 Text("REFLECTIONS THIS PERIOD")
-                    .font(IhsanFont.smallCaps)
-                    .tracking(0.8)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.8)
+                    .foregroundStyle(IhsanColor.brassDark)
 
                 Text(generatedSummary)
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .foregroundStyle(IhsanColor.inkDeep)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -33,14 +33,14 @@ struct InsightCard: View {
                     Image(systemName: "cpu")
                         .font(.system(size: 10, weight: .semibold))
                     Text("GENERATED ON-DEVICE")
-                        .font(IhsanFont.smallCaps)
-                        .tracking(0.8)
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
                 }
-                .foregroundStyle(IhsanColor.textMuted.opacity(0.7))
+                .foregroundStyle(IhsanColor.brassDark.opacity(0.70))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(IhsanSpacing.lg)
-            .ihsanGlass(intensity: .regular)
+            .ihsanIlluminatedPanel(intensity: .regular)
         }
     }
 

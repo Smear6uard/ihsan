@@ -73,6 +73,7 @@ enum TrajectoryAggregator {
         var onTime = 0
         var late = 0
         var missed = 0
+        var jamaah = 0
         for day in activeDays {
             for completion in day.prayerCompletions {
                 switch completion.status {
@@ -80,6 +81,9 @@ enum TrajectoryAggregator {
                 case .late: late += 1
                 case .missed: missed += 1
                 case .qada, .none: break
+                }
+                if completion.withJamaah && completion.status != nil {
+                    jamaah += 1
                 }
             }
         }
@@ -135,6 +139,7 @@ enum TrajectoryAggregator {
             lateCount: late,
             missedCount: missed,
             qadaCount: qadaCount,
+            jamaahCount: jamaah,
             perPrayer: perPrayer
         )
     }

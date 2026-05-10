@@ -1,13 +1,15 @@
 import SwiftUI
 import IhsanDesignSystem
 
-/// 7D / 30D / 90D / Year segmented control. Same visual language as
-/// `RadiusSelector` on the masjid finder — a quiet capsule of ultra-thin
-/// material so it can sit above the heatmap without competing with it.
+/// 7D / 30D / 90D / Year segmented control. Restyled as a small caps
+/// inscription strip with a brass underline marking the selected
+/// option — sits above the grid like a marginal note in a manuscript
+/// rather than as a standalone control element.
 struct PeriodSelector: View {
     @Binding var period: TrajectoryPeriod
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Namespace private var underlineNamespace
 
     var body: some View {
         HStack(spacing: 0) {
@@ -19,37 +21,34 @@ struct PeriodSelector: View {
                         period = option
                     }
                 } label: {
-                    Text(option.label)
-                        .font(IhsanFont.smallCaps)
-                        .tracking(0.8)
-                        .foregroundStyle(
-                            period == option
-                                ? IhsanColor.textPrimary
-                                : IhsanColor.textMuted
-                        )
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, IhsanSpacing.sm)
-                        .background {
-                            if period == option {
-                                Capsule()
-                                    .fill(IhsanColor.textPrimary.opacity(0.12))
-                            }
+                    VStack(spacing: 6) {
+                        Text(option.label.uppercased())
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                            .foregroundStyle(
+                                period == option
+                                    ? IhsanColor.brass
+                                    : IhsanColor.brassDark.opacity(0.50)
+                            )
+
+                        if period == option {
+                            Capsule()
+                                .fill(IhsanIridescence.brassStroke(opacity: 0.95))
+                                .frame(width: 18, height: 1.5)
+                                .matchedGeometryEffect(id: "underline", in: underlineNamespace)
+                        } else {
+                            Color.clear.frame(height: 1.5)
                         }
-                        .contentShape(Capsule())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, IhsanSpacing.sm)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("\(option.label) period")
                 .accessibilityAddTraits(period == option ? [.isSelected] : [])
             }
         }
-        .padding(IhsanSpacing.xs)
-        .background {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule()
-                        .strokeBorder(IhsanColor.atmospheric, lineWidth: 0.5)
-                }
-        }
+        .padding(.horizontal, IhsanSpacing.xs)
     }
 }
