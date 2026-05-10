@@ -12,6 +12,7 @@
 		428FEED02FAF30000097E665 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED12FAF30000097E665 /* IhsanIntents */; };
 		428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED42FAF30000097E665 /* IhsanLocation */; };
 		428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED72FAF30000097E665 /* IhsanDesignSystem */; };
+		428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEE12FAF30000097E665 /* IhsanFiqhConfig */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -65,6 +66,7 @@
 				428FEED02FAF30000097E665 /* IhsanIntents in Frameworks */,
 				428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */,
 				428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */,
+				428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -130,6 +132,7 @@
 				428FEED12FAF30000097E665 /* IhsanIntents */,
 				428FEED42FAF30000097E665 /* IhsanLocation */,
 				428FEED72FAF30000097E665 /* IhsanDesignSystem */,
+				428FEEE12FAF30000097E665 /* IhsanFiqhConfig */,
 			);
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
@@ -219,6 +222,7 @@
 				428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */,
 				428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */,
 				428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */,
+				428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428FEE9E2FAF234A0097E665 /* Products */;
@@ -664,6 +668,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/IhsanDesignSystem;
 		};
+		428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanFiqhConfig;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -691,6 +699,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */;
 			productName = IhsanDesignSystem;
+		};
+		428FEEE12FAF30000097E665 /* IhsanFiqhConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */;
+			productName = IhsanFiqhConfig;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

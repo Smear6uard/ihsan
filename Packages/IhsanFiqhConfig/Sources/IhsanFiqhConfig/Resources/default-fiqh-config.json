@@ -1,0 +1,156 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "2026-05-09.001",
+  "locale": "en",
+  "prompts": [
+    {
+      "id": "umar-muhasaba-001",
+      "promptEn": "Take account of yourself today, before you are taken to account.",
+      "citationEn": "Athar from 'Umar ibn al-Khattab (RA); cited by al-Ghazali in Ihya 'Ulum al-Din, Book 38",
+      "category": "muhasaba",
+      "timeOfDay": "night",
+      "weight": 1.2,
+      "isActive": true
+    },
+    {
+      "id": "ghazali-ihya-38-001",
+      "promptEn": "Looking back at your day — what helped you turn toward Allah, and what pulled you away?",
+      "citationEn": "al-Ghazali, Ihya 'Ulum al-Din, Book 38 (Kitab al-Muraqaba wa al-Muhasaba)",
+      "category": "muhasaba",
+      "timeOfDay": "night",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "bukhari-consistency-001",
+      "promptEn": "Which small, consistent act today brought you closer to Allah?",
+      "citationEn": "Hadith: 'The most beloved deeds to Allah are the most consistent, even if small.' (Bukhari 6464, Muslim 782 — narrated by 'A'isha RA)",
+      "category": "muhasaba",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "bukhari-niyyah-001",
+      "promptEn": "Of the actions you performed today, which were truly for Allah's sake?",
+      "citationEn": "Hadith: 'Actions are but by intentions.' (Bukhari 1, Muslim 1907 — narrated by 'Umar ibn al-Khattab RA)",
+      "category": "muhasaba",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "ibn-qayyim-madarij-001",
+      "promptEn": "Was your prayer today a conversation, or a recitation? What changed in your heart as you stood?",
+      "citationEn": "Theme from Ibn al-Qayyim, Madarij al-Salikin (on the station of khushu')",
+      "category": "presence",
+      "timeOfDay": "night",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "bukhari-dhikr-001",
+      "promptEn": "When did you remember Allah today without anyone reminding you?",
+      "citationEn": "Hadith: 'The example of one who remembers his Lord and one who does not is like the living and the dead.' (Bukhari 6407 — narrated by Abu Musa al-Ash'ari RA)",
+      "category": "presence",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "quran-14-7-001",
+      "promptEn": "Name three blessings from today that you would have missed if you hadn't paused to notice them.",
+      "citationEn": "Qur'an 14:7 — 'If you are grateful, I will surely increase you.'",
+      "category": "gratitude",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "muslim-suhayb-001",
+      "promptEn": "Where did good come to you today? Where did difficulty come? Did your response in each match the believer's standard?",
+      "citationEn": "Hadith: 'Wonderful is the affair of the believer — when good befalls him he is grateful; when harm befalls him he is patient. All of it is good for him.' (Muslim 2999 — narrated by Suhayb RA)",
+      "category": "gratitude",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "quran-65-3-001",
+      "promptEn": "What worry did you carry today that, if you had truly relied on Allah, you could have set down?",
+      "citationEn": "Qur'an 65:3 — 'And whoever relies upon Allah, He is sufficient for him.'",
+      "category": "reliance",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "bukhari-tawbah-001",
+      "promptEn": "Is there something from today you would not want recorded against you? Turn to Allah now, while the day is still close.",
+      "citationEn": "Hadith: 'Allah rejoices more over the repentance of His servant than one of you would over finding his lost camel in the desert.' (Bukhari 6309, Muslim 2747 — narrated by Anas RA)",
+      "category": "repentance",
+      "timeOfDay": "night",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "ghazali-tawbah-001",
+      "promptEn": "What habit have you tried to leave before? What would it take, today, to leave it once more?",
+      "citationEn": "al-Ghazali, Ihya 'Ulum al-Din, Book 31 (Kitab al-Tawbah)",
+      "category": "repentance",
+      "weight": 0.9,
+      "isActive": true
+    },
+    {
+      "id": "quran-2-153-001",
+      "promptEn": "Where did you reach the edge of your patience today? What carried you across?",
+      "citationEn": "Qur'an 2:153 — 'Seek help in patience and prayer; truly Allah is with the patient.'",
+      "category": "patience",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "last-third-descent-001",
+      "promptEn": "In this last third of the night, what would you ask of your Lord that you have not yet asked?",
+      "citationEn": "Hadith Qudsi: 'Our Lord descends each night to the lowest heaven when the last third of the night remains, saying: Who is calling on Me, that I may answer him?' (Bukhari 1145, Muslim 758 — narrated by Abu Hurayra RA)",
+      "category": "presence",
+      "timeOfDay": "lastThird",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "ghazali-tafakkur-001",
+      "promptEn": "Sit a moment with one moment from today. What was Allah teaching you in it?",
+      "citationEn": "al-Ghazali, Ihya 'Ulum al-Din, Book 39 (Kitab al-Tafakkur)",
+      "category": "muhasaba",
+      "timeOfDay": "night",
+      "weight": 1.0,
+      "isActive": true
+    },
+    {
+      "id": "hadith-qudsi-thinks-of-me-001",
+      "promptEn": "How did you think of Allah today? Did you think of Him as near, or as distant?",
+      "citationEn": "Hadith Qudsi: 'I am as My servant thinks of Me, and I am with him when he remembers Me.' (Bukhari 7405, Muslim 2675 — narrated by Abu Hurayra RA)",
+      "category": "general",
+      "timeOfDay": "night",
+      "weight": 1.0,
+      "isActive": true
+    }
+  ],
+  "framing": {
+    "onTimeLabel": "On Time",
+    "lateLabel": "Late",
+    "missedLabel": "Missed",
+    "qadaLabel": "Qada",
+    "pauseModeTitle": "Pause",
+    "pauseModeDescription": "Excludes days from your trajectory analytics. The app does not ask why — pause mode is for any time prayer is excused or you simply need a quiet space.",
+    "travelModeTitle": "Travel",
+    "travelModeDescription": "Marks days as travel days. Prayer is still expected (qasr or jam' permitting); this just notes that you were traveling.",
+    "reflectionEmptyTitle": "Begin your record.",
+    "reflectionEmptySubtitle": "Today's prompt is above. Write or speak whatever comes to mind. Past entries appear here.",
+    "trajectoryEmptyTitle": "Begin your record.",
+    "trajectoryEmptySubtitle": "Log your first prayer on the Today screen to start your trajectory."
+  },
+  "thresholds": {
+    "lateDefinitionDescription": "A prayer is 'late' when it is performed after the preferred (mustahab) time but still within the valid time window. Ihsan does not enforce a specific threshold — you classify your own prayer based on your own honest assessment.",
+    "autoLateSuggestionEnabled": false,
+    "autoLateThresholdSeconds": 0,
+    "pauseMinimumDays": 0,
+    "witrTrackingAvailable": false,
+    "learningModeAvailable": false
+  }
+}
