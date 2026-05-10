@@ -1,4 +1,5 @@
 import Foundation
+import IhsanCore
 
 public actor FiqhConfigService {
     public static let shared = FiqhConfigService()
@@ -14,6 +15,10 @@ public actor FiqhConfigService {
     private var didStartBackgroundRefresh = false
 
     public init() {}
+
+    init(initialConfig: FiqhConfig) {
+        self.loadedConfig = initialConfig
+    }
 
     public func currentConfig() throws -> FiqhConfig {
         if let loaded = loadedConfig {
@@ -181,10 +186,17 @@ public actor FiqhConfigService {
 
     public func prompt(
         for date: Date,
-        timeOfDay: PromptTimeOfDay? = nil
+        timeOfDay: PromptTimeOfDay? = nil,
+        hijriCalendar: Calendar = RamadanContext.currentHijriCalendar
     ) throws -> ReflectionPrompt {
         let config = try currentConfig()
-        let activePrompts = config.prompts.filter(\.isActive)
+        let isRamadan = RamadanContext.isCurrentlyRamadan(
+            at: date,
+            calendar: hijriCalendar
+        )
+        let activePrompts = config.prompts.filter { prompt in
+            prompt.isActive && (isRamadan || !prompt.ramadanOnly)
+        }
 
         let candidates: [ReflectionPrompt]
         if let requested = timeOfDay {

@@ -15,5 +15,22 @@ enum TodayState {
         let nextPrayerTime: PrayerTime
         let isWithinFajrToSunriseWindow: Bool
         let activePrayer: Prayer?
+        let ramadanContext: RamadanContext
+
+        var isCurrentlyRamadan: Bool {
+            ramadanContext.isCurrentlyRamadan
+        }
+
+        var isWithinSuhoorWindow: Bool {
+            isCurrentlyRamadan
+                && nextPrayerTime.prayer == .fajr
+                && !isWithinFajrToSunriseWindow
+        }
+
+        var isCountingDownToIftar: Bool {
+            isCurrentlyRamadan
+                && nextPrayerTime.prayer == .maghrib
+                && !isWithinFajrToSunriseWindow
+        }
     }
 }

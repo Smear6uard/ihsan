@@ -145,6 +145,10 @@ private struct TodayReadyView: View {
                     masjidAction: onMasjids
                 )
 
+                if snapshot.isWithinSuhoorWindow {
+                    SuhoorIftarBanner(suhoorEnd: snapshot.nextPrayerTime.scheduledTime)
+                }
+
                 TodayHeroSection(snapshot: snapshot)
 
                 TodayPrayerList(
