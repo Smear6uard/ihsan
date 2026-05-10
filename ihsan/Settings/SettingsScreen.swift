@@ -1,0 +1,1242 @@
+import SwiftUI
+import SwiftData
+import UIKit
+import UserNotifications
+import IhsanCore
+import IhsanDesignSystem
+import IhsanFiqhConfig
+import IhsanLocation
+import IhsanPrayerTimes
+
+@MainActor
+struct SettingsScreen: View {
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.openURL) private var openURL
+
+    @Query private var settingsRows: [UserSettings]
+    @Query(sort: \PauseInterval.startDate, order: .reverse) private var pauses: [PauseInterval]
+    @Query(sort: \TravelInterval.startDate, order: .reverse) private var travels: [TravelInterval]
+    @Query(sort: \PrayerLog.prayerDate, order: .reverse) private var prayerLogs: [PrayerLog]
+    @Query(sort: \Reflection.forDate, order: .reverse) private var reflections: [Reflection]
+
+    @State private var path: [SettingsRoute] = []
+    @State private var latestPlace: LocatedPlace?
+    @State private var refreshMessage: String?
+    @State private var pauseDescription = ""
+    @State private var travelDescription = ""
+    @State private var confirmingPauseEnable = false
+    @State private var confirmingTravelEnable = false
+    @State private var confirmingDeleteAllData = false
+    @State private var exportItem: ExportItem?
+    @State private var exportError: String?
+
+    #if DEBUG
+    @State private var showingCoordinates = false
+    #endif
+
+    private let locationCoordinator = CoreLocationCoordinator.shared
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            ZStack {
+                IhsanColor.ground.ignoresSafeArea()
+
+                ScrollView {
+                    VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                        header
+
+                        if let settings {
+                            LocationSection(
+                                settings: settings,
+                                latestPlace: latestPlace,
+                                refreshMessage: refreshMessage,
+                                onCityTap: showCoordinatesIfAvailable,
+                                onAutomaticLocationChanged: setAutomaticLocationUpdates(_:for:),
+                                onRefresh: { refreshLocation(for: settings) }
+                            )
+
+                            CalculationSection(settings: settings, path: $path)
+                            MadhabSection(settings: settings, path: $path)
+                            HighLatitudeSection(settings: settings, path: $path)
+                            NotificationsSection(settings: settings, path: $path, onToggleNotifications: setNotificationsEnabled(_:for:))
+                            PauseModeSection(
+                                activePause: activePause,
+                                description: pauseDescription,
+                                onToggle: handlePauseToggle(_:)
+                            )
+                            TravelModeSection(
+                                activeTravel: activeTravel,
+                                description: travelDescription,
+                                path: $path,
+                                onToggle: handleTravelToggle(_:)
+                            )
+                            DisplaySection(settings: settings, path: $path)
+                            ReflectionSyncSection(settings: settings)
+                            PrivacySection(
+                                onExport: exportData,
+                                onDelete: { confirmingDeleteAllData = true }
+                            )
+                            AboutSection(openURL: openURL)
+                        } else {
+                            ProgressView()
+                                .tint(IhsanColor.textSecondary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.top, IhsanSpacing.xxl)
+                        }
+
+                        Color.clear.frame(height: IhsanSpacing.xl)
+                    }
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.md)
+                }
+            }
+            .navigationDestination(for: SettingsRoute.self) { route in
+                if let settings {
+                    destination(for: route, settings: settings)
+                }
+            }
+            .navigationTitle("Settings")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .task {
+            bootstrapSettings()
+            latestPlace = locationCoordinator.mostRecentResolvedPlace()
+            await loadFiqhFraming()
+        }
+        .confirmationDialog(
+            "Pause prayer tracking?",
+            isPresented: $confirmingPauseEnable,
+            titleVisibility: .visible
+        ) {
+            Button("Enable Pause Mode") { createPauseInterval() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Ihsan will mark this period as paused until you turn Pause Mode off.")
+        }
+        .confirmationDialog(
+            "Enable Travel Mode?",
+            isPresented: $confirmingTravelEnable,
+            titleVisibility: .visible
+        ) {
+            Button("Enable Travel Mode") { createTravelInterval() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Ihsan will mark this period as travel until you turn Travel Mode off.")
+        }
+        .confirmationDialog(
+            "Delete all Ihsan data?",
+            isPresented: $confirmingDeleteAllData,
+            titleVisibility: .visible
+        ) {
+            Button("Delete All Data", role: .destructive, action: deleteAllData)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This removes prayer logs, reflections, pause and travel intervals, summaries, and settings from this device.")
+        }
+        .sheet(item: $exportItem) { item in
+            ActivityView(activityItems: [item.url])
+                .presentationDetents([.medium, .large])
+        }
+        .alert("Export failed", isPresented: Binding(
+            get: { exportError != nil },
+            set: { if !$0 { exportError = nil } }
+        )) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(exportError ?? "")
+        }
+        #if DEBUG
+        .sheet(isPresented: $showingCoordinates) {
+            CoordinatesDebugSheet(place: latestPlace)
+                .presentationDetents([.medium])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(IhsanColor.ground)
+        }
+        #endif
+    }
+
+    private var settings: UserSettings? {
+        settingsRows.first
+    }
+
+    private var activePause: PauseInterval? {
+        pauses.first(where: \.isActive)
+    }
+
+    private var activeTravel: TravelInterval? {
+        travels.first(where: \.isActive)
+    }
+
+    private var header: some View {
+        Text("Settings")
+            .font(IhsanFont.title)
+            .foregroundStyle(IhsanColor.textPrimary)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    @ViewBuilder
+    private func destination(for route: SettingsRoute, settings: UserSettings) -> some View {
+        switch route {
+        case .calculationMethod:
+            CalculationMethodPicker(settings: settings)
+        case .madhab:
+            MadhabPicker(settings: settings)
+        case .highLatitudeRule:
+            HighLatitudeRulePicker(settings: settings)
+        case .adhanSound:
+            AdhanSoundPicker()
+        case .jamPolicy:
+            if let activeTravel {
+                JamPolicyPicker(travel: activeTravel)
+            }
+        case .theme:
+            ThemePicker(settings: settings)
+        }
+    }
+
+    private func bootstrapSettings() {
+        do {
+            _ = try UserSettings.fetchOrCreate(in: modelContext)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+
+    private func loadFiqhFraming() async {
+        do {
+            let framing = try await FiqhConfigService.shared.currentConfig().framing
+            pauseDescription = framing.pauseModeDescription
+            travelDescription = framing.travelModeDescription
+        } catch {
+            pauseDescription = "Pause Mode keeps a period out of prayer-log expectations. Ihsan does not ask why."
+            travelDescription = "Travel Mode marks a travel period and exposes jam and qasr controls."
+        }
+    }
+
+    private func showCoordinatesIfAvailable() {
+        #if DEBUG
+        showingCoordinates = true
+        #endif
+    }
+
+    private func setAutomaticLocationUpdates(_ isEnabled: Bool, for settings: UserSettings) {
+        settings.automaticLocationUpdatesEnabled = isEnabled
+        settings.modifiedAt = .now
+        Task {
+            do {
+                if isEnabled {
+                    _ = try await locationCoordinator.requestAlwaysAuthorization()
+                    try await locationCoordinator.startMonitoringSignificantChanges()
+                    refreshMessage = "Automatic updates enabled"
+                } else {
+                    await locationCoordinator.stopMonitoringSignificantChanges()
+                    refreshMessage = "Automatic updates disabled"
+                }
+            } catch let error as LocationError {
+                refreshMessage = error.userFacingMessage
+            } catch {
+                refreshMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func refreshLocation(for settings: UserSettings) {
+        refreshMessage = "Refreshing location..."
+        Task {
+            do {
+                _ = try await locationCoordinator.requestWhenInUseAuthorization()
+                let place = try await locationCoordinator.currentPlace(timeout: 12, staleAfter: 0)
+                latestPlace = place
+                settings.lastResolvedCityName = place.cityName
+                settings.lastResolvedCountryCode = place.countryCode
+                settings.modifiedAt = .now
+                refreshMessage = "Location refreshed"
+            } catch let error as LocationError {
+                refreshMessage = error.userFacingMessage
+            } catch {
+                refreshMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private func setNotificationsEnabled(_ isEnabled: Bool, for settings: UserSettings) {
+        settings.notificationsEnabled = isEnabled
+        settings.modifiedAt = .now
+        guard isEnabled else { return }
+
+        Task {
+            do {
+                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
+                if !granted {
+                    settings.notificationsEnabled = false
+                    settings.modifiedAt = .now
+                }
+            } catch {
+                settings.notificationsEnabled = false
+                settings.modifiedAt = .now
+            }
+        }
+    }
+
+    private func handlePauseToggle(_ isEnabled: Bool) {
+        if isEnabled {
+            confirmingPauseEnable = true
+        } else {
+            closePauseInterval()
+        }
+    }
+
+    private func createPauseInterval() {
+        guard activePause == nil else { return }
+        let now = Date.now
+        modelContext.insert(PauseInterval(
+            startDate: now,
+            loggedTimeZoneIdentifier: TimeZone.current.identifier,
+            createdAt: now,
+            modifiedAt: now
+        ))
+    }
+
+    private func closePauseInterval() {
+        guard let activePause else { return }
+        let now = Date.now
+        activePause.endDate = now
+        activePause.modifiedAt = now
+    }
+
+    private func handleTravelToggle(_ isEnabled: Bool) {
+        if isEnabled {
+            confirmingTravelEnable = true
+        } else {
+            closeTravelInterval()
+        }
+    }
+
+    private func createTravelInterval() {
+        guard activeTravel == nil else { return }
+        let now = Date.now
+        modelContext.insert(TravelInterval(
+            startDate: now,
+            loggedTimeZoneIdentifier: TimeZone.current.identifier,
+            createdAt: now,
+            modifiedAt: now
+        ))
+    }
+
+    private func closeTravelInterval() {
+        guard let activeTravel else { return }
+        let now = Date.now
+        activeTravel.endDate = now
+        activeTravel.modifiedAt = now
+    }
+
+    private func exportData() {
+        do {
+            let payload = SettingsExportPayload(
+                exportedAt: .now,
+                prayerLogs: prayerLogs.map(ExportPrayerLog.init),
+                reflections: reflections.map(ExportReflection.init)
+            )
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(payload)
+            let url = FileManager.default.temporaryDirectory
+                .appendingPathComponent("ihsan-export-\(Self.exportFilenameDate()).json")
+            try data.write(to: url, options: [.atomic])
+            settings?.lastDataExportAt = .now
+            settings?.modifiedAt = .now
+            exportItem = ExportItem(url: url)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+
+    private func deleteAllData() {
+        do {
+            try deleteAll(PrayerLog.self)
+            try deleteAll(Reflection.self)
+            try deleteAll(DayRecord.self)
+            try deleteAll(PauseInterval.self)
+            try deleteAll(TravelInterval.self)
+            try deleteAll(PeriodSummary.self)
+            try deleteAll(UserSettings.self)
+            _ = try UserSettings.fetchOrCreate(in: modelContext)
+        } catch {
+            exportError = error.localizedDescription
+        }
+    }
+
+    private func deleteAll<T: PersistentModel>(_ type: T.Type) throws {
+        let records = try modelContext.fetch(FetchDescriptor<T>())
+        for record in records {
+            modelContext.delete(record)
+        }
+    }
+
+    private static func exportFilenameDate() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.dateFormat = "yyyyMMdd-HHmmss"
+        return formatter.string(from: .now)
+    }
+}
+
+private enum SettingsRoute: Hashable {
+    case calculationMethod
+    case madhab
+    case highLatitudeRule
+    case adhanSound
+    case jamPolicy
+    case theme
+}
+
+// MARK: - Sections
+
+private struct LocationSection: View {
+    let settings: UserSettings
+    let latestPlace: LocatedPlace?
+    let refreshMessage: String?
+    let onCityTap: () -> Void
+    let onAutomaticLocationChanged: (Bool, UserSettings) -> Void
+    let onRefresh: () -> Void
+
+    var body: some View {
+            SettingsSectionCard("Location") {
+            #if DEBUG
+            SettingsRow(
+                title: currentCityTitle,
+                subtitle: currentCitySubtitle,
+                icon: "location.fill",
+                action: onCityTap
+            ) { EmptyView() }
+            #else
+            SettingsRow(
+                title: currentCityTitle,
+                subtitle: currentCitySubtitle,
+                icon: "location.fill"
+            ) { EmptyView() }
+            #endif
+
+            SettingsRow(title: "Automatic location updates", icon: "location.circle") {
+                Toggle("", isOn: Binding(
+                    get: { settings.automaticLocationUpdatesEnabled },
+                    set: { onAutomaticLocationChanged($0, settings) }
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.textPrimary)
+                .accessibilityLabel("Automatic location updates")
+            }
+
+            SettingsRow(
+                title: "Refresh location now",
+                subtitle: refreshMessage,
+                icon: "location.magnifyingglass",
+                action: onRefresh
+            )
+        }
+    }
+
+    private var currentCityTitle: String {
+        latestPlace?.cityName ?? settings.lastResolvedCityName ?? "Current Location"
+    }
+
+    private var currentCitySubtitle: String {
+        latestPlace?.countryCode ?? settings.lastResolvedCountryCode ?? "City resolves after location refresh"
+    }
+}
+
+private struct CalculationSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        SettingsSectionCard("Calculation Method") {
+            SettingsRow(
+                title: "Current method",
+                subtitle: settings.calculationMethod.settingsDisplayName,
+                icon: "function",
+                action: { path.append(.calculationMethod) }
+            )
+        }
+    }
+}
+
+private struct MadhabSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        SettingsSectionCard("Asr Method") {
+            SettingsRow(
+                title: "Current choice",
+                subtitle: settings.madhab.settingsDisplayName,
+                icon: "book.closed.fill",
+                action: { path.append(.madhab) }
+            )
+        }
+    }
+}
+
+private struct HighLatitudeSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        SettingsSectionCard("High Latitude Rule") {
+            SettingsRow(
+                title: "Current rule",
+                subtitle: settings.highLatitudeRule.settingsDisplayName,
+                icon: "sun.horizon",
+                action: { path.append(.highLatitudeRule) }
+            )
+
+            SettingsDescriptionText("This matters for users above approximately 48 degrees latitude, where twilight can be unusually long or absent in parts of the year.")
+        }
+    }
+}
+
+private struct NotificationsSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+    let onToggleNotifications: (Bool, UserSettings) -> Void
+
+    var body: some View {
+        SettingsSectionCard("Notifications") {
+            SettingsRow(title: "Adhan notifications", icon: "bell.fill") {
+                Toggle("", isOn: Binding(
+                    get: { settings.notificationsEnabled },
+                    set: { onToggleNotifications($0, settings) }
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.textPrimary)
+                .accessibilityLabel("Adhan notifications")
+            }
+
+            if settings.notificationsEnabled {
+                SettingsRow(
+                    title: "Sound",
+                    subtitle: "Default",
+                    icon: "speaker.wave.2.fill",
+                    action: { path.append(.adhanSound) }
+                )
+
+                ForEach(Prayer.allCases, id: \.self) { prayer in
+                    SettingsRow(title: prayer.displayNameEnglish, icon: "clock.badge.checkmark") {
+                        Toggle("", isOn: prayerNotificationBinding(for: prayer))
+                            .labelsHidden()
+                            .tint(IhsanColor.textPrimary)
+                            .accessibilityLabel("\(prayer.displayNameEnglish) notification")
+                    }
+                }
+            }
+        }
+    }
+
+    private func prayerNotificationBinding(for prayer: Prayer) -> Binding<Bool> {
+        Binding(
+            get: {
+                settings.prayerNotificationConfigs.first(where: { $0.prayer == prayer })?.isEnabled ?? true
+            },
+            set: { isEnabled in
+                var configs = settings.prayerNotificationConfigs
+                if let index = configs.firstIndex(where: { $0.prayer == prayer }) {
+                    configs[index].isEnabled = isEnabled
+                } else {
+                    configs.append(PrayerNotificationConfig(prayer: prayer, isEnabled: isEnabled))
+                }
+                settings.prayerNotificationConfigs = configs
+                settings.modifiedAt = .now
+            }
+        )
+    }
+}
+
+private struct PauseModeSection: View {
+    let activePause: PauseInterval?
+    let description: String
+    let onToggle: (Bool) -> Void
+
+    var body: some View {
+        SettingsSectionCard("Pause Mode") {
+            SettingsRow(
+                title: "Status",
+                subtitle: activePause.map { "Active since \($0.startDate.formatted(date: .abbreviated, time: .shortened))" } ?? "Inactive",
+                icon: "pause.circle.fill"
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { activePause != nil },
+                    set: onToggle
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.textPrimary)
+                .accessibilityLabel("Pause Mode")
+            }
+
+            SettingsDescriptionText(description)
+        }
+    }
+}
+
+private struct TravelModeSection: View {
+    let activeTravel: TravelInterval?
+    let description: String
+    @Binding var path: [SettingsRoute]
+    let onToggle: (Bool) -> Void
+
+    var body: some View {
+        SettingsSectionCard("Travel Mode") {
+            SettingsRow(
+                title: "Status",
+                subtitle: activeTravel.map { "Active since \($0.startDate.formatted(date: .abbreviated, time: .shortened))" } ?? "Inactive",
+                icon: "airplane"
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { activeTravel != nil },
+                    set: onToggle
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.textPrimary)
+                .accessibilityLabel("Travel Mode")
+            }
+
+            if let activeTravel {
+                SettingsRow(
+                    title: "Jam policy",
+                    subtitle: activeTravel.jamPolicy.settingsDisplayName,
+                    icon: "arrow.triangle.merge",
+                    action: { path.append(.jamPolicy) }
+                )
+
+                SettingsRow(title: "Qasr enabled", icon: "arrow.down.forward.and.arrow.up.backward") {
+                    Toggle("", isOn: Binding(
+                        get: { activeTravel.qasrEnabled },
+                        set: {
+                            activeTravel.qasrEnabled = $0
+                            activeTravel.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.textPrimary)
+                    .accessibilityLabel("Qasr enabled")
+                }
+            }
+
+            SettingsDescriptionText(description)
+        }
+    }
+}
+
+private struct DisplaySection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        SettingsSectionCard("Display") {
+            SettingsRow(
+                title: "Theme",
+                subtitle: settings.theme.settingsDisplayName,
+                icon: "moon.stars.fill",
+                action: { path.append(.theme) }
+            )
+        }
+    }
+}
+
+private struct ReflectionSyncSection: View {
+    let settings: UserSettings
+
+    var body: some View {
+        SettingsSectionCard("Reflection Sync") {
+            SettingsRow(
+                title: "Sync voice memos via iCloud",
+                subtitle: "Off by default",
+                icon: "icloud.fill"
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { settings.autoSyncAudioMemos },
+                    set: {
+                        settings.autoSyncAudioMemos = $0
+                        settings.modifiedAt = .now
+                    }
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.textPrimary)
+                .accessibilityLabel("Sync voice memos via iCloud")
+            }
+
+            SettingsDescriptionText("Voice recordings stay on this device by default. Enable to sync audio across your Apple devices via iCloud private database.")
+        }
+    }
+}
+
+private struct PrivacySection: View {
+    let onExport: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        SettingsSectionCard("Privacy") {
+            SettingsDescriptionText("Ihsan stores your prayer log on this device and syncs only across your own Apple devices via iCloud private database, end-to-end encrypted by Apple. No analytics, no third-party services, no accounts. Your location is used to calculate prayer times and is never stored — only your city name is saved for display. Voice recordings stay on this device unless you explicitly enable audio sync above.")
+
+            SettingsRow(
+                title: "Export my data",
+                icon: "square.and.arrow.up",
+                action: onExport
+            )
+            .accessibilityHint("Creates a JSON export and opens the share sheet.")
+
+            SettingsRow(
+                title: "Delete all data",
+                icon: "trash",
+                action: onDelete
+            )
+            .accessibilityHint("Opens a confirmation before deleting local Ihsan data.")
+        }
+    }
+}
+
+private struct AboutSection: View {
+    let openURL: OpenURLAction
+
+    var body: some View {
+        SettingsSectionCard("About") {
+            SettingsRow(
+                title: "Version",
+                subtitle: "\(Bundle.main.appVersion) (\(Bundle.main.buildNumber))",
+                icon: "info.circle.fill"
+            ) {
+                EmptyView()
+            }
+            SettingsRow(title: "Photography credits", subtitle: "Sunrise and Maghrib wallpaper sources pending", icon: "camera.fill") { EmptyView() }
+            SettingsRow(title: "Audio credits", subtitle: "Adhan recording credits pending", icon: "waveform") { EmptyView() }
+            SettingsRow(
+                title: "Fiqh content credits",
+                subtitle: "ihsan-fiqh-config public repo",
+                icon: "book.pages.fill",
+                action: { openURL(URL(string: "https://github.com/sameerstudios/ihsan-fiqh-config")!) }
+            )
+            SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", icon: "heart.fill") { EmptyView() }
+            SettingsRow(
+                title: "Privacy policy",
+                subtitle: "Hosted policy URL pending before App Store submission",
+                icon: "lock.shield.fill",
+                action: { openURL(URL(string: "https://sameerstudios.github.io/ihsan/privacy")!) }
+            )
+        }
+    }
+}
+
+// MARK: - Pickers
+
+private struct CalculationMethodPicker: View {
+    let settings: UserSettings
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        PickerScaffold(title: "Calculation Method") {
+            SettingsSectionCard("Automatic") {
+                SettingsRow(
+                    title: "Auto-detect from location",
+                    subtitle: autoDetectSubtitle,
+                    icon: "location.viewfinder",
+                    action: autoDetect
+                )
+            }
+
+            SettingsSectionCard("Methods") {
+                ForEach(CalculationMethodChoice.allCases, id: \.self) { method in
+                    optionRow(
+                        title: method.settingsDisplayName,
+                        subtitle: method.settingsDescription,
+                        isSelected: settings.calculationMethod == method
+                    ) {
+                        settings.calculationMethodRaw = method.rawValue
+                        settings.modifiedAt = .now
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    private var recommendedMethod: CalculationMethodChoice? {
+        settings.lastResolvedCountryCode.map(CalculationMethodChoice.recommendedMethod)
+    }
+
+    private var autoDetectSubtitle: String {
+        guard let countryCode = settings.lastResolvedCountryCode else {
+            return "Refresh location first"
+        }
+        return "\(countryCode.uppercased()) recommends \((recommendedMethod ?? .muslimWorldLeague).settingsDisplayName)"
+    }
+
+    private func autoDetect() {
+        guard let countryCode = settings.lastResolvedCountryCode else { return }
+        settings.calculationMethodRaw = CalculationMethodChoice.recommendedMethod(for: countryCode).rawValue
+        settings.modifiedAt = .now
+        dismiss()
+    }
+}
+
+private struct MadhabPicker: View {
+    let settings: UserSettings
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        PickerScaffold(title: "Asr Method") {
+            SettingsSectionCard("Madhab") {
+                ForEach(MadhabChoice.allCases, id: \.self) { madhab in
+                    optionRow(
+                        title: madhab.settingsDisplayName,
+                        subtitle: madhab.settingsDescription,
+                        isSelected: settings.madhab == madhab
+                    ) {
+                        settings.madhabRaw = madhab.rawValue
+                        settings.modifiedAt = .now
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct HighLatitudeRulePicker: View {
+    let settings: UserSettings
+    @Environment(\.dismiss) private var dismiss
+
+    private let rules: [HighLatitudeRule] = [.middleOfNight, .oneSeventh, .angleBased]
+
+    var body: some View {
+        PickerScaffold(title: "High Latitude Rule") {
+            SettingsSectionCard("Rule") {
+                SettingsDescriptionText("This matters for users above approximately 48 degrees latitude.")
+
+                ForEach(rules, id: \.self) { rule in
+                    optionRow(
+                        title: rule.settingsDisplayName,
+                        subtitle: rule.settingsDescription,
+                        isSelected: settings.highLatitudeRule == rule
+                    ) {
+                        settings.highLatitudeRuleRaw = rule.rawValue
+                        settings.modifiedAt = .now
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct AdhanSoundPicker: View {
+    private let options = [
+        "Default",
+        "Adhan Standard",
+        "Adhan Fajr-aware",
+        "Tone Only"
+    ]
+
+    var body: some View {
+        PickerScaffold(title: "Adhan Sound") {
+            SettingsSectionCard("Sound") {
+                ForEach(options, id: \.self) { option in
+                    SettingsRow(title: option, subtitle: "Sound switching lands with notification scheduling", icon: "speaker.wave.2.fill") {
+                        EmptyView()
+                    }
+                    .accessibilityHint("This option is visible but not active yet.")
+                }
+            }
+        }
+    }
+}
+
+private struct JamPolicyPicker: View {
+    let travel: TravelInterval
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        PickerScaffold(title: "Jam Policy") {
+            SettingsSectionCard("Travel") {
+                ForEach(JamPolicy.allCases, id: \.self) { policy in
+                    optionRow(
+                        title: policy.settingsDisplayName,
+                        subtitle: policy.settingsDescription,
+                        isSelected: travel.jamPolicy == policy
+                    ) {
+                        travel.jamPolicyRaw = policy.rawValue
+                        travel.modifiedAt = .now
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ThemePicker: View {
+    let settings: UserSettings
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        PickerScaffold(title: "Theme") {
+            SettingsSectionCard("Display") {
+                optionRow(
+                    title: "Always Dark",
+                    subtitle: "Default for v1",
+                    isSelected: settings.theme == .dark
+                ) {
+                    settings.themeRaw = ThemePreference.dark.rawValue
+                    settings.modifiedAt = .now
+                    dismiss()
+                }
+
+                optionRow(
+                    title: "System",
+                    subtitle: "Light mode experimentation is planned for v1.1",
+                    isSelected: settings.theme == .auto
+                ) {
+                    // v1 intentionally renders dark even when System is selected;
+                    // light mode support is a v1.1 rendering project.
+                    settings.themeRaw = ThemePreference.auto.rawValue
+                    settings.modifiedAt = .now
+                    dismiss()
+                }
+            }
+        }
+    }
+}
+
+private struct PickerScaffold<Content: View>: View {
+    let title: String
+    let content: Content
+
+    init(title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        ZStack {
+            IhsanColor.ground.ignoresSafeArea()
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                    content
+                    Color.clear.frame(height: IhsanSpacing.xl)
+                }
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.top, IhsanSpacing.md)
+            }
+        }
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private func optionRow(
+    title: String,
+    subtitle: String,
+    isSelected: Bool,
+    action: @escaping () -> Void
+) -> some View {
+    SettingsRow(title: title, subtitle: subtitle, icon: isSelected ? "checkmark.circle.fill" : "circle", action: action) {
+        EmptyView()
+    }
+    .accessibilityHint(isSelected ? "Selected" : "Double tap to select")
+}
+
+#if DEBUG
+private struct CoordinatesDebugSheet: View {
+    let place: LocatedPlace?
+
+    var body: some View {
+        ZStack {
+            IhsanColor.ground.ignoresSafeArea()
+            GlassCard {
+                VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+                    SectionHeader("Coordinates")
+                    SettingsDescriptionText(coordinatesText)
+                    SettingsDescriptionText("Coordinates are shown for debugging only and are not stored.")
+                }
+            }
+            .padding(IhsanSpacing.md)
+        }
+    }
+
+    private var coordinatesText: String {
+        guard let place else {
+            return "No resolved location is cached yet."
+        }
+        return "Latitude \(place.coordinates.latitude), longitude \(place.coordinates.longitude). Resolved at \(place.timestamp.formatted(date: .abbreviated, time: .standard))."
+    }
+}
+#endif
+
+private struct ActivityView: UIViewControllerRepresentable {
+    let activityItems: [Any]
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: activityItems, applicationActivities: nil)
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+private struct ExportItem: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+// MARK: - Export payload
+
+private struct SettingsExportPayload: Codable {
+    let exportedAt: Date
+    let prayerLogs: [ExportPrayerLog]
+    let reflections: [ExportReflection]
+}
+
+private struct ExportPrayerLog: Codable {
+    let id: UUID
+    let prayer: String
+    let prayerDate: Date
+    let loggedTimeZoneIdentifier: String
+    let scheduledTime: Date
+    let prayedAt: Date?
+    let loggedAt: Date
+    let status: String
+    let lateBySeconds: Int?
+    let withJamaah: Bool
+    let jamaahLocation: String?
+    let prayerVariant: String
+    let combinedWithPrayerLogID: UUID?
+    let combinationKind: String?
+    let qadaForPrayerLogID: UUID?
+    let sourceSurface: String
+    let note: String?
+    let createdAt: Date
+    let modifiedAt: Date
+
+    init(_ log: PrayerLog) {
+        id = log.id
+        prayer = log.prayerRaw
+        prayerDate = log.prayerDate
+        loggedTimeZoneIdentifier = log.loggedTimeZoneIdentifier
+        scheduledTime = log.scheduledTime
+        prayedAt = log.prayedAt
+        loggedAt = log.loggedAt
+        status = log.statusRaw
+        lateBySeconds = log.lateBySeconds
+        withJamaah = log.withJamaah
+        jamaahLocation = log.jamaahLocationRaw
+        prayerVariant = log.prayerVariantRaw
+        combinedWithPrayerLogID = log.combinedWithPrayerLogID
+        combinationKind = log.combinationKindRaw
+        qadaForPrayerLogID = log.qadaForPrayerLogID
+        sourceSurface = log.sourceSurface
+        note = log.note
+        createdAt = log.createdAt
+        modifiedAt = log.modifiedAt
+    }
+}
+
+private struct ExportReflection: Codable {
+    let id: UUID
+    let kind: String
+    let forDate: Date
+    let loggedTimeZoneIdentifier: String
+    let promptText: String?
+    let promptCitation: String?
+    let typedText: String?
+    let transcript: String?
+    let voiceMemoID: UUID?
+    let aiSummaryTitle: String?
+    let aiTagsJSON: String?
+    let aiGeneratedAt: Date?
+    let aiModelVersion: String?
+    let linkedPrayerLogID: UUID?
+    let wordCount: Int?
+    let createdAt: Date
+    let modifiedAt: Date
+
+    init(_ reflection: Reflection) {
+        id = reflection.id
+        kind = reflection.kindRaw
+        forDate = reflection.forDate
+        loggedTimeZoneIdentifier = reflection.loggedTimeZoneIdentifier
+        promptText = reflection.promptText
+        promptCitation = reflection.promptCitation
+        typedText = reflection.typedText
+        transcript = reflection.transcript
+        voiceMemoID = reflection.voiceMemoID
+        aiSummaryTitle = reflection.aiSummaryTitle
+        aiTagsJSON = reflection.aiTagsJSON
+        aiGeneratedAt = reflection.aiGeneratedAt
+        aiModelVersion = reflection.aiModelVersion
+        linkedPrayerLogID = reflection.linkedPrayerLogID
+        wordCount = reflection.wordCount
+        createdAt = reflection.createdAt
+        modifiedAt = reflection.modifiedAt
+    }
+}
+
+// MARK: - Display helpers
+
+private extension UserSettings {
+    var prayerNotificationConfigs: [PrayerNotificationConfig] {
+        get {
+            guard let data = prayerNotificationsConfigJSON.data(using: .utf8),
+                  let configs = try? JSONDecoder().decode([PrayerNotificationConfig].self, from: data)
+            else {
+                return Prayer.allCases.map { PrayerNotificationConfig(prayer: $0) }
+            }
+            return configs
+        }
+        set {
+            guard let data = try? JSONEncoder().encode(newValue),
+                  let json = String(data: data, encoding: .utf8)
+            else { return }
+            prayerNotificationsConfigJSON = json
+        }
+    }
+}
+
+private extension CalculationMethodChoice {
+    var settingsDisplayName: String {
+        switch self {
+        case .muslimWorldLeague: "MWL"
+        case .isna: "ISNA"
+        case .egyptian: "Egyptian"
+        case .ummAlQura: "Umm al-Qura"
+        case .karachi: "Karachi"
+        case .dubai: "Dubai"
+        case .qatar: "Qatar"
+        case .kuwait: "Kuwait"
+        case .singapore: "Singapore"
+        case .tehran: "Tehran"
+        case .jafari: "Jafari"
+        case .moonsightingCommittee: "Moonsighting Committee"
+        case .northAmerica: "North America"
+        case .turkey: "Turkey"
+        case .other: "Other"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .muslimWorldLeague: "Worldwide default"
+        case .isna: "North America"
+        case .egyptian: "Egypt and parts of Africa"
+        case .ummAlQura: "Saudi Arabia and Gulf"
+        case .karachi: "South Asia"
+        case .dubai: "United Arab Emirates"
+        case .qatar: "Qatar"
+        case .kuwait: "Kuwait"
+        case .singapore: "Singapore and nearby regions"
+        case .tehran: "Iran"
+        case .jafari: "Shia Ithna Ashari communities"
+        case .moonsightingCommittee: "Moonsighting Committee settings"
+        case .northAmerica: "North America calculation profile"
+        case .turkey: "Turkey"
+        case .other: "Custom or unsupported method"
+        }
+    }
+
+    nonisolated static func recommendedMethod(for countryCode: String) -> CalculationMethodChoice {
+        switch countryCode.uppercased() {
+        case "US", "CA":
+            return .isna
+        case "SA", "AE", "QA", "KW", "BH", "OM":
+            return .ummAlQura
+        case "GB", "IE":
+            return .muslimWorldLeague
+        case "PK", "IN", "BD", "LK":
+            return .karachi
+        case "EG":
+            return .egyptian
+        case "SG", "MY", "ID", "BN":
+            return .singapore
+        case "TR":
+            return .turkey
+        case "IR":
+            return .tehran
+        default:
+            return .muslimWorldLeague
+        }
+    }
+}
+
+private extension MadhabChoice {
+    var settingsDisplayName: String {
+        switch self {
+        case .standard: "Standard"
+        case .hanafi: "Hanafi"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .standard: "Asr begins when an object's shadow equals its length. Used by Shafi'i, Maliki, Hanbali."
+        case .hanafi: "Asr begins when shadow equals twice the object's length."
+        }
+    }
+}
+
+private extension HighLatitudeRule {
+    var settingsDisplayName: String {
+        switch self {
+        case .middleOfNight: "Middle of Night"
+        case .oneSeventh: "One Seventh"
+        case .angleBased: "Angle Based"
+        case .twilightAngle: "Twilight Angle"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .middleOfNight: "Splits the night in half for affected prayers."
+        case .oneSeventh: "Uses one seventh of the night."
+        case .angleBased: "Uses the prayer angle as a proportion of the night."
+        case .twilightAngle: "Legacy twilight-angle handling."
+        }
+    }
+}
+
+private extension JamPolicy {
+    var settingsDisplayName: String {
+        switch self {
+        case .none: "None"
+        case .taqdim: "Taqdim"
+        case .takhir: "Takhir"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .none: "Do not combine prayers automatically."
+        case .taqdim: "Combine into the earlier prayer window."
+        case .takhir: "Combine into the later prayer window."
+        }
+    }
+}
+
+private extension ThemePreference {
+    var settingsDisplayName: String {
+        switch self {
+        case .auto: "System"
+        case .dark: "Always Dark"
+        case .light: "System"
+        }
+    }
+}
+
+private extension Bundle {
+    var appVersion: String {
+        object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+    }
+
+    var buildNumber: String {
+        object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+    }
+}

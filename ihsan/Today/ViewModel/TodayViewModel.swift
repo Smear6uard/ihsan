@@ -42,8 +42,13 @@ final class TodayViewModel {
             settings = try UserSettings.fetchOrCreate(in: modelContext)
             try await refreshSnapshot()
 
-            try await locationProvider.startMonitoringSignificantChanges()
-            startObservingLocationChanges()
+            if settings?.automaticLocationUpdatesEnabled == true {
+                try await locationProvider.startMonitoringSignificantChanges()
+                startObservingLocationChanges()
+            } else {
+                await locationProvider.stopMonitoringSignificantChanges()
+                significantChangesTask?.cancel()
+            }
         } catch let error as LocationError {
             state = .error(error.userFacingMessage)
         } catch {
@@ -59,6 +64,9 @@ final class TodayViewModel {
 
         let place = try await locationProvider.currentPlace()
         let now = Date.now
+        settings.lastResolvedCityName = place.cityName
+        settings.lastResolvedCountryCode = place.countryCode
+        settings.modifiedAt = now
 
         let dayTimes = try prayerTimesProvider.dayTimes(
             for: now,

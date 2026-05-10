@@ -25,7 +25,7 @@ struct RootTabView: View {
                 .tabItem { Label("Reflection", systemImage: "book.closed") }
                 .tag(Tab.reflection)
 
-            ComingSoonScreen(title: "Settings")
+            SettingsScreen()
                 .tabItem { Label("Settings", systemImage: "gearshape") }
                 .tag(Tab.settings)
         }
