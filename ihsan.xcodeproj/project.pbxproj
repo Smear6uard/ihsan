@@ -13,6 +13,11 @@
 		428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED42FAF30000097E665 /* IhsanLocation */; };
 		428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED72FAF30000097E665 /* IhsanDesignSystem */; };
 		428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEE12FAF30000097E665 /* IhsanFiqhConfig */; };
+		4F1D5E1100000000000000B1 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C1 /* IhsanCore */; };
+		4F1D5E1100000000000000B2 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C2 /* IhsanPrayerTimes */; };
+		4F1D5E1100000000000000B3 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C3 /* IhsanIntents */; };
+		4F1D5E1100000000000000B4 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 4F1D5E1100000000000000C4 /* IhsanDesignSystem */; };
+		4F1D5E1100000000000000B5 /* ihsanWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 4F1D5E1100000000000000A1 /* ihsanWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,12 +35,33 @@
 			remoteGlobalIDString = 428FEE9C2FAF234A0097E665;
 			remoteInfo = ihsan;
 		};
+		4F1D5E1100000000000000D1 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 428FEE952FAF234A0097E665 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 4F1D5E1100000000000000A3;
+			remoteInfo = ihsanWidgets;
+		};
 /* End PBXContainerItemProxy section */
+/* Begin PBXCopyFilesBuildPhase section */
+		4F1D5E1100000000000000A7 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				4F1D5E1100000000000000B5 /* ihsanWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		428FEE9D2FAF234A0097E665 /* ihsan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ihsan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		428FEEAA2FAF234C0097E665 /* ihsanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ihsanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		428FEEB42FAF234C0097E665 /* ihsanUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ihsanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4F1D5E1100000000000000A1 /* ihsanWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ihsanWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -54,7 +80,30 @@
 			path = ihsanUITests;
 			sourceTree = "<group>";
 		};
+		4F1D5E1100000000000000A2 /* ihsanWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4F1D5E1100000000000000A8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
+			explicitFileTypes = {
+			};
+			explicitFolders = (
+			);
+			path = ihsanWidgets;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		4F1D5E1100000000000000A8 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				ihsanWidgets.entitlements,
+			);
+			target = 4F1D5E1100000000000000A3 /* ihsanWidgets */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		428FEE9A2FAF234A0097E665 /* Frameworks */ = {
@@ -84,6 +133,17 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F1D5E1100000000000000A5 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4F1D5E1100000000000000B1 /* IhsanCore in Frameworks */,
+				4F1D5E1100000000000000B2 /* IhsanPrayerTimes in Frameworks */,
+				4F1D5E1100000000000000B3 /* IhsanIntents in Frameworks */,
+				4F1D5E1100000000000000B4 /* IhsanDesignSystem in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +151,7 @@
 			isa = PBXGroup;
 			children = (
 				428FEE9F2FAF234A0097E665 /* ihsan */,
+				4F1D5E1100000000000000A2 /* ihsanWidgets */,
 				428FEEAD2FAF234C0097E665 /* ihsanTests */,
 				428FEEB72FAF234C0097E665 /* ihsanUITests */,
 				428FEE9E2FAF234A0097E665 /* Products */,
@@ -103,6 +164,7 @@
 				428FEE9D2FAF234A0097E665 /* ihsan.app */,
 				428FEEAA2FAF234C0097E665 /* ihsanTests.xctest */,
 				428FEEB42FAF234C0097E665 /* ihsanUITests.xctest */,
+				4F1D5E1100000000000000A1 /* ihsanWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,10 +179,12 @@
 				428FEE992FAF234A0097E665 /* Sources */,
 				428FEE9A2FAF234A0097E665 /* Frameworks */,
 				428FEE9B2FAF234A0097E665 /* Resources */,
+				4F1D5E1100000000000000A7 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				4F1D5E1100000000000000D2 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				428FEE9F2FAF234A0097E665 /* ihsan */,
@@ -137,6 +201,32 @@
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
 			productType = "com.apple.product-type.application";
+		};
+		4F1D5E1100000000000000A3 /* ihsanWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 4F1D5E1100000000000000D3 /* Build configuration list for PBXNativeTarget "ihsanWidgets" */;
+			buildPhases = (
+				4F1D5E1100000000000000A4 /* Sources */,
+				4F1D5E1100000000000000A5 /* Frameworks */,
+				4F1D5E1100000000000000A6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				4F1D5E1100000000000000A2 /* ihsanWidgets */,
+			);
+			name = ihsanWidgets;
+			packageProductDependencies = (
+				4F1D5E1100000000000000C1 /* IhsanCore */,
+				4F1D5E1100000000000000C2 /* IhsanPrayerTimes */,
+				4F1D5E1100000000000000C3 /* IhsanIntents */,
+				4F1D5E1100000000000000C4 /* IhsanDesignSystem */,
+			);
+			productName = ihsanWidgets;
+			productReference = 4F1D5E1100000000000000A1 /* ihsanWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 		428FEEA92FAF234C0097E665 /* ihsanTests */ = {
 			isa = PBXNativeTarget;
@@ -205,6 +295,9 @@
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 428FEE9C2FAF234A0097E665;
 					};
+					4F1D5E1100000000000000A3 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
 				};
 			};
 			buildConfigurationList = 428FEE982FAF234A0097E665 /* Build configuration list for PBXProject "ihsan" */;
@@ -230,6 +323,7 @@
 			projectRoot = "";
 			targets = (
 				428FEE9C2FAF234A0097E665 /* ihsan */,
+				4F1D5E1100000000000000A3 /* ihsanWidgets */,
 				428FEEA92FAF234C0097E665 /* ihsanTests */,
 				428FEEB32FAF234C0097E665 /* ihsanUITests */,
 			);
@@ -252,6 +346,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		428FEEB22FAF234C0097E665 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4F1D5E1100000000000000A6 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -282,6 +383,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4F1D5E1100000000000000A4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -294,6 +402,11 @@
 			isa = PBXTargetDependency;
 			target = 428FEE9C2FAF234A0097E665 /* ihsan */;
 			targetProxy = 428FEEB52FAF234C0097E665 /* PBXContainerItemProxy */;
+		};
+		4F1D5E1100000000000000D2 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 4F1D5E1100000000000000A3 /* ihsanWidgets */;
+			targetProxy = 4F1D5E1100000000000000D1 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -610,6 +723,92 @@
 			};
 			name = Release;
 		};
+		4F1D5E1100000000000000D4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWidgets/ihsanWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ihsan;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.3;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		4F1D5E1100000000000000D5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWidgets/ihsanWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Ihsan;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.3;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.widgets;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -645,6 +844,15 @@
 			buildConfigurations = (
 				428FEEC52FAF234C0097E665 /* Debug */,
 				428FEEC62FAF234C0097E665 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		4F1D5E1100000000000000D3 /* Build configuration list for PBXNativeTarget "ihsanWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				4F1D5E1100000000000000D4 /* Debug */,
+				4F1D5E1100000000000000D5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -708,6 +916,26 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */;
 			productName = IhsanFiqhConfig;
+		};
+		4F1D5E1100000000000000C1 /* IhsanCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */;
+			productName = IhsanCore;
+		};
+		4F1D5E1100000000000000C2 /* IhsanPrayerTimes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */;
+			productName = IhsanPrayerTimes;
+		};
+		4F1D5E1100000000000000C3 /* IhsanIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */;
+			productName = IhsanIntents;
+		};
+		4F1D5E1100000000000000C4 /* IhsanDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */;
+			productName = IhsanDesignSystem;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
