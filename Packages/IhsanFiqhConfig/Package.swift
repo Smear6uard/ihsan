@@ -16,9 +16,13 @@ let package = Package(
             targets: ["IhsanFiqhConfig"]
         )
     ],
+    dependencies: [
+        .package(path: "../IhsanCore")
+    ],
     targets: [
         .target(
             name: "IhsanFiqhConfig",
+            dependencies: ["IhsanCore"],
             resources: [
                 .process("Resources")
             ],
@@ -28,7 +32,7 @@ let package = Package(
         ),
         .testTarget(
             name: "IhsanFiqhConfigTests",
-            dependencies: ["IhsanFiqhConfig"],
+            dependencies: ["IhsanFiqhConfig", "IhsanCore"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

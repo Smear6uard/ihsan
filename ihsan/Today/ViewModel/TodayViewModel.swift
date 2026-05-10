@@ -13,6 +13,7 @@ final class TodayViewModel {
 
     private let locationProvider: LocationProviding
     private let prayerTimesProvider: PrayerTimesProviding
+    private let hijriCalendar: Calendar
     private let modelContext: ModelContext
     private var settings: UserSettings?
 
@@ -22,10 +23,12 @@ final class TodayViewModel {
     init(
         locationProvider: LocationProviding = CoreLocationCoordinator.shared,
         prayerTimesProvider: PrayerTimesProviding = AdhanPrayerTimesProvider(),
+        hijriCalendar: Calendar = RamadanContext.currentHijriCalendar,
         modelContext: ModelContext
     ) {
         self.locationProvider = locationProvider
         self.prayerTimesProvider = prayerTimesProvider
+        self.hijriCalendar = hijriCalendar
         self.modelContext = modelContext
     }
 
@@ -98,7 +101,8 @@ final class TodayViewModel {
             dayTimes: dayTimes,
             nextPrayerTime: nextPrayer,
             isWithinFajrToSunriseWindow: isWithinFajrToSunriseWindow(now: now, dayTimes: dayTimes),
-            activePrayer: activePrayer
+            activePrayer: activePrayer,
+            ramadanContext: RamadanContext(at: now, calendar: hijriCalendar)
         ))
     }
 
