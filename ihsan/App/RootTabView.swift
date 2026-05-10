@@ -6,31 +6,24 @@ import IhsanIntents
 struct RootTabView: View {
     @State private var selectedTab: Tab = .today
     @Environment(\.scenePhase) private var scenePhase
-
-    enum Tab: Hashable {
-        case today, trajectory, reflection, settings
-    }
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        TabView(selection: $selectedTab) {
-            TodayScreen()
-                .tabItem { Label("Today", systemImage: "calendar") }
-                .tag(Tab.today)
+        ZStack(alignment: .bottom) {
+            tabContent
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear
+                        .frame(height: IhsanSpacing.tabBarHeight + IhsanSpacing.xl)
+                        .allowsHitTesting(false)
+                }
 
-            TrajectoryScreen()
-                .tabItem { Label("Trajectory", systemImage: "chart.dots.scatter") }
-                .tag(Tab.trajectory)
-
-            ReflectionScreen()
-                .tabItem { Label("Reflection", systemImage: "book.closed") }
-                .tag(Tab.reflection)
-
-            SettingsScreen()
-                .tabItem { Label("Settings", systemImage: "gearshape") }
-                .tag(Tab.settings)
+            CustomTabBar(selectedTab: $selectedTab)
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.bottom, IhsanSpacing.sm)
         }
-        .tint(IhsanColor.textPrimary)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: selectedTab)
         .task {
+            Haptics.prepareAll()
             // Cold-launch: the OpenReflectionIntent has already written
             // a flag into App Group UserDefaults; switch to Reflection
             // before the user sees the default Today tab.
@@ -49,16 +42,30 @@ struct RootTabView: View {
         }
         .onChange(of: scenePhase) { _, newPhase in
             // If the app comes back to foreground because of a Siri /
-            // Shortcut invocation, the flag is already set — re-check.
+            // Shortcut invocation, the flag is already set; re-check.
             if newPhase == .active, hasFreshReflectionDeeplink() {
                 selectedTab = .reflection
             }
         }
     }
 
+    @ViewBuilder
+    private var tabContent: some View {
+        switch selectedTab {
+        case .today:
+            TodayScreen()
+        case .trajectory:
+            TrajectoryScreen()
+        case .reflection:
+            ReflectionScreen()
+        case .settings:
+            SettingsScreen()
+        }
+    }
+
     /// Reads the App Group UserDefaults flag without clearing it. The
     /// Reflection screen is the consumer that clears the flag once it
-    /// has applied input focus — this lets both views observe the same
+    /// has applied input focus; this lets both views observe the same
     /// signal from their respective lifecycles.
     private func hasFreshReflectionDeeplink() -> Bool {
         guard let defaults = UserDefaults(

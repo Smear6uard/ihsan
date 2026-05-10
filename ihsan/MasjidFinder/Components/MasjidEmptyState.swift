@@ -31,7 +31,10 @@ struct MasjidEmptyState: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
 
-            Button(action: onOpenMaps) {
+            Button {
+                Haptics.impact(.light)
+                onOpenMaps()
+            } label: {
                 HStack(spacing: IhsanSpacing.sm) {
                     Image(systemName: "map")
                         .font(.system(size: 14, weight: .semibold))

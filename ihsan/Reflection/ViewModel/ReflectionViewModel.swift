@@ -120,6 +120,7 @@ final class ReflectionViewModel {
         inputErrorMessage = nil
         await recorder.start()
         if case .permissionDenied = recorder.state {
+            Haptics.notification(.warning)
             inputErrorMessage = "Microphone access is needed to record. You can enable it in Settings."
         } else if case let .failed(message) = recorder.state {
             inputErrorMessage = message
@@ -176,7 +177,11 @@ final class ReflectionViewModel {
                 draft.typedText = transcript
             }
         } catch SpeechTranscriptionService.TranscriptionError.permissionDenied {
+            Haptics.notification(.warning)
             inputErrorMessage = "Speech recognition wasn't authorized — your audio is saved without a transcript."
+        } catch SpeechTranscriptionService.TranscriptionError.recognitionFailed(_) {
+            Haptics.notification(.warning)
+            inputErrorMessage = "Couldn't transcribe automatically — your audio is saved. You can type a note instead."
         } catch {
             inputErrorMessage = "Couldn't transcribe automatically — your audio is saved. You can type a note instead."
         }

@@ -11,6 +11,7 @@ struct PeriodSelector: View {
         HStack(spacing: 0) {
             ForEach(TrajectoryPeriod.allCases) { option in
                 Button {
+                    guard period != option else { return }
                     Haptics.tap()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         period = option

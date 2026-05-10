@@ -89,16 +89,19 @@ struct MasjidResultRow: View {
         .buttonStyle(.plain)
         .contextMenu {
             Button {
+                Haptics.impact(.light)
                 onTap()
             } label: {
                 Label("Open in Apple Maps", systemImage: "map")
             }
             Button {
+                Haptics.impact(.light)
                 onCopyAddress()
             } label: {
                 Label("Copy Address", systemImage: "doc.on.doc")
             }
             Button {
+                Haptics.impact(.light)
                 onShare()
             } label: {
                 Label("Share Location", systemImage: "square.and.arrow.up")

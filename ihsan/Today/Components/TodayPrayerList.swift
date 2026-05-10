@@ -88,7 +88,6 @@ private struct PrayerRowComposable: View {
             Spacer(minLength: IhsanSpacing.sm)
 
             Button {
-                Haptics.tap()
                 showingActionDialog = true
             } label: {
                 if let status {
@@ -113,12 +112,17 @@ private struct PrayerRowComposable: View {
             isPresented: $showingActionDialog,
             titleVisibility: .visible
         ) {
-            Button("On Time") { onSetStatus(.onTime) }
-            Button("Late") { onSetStatus(.late) }
-            Button("Missed", role: .destructive) { onSetStatus(.missed) }
-            Button("Qada") { onSetStatus(.qada) }
+            Button("On Time") { setStatus(.onTime) }
+            Button("Late") { setStatus(.late) }
+            Button("Missed", role: .destructive) { setStatus(.missed) }
+            Button("Qada") { setStatus(.qada) }
             Button("Cancel", role: .cancel) {}
         }
+    }
+
+    private func setStatus(_ status: PrayerStatus) {
+        Haptics.impact(.light)
+        onSetStatus(status)
     }
 
     private var statusAccessibilityLabel: String {
