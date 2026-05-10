@@ -105,7 +105,7 @@ private struct PrayerRowComposable: View {
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm)
         .frame(minHeight: IhsanSpacing.prayerRowHeight)
-        .ihsanGlass(intensity: isActive ? .hero : .regular)
+        .ihsanGlass(intensity: isActive ? .hero : .regular, isActive: isActive)
         .confirmationDialog(
             prayer.displayNameEnglish,
             isPresented: $showingActionDialog,
