@@ -6,6 +6,8 @@ import IhsanPrayerTimes
 struct TodayHeroSection: View {
     let snapshot: TodayState.Snapshot
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let target = effectiveTargetTime
@@ -50,7 +52,8 @@ struct TodayHeroSection: View {
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
-                    .animation(.snappy(duration: 0.25), value: remaining)
+                    .animation(reduceMotion ? nil : .snappy(duration: 0.25),
+                               value: remaining)
                     .accessibilityLabel(accessibilityLabel(for: spokenCountdown, at: context.date))
 
                 Text(effectiveLabel(at: context.date).uppercased())

@@ -4,6 +4,8 @@ import IhsanDesignSystem
 struct SuhoorIftarBanner: View {
     let suhoorEnd: Date
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let remaining = max(0, suhoorEnd.timeIntervalSince(context.date))
@@ -22,7 +24,8 @@ struct SuhoorIftarBanner: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.6)
                             .contentTransition(.numericText())
-                            .animation(.snappy(duration: 0.25), value: remaining)
+                            .animation(reduceMotion ? nil : .snappy(duration: 0.25),
+                                       value: remaining)
                     }
 
                     Spacer(minLength: IhsanSpacing.md)
