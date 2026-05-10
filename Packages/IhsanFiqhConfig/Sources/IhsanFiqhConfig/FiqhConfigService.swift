@@ -5,7 +5,7 @@ public actor FiqhConfigService {
     public static let shared = FiqhConfigService()
 
     public static let remoteConfigURL = URL(
-        string: "https://raw.githubusercontent.com/sameerstudios/ihsan-fiqh-config/main/v1/fiqh-config.json"
+        string: "https://raw.githubusercontent.com/Smear6uard/ihsan-fiqh-config/main/fiqh-config.json"
     )!
 
     private static let cacheFilename = "fiqh-config-cached.json"
