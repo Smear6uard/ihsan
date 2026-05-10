@@ -17,7 +17,7 @@ public final class TravelInterval {
     public var toLocationLabel: String?
 
     public var qasrEnabled: Bool = true
-    public var jamPolicyRaw: String = JamPolicy.ask.rawValue
+    public var jamPolicyRaw: String = JamPolicy.none.rawValue
 
     @Attribute(.allowsCloudEncryption)
     public var note: String?
@@ -33,7 +33,7 @@ public final class TravelInterval {
         fromLocationLabel: String? = nil,
         toLocationLabel: String? = nil,
         qasrEnabled: Bool = true,
-        jamPolicy: JamPolicy = .ask,
+        jamPolicy: JamPolicy = .none,
         note: String? = nil,
         createdAt: Date = .now,
         modifiedAt: Date = .now
@@ -58,7 +58,11 @@ public extension TravelInterval {
     }
 
     var jamPolicy: JamPolicy {
-        JamPolicy(rawValue: jamPolicyRaw) ?? .ask
+        if let policy = JamPolicy(rawValue: jamPolicyRaw) {
+            return policy
+        }
+
+        return .none
     }
 
     func contains(_ date: Date) -> Bool {

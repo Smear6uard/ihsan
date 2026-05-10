@@ -30,9 +30,13 @@ public final class UserSettings {
     public var calculationMethodRaw: String = CalculationMethodChoice.isna.rawValue
     public var madhabRaw: String = MadhabChoice.standard.rawValue
     public var highLatitudeRuleRaw: String = HighLatitudeRule.middleOfNight.rawValue
+    public var automaticLocationUpdatesEnabled: Bool = true
+    @Attribute(.allowsCloudEncryption)
+    public var lastResolvedCityName: String?
+    public var lastResolvedCountryCode: String?
     public var notificationsEnabled: Bool = true
     public var prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON
-    public var themeRaw: String = ThemePreference.auto.rawValue
+    public var themeRaw: String = ThemePreference.dark.rawValue
     public var hijriCalendarOffsetDays: Int = 0
     public var arabicNumeralsEnabled: Bool = false
     public var weekStartsOnSaturday: Bool = true
@@ -50,9 +54,12 @@ public final class UserSettings {
         calculationMethod: CalculationMethodChoice = .isna,
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
+        automaticLocationUpdatesEnabled: Bool = true,
+        lastResolvedCityName: String? = nil,
+        lastResolvedCountryCode: String? = nil,
         notificationsEnabled: Bool = true,
         prayerNotificationsConfigJSON: String = UserSettings.defaultPrayerNotificationsConfigJSON,
-        theme: ThemePreference = .auto,
+        theme: ThemePreference = .dark,
         hijriCalendarOffsetDays: Int = 0,
         arabicNumeralsEnabled: Bool = false,
         weekStartsOnSaturday: Bool = true,
@@ -69,6 +76,9 @@ public final class UserSettings {
         self.calculationMethodRaw = calculationMethod.rawValue
         self.madhabRaw = madhab.rawValue
         self.highLatitudeRuleRaw = highLatitudeRule.rawValue
+        self.automaticLocationUpdatesEnabled = automaticLocationUpdatesEnabled
+        self.lastResolvedCityName = lastResolvedCityName
+        self.lastResolvedCountryCode = lastResolvedCountryCode
         self.notificationsEnabled = notificationsEnabled
         self.prayerNotificationsConfigJSON = prayerNotificationsConfigJSON
         self.themeRaw = theme.rawValue

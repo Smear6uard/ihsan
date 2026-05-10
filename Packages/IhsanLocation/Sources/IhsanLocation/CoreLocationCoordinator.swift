@@ -32,6 +32,10 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
         Self.translate(manager.authorizationStatus)
     }
 
+    public func mostRecentResolvedPlace() -> LocatedPlace? {
+        lock.withLock { cachedPlace }
+    }
+
     @discardableResult
     public func requestWhenInUseAuthorization() async throws -> LocationAuthorization {
         let current = manager.authorizationStatus
