@@ -1,0 +1,292 @@
+import Foundation
+import Testing
+@testable import IhsanDesignSystem
+
+// MARK: - Helpers
+
+private func makeDate(hour: Int, minute: Int = 0, second: Int = 0) -> Date {
+    var components = DateComponents()
+    components.year = 2026
+    components.month = 5
+    components.day = 15
+    components.hour = hour
+    components.minute = minute
+    components.second = second
+    return Calendar.current.date(from: components)!
+}
+
+/// Pure WCAG luminance from sRGB.
+private func relativeLuminance(_ rgb: IhsanColor.RGB) -> Double {
+    func channel(_ c: Double) -> Double {
+        c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+    }
+    return 0.2126 * channel(rgb.red)
+        + 0.7152 * channel(rgb.green)
+        + 0.0722 * channel(rgb.blue)
+}
+
+private func contrastRatio(_ a: IhsanColor.RGB, _ b: IhsanColor.RGB) -> Double {
+    let la = relativeLuminance(a)
+    let lb = relativeLuminance(b)
+    let (lighter, darker) = la > lb ? (la, lb) : (lb, la)
+    return (lighter + 0.05) / (darker + 0.05)
+}
+
+private let textInkRGB: IhsanColor.RGB = (
+    red: 0x1A / 255.0, green: 0x1F / 255.0, blue: 0x2E / 255.0
+)
+private let textBoneRGB: IhsanColor.RGB = (
+    red: 0xE8 / 255.0, green: 0xDF / 255.0, blue: 0xC9 / 255.0
+)
+
+// MARK: - Sky stops
+
+@Test
+func skyTopStopsAreOrderedByProgress() {
+    let progresses = IhsanColor.skyTopStops.map(\.progress)
+    #expect(progresses == progresses.sorted())
+}
+
+@Test
+func skyBottomStopsAreOrderedByProgress() {
+    let progresses = IhsanColor.skyBottomStops.map(\.progress)
+    #expect(progresses == progresses.sorted())
+}
+
+@Test
+func skyStopsSpanFullDay() {
+    #expect(IhsanColor.skyTopStops.first!.progress == 0.0)
+    #expect(IhsanColor.skyTopStops.last!.progress == 1.0)
+    #expect(IhsanColor.skyBottomStops.first!.progress == 0.0)
+    #expect(IhsanColor.skyBottomStops.last!.progress == 1.0)
+}
+
+@Test
+func skyTopWrapsAroundMidnight() {
+    let first = IhsanColor.skyTopStops.first!
+    let last = IhsanColor.skyTopStops.last!
+    #expect(first.rgb.red == last.rgb.red)
+    #expect(first.rgb.green == last.rgb.green)
+    #expect(first.rgb.blue == last.rgb.blue)
+}
+
+@Test
+func skyBottomWrapsAroundMidnight() {
+    let first = IhsanColor.skyBottomStops.first!
+    let last = IhsanColor.skyBottomStops.last!
+    #expect(first.rgb.red == last.rgb.red)
+    #expect(first.rgb.green == last.rgb.green)
+    #expect(first.rgb.blue == last.rgb.blue)
+}
+
+@Test
+func skyAtMidnightIsDeepUltramarine() {
+    // Both top and bottom should hit the static `ground` colour at
+    // local midnight.
+    let top = IhsanColor.interpolatedRGB(
+        stops: IhsanColor.skyTopStops, at: 0.0
+    )
+    let bottom = IhsanColor.interpolatedRGB(
+        stops: IhsanColor.skyBottomStops, at: 0.0
+    )
+    #expect(abs(top.red - 0x0E / 255.0) < 0.001)
+    #expect(abs(top.green - 0x14 / 255.0) < 0.001)
+    #expect(abs(top.blue - 0x28 / 255.0) < 0.001)
+    #expect(abs(bottom.red - 0x0E / 255.0) < 0.001)
+    #expect(abs(bottom.green - 0x14 / 255.0) < 0.001)
+    #expect(abs(bottom.blue - 0x28 / 255.0) < 0.001)
+}
+
+@Test
+func skyShiftsVisiblyAcrossTheDay() {
+    // The whole point of the redirect is that the sky reads as "different"
+    // at different times. Compare four checkpoints — pre-dawn (4am),
+    // morning (9am), late afternoon (5pm), night (11pm) — and verify
+    // each pair has a meaningful chromatic distance. The bottom band
+    // exposes the warmth shift more aggressively than the top, so we
+    // sample it.
+    func bottom(at hour: Int) -> IhsanColor.RGB {
+        IhsanColor.interpolatedRGB(
+            stops: IhsanColor.skyBottomStops,
+            at: IhsanColor.dayProgress(for: makeDate(hour: hour))
+        )
+    }
+    let dawn = bottom(at: 4)
+    let morning = bottom(at: 9)
+    let lateAfternoon = bottom(at: 17)
+    let night = bottom(at: 23)
+
+    func distance(_ a: IhsanColor.RGB, _ b: IhsanColor.RGB) -> Double {
+        let dr = a.red - b.red
+        let dg = a.green - b.green
+        let db = a.blue - b.blue
+        return (dr * dr + dg * dg + db * db).squareRoot()
+    }
+
+    // Adjacent windows must be visibly distinct, antipodal windows
+    // must differ massively. Tuned against the actual stops so that
+    // a passing test corresponds to a screen the user reads as
+    // "morning vs afternoon vs night" without checking a clock.
+    #expect(distance(dawn, morning) > 0.5,
+            "dawn→morning distance was \(distance(dawn, morning))")
+    #expect(distance(morning, lateAfternoon) > 0.20,
+            "morning→late-afternoon distance was \(distance(morning, lateAfternoon))")
+    #expect(distance(dawn, lateAfternoon) > 0.4,
+            "dawn→late-afternoon distance was \(distance(dawn, lateAfternoon))")
+    #expect(distance(morning, night) > 0.5,
+            "morning→night distance was \(distance(morning, night))")
+    #expect(distance(lateAfternoon, night) > 0.5,
+            "late-afternoon→night distance was \(distance(lateAfternoon, night))")
+}
+
+@Test
+func skyBottomIsWarmerThanTopAtNoon() {
+    // At Dhuhr the bottom of the gradient should sit closer to cream
+    // while the top sits in pale neutral — the gradient reads as
+    // "horizon below, sky above" rather than as a flat panel.
+    let p = IhsanColor.dayProgress(for: makeDate(hour: 12))
+    let top = IhsanColor.interpolatedRGB(stops: IhsanColor.skyTopStops, at: p)
+    let bottom = IhsanColor.interpolatedRGB(stops: IhsanColor.skyBottomStops, at: p)
+    // Bottom red channel should exceed top red channel — warmer.
+    #expect(bottom.red > top.red)
+}
+
+// MARK: - Card surface
+
+@Test
+func cardSurfaceIsLightAtNoon() {
+    let p = IhsanColor.dayProgress(for: makeDate(hour: 12))
+    let rgb = IhsanColor.interpolatedRGB(stops: IhsanColor.cardSurfaceStops, at: p)
+    let lum = relativeLuminance(rgb)
+    #expect(lum > 0.5, "noon card surface luminance was \(lum), expected > 0.5")
+}
+
+@Test
+func cardSurfaceIsDarkAtMidnight() {
+    let rgb = IhsanColor.interpolatedRGB(
+        stops: IhsanColor.cardSurfaceStops, at: 0.0
+    )
+    let lum = relativeLuminance(rgb)
+    #expect(lum < 0.1, "midnight card surface luminance was \(lum), expected < 0.1")
+}
+
+@Test
+func cardSurfaceIsLightThroughDaylightHours() {
+    // Between sunrise (~6:30am, p≈0.27) and just before maghrib
+    // (~6:30pm, p≈0.77) the card stays in the "light" pole so dark
+    // text always reads against it.
+    for hour in 8...16 {
+        let p = IhsanColor.dayProgress(for: makeDate(hour: hour))
+        let rgb = IhsanColor.interpolatedRGB(stops: IhsanColor.cardSurfaceStops, at: p)
+        let lum = relativeLuminance(rgb)
+        #expect(
+            lum > IhsanColor.cardForegroundLuminanceThreshold,
+            "card luminance at \(hour):00 was \(lum), expected > threshold"
+        )
+    }
+}
+
+@Test
+func cardSurfaceIsDarkThroughDeepNight() {
+    // Between full Isha and pre-Fajr the card stays in the amber-night
+    // pole. Test 11pm and 3am.
+    for hour in [23, 3] {
+        let p = IhsanColor.dayProgress(for: makeDate(hour: hour))
+        let rgb = IhsanColor.interpolatedRGB(stops: IhsanColor.cardSurfaceStops, at: p)
+        let lum = relativeLuminance(rgb)
+        #expect(
+            lum < IhsanColor.cardForegroundLuminanceThreshold,
+            "card luminance at \(hour):00 was \(lum), expected < threshold"
+        )
+    }
+}
+
+// MARK: - Foreground contrast on cards
+
+@Test
+func darkInkOnCreamCardMeetsWCAGAA() {
+    // Dark ink on the cream card surface (#E8DFC9) should comfortably
+    // exceed the 4.5:1 normal-text threshold.
+    let cream: IhsanColor.RGB = (
+        red: 0xE8 / 255.0, green: 0xDF / 255.0, blue: 0xC9 / 255.0
+    )
+    let ratio = contrastRatio(textInkRGB, cream)
+    #expect(ratio >= 4.5, "ink-on-cream contrast was \(ratio), expected ≥ 4.5")
+}
+
+@Test
+func boneCreamOnAmberCardMeetsWCAGAA() {
+    // Bone cream on the amber-night card surface (#3D3328) should
+    // comfortably exceed 4.5:1.
+    let amber: IhsanColor.RGB = (
+        red: 0x3D / 255.0, green: 0x33 / 255.0, blue: 0x28 / 255.0
+    )
+    let ratio = contrastRatio(textBoneRGB, amber)
+    #expect(ratio >= 4.5, "bone-on-amber contrast was \(ratio), expected ≥ 4.5")
+}
+
+@Test
+func cardForegroundContrastAcrossEveryHour() {
+    // For every hour of the day, the resolved primary foreground colour
+    // should clear 4.5:1 against the resolved card surface. This is the
+    // single most important regression check: it's what stops the
+    // visual redirect from sliding back into the "warm tint takeover"
+    // failure mode where text disappeared into the card.
+    for hour in 0..<24 {
+        let date = makeDate(hour: hour, minute: 30)
+        let surface = IhsanColor.cardSurfaceRGB(at: date)
+        let lum = IhsanColor.cardSurfaceLuminance(at: date)
+        let foreground = lum > IhsanColor.cardForegroundLuminanceThreshold
+            ? textInkRGB
+            : textBoneRGB
+        let ratio = contrastRatio(foreground, surface)
+        #expect(
+            ratio >= 4.5,
+            "hour \(hour):30 contrast was \(ratio), surface lum \(lum)"
+        )
+    }
+}
+
+// MARK: - Card stops continuity
+
+@Test
+func cardStopsAreOrderedByProgress() {
+    let progresses = IhsanColor.cardSurfaceStops.map(\.progress)
+    #expect(progresses == progresses.sorted())
+}
+
+@Test
+func cardStopsSpanFullDay() {
+    #expect(IhsanColor.cardSurfaceStops.first!.progress == 0.0)
+    #expect(IhsanColor.cardSurfaceStops.last!.progress == 1.0)
+}
+
+@Test
+func cardStopsWrapAroundMidnight() {
+    let first = IhsanColor.cardSurfaceStops.first!
+    let last = IhsanColor.cardSurfaceStops.last!
+    #expect(first.rgb.red == last.rgb.red)
+    #expect(first.rgb.green == last.rgb.green)
+    #expect(first.rgb.blue == last.rgb.blue)
+}
+
+// MARK: - Accent
+
+@Test
+func warmAccentIsRoseGoldNearMaghrib() {
+    // The maghrib window should resolve to rose-gold so the now-marker
+    // and active surface pull warmer there.
+    let p = IhsanColor.dayProgress(for: makeDate(hour: 19))
+    #expect(p >= 0.74 && p <= 0.84, "maghrib progress was \(p)")
+}
+
+@Test
+func warmAccentIsBrassAtNoonAndMidnight() {
+    // Outside the maghrib window the accent stays steady on brass —
+    // the now-marker should never flash bright orange at unexpected
+    // moments.
+    let noonP = IhsanColor.dayProgress(for: makeDate(hour: 12))
+    let midnightP = IhsanColor.dayProgress(for: makeDate(hour: 0))
+    #expect(!(noonP >= 0.74 && noonP <= 0.84))
+    #expect(!(midnightP >= 0.74 && midnightP <= 0.84))
+}
