@@ -115,9 +115,74 @@ What the source pass cannot verify and needs device measurement:
 
 ## Edge cases (Category 6)
 
-See the Cat 6 commit message — most edge-case items are observable
-behaviours that need device-state setup (no Apple Intelligence, no
-Dynamic Island, signed out of iCloud) to confirm.
+Items added in this pass (need device verification):
+
+- **iOS Qibla compass-unavailable state**. New
+  `QiblaState.compassUnavailable(snapshot)` triggered when
+  `CLLocationManager.headingAvailable()` is false. Renders bearing
+  + distance + a one-line explanation, no dial. Walks through on
+  iPad Pro M-series (no compass) — confirm the state appears, not
+  the regular dial frozen at North.
+- **Orphan voice-memo cleanup at launch**. New
+  `ReflectionAudioPaths.cleanupOrphans(knownMemoIDs:)` invoked from
+  RootGate.task on every cold launch. Best-effort; minAge guard of
+  5 min so an in-flight recording from a previous session can't be
+  swept on relaunch. Verify by:
+  1. Start recording (file appears in App Group container).
+  2. Force-quit while still recording.
+  3. Wait > 5 min.
+  4. Cold launch the app.
+  5. Confirm the orphan .m4a is gone.
+  Then verify the inverse: a saved Reflection's audio is NOT
+  swept (its UUID is in the known set).
+
+Items already correct, audited but unchanged:
+
+- **First launch with no location permission** — TodayState /
+  MasjidFinderState / QiblaState all carry a
+  `.needsLocationPermission` case with a permission-prompting view
+  (TodayScreen.swift:51, MasjidFinderScreen.swift:62,
+  QiblaScreen.swift:41). Onboarding owns the initial prompt;
+  these states catch the post-onboarding "settings → off" case.
+- **Apple Intelligence absence** — InsightCard checks
+  `SystemLanguageModel.default.availability` under
+  `canImport(FoundationModels)` and renders nothing when the model
+  isn't available (InsightCard.swift:51-60). No greyed state, no
+  upgrade prompt — exactly the spec'd silent-hide behaviour.
+- **No Dynamic Island (iPhone 14 base, etc.)** — handled by
+  ActivityConfiguration's automatic fallback to lock-screen-only
+  rendering. Verify on a real iPhone 14 base.
+- **Apple Watch without compass** — `ihsanWatch/Qibla/QiblaView`
+  already has a `compassUnavailable` state with bearing + distance
+  fallback (QiblaView.swift:121-139). The iOS-side change above
+  brings parity.
+- **AudioRecordingService interruption** — phone calls / Siri /
+  alarms post `AVAudioSession.interruptionNotification`; the
+  service's `handleInterruption` finalises the recording so the
+  user sees what was captured rather than a stuck "Recording…"
+  state (AudioRecordingService.swift:212-226).
+- **App-Group container missing** — `IhsanModelContainerFactory`
+  falls back to in-memory if the shared store fails
+  (IhsanApp.swift:15-24). Same pattern handles the iCloud-signed-
+  out edge: SwiftData's CloudKit sync degrades to local-only
+  silently.
+- **IhsanFiqhConfig fetch failure** — `FiqhConfigService` ships a
+  bundled config and falls back to it on network failure (see the
+  package's `BundledConfigParsingTests`).
+- **Reinstall** — bundled fiqh config covers the cold-start
+  prompts; CloudKit-synced PrayerLogs and Reflections restore from
+  the user's iCloud once auth completes. Audio memos do NOT sync
+  by design (privacy; raw audio stays on the device that recorded
+  it) — verify a reinstalled app shows feed cards in
+  `voiceMissing` shape for memos whose audio doesn't exist locally.
+
+Items needing pure device verification (no source change possible):
+
+- **Force-quit during prayer logging**. SwiftData persists on
+  every `setStatus` / `toggleJamaah` call; relaunch should show
+  the last persisted state. There's no in-flight transaction state
+  in TodayViewModel that could be lost. Confirm on device by
+  force-quitting mid-tap.
 
 ## Pre-existing build warnings (out of scope, flagging)
 

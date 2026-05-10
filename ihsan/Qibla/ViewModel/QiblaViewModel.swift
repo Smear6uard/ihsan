@@ -1,3 +1,4 @@
+import CoreLocation
 import Foundation
 import SwiftUI
 import IhsanLocation
@@ -34,14 +35,22 @@ final class QiblaViewModel {
             }
 
             let place = try await locationProvider.currentPlace()
-            state = .ready(.init(
+            let snapshot = QiblaState.Snapshot(
                 cityName: place.cityName,
                 coordinates: place.coordinates,
                 qiblaBearing: place.coordinates.qiblaBearing,
                 distanceToMakkahKm: place.coordinates.distanceToKaaba
-            ))
+            )
 
-            startHeadingUpdates()
+            // Hardware-availability gate. Without a magnetometer we can't
+            // animate the dial, but bearing + distance are still meaningful
+            // (the user can sight against a known landmark).
+            if CLLocationManager.headingAvailable() {
+                state = .ready(snapshot)
+                startHeadingUpdates()
+            } else {
+                state = .compassUnavailable(snapshot)
+            }
         } catch let error as LocationError {
             if error == .permissionDenied || error == .permissionRestricted {
                 Haptics.notification(.warning)

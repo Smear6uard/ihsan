@@ -76,6 +76,7 @@ private struct RootGate: View {
         }
         .task {
             ensureSingletonExists()
+            sweepOrphanReflectionAudio()
             didResolveInitialSettings = true
         }
         #if canImport(ActivityKit) && os(iOS)
@@ -122,6 +123,24 @@ private struct RootGate: View {
             // re-show setup once than to hide it from a brand new
             // install.
         }
+    }
+
+    /// Force-quit during a recording leaves an .m4a in the App Group
+    /// container with no Reflection pointing to it. Sweep those at
+    /// launch — best-effort, age-guarded so we never touch a file
+    /// from an in-flight recording.
+    private func sweepOrphanReflectionAudio() {
+        let descriptor = FetchDescriptor<Reflection>()
+        let known: Set<UUID>
+        if let reflections = try? modelContext.fetch(descriptor) {
+            known = Set(reflections.compactMap(\.voiceMemoID))
+        } else {
+            // Couldn't query — be safe and leave files alone rather
+            // than risk deleting a record's audio because of a
+            // transient fetch error.
+            return
+        }
+        ReflectionAudioPaths.cleanupOrphans(knownMemoIDs: known)
     }
 
     #if canImport(ActivityKit) && os(iOS)
