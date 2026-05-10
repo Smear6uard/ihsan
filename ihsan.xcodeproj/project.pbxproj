@@ -428,6 +428,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Ihsan transcribes voice reflections on-device using Apple's Speech framework. No audio leaves your phone.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -473,6 +475,8 @@
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Ihsan calculates your prayer times from your current location. Coordinates are never stored or shared.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared.";
+				INFOPLIST_KEY_NSSpeechRecognitionUsageDescription = "Ihsan transcribes voice reflections on-device using Apple's Speech framework. No audio leaves your phone.";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
