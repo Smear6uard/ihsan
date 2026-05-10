@@ -113,10 +113,12 @@ private struct PrayerIslandExpandedLeading: View {
                     .font(.system(size: 16, weight: .semibold))
                     .foregroundStyle(IhsanColor.textPrimary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text(context.attributes.arabicName)
                     .font(.system(size: 15, weight: .regular))
                     .foregroundStyle(IhsanColor.textSecondary)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
         }
     }

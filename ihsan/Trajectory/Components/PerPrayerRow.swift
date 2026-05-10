@@ -18,9 +18,13 @@ struct PerPrayerRow: View {
                 Text(aggregate.prayer.displayNameEnglish)
                     .font(IhsanFont.bodyEnglishBold)
                     .foregroundStyle(IhsanColor.textPrimary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
                 Text(aggregate.prayer.displayNameArabic)
                     .font(.system(size: 15))
                     .foregroundStyle(IhsanColor.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .frame(width: 120, alignment: .leading)
 
@@ -31,6 +35,8 @@ struct PerPrayerRow: View {
                 .font(IhsanFont.tabular)
                 .foregroundStyle(IhsanColor.textMuted)
                 .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
                 .frame(width: 72, alignment: .trailing)
                 .accessibilityHidden(true)
         }

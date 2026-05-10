@@ -43,6 +43,11 @@ struct TodayHeroSection: View {
                     .font(IhsanFont.heroCountdown)
                     .foregroundStyle(IhsanColor.textPrimary)
                     .monospacedDigit()
+                    // Allow the hero countdown to shrink rather than wrap or
+                    // truncate at the largest Dynamic Type sizes — wrapping a
+                    // tabular timer breaks the visual cadence of the digits.
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .contentTransition(.numericText())
                     .animation(.snappy(duration: 0.25), value: remaining)
                     .accessibilityLabel(accessibilityLabel(for: countdown, at: context.date))

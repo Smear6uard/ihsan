@@ -19,6 +19,8 @@ struct SuhoorIftarBanner: View {
                             .font(.system(size: 30, weight: .light, design: .rounded))
                             .monospacedDigit()
                             .foregroundStyle(IhsanColor.textPrimary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
                             .contentTransition(.numericText())
                             .animation(.snappy(duration: 0.25), value: remaining)
                     }

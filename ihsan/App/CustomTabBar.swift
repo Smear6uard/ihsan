@@ -103,6 +103,7 @@ struct CustomTabBar: View {
                 Text(tab.title)
                     .font(IhsanFont.tabBar)
                     .lineLimit(1)
+                    .minimumScaleFactor(0.7)
             }
             .foregroundStyle(selectedTab == tab ? IhsanColor.textPrimary : IhsanColor.textMuted)
             .frame(maxWidth: .infinity, maxHeight: .infinity)

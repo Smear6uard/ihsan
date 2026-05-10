@@ -33,7 +33,7 @@ struct OnboardingPrimaryButton: View {
                 }
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            .frame(minHeight: 54)
             .ihsanGlass(in: Capsule(style: .continuous), intensity: .hero)
             .overlay {
                 Capsule(style: .continuous)
