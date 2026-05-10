@@ -149,11 +149,17 @@
 		};
 		5A00000000000000000A0003 /* ihsanWatch */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				5A00000000000000000A000B /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
 			path = ihsanWatch;
 			sourceTree = "<group>";
 		};
 		6B00000000000000000A0003 /* ihsanWatchWidgets */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6B00000000000000000A000B /* PBXFileSystemSynchronizedBuildFileExceptionSet */,
+			);
 			path = ihsanWatchWidgets;
 			sourceTree = "<group>";
 		};
@@ -167,6 +173,22 @@
 				ihsanWidgets.entitlements,
 			);
 			target = 4F1D5E1100000000000000A3 /* ihsanWidgets */;
+		};
+		5A00000000000000000A000B /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				ihsanWatch.entitlements,
+			);
+			target = 5A00000000000000000A0001 /* ihsanWatch */;
+		};
+		6B00000000000000000A000B /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				ihsanWatchWidgets.entitlements,
+			);
+			target = 6B00000000000000000A0001 /* ihsanWatchWidgets */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 

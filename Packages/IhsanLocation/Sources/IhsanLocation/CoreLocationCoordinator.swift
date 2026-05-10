@@ -134,6 +134,9 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
     }
 
     public func startMonitoringSignificantChanges() async throws {
+        #if os(watchOS)
+        throw LocationError.locationUnavailable
+        #else
         guard CLLocationManager.significantLocationChangeMonitoringAvailable() else {
             throw LocationError.locationUnavailable
         }
@@ -151,10 +154,13 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
         }
 
         manager.startMonitoringSignificantLocationChanges()
+        #endif
     }
 
     public func stopMonitoringSignificantChanges() async {
+        #if !os(watchOS)
         manager.stopMonitoringSignificantLocationChanges()
+        #endif
     }
 
     public func isHeadingAvailable() -> Bool {
