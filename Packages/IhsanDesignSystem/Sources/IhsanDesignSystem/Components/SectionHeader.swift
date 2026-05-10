@@ -1,8 +1,9 @@
 import SwiftUI
 
-/// Small caps section label. Renders as uppercase tracked text in the
-/// muted text tier — quiet by design so the content beneath it carries
-/// the visual weight.
+/// Small caps section label rendered in the manuscript register —
+/// uppercase, brass-tinted, letter-spaced. Sits above the content
+/// inside a `SettingsSectionCard` or as the first child of any
+/// manuscript-style section.
 public struct SectionHeader: View {
     public let title: String
 
@@ -12,23 +13,21 @@ public struct SectionHeader: View {
 
     public var body: some View {
         Text(title.uppercased())
-            .font(IhsanFont.smallCaps)
-            .tracking(1.2)
-            .foregroundStyle(IhsanColor.textMuted)
+            .font(IhsanFont.inscription)
+            .tracking(1.8)
+            .foregroundStyle(IhsanColor.brassDark)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, IhsanSpacing.md)
-            .padding(.vertical, IhsanSpacing.sm)
             .accessibilityAddTraits(.isHeader)
     }
 }
 
 #Preview("Section header") {
-    VStack(spacing: 0) {
-        SectionHeader("Location")
-        SectionHeader("Calculation")
-        SectionHeader("Notifications")
+    VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+        SectionHeader("Location & Times")
+        SectionHeader("Adhan")
+        SectionHeader("Practice")
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

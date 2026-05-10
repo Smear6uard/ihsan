@@ -38,68 +38,64 @@ struct SettingsScreen: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            ZStack {
-                IhsanColor.ground.ignoresSafeArea()
+            ScrollView {
+                VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                    header
 
-                ScrollView {
-                    VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-                        header
+                    if let settings {
+                        LocationSection(
+                            settings: settings,
+                            latestPlace: latestPlace,
+                            refreshMessage: refreshMessage,
+                            onCityTap: showCoordinatesIfAvailable,
+                            onAutomaticLocationChanged: setAutomaticLocationUpdates(_:for:),
+                            onRefresh: { refreshLocation(for: settings) }
+                        )
 
-                        if let settings {
-                            LocationSection(
-                                settings: settings,
-                                latestPlace: latestPlace,
-                                refreshMessage: refreshMessage,
-                                onCityTap: showCoordinatesIfAvailable,
-                                onAutomaticLocationChanged: setAutomaticLocationUpdates(_:for:),
-                                onRefresh: { refreshLocation(for: settings) }
-                            )
-
-                            CalculationSection(settings: settings, path: $path)
-                            MadhabSection(settings: settings, path: $path)
-                            HighLatitudeSection(settings: settings, path: $path)
-                            NotificationsSection(settings: settings, path: $path, onToggleNotifications: setNotificationsEnabled(_:for:))
-                            PauseModeSection(
-                                activePause: activePause,
-                                description: pauseDescription,
-                                onToggle: handlePauseToggle(_:)
-                            )
-                            TravelModeSection(
-                                activeTravel: activeTravel,
-                                description: travelDescription,
-                                path: $path,
-                                onToggle: handleTravelToggle(_:)
-                            )
-                            DisplaySection(settings: settings, path: $path)
-                            ReflectionSyncSection(settings: settings)
-                            PrivacySection(
-                                onExport: exportData,
-                                onDelete: {
-                                    Haptics.impact(.light)
-                                    confirmingDeleteAllData = true
-                                }
-                            )
-                            AboutSection(openURL: openURL)
-                        } else {
-                            ProgressView()
-                                .tint(IhsanColor.textSecondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(.top, IhsanSpacing.xxl)
-                        }
-
-                        Color.clear.frame(height: IhsanSpacing.xl)
+                        CalculationSection(settings: settings, path: $path)
+                        MadhabSection(settings: settings, path: $path)
+                        HighLatitudeSection(settings: settings, path: $path)
+                        NotificationsSection(settings: settings, path: $path, onToggleNotifications: setNotificationsEnabled(_:for:))
+                        PauseModeSection(
+                            activePause: activePause,
+                            description: pauseDescription,
+                            onToggle: handlePauseToggle(_:)
+                        )
+                        TravelModeSection(
+                            activeTravel: activeTravel,
+                            description: travelDescription,
+                            path: $path,
+                            onToggle: handleTravelToggle(_:)
+                        )
+                        DisplaySection(settings: settings, path: $path)
+                        ReflectionSyncSection(settings: settings)
+                        PrivacySection(
+                            onExport: exportData,
+                            onDelete: {
+                                Haptics.impact(.light)
+                                confirmingDeleteAllData = true
+                            }
+                        )
+                        AboutSection(openURL: openURL)
+                    } else {
+                        ProgressView()
+                            .tint(IhsanColor.brass)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, IhsanSpacing.xxl)
                     }
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.top, IhsanSpacing.md)
+
+                    Color.clear.frame(height: IhsanSpacing.xl)
                 }
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.top, IhsanSpacing.md)
             }
+            .ihsanManuscriptPage()
             .navigationDestination(for: SettingsRoute.self) { route in
                 if let settings {
                     destination(for: route, settings: settings)
                 }
             }
-            .navigationTitle("Settings")
-            .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
         }
         .task {
             bootstrapSettings()
@@ -153,7 +149,7 @@ struct SettingsScreen: View {
             CoordinatesDebugSheet(place: latestPlace)
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
-                .presentationBackground(IhsanColor.ground)
+                .presentationBackground(.thinMaterial)
         }
         #endif
     }
@@ -171,10 +167,18 @@ struct SettingsScreen: View {
     }
 
     private var header: some View {
-        Text("Settings")
-            .font(IhsanFont.title)
-            .foregroundStyle(IhsanColor.textPrimary)
-            .accessibilityAddTraits(.isHeader)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Quiet preferences")
+                .font(.system(size: 32, weight: .medium, design: .serif))
+                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .accessibilityAddTraits(.isHeader)
+            Text("SETTINGS")
+                .font(IhsanFont.inscription)
+                .tracking(2.0)
+                .foregroundStyle(IhsanColor.brass)
+            OrnamentalDivider()
+                .padding(.top, IhsanSpacing.xs)
+        }
     }
 
     @ViewBuilder
@@ -452,7 +456,7 @@ private struct LocationSection: View {
                     set: { onAutomaticLocationChanged($0, settings) }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.textPrimary)
+                .tint(IhsanColor.brass)
                 .accessibilityLabel("Automatic location updates")
             }
 
@@ -546,7 +550,7 @@ private struct NotificationsSection: View {
                     set: { onToggleNotifications($0, settings) }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.textPrimary)
+                .tint(IhsanColor.brass)
                 .accessibilityLabel("Adhan notifications")
             }
 
@@ -565,7 +569,7 @@ private struct NotificationsSection: View {
                     SettingsRow(title: prayer.displayNameEnglish, icon: "clock.badge.checkmark") {
                         Toggle("", isOn: prayerNotificationBinding(for: prayer))
                             .labelsHidden()
-                            .tint(IhsanColor.textPrimary)
+                            .tint(IhsanColor.brass)
                             .accessibilityLabel("\(prayer.displayNameEnglish) notification")
                     }
                 }
@@ -609,7 +613,7 @@ private struct PauseModeSection: View {
                     set: onToggle
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.textPrimary)
+                .tint(IhsanColor.brass)
                 .accessibilityLabel("Pause Mode")
             }
 
@@ -636,7 +640,7 @@ private struct TravelModeSection: View {
                     set: onToggle
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.textPrimary)
+                .tint(IhsanColor.brass)
                 .accessibilityLabel("Travel Mode")
             }
 
@@ -660,7 +664,7 @@ private struct TravelModeSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.textPrimary)
+                    .tint(IhsanColor.brass)
                     .accessibilityLabel("Qasr enabled")
                 }
             }
@@ -707,7 +711,7 @@ private struct ReflectionSyncSection: View {
                     }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.textPrimary)
+                .tint(IhsanColor.brass)
                 .accessibilityLabel("Sync voice memos via iCloud")
             }
 
@@ -964,7 +968,7 @@ private struct PickerScaffold<Content: View>: View {
 
     var body: some View {
         ZStack {
-            IhsanColor.ground.ignoresSafeArea()
+            Color.clear.ihsanManuscriptPage()
 
             ScrollView {
                 VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
@@ -1001,14 +1005,16 @@ private struct CoordinatesDebugSheet: View {
 
     var body: some View {
         ZStack {
-            IhsanColor.ground.ignoresSafeArea()
-            GlassCard {
-                VStack(alignment: .leading, spacing: IhsanSpacing.md) {
-                    SectionHeader("Coordinates")
-                    SettingsDescriptionText(coordinatesText)
-                    SettingsDescriptionText("Coordinates are shown for debugging only and are not stored.")
-                }
+            Color.clear.ihsanManuscriptPage()
+            VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+                SectionHeader("Coordinates")
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.sm)
+                SettingsDescriptionText(coordinatesText)
+                SettingsDescriptionText("Coordinates are shown for debugging only and are not stored.")
+                    .padding(.bottom, IhsanSpacing.sm)
             }
+            .ihsanIlluminatedPanel(intensity: .regular)
             .padding(IhsanSpacing.md)
         }
     }

@@ -11,7 +11,7 @@ public struct SettingsDescriptionText: View {
     public var body: some View {
         Text(text)
             .font(IhsanFont.bodyEnglish)
-            .foregroundStyle(IhsanColor.textSecondary)
+            .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, IhsanSpacing.md)

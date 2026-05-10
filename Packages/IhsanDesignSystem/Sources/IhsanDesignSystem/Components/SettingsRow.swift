@@ -1,9 +1,12 @@
 import SwiftUI
 
-/// iOS-grouped-list-style row, rendered in Liquid Glass. Use a column of
-/// these inside a `VStack` (with no spacing) to recreate the grouped-list
-/// aesthetic without falling back to `List` styling that fights the dark
-/// ground.
+/// One settings row rendered as a manuscript-style inscription:
+/// title in refined serif on the left, optional subtitle / value in
+/// small caps brass on the right (or beneath the title), and a
+/// trailing accessory (chevron, toggle, or custom). Rows live inside
+/// a `SettingsSectionCard` and are separated by thin brass hairlines
+/// — they DO NOT carry their own panel borders, so the section
+/// reads as one composed surface.
 ///
 /// Generic over the trailing accessory so callers can pass a `Toggle`,
 /// `Text`, chevron, or any custom view without forcing one shape.
@@ -29,12 +32,18 @@ public struct SettingsRow<Accessory: View>: View {
     }
 
     public var body: some View {
-        Group {
-            if let action {
-                Button(action: action) { rowContent }
-                    .buttonStyle(.plain)
-            } else {
-                rowContent
+        VStack(spacing: 0) {
+            Divider()
+                .frame(height: 0.5)
+                .overlay(IhsanColor.brass.opacity(0.20))
+
+            Group {
+                if let action {
+                    Button(action: action) { rowContent }
+                        .buttonStyle(.plain)
+                } else {
+                    rowContent
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -46,33 +55,25 @@ public struct SettingsRow<Accessory: View>: View {
         HStack(spacing: IhsanSpacing.md) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 17, weight: .regular))
-                    .foregroundStyle(IhsanColor.textSecondary)
-                    .frame(width: 24)
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(IhsanColor.brassDark)
+                    .frame(width: 22)
             }
-            VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
-                Text(title)
-                    .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.textPrimary)
-                if let subtitle {
-                    Text(subtitle)
-                        .font(IhsanFont.citation)
-                        .foregroundStyle(IhsanColor.textMuted)
-                }
-            }
+            Text(title)
+                .font(.system(size: 17, weight: .regular, design: .serif))
+                .foregroundStyle(IhsanColor.inkDeep)
             Spacer(minLength: IhsanSpacing.sm)
+            if let subtitle {
+                Text(subtitle.uppercased())
+                    .font(IhsanFont.inscription)
+                    .tracking(1.4)
+                    .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
+            }
             accessory
         }
         .padding(.horizontal, IhsanSpacing.md)
-        .padding(.vertical, IhsanSpacing.sm + IhsanSpacing.xxs)
+        .padding(.vertical, IhsanSpacing.sm + 2)
         .frame(minHeight: 44)
-        .ihsanGlass(
-            in: RoundedRectangle(
-                cornerRadius: IhsanSpacing.smallCardRadius,
-                style: .continuous
-            ),
-            intensity: .subtle
-        )
     }
 
     private var accessibilityLabel: String {
@@ -82,8 +83,8 @@ public struct SettingsRow<Accessory: View>: View {
 }
 
 public extension SettingsRow where Accessory == AnyView {
-    /// Convenience initializer that renders a chevron when no accessory is
-    /// supplied. Standard for navigation rows.
+    /// Convenience initializer that renders a brass chevron when no
+    /// accessory is supplied. Standard for navigation rows.
     init(
         title: String,
         subtitle: String? = nil,
@@ -98,8 +99,8 @@ public extension SettingsRow where Accessory == AnyView {
         ) {
             AnyView(
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IhsanColor.brassDark.opacity(0.55))
             )
         }
     }
@@ -109,35 +110,23 @@ private struct SettingsRowPreviewWrapper: View {
     @State private var notifications = true
 
     var body: some View {
-        VStack(spacing: IhsanSpacing.sm) {
-            SectionHeader("Location")
-            SettingsRow(
-                title: "Mecca",
-                subtitle: "Auto-detected",
-                icon: "location.fill",
-                action: {}
-            )
-            SectionHeader("Calculation")
-            SettingsRow(
-                title: "Method",
-                subtitle: "Umm al-Qura",
-                icon: "function",
-                action: {}
-            )
-            SettingsRow(
-                title: "Madhab",
-                subtitle: "Standard",
-                icon: "book.closed.fill",
-                action: {}
-            )
-            SectionHeader("Notifications")
-            SettingsRow(
-                title: "Adhan reminders",
-                icon: "bell.fill"
-            ) {
-                Toggle("", isOn: $notifications)
-                    .labelsHidden()
-                    .tint(IhsanColor.textPrimary)
+        VStack(spacing: IhsanSpacing.lg) {
+            SettingsSectionCard("Location & Times") {
+                SettingsRow(title: "Oakland, CA", icon: "location.fill", action: {})
+                SettingsRow(title: "Method", subtitle: "ISNA", action: {})
+                SettingsRow(title: "Madhhab (Asr)", subtitle: "Standard", action: {})
+            }
+            SettingsSectionCard("Adhan") {
+                SettingsRow(title: "Fajr", subtitle: "Makkah · Soft", action: {})
+                SettingsRow(title: "Dhuhr", subtitle: "Off", action: {})
+                SettingsRow(title: "Asr", subtitle: "Off", action: {})
+            }
+            SettingsSectionCard("Practice") {
+                SettingsRow(title: "Adhan reminders", icon: "bell.fill") {
+                    Toggle("", isOn: $notifications)
+                        .labelsHidden()
+                        .tint(IhsanColor.brass)
+                }
             }
         }
         .padding()
@@ -148,5 +137,5 @@ private struct SettingsRowPreviewWrapper: View {
     ScrollView {
         SettingsRowPreviewWrapper()
     }
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }
