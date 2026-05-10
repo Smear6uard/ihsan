@@ -1,19 +1,20 @@
 import SwiftUI
 import IhsanCore
 
-/// The day's path rendered as a gentle sine-curve arc from the left
-/// horizon (Fajr) through the zenith to the right horizon (Isha), with
-/// one dot per fard prayer positioned along the curve at its actual
-/// scheduled time. A larger glowing brass dot tracks the current moment.
+/// The day's prayer schedule rendered as an illuminated astrolabe-style
+/// arc: a brass curve from the left horizon (Fajr) through the zenith to
+/// the right horizon (Isha), with a small four-pointed star at each
+/// fard prayer's scheduled time and a larger eight-pointed gold star
+/// marking the current moment.
 ///
 /// At night — before Fajr or after Isha — the arc collapses to a flat
-/// horizontal line with a quiet moon icon, signalling that the day's
-/// arc has not yet begun (or has completed).
+/// horizontal brass line with a small crescent moon at the user's
+/// current position. The same chromatic key (brass arc, gold now-marker)
+/// is preserved so the screen reads in one visual register.
 ///
-/// This component is the visual signature of the Today screen. Get the
-/// arc proportions, the dot weights, and the now-marker glow right and
-/// the whole screen reads "premium iOS app" rather than "generic prayer
-/// app".
+/// This component is the single most distinctive element of the Today
+/// screen. Get the star geometry, the proportions, and the gold glow
+/// right and the whole composition reads "illuminated manuscript".
 public struct PrayerArc: View {
     public struct PrayerMark: Sendable {
         public let prayer: Prayer
@@ -35,13 +36,8 @@ public struct PrayerArc: View {
     }
 
     public var body: some View {
-        // Re-render once a minute. The arc geometry doesn't change between
-        // ticks; what changes is which dots are "past" and where the
-        // now-marker sits. A 60 s cadence is plenty for either signal.
         TimelineView(.periodic(from: .now, by: 60)) { context in
             let now = override ?? context.date
-            let accent = IhsanColor.accentWarm(at: now)
-            let contrast = IhsanColor.cardForegroundPrimary(at: now)
             let position = ArcPosition.compute(at: now, marks: prayerMarks)
 
             GeometryReader { geometry in
@@ -53,21 +49,18 @@ public struct PrayerArc: View {
                             nowT: nowT,
                             now: now,
                             size: geometry.size,
-                            accent: accent,
-                            contrast: contrast,
                             reduceMotion: reduceMotion
                         )
                     case .preDawn, .postIsha:
                         NightLayer(
                             position: position,
-                            size: geometry.size,
-                            accent: accent,
-                            contrast: contrast
+                            size: geometry.size
                         )
                     }
                 }
             }
-            .frame(height: 80)
+            .frame(height: ArcGeometry.containerHeight)
+            .padding(.horizontal, ArcGeometry.horizontalInset)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(accessibilityLabel(for: position, now: now))
         }
@@ -100,10 +93,9 @@ public struct PrayerArc: View {
 
 // MARK: - Position model
 
-/// Where "now" sits relative to the day's arc.
-/// `internal` (not `private`) so `PrayerArcTests` can verify the
-/// transition points between night and day without going through the
-/// full SwiftUI view tree.
+/// Where "now" sits relative to the day's arc. `internal` (not `private`)
+/// so `PrayerArcTests` can verify the transition points between night
+/// and day without going through the full SwiftUI view tree.
 enum ArcPosition: Equatable {
     case preDawn       // before Fajr
     case dayArc(t: Double) // between Fajr and Isha, t ∈ [0, 1]
@@ -132,10 +124,25 @@ enum ArcPosition: Equatable {
 /// `internal` (not `private`) so `PrayerArcTests` can pin the curve's
 /// endpoints and apex.
 enum ArcGeometry {
-    static let inset: CGFloat = 14
-    static let baseInsetBottom: CGFloat = 14
-    /// Vertical room between the base and the apex.
-    static let amplitude: CGFloat = 50
+    /// Outer horizontal margin applied via `.padding(.horizontal, ...)`.
+    /// Combines with the inner inset so the curve never touches the screen
+    /// edges nor the panel borders flanking it on the Today screen.
+    static let horizontalInset: CGFloat = 18
+
+    /// Inner inset from the geometry's edges to the arc endpoints, in
+    /// points. Leaves room for the marker stars at the horizon to render
+    /// fully without clipping.
+    static let inset: CGFloat = 12
+
+    /// Vertical room from the base to the apex of the arc.
+    static let amplitude: CGFloat = 56
+
+    /// Distance from the base of the arc up to the baseline.
+    static let baseInsetBottom: CGFloat = 16
+
+    /// The vertical extent of the arc component. Hosts the curve, the
+    /// markers, and accommodates the now-marker's glow without clipping.
+    static let containerHeight: CGFloat = 90
 
     static func point(at t: Double, in size: CGSize) -> CGPoint {
         let usableWidth = size.width - inset * 2
@@ -145,10 +152,10 @@ enum ArcGeometry {
         return CGPoint(x: x, y: y)
     }
 
-    /// Sampled path of the arc itself. 60 segments produces a curve
-    /// that reads as smooth at every iPhone width without burning
-    /// per-frame cycles in Canvas.
-    static func path(in size: CGSize, segments: Int = 60) -> Path {
+    /// Sampled path of the arc itself. 80 segments produces a curve that
+    /// reads as smooth at every iPhone width without burning per-frame
+    /// cycles in Canvas.
+    static func path(in size: CGSize, segments: Int = 80) -> Path {
         var path = Path()
         for i in 0...segments {
             let t = Double(i) / Double(segments)
@@ -165,53 +172,53 @@ enum ArcGeometry {
 
 // MARK: - Layers
 
-/// The full day arc — curve + 5 prayer dots + glowing now-marker.
+/// The full day arc — curve + 5 prayer star markers + glowing now-marker.
 private struct ArcLayer: View {
     let marks: [PrayerArc.PrayerMark]
     let nowT: Double
     let now: Date
     let size: CGSize
-    let accent: Color
-    let contrast: Color
     let reduceMotion: Bool
 
     var body: some View {
         ZStack {
-            // 1. The arc curve. Thin, atmospheric, feathered at the ends
-            //    via a horizontal gradient so it dissolves into the sky
+            // 1. The arc curve. Thin brass stroke at 50% opacity,
+            //    feathered at the ends so it dissolves into the page
             //    rather than terminating in hard endpoints.
             ArcStroke()
                 .stroke(
                     LinearGradient(
                         colors: [
-                            contrast.opacity(0.06),
-                            contrast.opacity(0.32),
-                            contrast.opacity(0.32),
-                            contrast.opacity(0.06)
+                            IhsanColor.brass.opacity(0.08),
+                            IhsanColor.brass.opacity(0.50),
+                            IhsanColor.brass.opacity(0.50),
+                            IhsanColor.brass.opacity(0.08)
                         ],
                         startPoint: .leading,
                         endPoint: .trailing
                     ),
-                    style: StrokeStyle(lineWidth: 1.2, lineCap: .round)
+                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
                 )
                 .frame(width: size.width, height: size.height)
 
-            // 2. Past prayer dots — filled in the warm accent.
-            //    Future prayer dots — outlined ring in the same accent.
+            // 2. Prayer star markers — small four-pointed stars
+            //    positioned at each prayer's scheduled time. Past
+            //    prayers fill, future prayers outline.
             ForEach(0..<marks.count, id: \.self) { i in
                 let mark = marks[i]
                 let t = parametricT(for: mark)
                 let p = ArcGeometry.point(at: t, in: size)
                 let isPast = mark.time <= now
 
-                PrayerDot(isPast: isPast, accent: accent)
+                PrayerMarker(isPast: isPast)
                     .position(p)
             }
 
-            // 3. Now-marker — larger filled dot in accent with glow halo.
-            //    The 3 s pulse is suppressed under Reduce Motion.
+            // 3. Current-time marker — an eight-pointed gold star with a
+            //    soft gold glow. The single moment of saturation on the
+            //    arc; everything else is brass.
             let nowPoint = ArcGeometry.point(at: nowT, in: size)
-            NowMarker(accent: accent, reduceMotion: reduceMotion)
+            NowMarker(reduceMotion: reduceMotion)
                 .position(nowPoint)
         }
     }
@@ -233,97 +240,102 @@ private struct ArcStroke: Shape {
     }
 }
 
-/// A single prayer dot. Past prayers carry a filled disc; future
-/// prayers carry only the outlined ring. The ring is always drawn so
-/// past dots have a defining edge against the bright accent fill.
-private struct PrayerDot: View {
+/// A single prayer marker rendered as a four-pointed star. Past prayers
+/// fill the star in brass; future prayers render only the outlined
+/// stroke. The size (8pt) is calibrated against the curve's stroke width
+/// so the markers read as ornaments laid on the arc, not as glyphs
+/// floating above it.
+private struct PrayerMarker: View {
     let isPast: Bool
-    let accent: Color
 
     var body: some View {
         ZStack {
             if isPast {
-                Circle()
-                    .fill(accent.opacity(0.90))
+                FourPointedStar()
+                    .fill(IhsanColor.brass.opacity(0.92))
                     .frame(width: 8, height: 8)
-                    .shadow(color: accent.opacity(0.45), radius: 3, x: 0, y: 0)
             }
-            Circle()
-                .strokeBorder(
-                    accent.opacity(isPast ? 0.55 : 0.85),
+            FourPointedStar()
+                .stroke(
+                    IhsanColor.brass.opacity(isPast ? 0.55 : 0.85),
                     lineWidth: 1.0
                 )
                 .frame(width: 9, height: 9)
         }
+        .shadow(
+            color: isPast ? IhsanColor.brass.opacity(0.35) : .clear,
+            radius: 2,
+            x: 0,
+            y: 0
+        )
     }
 }
 
-/// The now-marker. Larger than the prayer dots, with a tinted halo so it
-/// reads as the focal element. The 3 s breathing cycle uses a sine
-/// derived from the timeline timestamp — no `@State`, no background
-/// mutation.
+/// The now-marker. A large eight-pointed Star-of-Lakshmi rendered in
+/// gold, with a soft gold halo and a subtle 3-second breathing pulse.
+/// The pulse is suppressed under Reduce Motion.
 private struct NowMarker: View {
-    let accent: Color
     let reduceMotion: Bool
 
     var body: some View {
         if reduceMotion {
-            cursorView(scale: 1.0, opacity: 1.0)
+            markerBody(scale: 1.0, opacity: 1.0)
         } else {
             TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { context in
                 let elapsed = context.date.timeIntervalSinceReferenceDate
                 let phase = elapsed * (2 * .pi / 3.0) // 3 s cycle
                 let pulse = 0.5 + 0.5 * sin(phase)
-                let scale = 1.0 + 0.14 * pulse
-                let opacity = 0.85 + 0.15 * pulse
-                cursorView(scale: scale, opacity: opacity)
+                let scale = 1.0 + 0.10 * pulse
+                let opacity = 0.88 + 0.12 * pulse
+                markerBody(scale: scale, opacity: opacity)
             }
         }
     }
 
     @ViewBuilder
-    private func cursorView(scale: CGFloat, opacity: Double) -> some View {
+    private func markerBody(scale: CGFloat, opacity: Double) -> some View {
         ZStack {
-            // Soft outer halo
-            Circle()
-                .fill(accent.opacity(0.18))
-                .frame(width: 28, height: 28)
+            // Outer gold halo. Wider and softer than the inner star,
+            // tinted at 30% so it lifts the marker off the brass arc
+            // without ever reading as a glare.
+            EightPointedStar()
+                .fill(IhsanColor.gold.opacity(0.30))
+                .frame(width: 30, height: 30)
                 .blur(radius: 4)
-            // Inner filled marker
-            Circle()
-                .fill(accent)
-                .frame(width: 12, height: 12)
+
+            // Inner solid gold star — the visible marker.
+            EightPointedStar()
+                .fill(IhsanColor.gold)
+                .frame(width: 14, height: 14)
                 .overlay {
-                    Circle()
-                        .strokeBorder(.white.opacity(0.55), lineWidth: 0.75)
+                    EightPointedStar()
+                        .stroke(IhsanColor.brassLight.opacity(0.65), lineWidth: 0.6)
                 }
-                .shadow(color: accent.opacity(0.75), radius: 6, x: 0, y: 0)
-                .shadow(color: accent.opacity(0.45), radius: 14, x: 0, y: 0)
+                .shadow(color: IhsanColor.gold.opacity(0.75), radius: 6, x: 0, y: 0)
+                .shadow(color: IhsanColor.gold.opacity(0.40), radius: 14, x: 0, y: 0)
         }
         .scaleEffect(scale)
         .opacity(opacity)
     }
 }
 
-/// The pre-Fajr / post-Isha alternative. A flat horizontal line at the
-/// arc's base with a small moon icon at its centre. The arc is absent
-/// because the day's prayer arc has not yet begun, or has completed.
+/// The pre-Fajr / post-Isha alternative. A thin horizontal brass band at
+/// the arc's base with a small crescent moon at the user's current
+/// position. The arc is absent because the day's prayer arc has not yet
+/// begun or has completed; the page is contemplative.
 private struct NightLayer: View {
     let position: ArcPosition
     let size: CGSize
-    let accent: Color
-    let contrast: Color
 
     var body: some View {
         ZStack {
-            // Flat horizontal line — feathered ends so it never reads
-            // as a hard ruled border.
+            // Feathered brass horizon line.
             LinearGradient(
                 colors: [
-                    contrast.opacity(0.05),
-                    contrast.opacity(0.32),
-                    contrast.opacity(0.32),
-                    contrast.opacity(0.05)
+                    IhsanColor.brass.opacity(0.05),
+                    IhsanColor.brass.opacity(0.40),
+                    IhsanColor.brass.opacity(0.40),
+                    IhsanColor.brass.opacity(0.05)
                 ],
                 startPoint: .leading,
                 endPoint: .trailing
@@ -337,16 +349,15 @@ private struct NightLayer: View {
                 y: size.height - ArcGeometry.baseInsetBottom
             )
 
-            // Moon icon at the centre of the line, tinted in the
-            // current accent so it sits in the same chromatic key as
-            // the rest of the screen at night.
+            // Crescent moon centred on the line. Brass-tinted so it
+            // belongs to the same chromatic key as the day arc.
             Image(systemName: moonSymbol)
-                .font(.system(size: 16, weight: .regular))
-                .foregroundStyle(accent.opacity(0.85))
-                .shadow(color: accent.opacity(0.45), radius: 4, x: 0, y: 0)
+                .font(.system(size: 18, weight: .regular))
+                .foregroundStyle(IhsanColor.brass.opacity(0.88))
+                .shadow(color: IhsanColor.brass.opacity(0.45), radius: 4, x: 0, y: 0)
                 .position(
                     x: size.width / 2,
-                    y: size.height - ArcGeometry.baseInsetBottom - 14
+                    y: size.height - ArcGeometry.baseInsetBottom - 16
                 )
         }
     }
@@ -360,7 +371,7 @@ private struct NightLayer: View {
     }
 }
 
-// MARK: - Preview
+// MARK: - Previews
 
 #Preview("Prayer arc — mid-afternoon") {
     let calendar = Calendar.current
@@ -379,7 +390,7 @@ private struct NightLayer: View {
         IhsanSkyGradient().ignoresSafeArea()
         VStack {
             PrayerArc(prayerMarks: marks)
-                .padding(.horizontal, IhsanSpacing.lg)
+                .padding(.horizontal, IhsanSpacing.md)
         }
     }
     .environment(\.timeOfDayOverride, time(15, 45))
@@ -402,7 +413,7 @@ private struct NightLayer: View {
         IhsanSkyGradient().ignoresSafeArea()
         VStack {
             PrayerArc(prayerMarks: marks)
-                .padding(.horizontal, IhsanSpacing.lg)
+                .padding(.horizontal, IhsanSpacing.md)
         }
     }
     .environment(\.timeOfDayOverride, time(3, 30))

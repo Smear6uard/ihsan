@@ -32,15 +32,18 @@ private let testSize = CGSize(width: 360, height: 80)
 @Test
 func arcStartsAtLeftHorizon() {
     let p = ArcGeometry.point(at: 0, in: testSize)
-    #expect(p.x == ArcGeometry.inset)
-    #expect(p.y == testSize.height - ArcGeometry.baseInsetBottom)
+    #expect(abs(p.x - ArcGeometry.inset) < 0.001)
+    #expect(abs(p.y - (testSize.height - ArcGeometry.baseInsetBottom)) < 0.001)
 }
 
 @Test
 func arcEndsAtRightHorizon() {
+    // `sin(π)` carries a sub-ULP residue, so the apex term is ~1e-16
+    // rather than exactly zero. Compare with tolerance to match the
+    // pattern used by the apex test below.
     let p = ArcGeometry.point(at: 1, in: testSize)
-    #expect(p.x == testSize.width - ArcGeometry.inset)
-    #expect(p.y == testSize.height - ArcGeometry.baseInsetBottom)
+    #expect(abs(p.x - (testSize.width - ArcGeometry.inset)) < 0.001)
+    #expect(abs(p.y - (testSize.height - ArcGeometry.baseInsetBottom)) < 0.001)
 }
 
 @Test
