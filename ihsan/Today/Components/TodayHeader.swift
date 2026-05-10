@@ -1,6 +1,20 @@
 import SwiftUI
 import IhsanDesignSystem
 
+/// Page header for the Today screen. Sits directly on the manuscript
+/// page gradient with refined typography:
+///
+/// - Location name in large small caps, letter-spaced, contrast-picked
+///   against the page colour so it reads at every hour.
+/// - Hijri date below in inscription small caps with a brass moon-phase
+///   glyph.
+/// - An ornamental brass divider — feathered rule with a tiny four-
+///   pointed star at centre — separating the header from the content
+///   below.
+/// - Qibla and masjid affordances on the right as small circular
+///   illuminated chips: cream / amber disc bordered in brass, with the
+///   icon glyph rendered in the same contrast-picked colour as the
+///   location text.
 struct TodayHeader: View {
     let cityName: String
     let date: Date
@@ -10,29 +24,20 @@ struct TodayHeader: View {
     @Environment(\.timeOfDayOverride) private var override
 
     var body: some View {
-        // The header sits directly on the sky gradient — not on a card —
-        // so foreground colours route through `skyForegroundPrimary(at:)`
-        // (which always picks the better-contrast pole) rather than
-        // through the warm-card helpers used by the prayer rows below.
-        // A subtle opposite-tinted text shadow boosts effective
-        // legibility through the brief sunrise / maghrib transition
-        // windows where the sky top sits at mid-tone.
         let referenceDate = override ?? date
         let foreground = IhsanColor.skyForegroundPrimary(at: referenceDate)
         let foregroundSecondary = IhsanColor.skyForegroundSecondary(at: referenceDate)
-        let accent = IhsanColor.accentWarm(at: referenceDate)
         let shadowColor = legibilityShadowColor(for: foreground)
 
-        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+        VStack(alignment: .leading, spacing: IhsanSpacing.md) {
             HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.md) {
                 VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-                    // City name now reads in `bodyEnglishBold` (17 pt
-                    // semibold default) instead of the previous 13 pt
-                    // smallCaps — gives the header a real typographic
-                    // anchor rather than a row of small-caps run-on
-                    // labels.
-                    Text(cityName)
-                        .font(IhsanFont.bodyEnglishBold)
+                    // Location as a small-caps inscription — letter-
+                    // spaced and prominent, the way a manuscript page's
+                    // place name reads as a header.
+                    Text(cityName.uppercased())
+                        .font(IhsanFont.inscriptionLarge)
+                        .tracking(2.4)
                         .foregroundStyle(foreground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -40,112 +45,107 @@ struct TodayHeader: View {
 
                     HStack(spacing: IhsanSpacing.xs + IhsanSpacing.xxs) {
                         Text(HijriDateFormatter.string(from: referenceDate))
-                            .font(IhsanFont.smallCaps)
+                            .font(IhsanFont.inscription)
+                            .tracking(1.4)
                             .foregroundStyle(foregroundSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
-                        MoonPhaseGlyph(date: referenceDate, accent: accent)
+                        MoonPhaseGlyph(date: referenceDate)
                     }
                 }
 
                 Spacer(minLength: IhsanSpacing.sm)
 
                 HStack(spacing: IhsanSpacing.sm) {
-                    IconChip(
+                    IlluminatedIconChip(
                         systemName: "location.north.line.fill",
                         accessibilityLabel: "Qibla compass",
-                        tint: foreground,
                         action: qiblaAction
                     )
-                    IconChip(
+                    IlluminatedIconChip(
                         systemName: "mappin.and.ellipse.circle.fill",
                         accessibilityLabel: "Find nearest masjid",
-                        tint: foreground,
                         action: masjidAction
                     )
                 }
             }
 
-            // Atmospheric hairline separating the header from the
-            // content below. The line carries the warm accent at low
-            // opacity so it reads as a thread laid across the sky
-            // rather than as a hard UI rule.
-            AccentHairline(accent: accent)
+            // Ornamental brass divider with a centred four-pointed
+            // star flourish — the page's section break, echoing the
+            // divider inside the hero countdown card.
+            OrnamentalDivider(
+                tint: IhsanColor.brass,
+                opacity: 0.34,
+                starSize: 7,
+                ruleWidth: nil
+            )
         }
     }
 
     /// Returns the opposite-tinted shadow colour used to boost the
     /// header's effective legibility during the brief windows where
     /// the sky top sits at mid-tone (around sunrise and maghrib).
-    /// Ink-dark text gets a soft white halo; bone-cream text gets a
-    /// soft dark halo.
     private func legibilityShadowColor(for foreground: Color) -> Color {
-        foreground == IhsanColor.textInkDark
-            ? .white.opacity(0.40)
-            : .black.opacity(0.45)
+        foreground == IhsanColor.inkDeep
+            ? .white.opacity(0.42)
+            : .black.opacity(0.48)
     }
 }
 
-/// Small monochrome moon-phase glyph, tinted to the warm accent so the
-/// header reads in one chromatic key with the prayer arc's now-marker
-/// and the active-prayer indicator below.
+/// Small monochrome moon-phase glyph, tinted in brass so it belongs to
+/// the same chromatic key as the dividers and corner ornaments
+/// elsewhere on the page.
 private struct MoonPhaseGlyph: View {
     let date: Date
-    let accent: Color
 
     var body: some View {
         let bucket = MoonPhase.bucket(at: date)
         Image(systemName: bucket.symbolName)
             .font(.system(size: 13, weight: .regular))
-            .foregroundStyle(accent.opacity(0.85))
-            .shadow(color: accent.opacity(0.35), radius: 2, x: 0, y: 0)
+            .foregroundStyle(IhsanColor.brass.opacity(0.88))
+            .shadow(color: IhsanColor.brass.opacity(0.35), radius: 2, x: 0, y: 0)
             .accessibilityLabel(bucket.spokenLabel)
     }
 }
 
-/// Soft horizontal hairline drawn in the warm accent with feathered
-/// ends. Slightly stronger at the centre than at the edges so it
-/// reads as atmospheric structure rather than as a UI rule.
-private struct AccentHairline: View {
-    let accent: Color
-
-    var body: some View {
-        LinearGradient(
-            colors: [
-                .clear,
-                accent.opacity(0.28),
-                accent.opacity(0.18),
-                .clear
-            ],
-            startPoint: .leading,
-            endPoint: .trailing
-        )
-        .frame(height: IhsanSpacing.hairline)
-        .accessibilityHidden(true)
-    }
-}
-
-private struct IconChip: View {
+/// A circular illuminated chip used for the Qibla and masjid
+/// affordances at the top right of the page header. Built like a
+/// miniature illuminated panel: a solid cream / amber disc bordered
+/// in brass, with the icon glyph contrast-picked against that surface
+/// so it always reads cleanly regardless of the page colour beneath.
+private struct IlluminatedIconChip: View {
     let systemName: String
     let accessibilityLabel: String
-    let tint: Color
     let action: () -> Void
 
+    @Environment(\.timeOfDayOverride) private var override
+
     var body: some View {
+        let now = override ?? .now
+        let surface = IhsanColor.panelSurface(at: now)
+        let iconColor = IhsanColor.cardForegroundPrimary(at: now)
+
         Button {
             Haptics.impact(.medium)
             action()
         } label: {
             Image(systemName: systemName)
-                .font(.system(size: 16, weight: .medium))
-                .foregroundStyle(tint.opacity(0.92))
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(iconColor.opacity(0.88))
                 .frame(width: 36, height: 36)
-                // Sits on the sky directly, so we tint a subtle warm
-                // glass disc rather than reusing the dark
-                // `.ihsanGlass(.subtle)` material which would read as a
-                // cool patch on a warm sky.
-                .ihsanWarmCard(in: Circle(), intensity: .subtle)
+                .background {
+                    Circle()
+                        .fill(surface)
+                        .overlay {
+                            Circle()
+                                .strokeBorder(
+                                    IhsanColor.brass.opacity(0.55),
+                                    lineWidth: 0.75
+                                )
+                        }
+                }
+                .shadow(color: .black.opacity(0.08), radius: 4, x: 0, y: 1)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)

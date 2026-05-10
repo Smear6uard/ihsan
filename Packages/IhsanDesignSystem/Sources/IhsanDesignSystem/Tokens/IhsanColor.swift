@@ -320,6 +320,20 @@ public enum IhsanColor {
             : boneCream
     }
 
+    /// The illuminated-panel body colour at the given moment — `panelDay`
+    /// during daylight hours, `panelNight` at night. Resolves via the same
+    /// luminance threshold used by `cardForegroundPrimary`, so the surface
+    /// and its text foreground stay in lockstep across the sunrise /
+    /// maghrib flips. Use this when composing a custom illuminated
+    /// surface (e.g. a small chip) that needs to match the page's
+    /// dominant card material without going through the
+    /// `.ihsanIlluminatedPanel` modifier.
+    public static func panelSurface(at date: Date = .now) -> Color {
+        cardSurfaceLuminance(at: date) > cardForegroundLuminanceThreshold
+            ? panelDay
+            : panelNight
+    }
+
     /// Secondary text on a card surface — primary at 72% opacity.
     public static func cardForegroundSecondary(at date: Date = .now) -> Color {
         cardForegroundPrimary(at: date).opacity(0.72)
