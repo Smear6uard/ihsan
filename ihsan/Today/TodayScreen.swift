@@ -66,15 +66,18 @@ struct TodayScreen: View {
 
 private struct TodayLoadingView: View {
     var body: some View {
+        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
         VStack(spacing: IhsanSpacing.md) {
             ProgressView()
                 .progressViewStyle(.circular)
-                .tint(IhsanColor.textSecondary)
+                .tint(foregroundSecondary)
             Text("Loading prayer times…")
                 .font(IhsanFont.smallCaps)
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(foregroundSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Loading prayer times")
     }
 }
 
@@ -82,16 +85,20 @@ private struct TodayNeedsLocationView: View {
     let onRetry: () -> Void
 
     var body: some View {
+        let foreground = IhsanColor.skyForegroundPrimary()
+        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
+        let foregroundMuted = IhsanColor.skyForegroundMuted()
+        let accent = IhsanColor.accentWarm()
         VStack(spacing: IhsanSpacing.lg) {
             Image(systemName: "location.slash.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(foregroundMuted)
             Text("Location access is needed")
                 .font(IhsanFont.subtitle)
-                .foregroundStyle(IhsanColor.textPrimary)
+                .foregroundStyle(foreground)
             Text("Ihsan calculates prayer times from your current location. Coordinates are never stored or shared.")
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
+                .foregroundStyle(foregroundSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, IhsanSpacing.xl)
             Button("Continue") {
@@ -99,8 +106,8 @@ private struct TodayNeedsLocationView: View {
                 onRetry()
             }
                 .buttonStyle(.borderedProminent)
-                .tint(IhsanColor.textPrimary.opacity(0.18))
-                .foregroundStyle(IhsanColor.textPrimary)
+                .tint(accent.opacity(0.30))
+                .foregroundStyle(foreground)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -112,25 +119,29 @@ private struct TodayErrorView: View {
     let onRetry: () -> Void
 
     var body: some View {
+        let foreground = IhsanColor.skyForegroundPrimary()
+        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
+        let foregroundMuted = IhsanColor.skyForegroundMuted()
         VStack(spacing: IhsanSpacing.md) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(foregroundMuted)
             Text(message)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
+                .foregroundStyle(foregroundSecondary)
                 .multilineTextAlignment(.center)
             Button("Try Again") {
                 Haptics.impact(.light)
                 onRetry()
             }
                 .buttonStyle(.bordered)
-                .tint(IhsanColor.textPrimary)
+                .tint(foreground)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
+
 
 private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot

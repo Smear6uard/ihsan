@@ -282,6 +282,73 @@ public enum IhsanColor {
         return accentBrass
     }
 
+    // MARK: - Foreground colours for content sitting on the sky
+    //
+    // The header (city name, Hijri date, icon chips) does not float on a
+    // card — it sits directly on the sky gradient near the top of the
+    // screen. The card-foreground helpers above don't apply: the sky
+    // transitions between dark and light at different clock times than
+    // the cards do, so reusing `cardForegroundPrimary` would give a
+    // dark-text-on-dark-sky moment around sunrise.
+    //
+    // These helpers consult sky-TOP luminance specifically because that's
+    // where the header actually sits.
+
+    /// Internal RGB form of the sky top colour. Drives the foreground
+    /// brightness check below and is reused by tests to assert the
+    /// daylight / night flip happens at the right hour.
+    static func skyTopRGB(at date: Date) -> RGB {
+        interpolatedRGB(stops: skyTopStops, at: dayProgress(for: date))
+    }
+
+    /// WCAG-style relative luminance of the sky top at the given moment.
+    static func skyTopLuminance(at date: Date) -> Double {
+        let rgb = skyTopRGB(at: date)
+        func channel(_ c: Double) -> Double {
+            c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        return 0.2126 * channel(rgb.red)
+            + 0.7152 * channel(rgb.green)
+            + 0.0722 * channel(rgb.blue)
+    }
+
+    /// Approximate WCAG luminance of the two foreground extremes. Hard-
+    /// coded so the picker below doesn't have to recompute them per
+    /// call.
+    static let textInkLuminance: Double = 0.0130
+    static let textBoneLuminance: Double = 0.7150
+
+    /// Primary text colour for content sitting DIRECTLY on the sky
+    /// (header, status overlays, anything not inside a warm card).
+    ///
+    /// Instead of using a single threshold (which would pick the wrong
+    /// pole near the mid-tone transition zones around sunrise and
+    /// maghrib), this returns whichever of ink-dark or bone-cream has
+    /// the BETTER WCAG contrast against the current sky top. Callers
+    /// should still pair the colour with a small opposite-tinted text
+    /// shadow when their text would otherwise sit on a mid-tone sky.
+    public static func skyForegroundPrimary(at date: Date = .now) -> Color {
+        let skyLum = skyTopLuminance(at: date)
+        let inkContrast = wcagContrast(skyLum, textInkLuminance)
+        let creamContrast = wcagContrast(skyLum, textBoneLuminance)
+        return inkContrast >= creamContrast ? textInkDark : textBoneCream
+    }
+
+    /// WCAG contrast ratio between two relative luminances.
+    static func wcagContrast(_ a: Double, _ b: Double) -> Double {
+        let lighter = max(a, b)
+        let darker = min(a, b)
+        return (lighter + 0.05) / (darker + 0.05)
+    }
+
+    public static func skyForegroundSecondary(at date: Date = .now) -> Color {
+        skyForegroundPrimary(at: date).opacity(0.72)
+    }
+
+    public static func skyForegroundMuted(at date: Date = .now) -> Color {
+        skyForegroundPrimary(at: date).opacity(0.50)
+    }
+
     // MARK: - Status indicator colors
     //
     // All status indicators stay within the brass / bone / ivory / muted-white

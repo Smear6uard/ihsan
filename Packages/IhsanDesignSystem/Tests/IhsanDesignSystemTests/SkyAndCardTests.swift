@@ -290,3 +290,91 @@ func warmAccentIsBrassAtNoonAndMidnight() {
     #expect(!(noonP >= 0.74 && noonP <= 0.84))
     #expect(!(midnightP >= 0.74 && midnightP <= 0.84))
 }
+
+// MARK: - Sky foreground (header text directly on the sky)
+
+@Test
+func skyForegroundIsBoneCreamAtMidnight() {
+    // The midnight sky is deep ultramarine — ink dark would disappear,
+    // bone cream is the only correct choice.
+    let picked = IhsanColor.skyForegroundPrimary(at: makeDate(hour: 0))
+    #expect(picked == IhsanColor.textBoneCream)
+}
+
+@Test
+func skyForegroundIsInkDarkAtNoon() {
+    // The noon sky top is pale neutral cream — bone cream would
+    // disappear, ink dark is the only correct choice.
+    let picked = IhsanColor.skyForegroundPrimary(at: makeDate(hour: 12))
+    #expect(picked == IhsanColor.textInkDark)
+}
+
+@Test
+func skyForegroundPicksBetterContrastAtEveryHour() {
+    // For every hour the picked foreground must be the BETTER of the
+    // two extremes (ink dark or bone cream) against the sky top.
+    // Picking the worse one would be a regression of the warm-cards-
+    // on-time-adaptive-sky direction.
+    for hour in 0..<24 {
+        let date = makeDate(hour: hour, minute: 30)
+        let topLum = IhsanColor.skyTopLuminance(at: date)
+        let inkContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textInkLuminance)
+        let creamContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textBoneLuminance)
+        let picked = IhsanColor.skyForegroundPrimary(at: date)
+        if inkContrast >= creamContrast {
+            #expect(picked == IhsanColor.textInkDark,
+                    "hour \(hour):30 picked the wrong foreground")
+        } else {
+            #expect(picked == IhsanColor.textBoneCream,
+                    "hour \(hour):30 picked the wrong foreground")
+        }
+    }
+}
+
+@Test
+func skyForegroundContrastClearsLargeTextThresholdAtEveryHour() {
+    // The header is small caps semibold at 13 pt and sits over a small
+    // text shadow (see TodayHeader). We assert that the picked
+    // foreground's raw contrast against the sky top clears 3.0:1 (WCAG
+    // AA for large text) at every half-hour sample — with the shadow
+    // included, effective legibility climbs into the 4.5:1 zone for
+    // stable hours and stays readable through transition windows.
+    for hour in 0..<24 {
+        let date = makeDate(hour: hour, minute: 30)
+        let topRGB = IhsanColor.skyTopRGB(at: date)
+        let topLum = IhsanColor.skyTopLuminance(at: date)
+        let inkContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textInkLuminance)
+        let creamContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textBoneLuminance)
+        let foreground = inkContrast >= creamContrast ? textInkRGB : textBoneRGB
+        let ratio = contrastRatio(foreground, topRGB)
+        #expect(
+            ratio >= 3.0,
+            "hour \(hour):30 header contrast was \(ratio), sky top lum \(topLum)"
+        )
+    }
+}
+
+@Test
+func skyForegroundContrastClearsNormalTextThresholdOutsideTransitions() {
+    // Outside the brief sunrise (~7-8 am) and maghrib (~5-7 pm)
+    // transition zones the picked foreground must clear 4.5:1 (WCAG
+    // AA for normal text). The transition zones are explicitly
+    // excluded — they are short windows where the sky top is mid-tone
+    // and the header text leans on its shadow plus the smallCaps
+    // weight for legibility. See `TodayHeader` for the rendered
+    // treatment.
+    let stableHours = [0, 1, 2, 3, 4, 5, 9, 10, 11, 12, 13, 14, 15, 16, 20, 21, 22, 23]
+    for hour in stableHours {
+        let date = makeDate(hour: hour, minute: 30)
+        let topRGB = IhsanColor.skyTopRGB(at: date)
+        let topLum = IhsanColor.skyTopLuminance(at: date)
+        let inkContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textInkLuminance)
+        let creamContrast = IhsanColor.wcagContrast(topLum, IhsanColor.textBoneLuminance)
+        let foreground = inkContrast >= creamContrast ? textInkRGB : textBoneRGB
+        let ratio = contrastRatio(foreground, topRGB)
+        #expect(
+            ratio >= 4.5,
+            "stable hour \(hour):30 header contrast was \(ratio), sky top lum \(topLum)"
+        )
+    }
+}
