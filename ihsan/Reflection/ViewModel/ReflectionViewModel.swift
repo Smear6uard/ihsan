@@ -128,9 +128,16 @@ final class ReflectionViewModel {
 
     /// Stops recording and runs an on-device transcription. The audio is
     /// attached to the draft regardless of whether transcription succeeds.
+    ///
+    /// Idempotent: also called from the screen's state-change observer to
+    /// pick up implicit finalizations (backgrounding, AVAudioSession
+    /// interruptions). The memoID guard below prevents double-attaching.
     func endRecording() async {
         recorder.stop()
         guard case let .finished(memoID, fileURL, duration) = recorder.state else {
+            return
+        }
+        if draft.attachedAudio?.memoID == memoID {
             return
         }
 
@@ -146,7 +153,13 @@ final class ReflectionViewModel {
         isTranscribing = true
         defer {
             isTranscribing = false
-            recorder.reset()
+            // Only reset if the recorder is still pinned to the memo we
+            // just transcribed. If the user started a new recording during
+            // the await, the recorder is now in `.recording` for a
+            // different memo and resetting would clobber that state.
+            if case .finished(let id, _, _) = recorder.state, id == memoID {
+                recorder.reset()
+            }
         }
 
         do {
