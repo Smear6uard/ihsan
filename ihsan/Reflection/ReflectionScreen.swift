@@ -77,6 +77,14 @@ struct ReflectionScreen: View {
                 startRecorderTimer()
             } else {
                 stopRecorderTimer()
+                // Catch implicit finalizations the user didn't initiate —
+                // AVAudioSession interruption, app backgrounding finishing
+                // the recording on its own, etc. The view-model is
+                // idempotent, so this is a no-op when an explicit stop
+                // already triggered the attach + transcribe flow.
+                if let viewModel {
+                    Task { await viewModel.endRecording() }
+                }
             }
         }
         .sheet(item: $presentedReflection) { reflection in

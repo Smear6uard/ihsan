@@ -27,6 +27,37 @@ final class AudioRecordingService: NSObject, AVAudioRecorderDelegate {
 
     private var recorder: AVAudioRecorder?
     private var sessionConfigured = false
+    /// Stored once in `init`, removed once in `deinit`. The
+    /// `nonisolated(unsafe)` annotation lets the nonisolated `deinit` read
+    /// it; the property is otherwise only touched on the main actor.
+    nonisolated(unsafe) private var interruptionObserver: NSObjectProtocol?
+
+    override init() {
+        super.init()
+        // The observer is held for the lifetime of the service. The handler
+        // guards on the recording state, so it's a no-op outside of an
+        // active recording. We unwrap the interruption type at the
+        // notification site (where `Notification`'s non-Sendable shape is
+        // contained) and pass a Sendable enum across the actor hop.
+        interruptionObserver = NotificationCenter.default.addObserver(
+            forName: AVAudioSession.interruptionNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            let type = (notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt)
+                .flatMap(AVAudioSession.InterruptionType.init(rawValue:))
+            Task { @MainActor [weak self] in
+                guard let self, let type else { return }
+                self.handleInterruption(type: type)
+            }
+        }
+    }
+
+    deinit {
+        if let interruptionObserver {
+            NotificationCenter.default.removeObserver(interruptionObserver)
+        }
+    }
 
     /// Permission probe + start. Returns the URL the recording is being
     /// written to so the caller can hand it to a transcription service
@@ -171,6 +202,29 @@ final class AudioRecordingService: NSObject, AVAudioRecorderDelegate {
         #endif
     }
 
+    // MARK: - Interruption
+
+    /// Phone calls, alarms, Siri activation, and similar all post an
+    /// `AVAudioSession.interruptionNotification`. AVAudioRecorder pauses on
+    /// interruption begin; without intervention the view-model would stay
+    /// in `.recording` forever even though the system has frozen the input.
+    /// We finalize what was captured so the user can save what they have.
+    private func handleInterruption(type: AVAudioSession.InterruptionType) {
+        switch type {
+        case .began:
+            if case .recording = state {
+                stop()
+            }
+        case .ended:
+            // We do not auto-resume. The user is back from the interruption
+            // and will see the captured recording; they can start a new
+            // one if they want to add to it.
+            break
+        @unknown default:
+            break
+        }
+    }
+
     // MARK: - AVAudioRecorderDelegate
     //
     // `AVAudioRecorderDelegate` callbacks may arrive on a background thread.
@@ -183,12 +237,27 @@ final class AudioRecordingService: NSObject, AVAudioRecorderDelegate {
     ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
-            // Only react if we didn't already transition via `stop()`.
-            if case .recording = self.state, !flag {
-                self.state = .failed(message: "The recording could not be saved.")
-                self.recorder = nil
-                self.deactivateSession()
+            // Only react if we didn't already transition via `stop()` —
+            // the synchronous `stop()` path leaves state at `.finished`,
+            // and the delegate fires async after; that path short-circuits
+            // here. We reach the body when AVFoundation finalized the
+            // recording on its own (system-stopped due to backgrounding,
+            // or interruption that elapsed past the recorder).
+            guard case let .recording(memoID, startedAt, fileURL) = self.state else {
+                return
             }
+            if flag {
+                let duration = max(0.1, Date.now.timeIntervalSince(startedAt))
+                self.state = .finished(
+                    memoID: memoID,
+                    fileURL: fileURL,
+                    duration: duration
+                )
+            } else {
+                self.state = .failed(message: "The recording could not be saved.")
+            }
+            self.recorder = nil
+            self.deactivateSession()
         }
     }
 
