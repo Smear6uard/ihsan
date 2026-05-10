@@ -58,6 +58,16 @@ public protocol LocationProviding: Sendable {
     /// - For direction-critical features, check `sample.isAccuracyAcceptable`
     ///   before trusting the value.
     func headingUpdates() async throws -> AsyncStream<HeadingSample>
+
+    /// Synchronous hardware-availability probe for the magnetometer.
+    /// Used by surfaces that want to short-circuit before subscribing
+    /// to `headingUpdates()` — e.g., the watchOS Qibla screen, which
+    /// renders a different "compass not available on this watch"
+    /// state on Series 3/4 / first SE rather than a static dial.
+    ///
+    /// Returns `false` on macOS (no magnetometer), and on watchOS /
+    /// iPadOS / iOS where the device has no compass hardware.
+    func isHeadingAvailable() -> Bool
 }
 
 public extension LocationProviding {

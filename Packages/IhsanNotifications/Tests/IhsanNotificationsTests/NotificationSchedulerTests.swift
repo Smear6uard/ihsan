@@ -228,6 +228,8 @@ private struct MockLocationProvider: LocationProviding {
 
     func stopMonitoringSignificantChanges() async {}
 
+    func isHeadingAvailable() -> Bool { false }
+
     func headingUpdates() async throws -> AsyncStream<HeadingSample> {
         AsyncStream { continuation in
             continuation.finish()

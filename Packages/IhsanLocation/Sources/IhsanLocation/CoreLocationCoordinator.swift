@@ -157,6 +157,14 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
         manager.stopMonitoringSignificantLocationChanges()
     }
 
+    public func isHeadingAvailable() -> Bool {
+        #if os(macOS)
+        return false
+        #else
+        return CLLocationManager.headingAvailable()
+        #endif
+    }
+
     public func headingUpdates() async throws -> AsyncStream<HeadingSample> {
         #if os(macOS)
         // macOS has no magnetometer; CLHeading APIs are unavailable.

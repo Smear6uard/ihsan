@@ -13,6 +13,19 @@
 		428FEED32FAF30000097E665 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED42FAF30000097E665 /* IhsanLocation */; };
 		428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEED72FAF30000097E665 /* IhsanDesignSystem */; };
 		428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 428FEEE12FAF30000097E665 /* IhsanFiqhConfig */; };
+		5A00000000000000000B0001 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0001 /* IhsanCore */; };
+		5A00000000000000000B0002 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0002 /* IhsanPrayerTimes */; };
+		5A00000000000000000B0003 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0003 /* IhsanIntents */; };
+		5A00000000000000000B0004 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0004 /* IhsanLocation */; };
+		5A00000000000000000B0005 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0005 /* IhsanDesignSystem */; };
+		5A00000000000000000B0006 /* IhsanFiqhConfig in Frameworks */ = {isa = PBXBuildFile; productRef = 5A00000000000000000C0006 /* IhsanFiqhConfig */; };
+		6B00000000000000000B0001 /* IhsanCore in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0001 /* IhsanCore */; };
+		6B00000000000000000B0002 /* IhsanPrayerTimes in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0002 /* IhsanPrayerTimes */; };
+		6B00000000000000000B0003 /* IhsanLocation in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0003 /* IhsanLocation */; };
+		6B00000000000000000B0004 /* IhsanDesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0004 /* IhsanDesignSystem */; };
+		6B00000000000000000B0005 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0005 /* IhsanIntents */; };
+		7C00000000000000000D0001 /* ihsanWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A00000000000000000A0002 /* ihsanWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		7C00000000000000000E0001 /* ihsanWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6B00000000000000000A0002 /* ihsanWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -30,12 +43,53 @@
 			remoteGlobalIDString = 428FEE9C2FAF234A0097E665;
 			remoteInfo = ihsan;
 		};
+		7C00000000000000000D0004 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 428FEE952FAF234A0097E665 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 5A00000000000000000A0001;
+			remoteInfo = ihsanWatch;
+		};
+		7C00000000000000000E0003 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 428FEE952FAF234A0097E665 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 6B00000000000000000A0001;
+			remoteInfo = ihsanWatchWidgets;
+		};
 /* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		5A00000000000000000A000A /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				7C00000000000000000E0001 /* ihsanWatchWidgets.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7C00000000000000000D0002 /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				7C00000000000000000D0001 /* ihsanWatch.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
 		428FEE9D2FAF234A0097E665 /* ihsan.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ihsan.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		428FEEAA2FAF234C0097E665 /* ihsanTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ihsanTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		428FEEB42FAF234C0097E665 /* ihsanUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ihsanUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		5A00000000000000000A0002 /* ihsanWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ihsanWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		6B00000000000000000A0002 /* ihsanWatchWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ihsanWatchWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -52,6 +106,16 @@
 		428FEEB72FAF234C0097E665 /* ihsanUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ihsanUITests;
+			sourceTree = "<group>";
+		};
+		5A00000000000000000A0003 /* ihsanWatch */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ihsanWatch;
+			sourceTree = "<group>";
+		};
+		6B00000000000000000A0003 /* ihsanWatchWidgets */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = ihsanWatchWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -84,6 +148,31 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5A00000000000000000A0008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5A00000000000000000B0001 /* IhsanCore in Frameworks */,
+				5A00000000000000000B0002 /* IhsanPrayerTimes in Frameworks */,
+				5A00000000000000000B0003 /* IhsanIntents in Frameworks */,
+				5A00000000000000000B0004 /* IhsanLocation in Frameworks */,
+				5A00000000000000000B0005 /* IhsanDesignSystem in Frameworks */,
+				5A00000000000000000B0006 /* IhsanFiqhConfig in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6B00000000000000000A0008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6B00000000000000000B0001 /* IhsanCore in Frameworks */,
+				6B00000000000000000B0002 /* IhsanPrayerTimes in Frameworks */,
+				6B00000000000000000B0003 /* IhsanLocation in Frameworks */,
+				6B00000000000000000B0004 /* IhsanDesignSystem in Frameworks */,
+				6B00000000000000000B0005 /* IhsanIntents in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -91,6 +180,8 @@
 			isa = PBXGroup;
 			children = (
 				428FEE9F2FAF234A0097E665 /* ihsan */,
+				5A00000000000000000A0003 /* ihsanWatch */,
+				6B00000000000000000A0003 /* ihsanWatchWidgets */,
 				428FEEAD2FAF234C0097E665 /* ihsanTests */,
 				428FEEB72FAF234C0097E665 /* ihsanUITests */,
 				428FEE9E2FAF234A0097E665 /* Products */,
@@ -103,6 +194,8 @@
 				428FEE9D2FAF234A0097E665 /* ihsan.app */,
 				428FEEAA2FAF234C0097E665 /* ihsanTests.xctest */,
 				428FEEB42FAF234C0097E665 /* ihsanUITests.xctest */,
+				5A00000000000000000A0002 /* ihsanWatch.app */,
+				6B00000000000000000A0002 /* ihsanWatchWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -117,10 +210,12 @@
 				428FEE992FAF234A0097E665 /* Sources */,
 				428FEE9A2FAF234A0097E665 /* Frameworks */,
 				428FEE9B2FAF234A0097E665 /* Resources */,
+				7C00000000000000000D0002 /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				7C00000000000000000D0003 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				428FEE9F2FAF234A0097E665 /* ihsan */,
@@ -184,6 +279,63 @@
 			productReference = 428FEEB42FAF234C0097E665 /* ihsanUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
+		5A00000000000000000A0001 /* ihsanWatch */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5A00000000000000000A0004 /* Build configuration list for PBXNativeTarget "ihsanWatch" */;
+			buildPhases = (
+				5A00000000000000000A0007 /* Sources */,
+				5A00000000000000000A0008 /* Frameworks */,
+				5A00000000000000000A0009 /* Resources */,
+				5A00000000000000000A000A /* Embed Foundation Extensions */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7C00000000000000000E0002 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				5A00000000000000000A0003 /* ihsanWatch */,
+			);
+			name = ihsanWatch;
+			packageProductDependencies = (
+				5A00000000000000000C0001 /* IhsanCore */,
+				5A00000000000000000C0002 /* IhsanPrayerTimes */,
+				5A00000000000000000C0003 /* IhsanIntents */,
+				5A00000000000000000C0004 /* IhsanLocation */,
+				5A00000000000000000C0005 /* IhsanDesignSystem */,
+				5A00000000000000000C0006 /* IhsanFiqhConfig */,
+			);
+			productName = ihsanWatch;
+			productReference = 5A00000000000000000A0002 /* ihsanWatch.app */;
+			productType = "com.apple.product-type.application";
+		};
+		6B00000000000000000A0001 /* ihsanWatchWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6B00000000000000000A0004 /* Build configuration list for PBXNativeTarget "ihsanWatchWidgets" */;
+			buildPhases = (
+				6B00000000000000000A0007 /* Sources */,
+				6B00000000000000000A0008 /* Frameworks */,
+				6B00000000000000000A0009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				6B00000000000000000A0003 /* ihsanWatchWidgets */,
+			);
+			name = ihsanWatchWidgets;
+			packageProductDependencies = (
+				6B00000000000000000C0001 /* IhsanCore */,
+				6B00000000000000000C0002 /* IhsanPrayerTimes */,
+				6B00000000000000000C0003 /* IhsanLocation */,
+				6B00000000000000000C0004 /* IhsanDesignSystem */,
+				6B00000000000000000C0005 /* IhsanIntents */,
+			);
+			productName = ihsanWatchWidgets;
+			productReference = 6B00000000000000000A0002 /* ihsanWatchWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -204,6 +356,12 @@
 					428FEEB32FAF234C0097E665 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = 428FEE9C2FAF234A0097E665;
+					};
+					5A00000000000000000A0001 = {
+						CreatedOnToolsVersion = 26.4.1;
+					};
+					6B00000000000000000A0001 = {
+						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
 			};
@@ -230,6 +388,8 @@
 			projectRoot = "";
 			targets = (
 				428FEE9C2FAF234A0097E665 /* ihsan */,
+				5A00000000000000000A0001 /* ihsanWatch */,
+				6B00000000000000000A0001 /* ihsanWatchWidgets */,
 				428FEEA92FAF234C0097E665 /* ihsanTests */,
 				428FEEB32FAF234C0097E665 /* ihsanUITests */,
 			);
@@ -252,6 +412,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		428FEEB22FAF234C0097E665 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		5A00000000000000000A0009 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6B00000000000000000A0009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -282,6 +456,20 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		5A00000000000000000A0007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		6B00000000000000000A0007 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -294,6 +482,17 @@
 			isa = PBXTargetDependency;
 			target = 428FEE9C2FAF234A0097E665 /* ihsan */;
 			targetProxy = 428FEEB52FAF234C0097E665 /* PBXContainerItemProxy */;
+		};
+		7C00000000000000000D0003 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			platformFilter = ios;
+			target = 5A00000000000000000A0001 /* ihsanWatch */;
+			targetProxy = 7C00000000000000000D0004 /* PBXContainerItemProxy */;
+		};
+		7C00000000000000000E0002 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 6B00000000000000000A0001 /* ihsanWatchWidgets */;
+			targetProxy = 7C00000000000000000E0003 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -610,6 +809,134 @@
 			};
 			name = Release;
 		};
+		5A00000000000000000A0005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWatch/ihsanWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		5A00000000000000000A0006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWatch/ihsanWatch.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWatch/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
+		6B00000000000000000A0005 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWatchWidgets/ihsanWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWatchWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Debug;
+		};
+		6B00000000000000000A0006 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = ihsanWatchWidgets/ihsanWatchWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 5L4XYK45U6;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ihsanWatchWidgets/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.sameerstudios.ihsan.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "watchos watchsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 26.0;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -645,6 +972,24 @@
 			buildConfigurations = (
 				428FEEC52FAF234C0097E665 /* Debug */,
 				428FEEC62FAF234C0097E665 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5A00000000000000000A0004 /* Build configuration list for PBXNativeTarget "ihsanWatch" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5A00000000000000000A0005 /* Debug */,
+				5A00000000000000000A0006 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6B00000000000000000A0004 /* Build configuration list for PBXNativeTarget "ihsanWatchWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6B00000000000000000A0005 /* Debug */,
+				6B00000000000000000A0006 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -708,6 +1053,61 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */;
 			productName = IhsanFiqhConfig;
+		};
+		5A00000000000000000C0001 /* IhsanCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */;
+			productName = IhsanCore;
+		};
+		5A00000000000000000C0002 /* IhsanPrayerTimes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */;
+			productName = IhsanPrayerTimes;
+		};
+		5A00000000000000000C0003 /* IhsanIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */;
+			productName = IhsanIntents;
+		};
+		5A00000000000000000C0004 /* IhsanLocation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */;
+			productName = IhsanLocation;
+		};
+		5A00000000000000000C0005 /* IhsanDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */;
+			productName = IhsanDesignSystem;
+		};
+		5A00000000000000000C0006 /* IhsanFiqhConfig */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */;
+			productName = IhsanFiqhConfig;
+		};
+		6B00000000000000000C0001 /* IhsanCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEECA2FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanCore" */;
+			productName = IhsanCore;
+		};
+		6B00000000000000000C0002 /* IhsanPrayerTimes */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEEC92FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanPrayerTimes" */;
+			productName = IhsanPrayerTimes;
+		};
+		6B00000000000000000C0003 /* IhsanLocation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED52FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanLocation" */;
+			productName = IhsanLocation;
+		};
+		6B00000000000000000C0004 /* IhsanDesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */;
+			productName = IhsanDesignSystem;
+		};
+		6B00000000000000000C0005 /* IhsanIntents */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */;
+			productName = IhsanIntents;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
