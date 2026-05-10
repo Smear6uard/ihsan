@@ -12,35 +12,32 @@ struct TodayScreen: View {
     @State private var presentingMasjids = false
 
     var body: some View {
-        ZStack {
-            // Standard dark ground beneath everything.
-            IhsanColor.ground.ignoresSafeArea()
-
-            // Photographic wallpaper layer for sunrise/maghrib windows.
-            if case .ready(let snapshot) = viewModel?.state {
-                DaylightWallpaper(dayTimes: snapshot.dayTimes)
-                    .ignoresSafeArea()
+        content
+            // Time-adaptive sky. The gradient endpoints drift through
+            // the day so the screen reads as morning, afternoon, or
+            // night without the user having to check a clock. The
+            // photographic sunrise / maghrib assets live INSIDE the
+            // hero countdown card now (see `TodayHeroSection`), not
+            // across the whole background — keeps the warmth focused
+            // where the user's eye lands.
+            .ihsanSkyBackground()
+            .task {
+                if viewModel == nil {
+                    viewModel = TodayViewModel(modelContext: modelContext)
+                    Haptics.prepareAll()
+                }
+                await viewModel?.bootstrap()
             }
-
-            content
-        }
-        .task {
-            if viewModel == nil {
-                viewModel = TodayViewModel(modelContext: modelContext)
-                Haptics.prepareAll()
+            .sheet(isPresented: $presentingQibla) {
+                QiblaScreen()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
             }
-            await viewModel?.bootstrap()
-        }
-        .sheet(isPresented: $presentingQibla) {
-            QiblaScreen()
-                .presentationDetents([.large])
-                .presentationDragIndicator(.visible)
-        }
-        .sheet(isPresented: $presentingMasjids) {
-            MasjidFinderScreen()
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-        }
+            .sheet(isPresented: $presentingMasjids) {
+                MasjidFinderScreen()
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
     }
 
     @ViewBuilder
