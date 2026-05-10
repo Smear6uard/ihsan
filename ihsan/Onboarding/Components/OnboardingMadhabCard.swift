@@ -94,6 +94,6 @@ struct OnboardingMadhabCard: View {
     private var animation: Animation {
         reduceMotion
             ? .linear(duration: 0.18)
-            : .spring(response: 0.4, dampingFraction: 0.82)
+            : .spring(response: 0.4, dampingFraction: 0.85)
     }
 }

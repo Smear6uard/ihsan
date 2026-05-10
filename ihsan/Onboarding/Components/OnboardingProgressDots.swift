@@ -22,6 +22,10 @@ struct OnboardingProgressDots: View {
                         height: 6
                     )
                     .animation(
+                        // Slower than the standard 0.35 UI spring on
+                        // purpose: the dot morph between width 6 and
+                        // width 22 carries the "you advanced a step"
+                        // beat and benefits from a deliberate settle.
                         reduceMotion
                             ? .linear(duration: 0.18)
                             : .spring(response: 0.55, dampingFraction: 0.85),

@@ -102,9 +102,12 @@ struct QiblaCompassDial: View {
             .offset(y: -dialDiameter / 2 + 38)
             .rotationEffect(.degrees(qiblaBearing - currentHeading))
             .animation(
+                // Standard UI spring — alignment feedback comes from the
+                // brass halo + scale lift on KaabaIndicator, not from
+                // bounce in the rotation itself.
                 reduceMotion
                     ? nil
-                    : .spring(response: 0.45, dampingFraction: 0.7),
+                    : .spring(response: 0.4, dampingFraction: 0.85),
                 value: isAligned
             )
     }

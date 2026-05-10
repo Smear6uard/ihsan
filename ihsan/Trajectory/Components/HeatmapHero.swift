@@ -50,16 +50,13 @@ struct HeatmapHero: View {
         )
         return LazyVGrid(columns: columns, spacing: dotSpacing) {
             ForEach(snapshot.days) { day in
-                DayDot(day: day, diameter: dotDiameter)
-                    .frame(width: dotDiameter, height: dotDiameter)
-                    .contentShape(Rectangle())
-                    .onTapGesture {
-                        // Haptics audit: the dot itself is the intentional
-                        // mapped surface. Do not layer an additional sheet-
-                        // presentation haptic for the day popover.
-                        Haptics.tap()
-                        onDayTap(day)
-                    }
+                DayDot(day: day, diameter: dotDiameter) {
+                    // Haptics audit: the dot itself is the intentional
+                    // mapped surface. Do not layer an additional sheet-
+                    // presentation haptic for the day popover.
+                    Haptics.tap()
+                    onDayTap(day)
+                }
             }
         }
     }
@@ -75,9 +72,16 @@ struct HeatmapHero: View {
 /// 1) the dot (or pause dash),
 /// 2) the airplane glyph for travel days,
 /// 3) a subtle ring for today.
+///
+/// On tap the dot does a brief 1.0→1.12→1.0 bounce so the gesture has a
+/// felt-out target, then runs `onTap` to surface the popover.
 private struct DayDot: View {
     let day: DayCompletion
     let diameter: CGFloat
+    let onTap: () -> Void
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var tapBeat: Int = 0
 
     var body: some View {
         ZStack {
@@ -104,6 +108,24 @@ private struct DayDot: View {
             }
         }
         .frame(width: diameter, height: diameter)
+        .contentShape(Rectangle())
+        .keyframeAnimator(
+            initialValue: 1.0,
+            trigger: tapBeat
+        ) { content, scale in
+            content.scaleEffect(scale)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(1.12, duration: 0.10)
+                SpringKeyframe(1.0, spring: .bouncy(duration: 0.30, extraBounce: 0.08))
+            }
+        }
+        .onTapGesture {
+            if !reduceMotion {
+                tapBeat &+= 1
+            }
+            onTap()
+        }
     }
 
     private var opacity: Double {

@@ -13,7 +13,7 @@ struct PeriodSelector: View {
                 Button {
                     guard period != option else { return }
                     Haptics.tap()
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                    withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
                         period = option
                     }
                 } label: {

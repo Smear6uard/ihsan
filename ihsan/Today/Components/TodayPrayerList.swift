@@ -64,6 +64,7 @@ private struct PrayerRowComposable: View {
     let onSetStatus: (PrayerStatus) -> Void
     let onToggleJamaah: () -> Void
 
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var showingActionDialog = false
 
     var body: some View {
@@ -90,11 +91,7 @@ private struct PrayerRowComposable: View {
             Button {
                 showingActionDialog = true
             } label: {
-                if let status {
-                    StatusPill(status)
-                } else {
-                    StatusPlaceholder()
-                }
+                statusContent
             }
             .buttonStyle(.plain)
             .accessibilityLabel(statusAccessibilityLabel)
@@ -125,11 +122,63 @@ private struct PrayerRowComposable: View {
         onSetStatus(status)
     }
 
+    /// Status pill / placeholder, with a subtle scale + opacity beat on
+    /// status change so the pill never hard-cuts to a new colour.
+    @ViewBuilder
+    private var statusContent: some View {
+        Group {
+            if let status {
+                StatusPill(status)
+            } else {
+                StatusPlaceholder()
+            }
+        }
+        .modifier(StatusPillBeat(trigger: status, reduceMotion: reduceMotion))
+    }
+
     private var statusAccessibilityLabel: String {
         if let status {
             return "Status: \(status.rawValue), tap to change"
         }
         return "Tap to log \(prayer.displayNameEnglish)"
+    }
+}
+
+/// Briefly compresses the status pill to 0.95 / 0.65 opacity then springs
+/// back to 1.0 / 1.0 whenever the status changes. Reduce-motion users get
+/// the new pill without any motion.
+private struct StatusPillBeat: ViewModifier {
+    let trigger: PrayerStatus?
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        if reduceMotion {
+            content
+        } else {
+            content
+                .keyframeAnimator(
+                    initialValue: PillBeat(),
+                    trigger: trigger
+                ) { view, value in
+                    view
+                        .scaleEffect(value.scale)
+                        .opacity(value.opacity)
+                } keyframes: { _ in
+                    KeyframeTrack(\.scale) {
+                        CubicKeyframe(0.95, duration: 0.08)
+                        SpringKeyframe(1.0, spring: .smooth(duration: 0.32))
+                    }
+                    KeyframeTrack(\.opacity) {
+                        CubicKeyframe(0.65, duration: 0.08)
+                        CubicKeyframe(1.0, duration: 0.22)
+                    }
+                }
+        }
+    }
+
+    private struct PillBeat {
+        var scale: Double = 1.0
+        var opacity: Double = 1.0
     }
 }
 

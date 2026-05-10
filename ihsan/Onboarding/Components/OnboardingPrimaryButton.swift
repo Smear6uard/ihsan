@@ -58,6 +58,9 @@ private struct PressableScaleStyle: ButtonStyle {
             .scaleEffect(reduceMotion ? 1.0 : (configuration.isPressed ? 0.98 : 1.0))
             .opacity(configuration.isPressed ? 0.92 : 1.0)
             .animation(
+                // Press feedback intentionally tighter than the standard
+                // 0.35/0.85 UI spring: button-down should feel like
+                // immediate physical contact, not a settled UI transition.
                 reduceMotion
                     ? .linear(duration: 0.1)
                     : .spring(response: 0.32, dampingFraction: 0.78),

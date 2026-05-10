@@ -53,6 +53,11 @@ struct OnboardingWelcomeStep: View {
                 .opacity(hasAppeared ? 1 : 0)
                 .scaleEffect(hasAppeared ? 1.0 : 0.96)
                 .animation(
+                    // Splash entrance — intentionally a slow, generous
+                    // settle (response 0.7) rather than the standard UI
+                    // spring. The wordmark is the first impression of
+                    // the app; it should feel like it's arriving, not
+                    // popping in.
                     reduceMotion
                         ? .linear(duration: 0.2)
                         : .spring(response: 0.7, dampingFraction: 0.85),
