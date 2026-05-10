@@ -74,7 +74,10 @@ struct SettingsScreen: View {
                             ReflectionSyncSection(settings: settings)
                             PrivacySection(
                                 onExport: exportData,
-                                onDelete: { confirmingDeleteAllData = true }
+                                onDelete: {
+                                    Haptics.impact(.light)
+                                    confirmingDeleteAllData = true
+                                }
                             )
                             AboutSection(openURL: openURL)
                         } else {
@@ -215,11 +218,13 @@ struct SettingsScreen: View {
 
     private func showCoordinatesIfAvailable() {
         #if DEBUG
+        Haptics.impact(.medium)
         showingCoordinates = true
         #endif
     }
 
     private func setAutomaticLocationUpdates(_ isEnabled: Bool, for settings: UserSettings) {
+        Haptics.impact(.light)
         settings.automaticLocationUpdatesEnabled = isEnabled
         settings.modifiedAt = .now
         Task {
@@ -233,6 +238,9 @@ struct SettingsScreen: View {
                     refreshMessage = "Automatic updates disabled"
                 }
             } catch let error as LocationError {
+                if error == .permissionDenied || error == .permissionRestricted {
+                    Haptics.notification(.warning)
+                }
                 refreshMessage = error.userFacingMessage
             } catch {
                 refreshMessage = error.localizedDescription
@@ -241,6 +249,7 @@ struct SettingsScreen: View {
     }
 
     private func refreshLocation(for settings: UserSettings) {
+        Haptics.impact(.light)
         refreshMessage = "Refreshing location..."
         Task {
             do {
@@ -252,6 +261,9 @@ struct SettingsScreen: View {
                 settings.modifiedAt = .now
                 refreshMessage = "Location refreshed"
             } catch let error as LocationError {
+                if error == .permissionDenied || error == .permissionRestricted {
+                    Haptics.notification(.warning)
+                }
                 refreshMessage = error.userFacingMessage
             } catch {
                 refreshMessage = error.localizedDescription
@@ -288,6 +300,7 @@ struct SettingsScreen: View {
 
     private func createPauseInterval() {
         guard activePause == nil else { return }
+        Haptics.impact(.medium)
         let now = Date.now
         modelContext.insert(PauseInterval(
             startDate: now,
@@ -295,6 +308,7 @@ struct SettingsScreen: View {
             createdAt: now,
             modifiedAt: now
         ))
+        Haptics.notification(.success)
     }
 
     private func closePauseInterval() {
@@ -302,6 +316,7 @@ struct SettingsScreen: View {
         let now = Date.now
         activePause.endDate = now
         activePause.modifiedAt = now
+        Haptics.notification(.success)
     }
 
     private func handleTravelToggle(_ isEnabled: Bool) {
@@ -314,6 +329,7 @@ struct SettingsScreen: View {
 
     private func createTravelInterval() {
         guard activeTravel == nil else { return }
+        Haptics.impact(.medium)
         let now = Date.now
         modelContext.insert(TravelInterval(
             startDate: now,
@@ -321,6 +337,7 @@ struct SettingsScreen: View {
             createdAt: now,
             modifiedAt: now
         ))
+        Haptics.notification(.success)
     }
 
     private func closeTravelInterval() {
@@ -328,9 +345,11 @@ struct SettingsScreen: View {
         let now = Date.now
         activeTravel.endDate = now
         activeTravel.modifiedAt = now
+        Haptics.notification(.success)
     }
 
     private func exportData() {
+        Haptics.impact(.medium)
         do {
             let payload = SettingsExportPayload(
                 exportedAt: .now,
@@ -353,6 +372,7 @@ struct SettingsScreen: View {
     }
 
     private func deleteAllData() {
+        Haptics.impact(.medium)
         do {
             try deleteAll(PrayerLog.self)
             try deleteAll(Reflection.self)
@@ -362,6 +382,7 @@ struct SettingsScreen: View {
             try deleteAll(PeriodSummary.self)
             try deleteAll(UserSettings.self)
             _ = try UserSettings.fetchOrCreate(in: modelContext)
+            Haptics.notification(.success)
         } catch {
             exportError = error.localizedDescription
         }
@@ -394,6 +415,11 @@ private enum SettingsRoute: Hashable {
 }
 
 // MARK: - Sections
+// Haptics audit: navigation rows use `.light`; destructive confirmations,
+// sheet-like exports, and pause/travel mode commits use `.medium` plus
+// success/warning notifications. Routine SwiftUI `Toggle` controls do not
+// add extra custom haptics beyond the locked map, to avoid noisy settings
+// scrubbing when users flip several switches in sequence.
 
 private struct LocationSection: View {
     let settings: UserSettings
@@ -458,7 +484,10 @@ private struct CalculationSection: View {
                 title: "Current method",
                 subtitle: settings.calculationMethod.settingsDisplayName,
                 icon: "function",
-                action: { path.append(.calculationMethod) }
+                action: {
+                    Haptics.impact(.light)
+                    path.append(.calculationMethod)
+                }
             )
         }
     }
@@ -474,7 +503,10 @@ private struct MadhabSection: View {
                 title: "Current choice",
                 subtitle: settings.madhab.settingsDisplayName,
                 icon: "book.closed.fill",
-                action: { path.append(.madhab) }
+                action: {
+                    Haptics.impact(.light)
+                    path.append(.madhab)
+                }
             )
         }
     }
@@ -490,7 +522,10 @@ private struct HighLatitudeSection: View {
                 title: "Current rule",
                 subtitle: settings.highLatitudeRule.settingsDisplayName,
                 icon: "sun.horizon",
-                action: { path.append(.highLatitudeRule) }
+                action: {
+                    Haptics.impact(.light)
+                    path.append(.highLatitudeRule)
+                }
             )
 
             SettingsDescriptionText("This matters for users above approximately 48 degrees latitude, where twilight can be unusually long or absent in parts of the year.")
@@ -520,7 +555,10 @@ private struct NotificationsSection: View {
                     title: "Sound",
                     subtitle: "Default",
                     icon: "speaker.wave.2.fill",
-                    action: { path.append(.adhanSound) }
+                    action: {
+                        Haptics.impact(.light)
+                        path.append(.adhanSound)
+                    }
                 )
 
                 ForEach(Prayer.allCases, id: \.self) { prayer in
@@ -607,7 +645,10 @@ private struct TravelModeSection: View {
                     title: "Jam policy",
                     subtitle: activeTravel.jamPolicy.settingsDisplayName,
                     icon: "arrow.triangle.merge",
-                    action: { path.append(.jamPolicy) }
+                    action: {
+                        Haptics.impact(.light)
+                        path.append(.jamPolicy)
+                    }
                 )
 
                 SettingsRow(title: "Qasr enabled", icon: "arrow.down.forward.and.arrow.up.backward") {
@@ -639,7 +680,10 @@ private struct DisplaySection: View {
                 title: "Theme",
                 subtitle: settings.theme.settingsDisplayName,
                 icon: "moon.stars.fill",
-                action: { path.append(.theme) }
+                action: {
+                    Haptics.impact(.light)
+                    path.append(.theme)
+                }
             )
         }
     }
@@ -774,6 +818,7 @@ private struct CalculationMethodPicker: View {
 
     private func autoDetect() {
         guard let countryCode = settings.lastResolvedCountryCode else { return }
+        Haptics.impact(.light)
         settings.calculationMethodRaw = CalculationMethodChoice.recommendedMethod(for: countryCode).rawValue
         settings.modifiedAt = .now
         dismiss()
@@ -941,7 +986,10 @@ private func optionRow(
     isSelected: Bool,
     action: @escaping () -> Void
 ) -> some View {
-    SettingsRow(title: title, subtitle: subtitle, icon: isSelected ? "checkmark.circle.fill" : "circle", action: action) {
+    SettingsRow(title: title, subtitle: subtitle, icon: isSelected ? "checkmark.circle.fill" : "circle", action: {
+        Haptics.impact(.light)
+        action()
+    }) {
         EmptyView()
     }
     .accessibilityHint(isSelected ? "Selected" : "Double tap to select")

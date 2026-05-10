@@ -177,7 +177,10 @@ struct ReflectionScreen: View {
                         ReflectionHaptics.recordStop()
                         viewModel.cancelRecording()
                     },
-                    onDiscardAudio: { viewModel.discardAttachedAudio() },
+                    onDiscardAudio: {
+                        Haptics.impact(.light)
+                        viewModel.discardAttachedAudio()
+                    },
                     onTogglePlayback: { viewModel.togglePlaybackForDraft() },
                     onSave: { handleSave(viewModel: viewModel) },
                     isFocused: $isInputFocused
@@ -246,7 +249,10 @@ struct ReflectionScreen: View {
                                         reflection: entry
                                     ),
                                     onTogglePlayback: { viewModel.togglePlayback(for: entry) },
-                                    onTap: { presentedReflection = entry }
+                                    onTap: {
+                                        Haptics.impact(.light)
+                                        presentedReflection = entry
+                                    }
                                 )
                             }
                         }
@@ -273,6 +279,7 @@ struct ReflectionScreen: View {
     }
 
     private func handleSave(viewModel: ReflectionViewModel) {
+        Haptics.impact(.medium)
         let saved = viewModel.save()
         if saved {
             ReflectionHaptics.saveSuccess()

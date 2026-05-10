@@ -13,6 +13,7 @@ struct ReflectionDetailSheet: View {
     let onTogglePlayback: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var closeButtonDismissed = false
 
     var body: some View {
         ZStack {
@@ -54,6 +55,11 @@ struct ReflectionDetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
         .presentationBackground(IhsanColor.ground)
+        .onDisappear {
+            if !closeButtonDismissed {
+                Haptics.impact(.light)
+            }
+        }
     }
 
     private var metadataHeader: some View {
@@ -68,7 +74,11 @@ struct ReflectionDetailSheet: View {
                     .foregroundStyle(IhsanColor.textMuted)
             }
             Spacer()
-            Button("Done") { dismiss() }
+            Button("Done") {
+                closeButtonDismissed = true
+                Haptics.impact(.light)
+                dismiss()
+            }
                 .font(IhsanFont.bodyEnglishBold)
                 .foregroundStyle(IhsanColor.textSecondary)
         }

@@ -27,6 +27,9 @@ final class MasjidFinderViewModel {
         do {
             let auth = await locationProvider.currentAuthorization()
             guard auth.isAuthorized else {
+                if auth == .denied || auth == .restricted {
+                    Haptics.notification(.warning)
+                }
                 state = .needsLocationPermission
                 return
             }
@@ -36,6 +39,9 @@ final class MasjidFinderViewModel {
             self.cityName = place.cityName
             await search()
         } catch let error as LocationError {
+            if error == .permissionDenied || error == .permissionRestricted {
+                Haptics.notification(.warning)
+            }
             state = .error(error.userFacingMessage)
         } catch {
             state = .error(error.localizedDescription)

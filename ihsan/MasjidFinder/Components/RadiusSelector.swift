@@ -15,6 +15,7 @@ struct RadiusSelector: View {
         HStack(spacing: 0) {
             ForEach(SearchRadius.allCases) { option in
                 Button {
+                    guard radius != option else { return }
                     Haptics.tap()
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         radius = option

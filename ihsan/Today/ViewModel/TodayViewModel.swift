@@ -38,6 +38,9 @@ final class TodayViewModel {
         do {
             let auth = try await locationProvider.requestWhenInUseAuthorization()
             guard auth.isAuthorized else {
+                if auth == .denied || auth == .restricted {
+                    Haptics.notification(.warning)
+                }
                 state = .needsLocationPermission
                 return
             }
@@ -53,6 +56,9 @@ final class TodayViewModel {
                 significantChangesTask?.cancel()
             }
         } catch let error as LocationError {
+            if error == .permissionDenied || error == .permissionRestricted {
+                Haptics.notification(.warning)
+            }
             state = .error(error.userFacingMessage)
         } catch {
             state = .error(error.localizedDescription)
@@ -120,7 +126,7 @@ final class TodayViewModel {
         do {
             let intent = ToggleJamaahIntent(prayer: prayer)
             _ = try await intent.perform()
-            Haptics.soft()
+            Haptics.impact(.light)
         } catch {
             print("toggleJamaah failed: \(error)")
         }

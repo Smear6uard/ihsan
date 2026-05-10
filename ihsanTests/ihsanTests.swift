@@ -6,13 +6,17 @@
 //
 
 import Testing
+@testable import ihsan
 
-struct ihsanTests {
+@MainActor
+struct HapticsTests {
 
-    @Test func example() async throws {
-        // Write your test here and use APIs like `#expect(...)` to check expected conditions.
-        // Swift Testing Documentation
-        // https://developer.apple.com/documentation/testing
+    @Test func impactMapExposesLockedWeights() {
+        #expect(Haptics.Impact.allCases == [.light, .medium, .soft])
+    }
+
+    @Test func notificationMapOmitsErrorFeedback() {
+        #expect(Haptics.Notification.allCases == [.success, .warning])
     }
 
 }

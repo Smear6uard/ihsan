@@ -8,18 +8,28 @@ import IhsanDesignSystem
 struct QiblaScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = QiblaViewModel()
+    @State private var closeButtonDismissed = false
 
     var body: some View {
         ZStack {
             IhsanColor.ground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                QiblaSheetHeader { dismiss() }
+                QiblaSheetHeader {
+                    closeButtonDismissed = true
+                    Haptics.impact(.light)
+                    dismiss()
+                }
                 content
             }
         }
         .task {
             await viewModel.bootstrap()
+        }
+        .onDisappear {
+            if !closeButtonDismissed {
+                Haptics.impact(.medium)
+            }
         }
     }
 

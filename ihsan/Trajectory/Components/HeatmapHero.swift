@@ -54,6 +54,9 @@ struct HeatmapHero: View {
                     .frame(width: dotDiameter, height: dotDiameter)
                     .contentShape(Rectangle())
                     .onTapGesture {
+                        // Haptics audit: the dot itself is the intentional
+                        // mapped surface. Do not layer an additional sheet-
+                        // presentation haptic for the day popover.
                         Haptics.tap()
                         onDayTap(day)
                     }

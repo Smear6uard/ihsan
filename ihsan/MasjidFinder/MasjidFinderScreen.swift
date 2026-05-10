@@ -17,13 +17,18 @@ import UIKit
 struct MasjidFinderScreen: View {
     @Environment(\.dismiss) private var dismiss
     @State private var viewModel = MasjidFinderViewModel()
+    @State private var closeButtonDismissed = false
 
     var body: some View {
         ZStack {
             IhsanColor.ground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                MasjidSheetHeader { dismiss() }
+                MasjidSheetHeader {
+                    closeButtonDismissed = true
+                    Haptics.impact(.medium)
+                    dismiss()
+                }
 
                 RadiusSelector(radius: $viewModel.radius)
                     .padding(.horizontal, IhsanSpacing.md)
@@ -41,6 +46,11 @@ struct MasjidFinderScreen: View {
         }
         .task {
             await viewModel.bootstrap()
+        }
+        .onDisappear {
+            if !closeButtonDismissed {
+                Haptics.impact(.medium)
+            }
         }
     }
 
@@ -124,6 +134,7 @@ struct MasjidFinderScreen: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, IhsanSpacing.xl)
             Button {
+                Haptics.impact(.light)
                 Task { await viewModel.search() }
             } label: {
                 Text("Try Again")

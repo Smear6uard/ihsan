@@ -9,32 +9,23 @@ import UIKit
 /// stop and the save success.
 @MainActor
 enum ReflectionHaptics {
-    private static let lightImpact = UIImpactFeedbackGenerator(style: .light)
-    private static let mediumImpact = UIImpactFeedbackGenerator(style: .medium)
-    private static let notification = UINotificationFeedbackGenerator()
-
     static func prepareAll() {
-        lightImpact.prepare()
-        mediumImpact.prepare()
-        notification.prepare()
+        Haptics.prepareAll()
     }
 
     /// Medium tap — fires when recording starts.
     static func recordStart() {
-        mediumImpact.impactOccurred()
-        mediumImpact.prepare()
+        Haptics.impact(.medium)
     }
 
     /// Light tap — fires when recording stops, and on cancel.
     static func recordStop() {
-        lightImpact.impactOccurred()
-        lightImpact.prepare()
+        Haptics.impact(.light)
     }
 
     /// Success notification — fires after a reflection saves.
     static func saveSuccess() {
-        notification.notificationOccurred(.success)
-        notification.prepare()
+        Haptics.notification(.success)
     }
 }
 #else

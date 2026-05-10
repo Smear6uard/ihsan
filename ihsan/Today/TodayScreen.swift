@@ -97,7 +97,10 @@ private struct TodayNeedsLocationView: View {
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, IhsanSpacing.xl)
-            Button("Continue", action: onRetry)
+            Button("Continue") {
+                Haptics.impact(.light)
+                onRetry()
+            }
                 .buttonStyle(.borderedProminent)
                 .tint(IhsanColor.textPrimary.opacity(0.18))
                 .foregroundStyle(IhsanColor.textPrimary)
@@ -120,7 +123,10 @@ private struct TodayErrorView: View {
                 .font(IhsanFont.bodyEnglish)
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
-            Button("Try Again", action: onRetry)
+            Button("Try Again") {
+                Haptics.impact(.light)
+                onRetry()
+            }
                 .buttonStyle(.bordered)
                 .tint(IhsanColor.textPrimary)
         }

@@ -40,7 +40,10 @@ private struct IconChip: View {
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
+        Button {
+            Haptics.impact(.medium)
+            action()
+        } label: {
             Image(systemName: systemName)
                 .font(.system(size: 16, weight: .medium))
                 .foregroundStyle(IhsanColor.textSecondary)
