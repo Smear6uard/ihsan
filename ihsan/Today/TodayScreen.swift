@@ -172,60 +172,76 @@ private struct TodayReadyView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            CelestialScene(
-                latitude: snapshot.place.coordinates.latitude,
-                longitude: snapshot.place.coordinates.longitude,
-                prayerMarkers: snapshot.dayTimes.allFardh.map {
-                    PrayerMarkerData(prayer: $0.prayer, scheduledTime: $0.scheduledTime)
-                },
-                onMarkerTap: handleMarkerTap
-            )
-            .ignoresSafeArea()
+        GeometryReader { proxy in
+            // `markerZoneBottomInset` reserves enough vertical space for
+            // the focused card + the 8pt gap above it. Reading the
+            // bottom safe-area inset keeps the gap consistent across
+            // devices — the value picks up both the device's home
+            // indicator inset and the tab-bar inset that RootTabView
+            // adds to this view's parent.
+            let cardBottomPadding: CGFloat = IhsanSpacing.md
+            let sceneToCardGap: CGFloat = 8
+            let markerZoneBottomInset = proxy.safeAreaInsets.bottom
+                + cardBottomPadding
+                + FocusedPrayerCard.cardHeight
+                + sceneToCardGap
 
-            VStack(spacing: 0) {
-                TodayHeader(
-                    cityName: snapshot.place.cityName ?? "Current Location",
-                    date: .now,
-                    dayTimes: snapshot.dayTimes,
-                    onMoonPhaseTap: { isCelestialReferencePresented = true }
-                )
-                .padding(.horizontal, IhsanSpacing.md)
-                .padding(.top, IhsanSpacing.md)
-
-                Spacer(minLength: 0)
-            }
-
-            VStack(spacing: IhsanSpacing.sm) {
-                FocusedPrayerCard(
-                    prayer: effectiveFocusedPrayer,
-                    scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
-                    windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
-                    currentStatus: log(for: effectiveFocusedPrayer)?.status,
-                    isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
-                    isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
-                    onCommit: { status, isJamaah in
-                        commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
+            ZStack(alignment: .bottom) {
+                CelestialScene(
+                    latitude: snapshot.place.coordinates.latitude,
+                    longitude: snapshot.place.coordinates.longitude,
+                    prayerMarkers: snapshot.dayTimes.allFardh.map {
+                        PrayerMarkerData(prayer: $0.prayer, scheduledTime: $0.scheduledTime)
                     },
-                    onMoreOptions: {
-                        sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
-                    }
+                    onMarkerTap: handleMarkerTap,
+                    markerZoneBottomInset: markerZoneBottomInset
+                )
+                .ignoresSafeArea()
+
+                VStack(spacing: 0) {
+                    TodayHeader(
+                        cityName: snapshot.place.cityName ?? "Current Location",
+                        date: .now,
+                        dayTimes: snapshot.dayTimes,
+                        onMoonPhaseTap: { isCelestialReferencePresented = true }
+                    )
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.md)
+
+                    Spacer(minLength: 0)
+                }
+
+                VStack(spacing: IhsanSpacing.sm) {
+                    FocusedPrayerCard(
+                        prayer: effectiveFocusedPrayer,
+                        scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
+                        windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
+                        currentStatus: log(for: effectiveFocusedPrayer)?.status,
+                        isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
+                        isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
+                        onCommit: { status, isJamaah in
+                            commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
+                        },
+                        onMoreOptions: {
+                            sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
+                        }
+                    )
+                }
+                .padding(.bottom, IhsanSpacing.md)
+            }
+            .sheet(item: $sheetSelection) { selection in
+                logSheet(for: selection.prayer)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                    .presentationBackground(.thinMaterial)
+            }
+            .fullScreenCover(isPresented: $isCelestialReferencePresented) {
+                CelestialReferenceView(
+                    latitude: snapshot.place.coordinates.latitude,
+                    longitude: snapshot.place.coordinates.longitude,
+                    onDismiss: { isCelestialReferencePresented = false }
                 )
             }
-            .padding(.bottom, IhsanSpacing.md)
-        }
-        .sheet(item: $sheetSelection) { selection in
-            logSheet(for: selection.prayer)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.thinMaterial)
-        }
-        .fullScreenCover(isPresented: $isCelestialReferencePresented) {
-            CelestialReferenceView(
-                latitude: snapshot.place.coordinates.latitude,
-                longitude: snapshot.place.coordinates.longitude,
-                onDismiss: { isCelestialReferencePresented = false }
-            )
         }
     }
 

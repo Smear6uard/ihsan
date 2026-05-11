@@ -62,12 +62,19 @@ struct FocusedPrayerCard: View {
 
     enum Mode { case collapsed, expanded }
 
+    /// Fixed card height — the card never expands upward into the
+    /// celestial scene above when transitioning between prayers or
+    /// modes. All three states (default / expanded / logged) lay out
+    /// within this bound.
+    static let cardHeight: CGFloat = 140
+
     private var isLogged: Bool { currentStatus != nil }
 
     var body: some View {
         contentForMode
-            .padding(20)
+            .padding(14)
             .frame(maxWidth: .infinity)
+            .frame(height: Self.cardHeight)
             .celestialPanel(cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
             .animation(
@@ -190,8 +197,15 @@ struct FocusedPrayerCard: View {
 
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.md) {
-            HStack(spacing: IhsanSpacing.md) {
+        // The expanded state lays out tightly so the prayer name,
+        // jamaʿah toggle, and two timing commit buttons all fit
+        // within the card's fixed 140pt bound. The "HOW DID YOU
+        // PRAY?" inscription and "More options…" link from prior
+        // iterations are omitted here — the prayer name and the
+        // chevron on the collapsed card already deliver that
+        // information / affordance.
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: IhsanSpacing.sm) {
                 PrayerSymbolBadge(prayer: prayer)
                 prayerNameStack
                 Spacer()
@@ -202,16 +216,13 @@ struct FocusedPrayerCard: View {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
                         .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.85))
-                        .frame(width: 32, height: 32)
+                        .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
             }
 
-            Text("HOW DID YOU PRAY?")
-                .font(IhsanFont.inscription)
-                .tracking(1.6)
-                .foregroundStyle(IhsanCelestialPalette.current().accent)
+            Spacer(minLength: 0)
 
             JamaahToggle(isOn: $jamaahPending)
                 .frame(maxWidth: .infinity, alignment: .center)
@@ -235,20 +246,6 @@ struct FocusedPrayerCard: View {
                     commit(.late)
                 }
             }
-
-            Button {
-                Haptics.impact(.light)
-                mode = .collapsed
-                onMoreOptions()
-            } label: {
-                Text("More options…")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.2)
-                    .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.85))
-                    .padding(.vertical, 4)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("More options including qadā, missed, and edit")
         }
     }
 
@@ -543,9 +540,9 @@ private struct JamaahToggle: View {
                 .font(IhsanFont.inscription)
                 .tracking(2.0)
                 .foregroundStyle(labelColor)
-                .padding(.horizontal, 24)
-                .padding(.vertical, 9)
-                .frame(minWidth: 120)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 6)
+                .frame(minWidth: 110)
                 .background {
                     Capsule()
                         .fill(filling)
@@ -618,7 +615,7 @@ private struct TimingCommitButton: View {
                     .tracking(1.8)
             }
             .foregroundStyle(foregroundColor)
-            .padding(.vertical, 12)
+            .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
             .background {
                 Capsule()
