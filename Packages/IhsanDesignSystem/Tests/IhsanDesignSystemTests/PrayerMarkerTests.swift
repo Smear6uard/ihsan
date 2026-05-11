@@ -44,26 +44,18 @@ func markerStateForNextUpcomingIsCurrentRegardlessOfTime() {
     #expect(state == .current)
 }
 
-// MARK: - PrayerMarker label initialiser
+// MARK: - PrayerMarker constructed from Prayer
 
 @Test
-func prayerMarkerLabelIsUppercasedEnglishPrayerName() {
-    let marker = PrayerMarker(prayer: .fajr, state: .future)
-    #expect(marker.label == "FAJR")
+func prayerMarkerStoresThePrayerItRepresents() {
+    let fajr = PrayerMarker(prayer: .fajr, state: .future)
+    #expect(fajr.prayer == .fajr)
 
     let dhuhr = PrayerMarker(prayer: .dhuhr, state: .past)
-    #expect(dhuhr.label == "DHUHR")
+    #expect(dhuhr.prayer == .dhuhr)
 
     let isha = PrayerMarker(prayer: .isha, state: .current)
-    #expect(isha.label == "ISHA")
-}
-
-@Test
-func prayerMarkerPreservesArbitraryLabel() {
-    // Caller-provided labels are passed through without modification —
-    // used by abbreviation logic or future localisation paths.
-    let marker = PrayerMarker(label: "Custom", state: .past)
-    #expect(marker.label == "Custom")
+    #expect(isha.prayer == .isha)
 }
 
 // MARK: - PrayerMarkerData carries prayer + scheduled time
@@ -87,29 +79,19 @@ func prayerMarkerDataIsValueEqual() {
 // device-level inspection rather than unit assertion.
 
 @Test
-func prayerMarkerDefaultsToAboveHorizonForBackwardsCompatibility() {
-    let marker = PrayerMarker(label: "FAJR", state: .future)
+func prayerMarkerDefaultsToAboveHorizon() {
+    let marker = PrayerMarker(prayer: .fajr, state: .future)
     #expect(marker.aboveHorizon == true)
-
-    let prayerInit = PrayerMarker(prayer: .fajr, state: .future)
-    #expect(prayerInit.aboveHorizon == true)
 }
 
 @Test
 func prayerMarkerPreservesAboveHorizonWhenSetExplicitly() {
-    let belowHorizonLabelInit = PrayerMarker(
-        label: "MAGHRIB",
-        state: .past,
-        aboveHorizon: false
-    )
-    #expect(belowHorizonLabelInit.aboveHorizon == false)
-
-    let belowHorizonPrayerInit = PrayerMarker(
+    let belowHorizon = PrayerMarker(
         prayer: .isha,
         state: .future,
         aboveHorizon: false
     )
-    #expect(belowHorizonPrayerInit.aboveHorizon == false)
+    #expect(belowHorizon.aboveHorizon == false)
 }
 
 // MARK: - Helpers
