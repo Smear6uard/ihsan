@@ -82,6 +82,23 @@ public struct CelestialScene: View {
                         .opacity(state.starOpacity)
                 }
 
+                // Horizon line — a thin brass rule with warm glow
+                // above and rose-gold glow below, visible only when
+                // the sun is within ±10° of the horizon (the Fajr-to-
+                // sunrise and Maghrib-to-Isha windows). Drawn beneath
+                // the sun / moon ornaments so those cross over it.
+                let horizonOpacity = HorizonLine.opacity(
+                    forSunAltitude: solar.altitude
+                )
+                if horizonOpacity > 0.01 {
+                    HorizonLine(opacity: horizonOpacity)
+                        .frame(width: geometry.size.width)
+                        .position(
+                            x: geometry.size.width / 2,
+                            y: horizonY(in: geometry.size)
+                        )
+                }
+
                 // Sun ornament — visible whenever the sun's altitude
                 // is above the descent-animation margin (~-10° below
                 // horizon). Hidden at deep night when the sun is far
@@ -140,6 +157,18 @@ public struct CelestialScene: View {
         // Always show the sun if it's reasonably above the horizon, or
         // briefly during descent. Hide once it's deeply below.
         solar.altitude > -10.0 && sky.starOpacity < 0.90
+    }
+
+    /// The y-coordinate of the horizon (altitude 0°) in the celestial
+    /// scene. Used to place the horizon line band so that the brass
+    /// rule sits exactly where the sun crosses zero altitude as it
+    /// rises and sets.
+    private func horizonY(in size: CGSize) -> CGFloat {
+        CelestialMapping.screenPosition(
+            hourAngle: 0,
+            altitude: 0,
+            in: size
+        ).y
     }
 
     private func shouldShowMoon(lunar: LunarPosition, sky: SkyState) -> Bool {
