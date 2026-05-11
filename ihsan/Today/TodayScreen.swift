@@ -8,8 +8,6 @@ import IhsanPrayerTimes
 struct TodayScreen: View {
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: TodayViewModel?
-    @State private var presentingQibla = false
-    @State private var presentingMasjids = false
 
     var body: some View {
         content
@@ -19,16 +17,6 @@ struct TodayScreen: View {
                     Haptics.prepareAll()
                 }
                 await viewModel?.bootstrap()
-            }
-            .sheet(isPresented: $presentingQibla) {
-                QiblaScreen()
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-            }
-            .sheet(isPresented: $presentingMasjids) {
-                MasjidFinderScreen()
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
             }
     }
 
@@ -45,9 +33,7 @@ struct TodayScreen: View {
             if let viewModel {
                 TodayReadyView(
                     snapshot: snapshot,
-                    viewModel: viewModel,
-                    onQibla: { presentingQibla = true },
-                    onMasjids: { presentingMasjids = true }
+                    viewModel: viewModel
                 )
             }
         case .error(let message):
@@ -156,8 +142,6 @@ private struct TodayErrorView: View {
 private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
     let viewModel: TodayViewModel
-    let onQibla: () -> Void
-    let onMasjids: () -> Void
 
     @Query private var todaysLogs: [PrayerLog]
     @Query private var settingsRows: [UserSettings]
@@ -172,14 +156,10 @@ private struct TodayReadyView: View {
 
     init(
         snapshot: TodayState.Snapshot,
-        viewModel: TodayViewModel,
-        onQibla: @escaping () -> Void,
-        onMasjids: @escaping () -> Void
+        viewModel: TodayViewModel
     ) {
         self.snapshot = snapshot
         self.viewModel = viewModel
-        self.onQibla = onQibla
-        self.onMasjids = onMasjids
 
         let calendar = Calendar.current
         let startOfDay = calendar.startOfDay(for: .now)
@@ -205,9 +185,7 @@ private struct TodayReadyView: View {
             VStack(spacing: 0) {
                 TodayHeader(
                     cityName: snapshot.place.cityName ?? "Current Location",
-                    date: .now,
-                    qiblaAction: onQibla,
-                    masjidAction: onMasjids
+                    date: .now
                 )
                 .padding(.horizontal, IhsanSpacing.md)
                 .padding(.top, IhsanSpacing.md)

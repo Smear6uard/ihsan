@@ -8,9 +8,7 @@ import IhsanDesignSystem
         VStack {
             TodayHeader(
                 cityName: "Chicago",
-                date: .now,
-                qiblaAction: {},
-                masjidAction: {}
+                date: .now
             )
             .padding(IhsanSpacing.md)
             Spacer()
