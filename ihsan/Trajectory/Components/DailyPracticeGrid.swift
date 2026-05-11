@@ -2,10 +2,14 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// The "Daily Practice" matrix — the central visualization on the
-/// Trajectory screen. Renders the period's days as rows and the five
-/// fardh prayers as columns; each cell is a `DayPrayerCell` carrying
-/// both status and jamaʿah modifier in one small illuminated square.
+/// The day-by-day detail grid that sits beneath the gestalt dot pattern.
+///
+/// Renders the period's days as rows and the five fardh prayers as
+/// columns; each cell is a `DayPrayerCell` carrying both status and
+/// jamaʿah modifier in one small illuminated square. The gestalt grid
+/// above is the visual headline of the screen; this matrix exists for
+/// the user who wants to drill into the specific outcomes — which day,
+/// which prayer.
 ///
 /// The grid is wrapped in an illuminated parchment panel so it reads
 /// as one composed surface — the period's record laid out on a single
@@ -113,10 +117,10 @@ struct DailyPracticeGrid: View {
                 .frame(width: 5, height: 5)
             VStack(alignment: .leading, spacing: 0) {
                 Text(dayOfMonth(for: day.date))
-                    .font(IhsanFont.tabular)
+                    .font(.system(size: 16, weight: .medium, design: .serif))
                     .foregroundStyle(IhsanColor.inkDeep)
                 Text(dayOfWeek(for: day.date))
-                    .font(IhsanFont.inscription)
+                    .font(.system(size: 10, weight: .semibold, design: .default).smallCaps())
                     .tracking(1.0)
                     .foregroundStyle(IhsanColor.brassDark.opacity(0.75))
             }
@@ -139,21 +143,24 @@ struct DailyPracticeGrid: View {
     // MARK: - Geometry
 
     /// Cell size scales down for longer periods so the matrix fits
-    /// on a single iPhone screen without horizontal scrolling.
+    /// on a single iPhone screen without horizontal scrolling. The
+    /// gestalt dot grid above is the visual headline now, so the
+    /// detail-grid cells are demoted to ~85% of their previous size —
+    /// still legible, no longer dominant.
     private var cellSize: CGFloat {
         switch days.count {
-        case ...7: return 36
-        case ...14: return 30
-        case ...30: return 24
-        default: return 18
+        case ...7: return 30
+        case ...14: return 26
+        case ...30: return 20
+        default: return 15
         }
     }
 
     private var cellSpacing: CGFloat {
         switch days.count {
-        case ...7: return 8
-        case ...14: return 6
-        case ...30: return 4
+        case ...7: return 7
+        case ...14: return 5
+        case ...30: return 3
         default: return 2
         }
     }
@@ -164,10 +171,10 @@ struct DailyPracticeGrid: View {
 
     private var dateColumnWidth: CGFloat {
         switch days.count {
-        case ...7: return 76
-        case ...14: return 72
-        case ...30: return 64
-        default: return 56
+        case ...7: return 64
+        case ...14: return 60
+        case ...30: return 54
+        default: return 48
         }
     }
 

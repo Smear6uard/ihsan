@@ -1,9 +1,9 @@
 import Foundation
 import IhsanCore
 
-/// Period-level summary derived from a `[DayCompletion]`. Renders the factual
-/// summary line, the per-prayer rows, and the insight card. Carries no view
-/// dependencies so it stays trivially testable.
+/// Period-level summary derived from a `[DayCompletion]`. Feeds the quiet
+/// inscription row beneath the gestalt grid. Carries no view dependencies
+/// so it stays trivially testable.
 struct TrajectoryAggregate: Equatable, Sendable {
     /// Days inside the period that are NOT paused.
     let totalActiveDays: Int
@@ -24,8 +24,8 @@ struct TrajectoryAggregate: Equatable, Sendable {
     let qadaCount: Int
 
     /// Number of prayers within the period that were logged with
-    /// `withJamaah = true`. Surfaces on the SummaryStatsPanel as the
-    /// "JAMAʿAH" headline metric over `totalPossible`.
+    /// `withJamaah = true`. Surfaces in the quiet summary row as the
+    /// "JAMAʿAH · N" count.
     let jamaahCount: Int
 
     let perPrayer: [PrayerAggregate]

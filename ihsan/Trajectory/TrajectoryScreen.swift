@@ -7,18 +7,21 @@ import IhsanDesignSystem
 ///
 /// Reads `PrayerLog`, `PauseInterval`, and `TravelInterval` directly
 /// from SwiftData via `@Query`, hands them to a `TrajectoryViewModel`
-/// for aggregation, and presents:
+/// for aggregation, and presents — top to bottom:
 ///
-/// - A manuscript-style page header ("A pattern of days") with the
-///   period inscription as subtitle.
-/// - The summary stats panel (overall on-time %, jamaʿah count, and
-///   secondary on-time / missed / qadā tallies).
-/// - The Daily Practice grid — five-prayer × N-day matrix of
-///   illuminated cells, the central visualization of the screen.
-/// - A small legend strip decoding the cell types.
-/// - Per-prayer aggregate rows beneath the grid for users who want
-///   to see one prayer's pattern at a glance.
-/// - Optional Apple Intelligence insight card.
+/// 1. A manuscript-style page header ("A pattern of days") with the
+///    period inscription as subtitle.
+/// 2. The 7D / 30D / 90D / YEAR range selector pill.
+/// 3. The gestalt dot pattern — a single illuminated panel containing a
+///    5×N matrix of small dots, one row per prayer, one column per day
+///    (or per week in YEAR mode). The visual heart of the screen — the
+///    user reads their pattern at a glance before any number is shown.
+/// 4. A quiet inscriptional row of counts (ON TIME · N, JAMAʿAH · N,
+///    LATE · N, MISSED · N, QADĀ · N). Replaces the previous giant
+///    "% on-time" panel.
+/// 5. The day-by-day detail grid — same five-prayer × N-day matrix as
+///    before, scaled down so the gestalt above is the headline and this
+///    is the drill-down.
 struct TrajectoryScreen: View {
     @Query(sort: \PrayerLog.prayerDate, order: .reverse)
     private var logs: [PrayerLog]
@@ -131,7 +134,10 @@ struct TrajectoryScreen: View {
 
         case .ready(let snapshot):
             VStack(spacing: IhsanSpacing.lg) {
-                SummaryStatsPanel(aggregate: snapshot.aggregate)
+                gestaltPanel(snapshot: snapshot)
+                    .padding(.horizontal, IhsanSpacing.md)
+
+                QuietSummaryRow(aggregate: snapshot.aggregate)
                     .padding(.horizontal, IhsanSpacing.md)
 
                 DailyPracticeGrid(
@@ -141,17 +147,20 @@ struct TrajectoryScreen: View {
                     }
                 )
                 .padding(.horizontal, IhsanSpacing.md)
-
-                GridLegend()
-                    .padding(.horizontal, IhsanSpacing.lg)
-
-                PerPrayerList(aggregate: snapshot.aggregate)
-                    .padding(.horizontal, IhsanSpacing.md)
-
-                InsightCard(aggregate: snapshot.aggregate)
-                    .padding(.horizontal, IhsanSpacing.md)
             }
         }
+    }
+
+    /// The gestalt-pattern panel — the visual headline of the screen.
+    /// Wrapped here (rather than inside `GestaltGrid`) so the panel
+    /// padding stays in lockstep with the other illuminated panels on
+    /// the page.
+    @ViewBuilder
+    private func gestaltPanel(snapshot: TrajectoryState.Snapshot) -> some View {
+        GestaltGrid(days: snapshot.days, period: snapshot.period)
+            .padding(IhsanSpacing.lg)
+            .frame(maxWidth: .infinity)
+            .ihsanIlluminatedPanel(intensity: .regular)
     }
 }
 
