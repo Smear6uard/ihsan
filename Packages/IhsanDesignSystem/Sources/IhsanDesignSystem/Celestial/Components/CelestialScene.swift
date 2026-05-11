@@ -4,22 +4,38 @@ import SwiftUI
 /// The celestial Today screen's middle zone — the visual heart of the
 /// app, rendered as a single composed view.
 ///
-/// Phase 3 establishes the foundation: a time-adaptive sky gradient
-/// with a night star field overlaid. Phase 4 adds the sun and moon
-/// ornaments at their real altitudes; Phase 5 adds the five prayer
-/// markers positioned at the sun's altitude / hour angle at each
-/// prayer's scheduled time. Phase 6 adds the horizon line and glow
-/// halo for dawn / dusk transitions.
+/// The scene divides its drawing area horizontally into two regions
+/// using a brass horizon line. The line's vertical position glides
+/// between ~50% of the marker-zone height (pure night) and ~80%
+/// (daytime), driven by the sun's current altitude, so the user's
+/// daily cycle remains visually present even after the sun and moon
+/// have crossed off the visible portion of the sky.
+///
+/// Above the horizon line: the visible sky, the sun and moon ornaments
+/// at their real altitudes, and any prayer markers whose sun position
+/// at that prayer's scheduled time is above the horizon (Dhuhr, Asr,
+/// and Maghrib near sunset).
+///
+/// Below the horizon line: a darker subterranean band sampling the
+/// mode's `subterranean` token, with prayer markers for prayers whose
+/// sun is below the horizon at that prayer's scheduled time (Fajr,
+/// Maghrib after sunset, Isha) rendered with muted treatment. Each
+/// below-horizon marker keeps its real east-west position (left for
+/// dawn prayers, right for dusk) and its vertical depth corresponds to
+/// how far below the horizon the sun was at that moment.
+///
+/// The marker zone — the region of the scene where the horizon line
+/// and prayer markers may render — is defined by `markerZoneTopInset`
+/// and `markerZoneBottomInset`. The sky gradient and star field still
+/// fill the whole frame; only the markers and horizon respect the
+/// insets so they never collide with the header or the focused-prayer
+/// card.
 ///
 /// The view re-renders on a 60 s cadence so the sky drifts visibly
 /// through dawn and dusk without ever animating fast enough for the
 /// motion itself to read as movement. Reduce-motion users get a
 /// single static evaluation on first render; their experience is a
 /// snapshot of the celestial scene at the moment they opened it.
-///
-/// The accessibility label aggregates the scene's state into one
-/// spoken phrase ("Daytime sky", "Night sky with stars") so VoiceOver
-/// doesn't read out each individual star as a separate element.
 public struct CelestialScene: View {
 
     /// Observer latitude in degrees. Positive north, negative south.
@@ -42,6 +58,17 @@ public struct CelestialScene: View {
     /// non-interactive — appropriate for read-only previews.
     public let onMarkerTap: ((Prayer) -> Void)?
 
+    /// Distance from the top edge of the scene to the top of the
+    /// marker zone. Carves out room for the header and safe area so
+    /// positioned markers and the horizon line never collide with the
+    /// page chrome above.
+    public let markerZoneTopInset: CGFloat
+
+    /// Distance from the bottom edge of the scene to the bottom of
+    /// the marker zone. Carves out room for the focused-prayer card
+    /// and any tab bar below.
+    public let markerZoneBottomInset: CGFloat
+
     @Environment(\.timeOfDayOverride) private var override
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -49,12 +76,16 @@ public struct CelestialScene: View {
         latitude: Double,
         longitude: Double,
         prayerMarkers: [PrayerMarkerData] = [],
-        onMarkerTap: ((Prayer) -> Void)? = nil
+        onMarkerTap: ((Prayer) -> Void)? = nil,
+        markerZoneTopInset: CGFloat = 120,
+        markerZoneBottomInset: CGFloat = 280
     ) {
         self.latitude = latitude
         self.longitude = longitude
         self.prayerMarkers = prayerMarkers
         self.onMarkerTap = onMarkerTap
+        self.markerZoneTopInset = markerZoneTopInset
+        self.markerZoneBottomInset = markerZoneBottomInset
     }
 
     public var body: some View {
@@ -75,6 +106,10 @@ public struct CelestialScene: View {
         let solar = SolarPosition.compute(at: date, latitude: latitude, longitude: longitude)
         let lunar = LunarPosition.compute(at: date, latitude: latitude, longitude: longitude)
         let currentIndex = currentMarkerIndex(at: date)
+        let palette = IhsanCelestialPalette.current(at: date)
+        let horizonFraction = CelestialMapping.horizonYFraction(
+            forSunAltitude: solar.altitude
+        )
 
         GeometryReader { geometry in
             ZStack {
@@ -90,33 +125,58 @@ public struct CelestialScene: View {
                         .opacity(state.starOpacity)
                 }
 
-                // Horizon line — a thin brass rule with warm glow
-                // above and rose-gold glow below, visible only when
-                // the sun is within ±10° of the horizon (the Fajr-to-
-                // sunrise and Maghrib-to-Isha windows). Drawn beneath
-                // the sun / moon ornaments so those cross over it.
-                let horizonOpacity = HorizonLine.opacity(
-                    forSunAltitude: solar.altitude
+                // Subterranean band — the darker region below the
+                // horizon line where below-horizon prayer markers
+                // render. Sized to span from the horizon line down to
+                // the bottom of the marker zone.
+                let horizonY = CelestialMapping.horizonY(
+                    in: geometry.size,
+                    horizonYFraction: horizonFraction,
+                    topInset: markerZoneTopInset,
+                    bottomInset: markerZoneBottomInset
                 )
-                if horizonOpacity > 0.01 {
-                    HorizonLine(opacity: horizonOpacity)
-                        .frame(width: geometry.size.width)
+                let bandHeight = max(
+                    0,
+                    geometry.size.height - markerZoneBottomInset - horizonY
+                )
+                if bandHeight > 0 {
+                    SubterraneanBand(palette: palette)
+                        .frame(
+                            width: geometry.size.width,
+                            height: bandHeight
+                        )
                         .position(
                             x: geometry.size.width / 2,
-                            y: horizonY(in: geometry.size)
+                            y: horizonY + bandHeight / 2
                         )
                 }
 
-                // Sun ornament — visible whenever the sun's altitude
-                // is above the descent-animation margin (~-10° below
-                // horizon). Hidden at deep night when the sun is far
-                // below the user's local horizon.
+                // Horizon line — the brass rule is always visible; the
+                // warm / rose-gold glow bands fade in only during the
+                // dawn / dusk transition windows when the sun is
+                // within ±10° of the horizon.
+                let glowOpacity = HorizonLine.glowOpacity(
+                    forSunAltitude: solar.altitude
+                )
+                HorizonLine(glowOpacity: glowOpacity)
+                    .frame(width: geometry.size.width)
+                    .position(
+                        x: geometry.size.width / 2,
+                        y: horizonY
+                    )
+
+                // Sun ornament — positioned via the same horizon-aware
+                // mapping as the prayer markers so the sun sits exactly
+                // on the horizon line at sunrise / Maghrib.
                 if shouldShowSun(solar: solar, sky: state) {
                     SunOrnament(altitude: solar.altitude)
                         .position(
                             CelestialMapping.screenPosition(
                                 for: solar,
-                                in: geometry.size
+                                in: geometry.size,
+                                horizonYFraction: horizonFraction,
+                                topInset: markerZoneTopInset,
+                                bottomInset: markerZoneBottomInset
                             )
                         )
                 }
@@ -131,23 +191,34 @@ public struct CelestialScene: View {
                         .position(
                             CelestialMapping.screenPosition(
                                 for: lunar,
-                                in: geometry.size
+                                in: geometry.size,
+                                horizonYFraction: horizonFraction,
+                                topInset: markerZoneTopInset,
+                                bottomInset: markerZoneBottomInset
                             )
                         )
                 }
 
                 // Prayer markers — five small ornamental glyphs placed
                 // at the sun's position at each prayer's scheduled
-                // time. State variants (future / past / current)
-                // communicate where the user is in the day's schedule.
-                // Each marker is wrapped in a Button that fires the
-                // optional onMarkerTap callback, used by the Today
-                // screen to swap the focused-prayer card.
+                // time. Each marker is classified as above- or below-
+                // horizon based on the sun's altitude at THAT prayer's
+                // time; below-horizon markers render in the
+                // subterranean region with muted treatment.
                 ForEach(prayerMarkers.indices, id: \.self) { i in
                     let marker = prayerMarkers[i]
-                    let position = markerScreenPosition(
-                        for: marker,
-                        in: geometry.size
+                    let solarAtPrayer = SolarPosition.compute(
+                        at: marker.scheduledTime,
+                        latitude: latitude,
+                        longitude: longitude
+                    )
+                    let aboveHorizon = solarAtPrayer.altitude >= 0
+                    let position = CelestialMapping.screenPosition(
+                        for: solarAtPrayer,
+                        in: geometry.size,
+                        horizonYFraction: horizonFraction,
+                        topInset: markerZoneTopInset,
+                        bottomInset: markerZoneBottomInset
                     )
                     let state = markerState(
                         markerIndex: i,
@@ -162,14 +233,16 @@ public struct CelestialScene: View {
                             } label: {
                                 PrayerMarker(
                                     prayer: marker.prayer,
-                                    state: state
+                                    state: state,
+                                    aboveHorizon: aboveHorizon
                                 )
                             }
                             .buttonStyle(.plain)
                         } else {
                             PrayerMarker(
                                 prayer: marker.prayer,
-                                state: state
+                                state: state,
+                                aboveHorizon: aboveHorizon
                             )
                         }
                     }
@@ -187,46 +260,19 @@ public struct CelestialScene: View {
         solar.altitude > -10.0 && sky.starOpacity < 0.90
     }
 
-    /// The y-coordinate of the horizon (altitude 0°) in the celestial
-    /// scene. Used to place the horizon line band so that the brass
-    /// rule sits exactly where the sun crosses zero altitude as it
-    /// rises and sets.
-    private func horizonY(in size: CGSize) -> CGFloat {
-        CelestialMapping.screenPosition(
-            hourAngle: 0,
-            altitude: 0,
-            in: size
-        ).y
-    }
-
     private func shouldShowMoon(lunar: LunarPosition, sky: SkyState) -> Bool {
         // Moon only renders when above horizon and the sky is at least
         // somewhat dark so it has contrast against the parchment day.
         lunar.altitude > 0.0 && sky.starOpacity > 0.10
     }
 
-    /// Compute the screen position for a prayer marker by evaluating
-    /// the sun's position at the marker's scheduled time.
-    private func markerScreenPosition(
-        for marker: PrayerMarkerData,
-        in size: CGSize
-    ) -> CGPoint {
-        let solarAtPrayer = SolarPosition.compute(
-            at: marker.scheduledTime,
-            latitude: latitude,
-            longitude: longitude
-        )
-        return CelestialMapping.screenPosition(
-            for: solarAtPrayer,
-            in: size
-        )
-    }
-
     /// Index of the prayer marker that should render in the `.current`
     /// state — defined as the first prayer whose scheduled time is in
     /// the future (or `nil` if all prayers' times have passed). The
     /// markers preceding it are `.past`; the markers after it are
-    /// `.future`.
+    /// `.future`. Note: this is the temporal state of the marker; the
+    /// scene also computes `aboveHorizon` independently from the sun's
+    /// altitude at that prayer's scheduled time.
     private func currentMarkerIndex(at date: Date) -> Int? {
         prayerMarkers.firstIndex { $0.scheduledTime > date }
     }
@@ -316,7 +362,7 @@ public struct PrayerMarkerData: Sendable, Equatable {
     ]
     return ScrollView(.horizontal) {
         HStack(spacing: 0) {
-            ForEach([6, 9, 12, 16, 19, 22], id: \.self) { hour in
+            ForEach([4, 6, 9, 12, 16, 19, 22], id: \.self) { hour in
                 VStack {
                     Text("\(hour):00")
                         .font(.system(size: 11, weight: .semibold).smallCaps())
@@ -328,7 +374,7 @@ public struct PrayerMarkerData: Sendable, Equatable {
                         prayerMarkers: markers
                     )
                     .environment(\.timeOfDayOverride, time(hour, 0))
-                    .frame(width: 260, height: 380)
+                    .frame(width: 260, height: 540)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding(8)

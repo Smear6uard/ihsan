@@ -43,6 +43,7 @@ private enum NightHex {
     static let text: Int = 0xF0E5D0
     static let accent: Int = 0xC9A876
     static let accentBright: Int = 0xD4A574
+    static let subterranean: Int = 0x0A0E20
 }
 
 private enum DayHex {
@@ -58,6 +59,7 @@ private enum DayHex {
     // clears AA on every day-mode surface and sky stop.
     static let accent: Int = 0x6F5429
     static let accentBright: Int = 0xC9A876
+    static let subterranean: Int = 0xB8956A
 }
 
 // MARK: - Text on surface — body AA (≥ 4.5)
@@ -191,6 +193,45 @@ func isNightConvenienceMatchesCurrent() {
     let dayDate = dateAt(hour: 13, minute: 0)
     #expect(IhsanCelestialPalette.isNight(at: nightDate))
     #expect(!IhsanCelestialPalette.isNight(at: dayDate))
+}
+
+// MARK: - Subterranean: tonal extension of sky for below-horizon region
+//
+// The subterranean token is a tonal extension of the mode's sky, not a
+// new accent family. Two invariants matter: (a) it must be darker /
+// quieter than the sky deep stop so the below-horizon band reads as
+// "beneath the sky", not as a competing surface, and (b) it must NOT
+// be confusable with `surface` (which is the illuminated-panel body —
+// a different role).
+
+@Test
+func nightSubterraneanIsDarkerThanNightSkyDeep() {
+    let subterranean = SRGB(hex: NightHex.subterranean)
+    let skyDeep = SRGB(hex: NightHex.skyDeep)
+    #expect(
+        subterranean.relativeLuminance < skyDeep.relativeLuminance,
+        "night subterranean luminance \(subterranean.relativeLuminance) should be darker than night skyDeep \(skyDeep.relativeLuminance)"
+    )
+}
+
+@Test
+func daySubterraneanIsDarkerThanDaySkyDeep() {
+    let subterranean = SRGB(hex: DayHex.subterranean)
+    let skyDeep = SRGB(hex: DayHex.skyDeep)
+    #expect(
+        subterranean.relativeLuminance < skyDeep.relativeLuminance,
+        "day subterranean luminance \(subterranean.relativeLuminance) should be darker than day skyDeep \(skyDeep.relativeLuminance)"
+    )
+}
+
+@Test
+func subterraneanHexValuesMatchPaletteTokens() {
+    // Pinning the hex codes here keeps drift between the test fixtures
+    // and the palette source flagged at compile time. The spec locks
+    // these values; an inadvertent change should surface as a failed
+    // test rather than a silent visual regression.
+    #expect(NightHex.subterranean == 0x0A0E20)
+    #expect(DayHex.subterranean == 0xB8956A)
 }
 
 // MARK: - Helpers

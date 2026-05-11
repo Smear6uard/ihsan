@@ -312,6 +312,177 @@ func mappingClampsOutOfRangeValues() {
     #expect(abs(farLeft.x - edgeLeft.x) < 0.5, "extreme negative hour angle should clamp to left edge")
 }
 
+// MARK: - Horizon-aware mapping: horizonYFraction(forSunAltitude:)
+
+@Test
+func horizonFractionAtDaytimeAltitudeIs80Percent() {
+    // Sun above horizon → horizon line near the bottom (80%).
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: 0) == 0.80)
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: 30) == 0.80)
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: 90) == 0.80)
+}
+
+@Test
+func horizonFractionAtPureNightAltitudeIs50Percent() {
+    // Sun deep below horizon → horizon line at middle (50%).
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: -15) == 0.50)
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: -30) == 0.50)
+    #expect(CelestialMapping.horizonYFraction(forSunAltitude: -90) == 0.50)
+}
+
+@Test
+func horizonFractionInterpolatesAcrossTwilight() {
+    // Half-way through the -15° to 0° window (altitude -7.5) the
+    // horizon sits at 65% — midpoint of 50% and 80%.
+    let midpoint = CelestialMapping.horizonYFraction(forSunAltitude: -7.5)
+    #expect(abs(midpoint - 0.65) < 1e-9, "horizonYFraction at -7.5° was \(midpoint), expected 0.65")
+}
+
+@Test
+func horizonFractionIsMonotonicAcrossTwilight() {
+    var previous = -1.0
+    for alt in stride(from: -15.0, through: 0.0, by: 0.5) {
+        let value = CelestialMapping.horizonYFraction(forSunAltitude: alt)
+        #expect(value >= previous, "horizonYFraction non-monotonic at alt \(alt): was \(previous), now \(value)")
+        previous = value
+    }
+}
+
+// MARK: - Horizon-aware mapping: screenPosition
+
+@Test
+func horizonAwareMappingPlacesAltitudeZeroAtFractionalHorizonY() {
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 200
+    // Pure night: horizon at 50% of marker zone.
+    let nightPoint = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: 0,
+        in: size,
+        horizonYFraction: 0.50,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let zoneHeight = size.height - top - bottom // 500
+    let expectedNightY = top + 0.50 * zoneHeight // 100 + 250 = 350
+    #expect(abs(nightPoint.y - expectedNightY) < 0.5, "horizon at 50% should land y=\(expectedNightY), got \(nightPoint.y)")
+
+    // Daytime: horizon at 80%.
+    let dayPoint = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: 0,
+        in: size,
+        horizonYFraction: 0.80,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let expectedDayY = top + 0.80 * zoneHeight // 100 + 400 = 500
+    #expect(abs(dayPoint.y - expectedDayY) < 0.5, "horizon at 80% should land y=\(expectedDayY), got \(dayPoint.y)")
+}
+
+@Test
+func horizonAwareMappingPlacesZenithAtTopInset() {
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 200
+    let point = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: 90,
+        in: size,
+        horizonYFraction: 0.50,
+        topInset: top,
+        bottomInset: bottom
+    )
+    #expect(abs(point.y - top) < 0.5, "zenith should land at topInset \(top), got \(point.y)")
+}
+
+@Test
+func horizonAwareMappingPlacesAltitudeMinAtBottomOfMarkerZone() {
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 200
+    let point = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: CelestialMapping.defaultAltitudeMin,
+        in: size,
+        horizonYFraction: 0.50,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let expectedY = size.height - bottom // 600
+    #expect(abs(point.y - expectedY) < 0.5, "altitudeMin should land at bottom of marker zone \(expectedY), got \(point.y)")
+}
+
+@Test
+func horizonAwareMappingKeepsBelowHorizonMarkersWithinMarkerZone() {
+    // Far-below-horizon markers (Isha at midnight) must still land
+    // above `size.height - bottomInset` — never under the focused
+    // card or tab bar.
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 240 // typical focused-card height
+    let point = CelestialMapping.screenPosition(
+        hourAngle: 30,
+        altitude: -45, // far below horizon — clamped to altitudeMin
+        in: size,
+        horizonYFraction: 0.50,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let maxAllowedY = size.height - bottom
+    #expect(point.y <= maxAllowedY + 0.5, "below-horizon marker y=\(point.y) escaped marker zone (max y=\(maxAllowedY))")
+}
+
+@Test
+func horizonAwareMappingIsContinuousAcrossHorizonCrossing() {
+    // Mapping at altitude -0.01 and +0.01 should differ by less than
+    // a pixel — there is no discontinuity in the piecewise function
+    // at the horizon line.
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 200
+    let just_below = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: -0.01,
+        in: size,
+        horizonYFraction: 0.65,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let just_above = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: 0.01,
+        in: size,
+        horizonYFraction: 0.65,
+        topInset: top,
+        bottomInset: bottom
+    )
+    #expect(abs(just_below.y - just_above.y) < 1.0, "mapping discontinuous at horizon: below=\(just_below.y), above=\(just_above.y)")
+}
+
+@Test
+func horizonAwareHorizonYHelperMatchesScreenPositionAtAltitudeZero() {
+    let size = CGSize(width: 400, height: 800)
+    let top: CGFloat = 100
+    let bottom: CGFloat = 200
+    let helperY = CelestialMapping.horizonY(
+        in: size,
+        horizonYFraction: 0.65,
+        topInset: top,
+        bottomInset: bottom
+    )
+    let positionY = CelestialMapping.screenPosition(
+        hourAngle: 0,
+        altitude: 0,
+        in: size,
+        horizonYFraction: 0.65,
+        topInset: top,
+        bottomInset: bottom
+    ).y
+    #expect(abs(helperY - positionY) < 0.5, "horizonY helper \(helperY) disagrees with screenPosition at altitude 0 \(positionY)")
+}
+
 // MARK: - Helpers
 
 private extension Double {

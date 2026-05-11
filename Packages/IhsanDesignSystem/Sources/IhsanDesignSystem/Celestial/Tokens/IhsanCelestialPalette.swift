@@ -29,6 +29,11 @@ import SwiftUI
 ///   eight-pointed star, the sun ornament's core fill.
 /// - **accentMoon** — bone cream / honey gold (`#F0E5D0` / `#D4A574`).
 ///   The moon body during night, the sun body during day.
+/// - **subterranean** — a tonal extension of the mode's sky for the
+///   region beneath the horizon line (`#0A0E20` / `#B8956A`). Not a
+///   fifth accent family — the value is a deeper, quieter sibling of
+///   the sky so the below-horizon band reads as "beneath the visible
+///   sky" rather than as a competing surface.
 ///
 /// The two named palettes (`.night` and `.day`) and the time-of-day
 /// resolver (`current(at:)`) are the only public surface for the
@@ -65,6 +70,15 @@ public struct IhsanCelestialPalette: Sendable, Equatable {
     /// night (bone cream `#F0E5D0`), sun during the day (gold
     /// `#D4A574`).
     public let accentMoon: Color
+
+    /// Region below the horizon line — a tonal extension of the
+    /// mode's sky, not a separate accent family. Quieter and dimmer
+    /// than `skyDeep` so the subterranean band reads as "beneath the
+    /// visible sky" rather than as a competing surface. Night uses a
+    /// deeper indigo (`#0A0E20`); day uses a muted warm dark
+    /// (`#B8956A`) that is rarely seen in the daytime composition
+    /// because the horizon then sits near the bottom of the scene.
+    public let subterranean: Color
 }
 
 // MARK: - Named palettes
@@ -87,7 +101,8 @@ public extension IhsanCelestialPalette {
         text: Color(celestialHex: 0xF0E5D0),
         accent: Color(celestialHex: 0xC9A876),
         accentBright: Color(celestialHex: 0xD4A574),
-        accentMoon: Color(celestialHex: 0xF0E5D0)
+        accentMoon: Color(celestialHex: 0xF0E5D0),
+        subterranean: Color(celestialHex: 0x0A0E20)
     )
 
     /// Day palette. Active from sunrise through Maghrib.
@@ -117,7 +132,8 @@ public extension IhsanCelestialPalette {
         text: Color(celestialHex: 0x1A1F2E),
         accent: Color(celestialHex: 0x6F5429),
         accentBright: Color(celestialHex: 0xC9A876),
-        accentMoon: Color(celestialHex: 0xD4A574)
+        accentMoon: Color(celestialHex: 0xD4A574),
+        subterranean: Color(celestialHex: 0xB8956A)
     )
 }
 

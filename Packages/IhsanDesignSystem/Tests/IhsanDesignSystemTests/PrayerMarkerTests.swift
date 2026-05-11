@@ -78,6 +78,40 @@ func prayerMarkerDataIsValueEqual() {
     #expect(a != c)
 }
 
+// MARK: - aboveHorizon parameter
+//
+// The aboveHorizon flag is a structural property of the marker — its
+// default value, its preservation across initialisers, and its
+// participation in the public surface. The visual treatment (muted
+// fill, dimmer label) lives in the SwiftUI body and is verified by
+// device-level inspection rather than unit assertion.
+
+@Test
+func prayerMarkerDefaultsToAboveHorizonForBackwardsCompatibility() {
+    let marker = PrayerMarker(label: "FAJR", state: .future)
+    #expect(marker.aboveHorizon == true)
+
+    let prayerInit = PrayerMarker(prayer: .fajr, state: .future)
+    #expect(prayerInit.aboveHorizon == true)
+}
+
+@Test
+func prayerMarkerPreservesAboveHorizonWhenSetExplicitly() {
+    let belowHorizonLabelInit = PrayerMarker(
+        label: "MAGHRIB",
+        state: .past,
+        aboveHorizon: false
+    )
+    #expect(belowHorizonLabelInit.aboveHorizon == false)
+
+    let belowHorizonPrayerInit = PrayerMarker(
+        prayer: .isha,
+        state: .future,
+        aboveHorizon: false
+    )
+    #expect(belowHorizonPrayerInit.aboveHorizon == false)
+}
+
 // MARK: - Helpers
 
 private func dateAt(hour: Int, minute: Int) -> Date {

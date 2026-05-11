@@ -124,4 +124,175 @@ public enum CelestialMapping {
             verticalInset: verticalInset
         )
     }
+
+    // MARK: - Horizon-aware piecewise mapping
+    //
+    // The default symmetric mapping above puts altitude 0° at a fixed
+    // y-position determined by `[altitudeMin, altitudeMax]`. That is
+    // correct for an isolated celestial-arc preview but wrong for the
+    // Today screen: the horizon's y-position must shift with the
+    // user's daily cycle so the below-horizon region remains visible
+    // (and prayer markers at deep negative altitudes don't collapse
+    // off-screen behind the focused-prayer card).
+    //
+    // The horizon-aware overloads below position altitude 0° at a
+    // caller-supplied `horizonYFraction` of the marker zone height,
+    // then linearly map above-horizon altitudes upward to the top inset
+    // and below-horizon altitudes downward to the bottom inset. The
+    // marker zone is defined by asymmetric `topInset` and `bottomInset`
+    // so callers can carve out room for the header (top) and focused-
+    // prayer card (bottom) without the chrome covering positioned
+    // ornaments.
+
+    /// The proportional y-position of the horizon line within the
+    /// marker zone, computed from the sun's current altitude. The
+    /// returned value is a fraction of the marker-zone height (0.0 =
+    /// top of zone, 1.0 = bottom).
+    ///
+    /// During pure night (sun well below horizon) the horizon sits at
+    /// `0.50` so the upper half of the scene holds the visible night
+    /// sky and the lower half holds the subterranean band where below-
+    /// horizon prayer markers live. During daytime (sun above horizon)
+    /// the horizon sits at `0.80` so almost the whole scene is sky and
+    /// only a slim band beneath holds any below-horizon markers. The
+    /// transitions (Fajr-to-sunrise, Maghrib-to-Isha) interpolate
+    /// linearly so the horizon line glides between positions rather
+    /// than snapping.
+    public static func horizonYFraction(forSunAltitude altitude: Double) -> Double {
+        let nightFraction: Double = 0.50
+        let dayFraction: Double = 0.80
+        let nightAltitudeThreshold: Double = -15.0
+        if altitude >= 0 {
+            return dayFraction
+        }
+        if altitude <= nightAltitudeThreshold {
+            return nightFraction
+        }
+        let t = (altitude - nightAltitudeThreshold)
+            / (0.0 - nightAltitudeThreshold)
+        return nightFraction + t * (dayFraction - nightFraction)
+    }
+
+    /// Map an (hour angle, altitude) pair to a `CGPoint` within a
+    /// horizon-aware marker zone.
+    ///
+    /// - Parameters:
+    ///   - hourAngle: Local hour angle in degrees, clamped to
+    ///     `[-hourAngleSpan, +hourAngleSpan]` as in the default mapping.
+    ///   - altitude: Altitude in degrees, clamped to
+    ///     `[altitudeMin, altitudeMax]`. Altitude 0° lands exactly on
+    ///     the horizon line.
+    ///   - size: The size of the celestial scene's drawing area.
+    ///   - horizonYFraction: Where within the marker zone altitude 0°
+    ///     should land. Typically computed from the current sun's
+    ///     altitude via `horizonYFraction(forSunAltitude:)`.
+    ///   - topInset: Distance from the top edge of `size` to the top
+    ///     of the marker zone. Carves out the header / safe area.
+    ///   - bottomInset: Distance from the bottom edge of `size` to the
+    ///     bottom of the marker zone. Carves out the focused-prayer
+    ///     card / tab bar.
+    ///   - horizontalInset: Symmetric inset from left and right edges.
+    ///   - hourAngleSpan: Half-width of the hour-angle range covered
+    ///     by the scene width.
+    ///   - altitudeMax: Altitude mapped to the top of the marker zone.
+    ///   - altitudeMin: Altitude mapped to the bottom of the marker
+    ///     zone. Negative — far below the horizon line.
+    public static func screenPosition(
+        hourAngle: Double,
+        altitude: Double,
+        in size: CGSize,
+        horizonYFraction: Double,
+        topInset: CGFloat,
+        bottomInset: CGFloat,
+        horizontalInset: CGFloat = defaultHorizontalInset,
+        hourAngleSpan: Double = defaultHourAngleSpan / 2.0,
+        altitudeMax: Double = defaultAltitudeMax,
+        altitudeMin: Double = defaultAltitudeMin
+    ) -> CGPoint {
+        let usableWidth = max(0, size.width - horizontalInset * 2)
+        let usableHeight = max(0, size.height - topInset - bottomInset)
+
+        // X — same as the default mapping.
+        let clampedHA = max(-hourAngleSpan, min(hourAngleSpan, hourAngle))
+        let xFraction = (clampedHA + hourAngleSpan) / (2.0 * hourAngleSpan)
+        let x = horizontalInset + CGFloat(xFraction) * usableWidth
+
+        // Y — piecewise around the horizon. Above the horizon,
+        // altitude `[0, altitudeMax]` maps linearly to y `[horizonY,
+        // topInset]`. Below, altitude `[altitudeMin, 0]` maps to y
+        // `[bottomY, horizonY]`.
+        let clampedFraction = max(0.0, min(1.0, horizonYFraction))
+        let horizonY = topInset + CGFloat(clampedFraction) * usableHeight
+
+        let y: CGFloat
+        if altitude >= 0 {
+            let clampedAlt = min(altitudeMax, altitude)
+            let aboveFraction = altitudeMax > 0 ? clampedAlt / altitudeMax : 0
+            y = horizonY - CGFloat(aboveFraction) * (horizonY - topInset)
+        } else {
+            let clampedAlt = max(altitudeMin, altitude)
+            let denom = abs(altitudeMin)
+            let belowFraction = denom > 0 ? abs(clampedAlt) / denom : 0
+            let bottomY = size.height - bottomInset
+            y = horizonY + CGFloat(belowFraction) * (bottomY - horizonY)
+        }
+
+        return CGPoint(x: x, y: y)
+    }
+
+    /// Convenience overload taking a `SolarPosition` directly with
+    /// horizon-aware piecewise mapping.
+    public static func screenPosition(
+        for position: SolarPosition,
+        in size: CGSize,
+        horizonYFraction: Double,
+        topInset: CGFloat,
+        bottomInset: CGFloat,
+        horizontalInset: CGFloat = defaultHorizontalInset
+    ) -> CGPoint {
+        screenPosition(
+            hourAngle: position.hourAngle,
+            altitude: position.altitude,
+            in: size,
+            horizonYFraction: horizonYFraction,
+            topInset: topInset,
+            bottomInset: bottomInset,
+            horizontalInset: horizontalInset
+        )
+    }
+
+    /// Convenience overload taking a `LunarPosition` directly with
+    /// horizon-aware piecewise mapping.
+    public static func screenPosition(
+        for position: LunarPosition,
+        in size: CGSize,
+        horizonYFraction: Double,
+        topInset: CGFloat,
+        bottomInset: CGFloat,
+        horizontalInset: CGFloat = defaultHorizontalInset
+    ) -> CGPoint {
+        screenPosition(
+            hourAngle: position.hourAngle,
+            altitude: position.altitude,
+            in: size,
+            horizonYFraction: horizonYFraction,
+            topInset: topInset,
+            bottomInset: bottomInset,
+            horizontalInset: horizontalInset
+        )
+    }
+
+    /// The screen y-coordinate of the horizon line for a marker zone
+    /// with the given insets and horizon fraction. Convenience for the
+    /// scene's horizon-line and subterranean-band positioning.
+    public static func horizonY(
+        in size: CGSize,
+        horizonYFraction: Double,
+        topInset: CGFloat,
+        bottomInset: CGFloat
+    ) -> CGFloat {
+        let usableHeight = max(0, size.height - topInset - bottomInset)
+        let clampedFraction = max(0.0, min(1.0, horizonYFraction))
+        return topInset + CGFloat(clampedFraction) * usableHeight
+    }
 }
