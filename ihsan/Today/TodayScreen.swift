@@ -149,6 +149,7 @@ private struct TodayReadyView: View {
     @State private var focusedPrayer: Prayer?
     @State private var sheetSelection: LogSheetSelection?
     @State private var revertFocusTask: Task<Void, Never>?
+    @State private var isCelestialReferencePresented = false
 
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
@@ -185,7 +186,9 @@ private struct TodayReadyView: View {
             VStack(spacing: 0) {
                 TodayHeader(
                     cityName: snapshot.place.cityName ?? "Current Location",
-                    date: .now
+                    date: .now,
+                    dayTimes: snapshot.dayTimes,
+                    onMoonPhaseTap: { isCelestialReferencePresented = true }
                 )
                 .padding(.horizontal, IhsanSpacing.md)
                 .padding(.top, IhsanSpacing.md)
@@ -216,6 +219,13 @@ private struct TodayReadyView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+        }
+        .fullScreenCover(isPresented: $isCelestialReferencePresented) {
+            CelestialReferenceView(
+                latitude: snapshot.place.coordinates.latitude,
+                longitude: snapshot.place.coordinates.longitude,
+                onDismiss: { isCelestialReferencePresented = false }
+            )
         }
     }
 

@@ -8,7 +8,9 @@ import IhsanDesignSystem
         VStack {
             TodayHeader(
                 cityName: "Chicago",
-                date: .now
+                date: .now,
+                dayTimes: nil,
+                onMoonPhaseTap: {}
             )
             .padding(IhsanSpacing.md)
             Spacer()
