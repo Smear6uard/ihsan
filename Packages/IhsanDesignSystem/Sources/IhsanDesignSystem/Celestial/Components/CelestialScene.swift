@@ -49,32 +49,108 @@ public struct CelestialScene: View {
     @ViewBuilder
     private func scene(at date: Date) -> some View {
         let state = SkyState.current(at: date)
+        let solar = SolarPosition.compute(at: date, latitude: latitude, longitude: longitude)
+        let lunar = LunarPosition.compute(at: date, latitude: latitude, longitude: longitude)
 
-        ZStack {
-            SkyGradient()
+        GeometryReader { geometry in
+            ZStack {
+                SkyGradient()
 
-            // Star field — visible at night, faded around dawn / dusk.
-            // The view itself reads the time-of-day via its own
-            // override; we modulate its visibility here with opacity
-            // so the per-minute redraw in CelestialScene doesn't have
-            // to reshuffle the star positions.
-            if state.starOpacity > 0.01 {
-                StarField()
-                    .opacity(state.starOpacity)
+                // Star field — visible at night, faded around dawn /
+                // dusk. The view itself reads the time-of-day via its
+                // own override; we modulate its visibility here with
+                // opacity so the per-minute redraw in CelestialScene
+                // doesn't have to reshuffle the star positions.
+                if state.starOpacity > 0.01 {
+                    StarField()
+                        .opacity(state.starOpacity)
+                }
+
+                // Sun ornament — visible whenever the sun's altitude
+                // is above the descent-animation margin (~-10° below
+                // horizon). Hidden at deep night when the sun is far
+                // below the user's local horizon.
+                if shouldShowSun(solar: solar, sky: state) {
+                    SunOrnament(altitude: solar.altitude)
+                        .position(
+                            CelestialMapping.screenPosition(
+                                for: solar,
+                                in: geometry.size
+                            )
+                        )
+                }
+
+                // Moon ornament — visible whenever the moon is above
+                // the horizon AND the sky is at least somewhat dark.
+                // Overlap with the sun during dawn / dusk is fine; the
+                // two are at different positions, and at twilight both
+                // are visible in real life.
+                if shouldShowMoon(lunar: lunar, sky: state) {
+                    MoonOrnament(position: lunar)
+                        .position(
+                            CelestialMapping.screenPosition(
+                                for: lunar,
+                                in: geometry.size
+                            )
+                        )
+                }
             }
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(for: state))
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabel(for: state, solar: solar, lunar: lunar))
     }
 
-    private func accessibilityLabel(for state: SkyState) -> String {
+    private func shouldShowSun(solar: SolarPosition, sky: SkyState) -> Bool {
+        // Always show the sun if it's reasonably above the horizon, or
+        // briefly during descent. Hide once it's deeply below.
+        solar.altitude > -10.0 && sky.starOpacity < 0.90
+    }
+
+    private func shouldShowMoon(lunar: LunarPosition, sky: SkyState) -> Bool {
+        // Moon only renders when above horizon and the sky is at least
+        // somewhat dark so it has contrast against the parchment day.
+        lunar.altitude > 0.0 && sky.starOpacity > 0.10
+    }
+
+    private func accessibilityLabel(
+        for state: SkyState,
+        solar: SolarPosition,
+        lunar: LunarPosition
+    ) -> String {
+        let base: String
         if state.starOpacity > 0.85 {
-            return "Night sky with stars."
+            base = "Night sky with stars"
         } else if state.starOpacity > 0.30 {
-            return "Twilight sky."
+            base = "Twilight sky"
         } else {
-            return "Daytime sky."
+            base = "Daytime sky"
         }
+
+        var parts: [String] = [base]
+
+        if solar.altitude > -10.0 && state.starOpacity < 0.90 {
+            let altitude = Int(solar.altitude.rounded())
+            parts.append("sun at \(altitude) degrees above horizon")
+        }
+
+        if lunar.altitude > 0.0 && state.starOpacity > 0.10 {
+            let f = lunar.illuminatedFraction
+            let phase: String
+            if f < 0.05 {
+                phase = "new moon"
+            } else if f < 0.30 {
+                phase = lunar.isWaxing ? "waxing crescent" : "waning crescent"
+            } else if f < 0.55 {
+                phase = lunar.isWaxing ? "first quarter" : "last quarter"
+            } else if f < 0.95 {
+                phase = lunar.isWaxing ? "waxing gibbous" : "waning gibbous"
+            } else {
+                phase = "full moon"
+            }
+            parts.append("\(phase) visible")
+        }
+
+        return parts.joined(separator: ". ") + "."
     }
 }
 
