@@ -1,12 +1,15 @@
+import IhsanCore
 import SwiftUI
 
 /// The celestial Today screen's middle zone — the visual heart of the
 /// app, rendered as a single composed view.
 ///
 /// Phase 3 establishes the foundation: a time-adaptive sky gradient
-/// with a night star field overlaid. Subsequent phases layer the sun
-/// / moon ornaments (Phase 4), the prayer markers (Phase 5), and the
-/// horizon line / glow halo (Phase 6) on top of this base.
+/// with a night star field overlaid. Phase 4 adds the sun and moon
+/// ornaments at their real altitudes; Phase 5 adds the five prayer
+/// markers positioned at the sun's altitude / hour angle at each
+/// prayer's scheduled time. Phase 6 adds the horizon line and glow
+/// halo for dawn / dusk transitions.
 ///
 /// The view re-renders on a 60 s cadence so the sky drifts visibly
 /// through dawn and dusk without ever animating fast enough for the
@@ -19,19 +22,31 @@ import SwiftUI
 /// doesn't read out each individual star as a separate element.
 public struct CelestialScene: View {
 
-    /// Observer latitude and longitude. Drives the astronomical math
-    /// in Phase 4+ (sun and moon ornament positions). Phase 3 doesn't
-    /// consume the coordinates directly — they're carried in the view
-    /// model so call sites are stable across phases.
+    /// Observer latitude in degrees. Positive north, negative south.
+    /// Drives the astronomical position math for the sun, moon, and
+    /// prayer markers.
     public let latitude: Double
+
+    /// Observer longitude in degrees. Positive east, negative west.
     public let longitude: Double
+
+    /// The day's prayer times. Each entry positions a `PrayerMarker`
+    /// on the scene at the sun's altitude / hour angle at that prayer's
+    /// scheduled time. Empty by default so previews and early-phase
+    /// integration paths don't need to thread prayer data.
+    public let prayerMarkers: [PrayerMarkerData]
 
     @Environment(\.timeOfDayOverride) private var override
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
-    public init(latitude: Double, longitude: Double) {
+    public init(
+        latitude: Double,
+        longitude: Double,
+        prayerMarkers: [PrayerMarkerData] = []
+    ) {
         self.latitude = latitude
         self.longitude = longitude
+        self.prayerMarkers = prayerMarkers
     }
 
     public var body: some View {
@@ -51,6 +66,7 @@ public struct CelestialScene: View {
         let state = SkyState.current(at: date)
         let solar = SolarPosition.compute(at: date, latitude: latitude, longitude: longitude)
         let lunar = LunarPosition.compute(at: date, latitude: latitude, longitude: longitude)
+        let currentIndex = currentMarkerIndex(at: date)
 
         GeometryReader { geometry in
             ZStack {
@@ -94,6 +110,26 @@ public struct CelestialScene: View {
                             )
                         )
                 }
+
+                // Prayer markers — five small ornamental glyphs placed
+                // at the sun's position at each prayer's scheduled
+                // time. State variants (future / past / current)
+                // communicate where the user is in the day's schedule.
+                ForEach(prayerMarkers.indices, id: \.self) { i in
+                    let marker = prayerMarkers[i]
+                    let position = markerScreenPosition(
+                        for: marker,
+                        in: geometry.size
+                    )
+                    let state = markerState(
+                        markerIndex: i,
+                        currentIndex: currentIndex,
+                        scheduledTime: marker.scheduledTime,
+                        now: date
+                    )
+                    PrayerMarker(prayer: marker.prayer, state: state)
+                        .position(position)
+                }
             }
         }
         .accessibilityElement(children: .combine)
@@ -110,6 +146,44 @@ public struct CelestialScene: View {
         // Moon only renders when above horizon and the sky is at least
         // somewhat dark so it has contrast against the parchment day.
         lunar.altitude > 0.0 && sky.starOpacity > 0.10
+    }
+
+    /// Compute the screen position for a prayer marker by evaluating
+    /// the sun's position at the marker's scheduled time.
+    private func markerScreenPosition(
+        for marker: PrayerMarkerData,
+        in size: CGSize
+    ) -> CGPoint {
+        let solarAtPrayer = SolarPosition.compute(
+            at: marker.scheduledTime,
+            latitude: latitude,
+            longitude: longitude
+        )
+        return CelestialMapping.screenPosition(
+            for: solarAtPrayer,
+            in: size
+        )
+    }
+
+    /// Index of the prayer marker that should render in the `.current`
+    /// state — defined as the first prayer whose scheduled time is in
+    /// the future (or `nil` if all prayers' times have passed). The
+    /// markers preceding it are `.past`; the markers after it are
+    /// `.future`.
+    private func currentMarkerIndex(at date: Date) -> Int? {
+        prayerMarkers.firstIndex { $0.scheduledTime > date }
+    }
+
+    private func markerState(
+        markerIndex: Int,
+        currentIndex: Int?,
+        scheduledTime: Date,
+        now: Date
+    ) -> PrayerMarker.State {
+        if markerIndex == currentIndex {
+            return .current
+        }
+        return scheduledTime <= now ? .past : .future
     }
 
     private func accessibilityLabel(
@@ -150,24 +224,55 @@ public struct CelestialScene: View {
             parts.append("\(phase) visible")
         }
 
+        if !prayerMarkers.isEmpty {
+            parts.append("\(prayerMarkers.count) prayer times marked across the day")
+        }
+
         return parts.joined(separator: ". ") + "."
+    }
+}
+
+/// One prayer time for the celestial scene to position a marker at.
+public struct PrayerMarkerData: Sendable, Equatable {
+    public let prayer: Prayer
+    public let scheduledTime: Date
+
+    public init(prayer: Prayer, scheduledTime: Date) {
+        self.prayer = prayer
+        self.scheduledTime = scheduledTime
     }
 }
 
 #Preview("Celestial scene — across the day") {
     let coordinates = (lat: 41.78, lng: -88.15)
+    let calendar = Calendar.current
+    let today = calendar.startOfDay(for: .now)
+    func time(_ h: Int, _ m: Int) -> Date {
+        calendar.date(byAdding: .second, value: h * 3600 + m * 60, to: today) ?? today
+    }
+    let markers: [PrayerMarkerData] = [
+        .init(prayer: .fajr, scheduledTime: time(5, 15)),
+        .init(prayer: .dhuhr, scheduledTime: time(12, 50)),
+        .init(prayer: .asr, scheduledTime: time(16, 40)),
+        .init(prayer: .maghrib, scheduledTime: time(20, 5)),
+        .init(prayer: .isha, scheduledTime: time(21, 40))
+    ]
     return ScrollView(.horizontal) {
         HStack(spacing: 0) {
-            ForEach([3, 6, 7, 12, 17, 18, 19, 22], id: \.self) { hour in
+            ForEach([6, 9, 12, 16, 19, 22], id: \.self) { hour in
                 VStack {
                     Text("\(hour):00")
                         .font(.system(size: 11, weight: .semibold).smallCaps())
                         .tracking(1.1)
                         .foregroundStyle(.white.opacity(0.7))
-                    CelestialScene(latitude: coordinates.lat, longitude: coordinates.lng)
-                        .environment(\.timeOfDayOverride, dateAt(hour: hour, minute: 0))
-                        .frame(width: 240, height: 360)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    CelestialScene(
+                        latitude: coordinates.lat,
+                        longitude: coordinates.lng,
+                        prayerMarkers: markers
+                    )
+                    .environment(\.timeOfDayOverride, time(hour, 0))
+                    .frame(width: 260, height: 380)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
                 .padding(8)
             }
@@ -175,14 +280,4 @@ public struct CelestialScene: View {
     }
     .background(.black)
     .ignoresSafeArea()
-}
-
-private func dateAt(hour: Int, minute: Int) -> Date {
-    var components = DateComponents()
-    components.year = 2026
-    components.month = 5
-    components.day = 15
-    components.hour = hour
-    components.minute = minute
-    return Calendar.current.date(from: components) ?? .now
 }

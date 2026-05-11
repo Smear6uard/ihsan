@@ -210,7 +210,7 @@ private struct ArcLayer: View {
                 let p = ArcGeometry.point(at: t, in: size)
                 let isPast = mark.time <= now
 
-                PrayerMarker(isPast: isPast)
+                PrayerArcDot(isPast: isPast)
                     .position(p)
             }
 
@@ -245,7 +245,7 @@ private struct ArcStroke: Shape {
 /// stroke. The size (8pt) is calibrated against the curve's stroke width
 /// so the markers read as ornaments laid on the arc, not as glyphs
 /// floating above it.
-private struct PrayerMarker: View {
+private struct PrayerArcDot: View {
     let isPast: Bool
 
     var body: some View {
