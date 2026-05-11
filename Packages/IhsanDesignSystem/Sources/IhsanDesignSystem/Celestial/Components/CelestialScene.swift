@@ -36,17 +36,25 @@ public struct CelestialScene: View {
     /// integration paths don't need to thread prayer data.
     public let prayerMarkers: [PrayerMarkerData]
 
+    /// Optional callback fired when a prayer marker is tapped. The
+    /// caller (Today screen) uses this to swap the focused-prayer
+    /// card to display the tapped prayer. `nil` makes the markers
+    /// non-interactive — appropriate for read-only previews.
+    public let onMarkerTap: ((Prayer) -> Void)?
+
     @Environment(\.timeOfDayOverride) private var override
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         latitude: Double,
         longitude: Double,
-        prayerMarkers: [PrayerMarkerData] = []
+        prayerMarkers: [PrayerMarkerData] = [],
+        onMarkerTap: ((Prayer) -> Void)? = nil
     ) {
         self.latitude = latitude
         self.longitude = longitude
         self.prayerMarkers = prayerMarkers
+        self.onMarkerTap = onMarkerTap
     }
 
     public var body: some View {
@@ -132,6 +140,9 @@ public struct CelestialScene: View {
                 // at the sun's position at each prayer's scheduled
                 // time. State variants (future / past / current)
                 // communicate where the user is in the day's schedule.
+                // Each marker is wrapped in a Button that fires the
+                // optional onMarkerTap callback, used by the Today
+                // screen to swap the focused-prayer card.
                 ForEach(prayerMarkers.indices, id: \.self) { i in
                     let marker = prayerMarkers[i]
                     let position = markerScreenPosition(
@@ -144,8 +155,25 @@ public struct CelestialScene: View {
                         scheduledTime: marker.scheduledTime,
                         now: date
                     )
-                    PrayerMarker(prayer: marker.prayer, state: state)
-                        .position(position)
+                    Group {
+                        if let onMarkerTap {
+                            Button {
+                                onMarkerTap(marker.prayer)
+                            } label: {
+                                PrayerMarker(
+                                    prayer: marker.prayer,
+                                    state: state
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        } else {
+                            PrayerMarker(
+                                prayer: marker.prayer,
+                                state: state
+                            )
+                        }
+                    }
+                    .position(position)
                 }
             }
         }

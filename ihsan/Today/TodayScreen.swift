@@ -13,14 +13,6 @@ struct TodayScreen: View {
 
     var body: some View {
         content
-            // Time-adaptive manuscript page. The gradient endpoints drift
-            // through the day so the screen reads as Persian indigo by
-            // night, parchment cream by day, and vermillion through the
-            // maghrib window — saturated and considered, never flat
-            // black or muddy brown. The photographic sunrise / maghrib
-            // assets live INSIDE the hero countdown card (see
-            // `TodayHeroSection`), not across the whole background.
-            .ihsanManuscriptPage()
             .task {
                 if viewModel == nil {
                     viewModel = TodayViewModel(modelContext: modelContext)
@@ -45,8 +37,10 @@ struct TodayScreen: View {
         switch viewModel?.state {
         case .loading, nil:
             TodayLoadingView()
+                .ihsanManuscriptPage()
         case .needsLocationPermission:
             TodayNeedsLocationView { Task { await viewModel?.bootstrap() } }
+                .ihsanManuscriptPage()
         case .ready(let snapshot):
             if let viewModel {
                 TodayReadyView(
@@ -58,6 +52,7 @@ struct TodayScreen: View {
             }
         case .error(let message):
             TodayErrorView(message: message) { Task { await viewModel?.bootstrap() } }
+                .ihsanManuscriptPage()
         }
     }
 }
@@ -142,6 +137,21 @@ private struct TodayErrorView: View {
     }
 }
 
+// MARK: - Ready state: the celestial Today screen
+//
+// New layout per the celestial redesign:
+//
+//   ┌─────────────────────────────┐
+//   │ Zone 1 — refined header     │   ~10% of screen
+//   │ Zone 2 — celestial scene    │   ~65% (sky, sun, moon, markers)
+//   │ Zone 3 — focused-prayer card│   ~25% (single illuminated panel)
+//   └─────────────────────────────┘
+//
+// The legacy hero countdown, prayer arc, and prayer list are folded
+// into the celestial scene's prayer markers and the focused card's
+// inline expansion. The full PrayerLogSheet remains accessible from
+// the card's chevron and "More options" link for edge cases (qadā,
+// retroactive missed, edit).
 
 private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
@@ -149,57 +159,205 @@ private struct TodayReadyView: View {
     let onQibla: () -> Void
     let onMasjids: () -> Void
 
+    @Query private var todaysLogs: [PrayerLog]
+    @Query private var settingsRows: [UserSettings]
+
+    @State private var focusedPrayer: Prayer?
+    @State private var sheetSelection: LogSheetSelection?
+    @State private var revertFocusTask: Task<Void, Never>?
+
+    /// Time the focused-prayer card stays on a marker-tapped prayer
+    /// before reverting to the next-upcoming prayer per spec.
+    private static let focusRevertInterval: TimeInterval = 8
+
+    init(
+        snapshot: TodayState.Snapshot,
+        viewModel: TodayViewModel,
+        onQibla: @escaping () -> Void,
+        onMasjids: @escaping () -> Void
+    ) {
+        self.snapshot = snapshot
+        self.viewModel = viewModel
+        self.onQibla = onQibla
+        self.onMasjids = onMasjids
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: .now)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        let predicate = #Predicate<PrayerLog> { log in
+            log.prayerDate >= startOfDay && log.prayerDate < endOfDay
+        }
+        self._todaysLogs = Query(filter: predicate, sort: \PrayerLog.prayerDate)
+    }
+
     var body: some View {
-        ScrollView {
-            VStack(spacing: IhsanSpacing.lg) {
+        ZStack(alignment: .bottom) {
+            CelestialScene(
+                latitude: snapshot.place.coordinates.latitude,
+                longitude: snapshot.place.coordinates.longitude,
+                prayerMarkers: snapshot.dayTimes.allFardh.map {
+                    PrayerMarkerData(prayer: $0.prayer, scheduledTime: $0.scheduledTime)
+                },
+                onMarkerTap: handleMarkerTap
+            )
+            .ignoresSafeArea()
+
+            VStack(spacing: 0) {
                 TodayHeader(
                     cityName: snapshot.place.cityName ?? "Current Location",
                     date: .now,
                     qiblaAction: onQibla,
                     masjidAction: onMasjids
                 )
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.top, IhsanSpacing.md)
 
-                if snapshot.isWithinSuhoorWindow {
-                    SuhoorIftarBanner(suhoorEnd: snapshot.nextPrayerTime.scheduledTime)
-                }
-
-                TodayHeroSection(snapshot: snapshot)
-
-                // Sun-arc visualisation — the visual signature element of
-                // the Today screen. Sits between the hero countdown and
-                // the prayer list, providing "where am I in the day"
-                // context as a single curved horizontal element.
-                PrayerArc(
-                    prayerMarks: snapshot.dayTimes.allFardh.map {
-                        PrayerArc.PrayerMark(prayer: $0.prayer, time: $0.scheduledTime)
-                    }
-                )
-
-                TodayPrayerList(
-                    snapshot: snapshot,
-                    onSetStatus: { prayer, status in
-                        Task { await viewModel.setStatus(status, for: prayer) }
-                    },
-                    onToggleJamaah: { prayer in
-                        Task { await viewModel.toggleJamaah(for: prayer) }
-                    },
-                    onToggleAdhan: { prayer in
-                        Task { await viewModel.toggleAdhanEnabled(for: prayer) }
-                    }
-                )
-
-                if shouldShowReflectionEntry {
-                    EveningReflectionEntry()
-                }
-
-                Color.clear.frame(height: IhsanSpacing.xl)
+                Spacer(minLength: 0)
             }
-            .padding(.horizontal, IhsanSpacing.md)
-            .padding(.top, IhsanSpacing.md)
+
+            VStack(spacing: IhsanSpacing.sm) {
+                FocusedPrayerCard(
+                    prayer: effectiveFocusedPrayer,
+                    scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
+                    windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
+                    currentStatus: log(for: effectiveFocusedPrayer)?.status,
+                    isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
+                    isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
+                    onCommit: { status, isJamaah in
+                        commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
+                    },
+                    onMoreOptions: {
+                        sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
+                    }
+                )
+            }
+            .padding(.bottom, IhsanSpacing.md)
+        }
+        .sheet(item: $sheetSelection) { selection in
+            logSheet(for: selection.prayer)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.thinMaterial)
         }
     }
 
-    private var shouldShowReflectionEntry: Bool {
-        Date.now >= snapshot.dayTimes.isha.scheduledTime
+    // MARK: - Focused prayer resolution
+
+    /// The prayer the focused card is currently displaying. The user
+    /// can override the default by tapping a marker on the scene; the
+    /// override reverts to the next-upcoming after 8 sec per spec.
+    private var effectiveFocusedPrayer: Prayer {
+        focusedPrayer
+            ?? snapshot.activePrayer
+            ?? snapshot.nextPrayerTime.prayer
     }
+
+    private func handleMarkerTap(_ prayer: Prayer) {
+        Haptics.impact(.light)
+        focusedPrayer = prayer
+        scheduleFocusRevert()
+    }
+
+    private func scheduleFocusRevert() {
+        revertFocusTask?.cancel()
+        revertFocusTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: UInt64(Self.focusRevertInterval * 1_000_000_000))
+            if !Task.isCancelled {
+                focusedPrayer = nil
+            }
+        }
+    }
+
+    // MARK: - Prayer time / log lookups
+
+    private func scheduledTime(for prayer: Prayer) -> Date {
+        snapshot.dayTimes.allFardh.first { $0.prayer == prayer }?.scheduledTime
+            ?? snapshot.nextPrayerTime.scheduledTime
+    }
+
+    /// End of `prayer`'s window. Fajr ends at sunrise, Dhuhr–Maghrib
+    /// at the next prayer, Isha returns `nil` (the window extends
+    /// past midnight and the card drops the "WINDOW ENDS" clause).
+    private func windowEndTime(for prayer: Prayer) -> Date? {
+        switch prayer {
+        case .fajr:
+            return snapshot.dayTimes.sunrise
+        case .dhuhr:
+            return snapshot.dayTimes.asr.scheduledTime
+        case .asr:
+            return snapshot.dayTimes.maghrib.scheduledTime
+        case .maghrib:
+            return snapshot.dayTimes.isha.scheduledTime
+        case .isha:
+            return nil
+        }
+    }
+
+    private func log(for prayer: Prayer) -> PrayerLog? {
+        todaysLogs.first { $0.prayer == prayer }
+    }
+
+    // MARK: - Commit
+
+    /// Translate the orthogonal `(timing, jamaʿah)` commit into the
+    /// existing `setStatus` + `toggleJamaah` view-model methods.
+    private func commit(status: PrayerStatus, isJamaah: Bool, for prayer: Prayer) {
+        let existingJamaah = log(for: prayer)?.withJamaah ?? false
+        Task {
+            await viewModel.setStatus(status, for: prayer)
+            if isJamaah != existingJamaah {
+                await viewModel.toggleJamaah(for: prayer)
+            }
+        }
+    }
+
+    // MARK: - Edge-case log sheet (still used for qadā, missed, edit)
+
+    @ViewBuilder
+    private func logSheet(for prayer: Prayer) -> some View {
+        let prayerTime = snapshot.dayTimes.allFardh.first { $0.prayer == prayer }
+        let log = log(for: prayer)
+        let adhanEnabled = settingsRows.first?.adhanEnabled(for: prayer) ?? true
+
+        if let prayerTime {
+            PrayerLogSheet(
+                prayer: prayer,
+                scheduledTime: prayerTime.scheduledTime,
+                windowEndTime: windowEndTime(for: prayer),
+                currentStatus: log?.status,
+                isJamaah: log?.withJamaah ?? false,
+                adhanEnabled: adhanEnabled,
+                onSelect: { choice in handleSheetChoice(choice, for: prayer) },
+                onToggleAdhan: { Task { await viewModel.toggleAdhanEnabled(for: prayer) } },
+                onCancel: {}
+            )
+        }
+    }
+
+    private func handleSheetChoice(_ choice: PrayerLogSheet.Choice, for prayer: Prayer) {
+        let currentJamaah = log(for: prayer)?.withJamaah ?? false
+        Task {
+            switch choice {
+            case .inJamaah:
+                await viewModel.setStatus(.onTime, for: prayer)
+                if !currentJamaah { await viewModel.toggleJamaah(for: prayer) }
+            case .onTime:
+                await viewModel.setStatus(.onTime, for: prayer)
+                if currentJamaah { await viewModel.toggleJamaah(for: prayer) }
+            case .late:
+                await viewModel.setStatus(.late, for: prayer)
+            case .qada:
+                await viewModel.setStatus(.qada, for: prayer)
+            case .missed:
+                await viewModel.setStatus(.missed, for: prayer)
+            }
+        }
+    }
+}
+
+/// Identifies which prayer's log sheet is currently presented.
+/// Hashable so it works as `sheet(item:)`'s identifier.
+private struct LogSheetSelection: Identifiable, Hashable {
+    let prayer: Prayer
+    var id: Prayer { prayer }
 }
