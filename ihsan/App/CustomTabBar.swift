@@ -45,13 +45,19 @@ enum Tab: Int, CaseIterable, Hashable, Identifiable {
 
 /// The bottom tab bar.
 ///
-/// The container reads as iOS 26 Liquid Glass — bare `.glassEffect()`
+/// The container reads as iOS 26 Liquid Glass — `.glassEffect()`
 /// applied to a rounded rectangle so the platform's native iridescence
-/// and refraction of the manuscript page beneath comes through. The
-/// per-tab cells render an SF Symbol over a small-caps inscription
-/// (TODAY · PATH · REFLECT · SET), and the active tab is marked by a
-/// gold icon and a small brass underline that slides between cells
-/// alongside the drag gesture.
+/// and refraction of the manuscript page beneath comes through. In
+/// daytime mode a thin warm-amber backing (`parchmentDeep` at 30 %
+/// opacity) sits BEHIND the glass so the bar reads against the cream
+/// daylight sky — without that backing the glass blends into the page
+/// and the tab labels lose contrast. Night mode leaves the glass over
+/// the dark page as-is.
+///
+/// Per-tab cells render an SF Symbol over a small-caps inscription
+/// (TODAY · PATH · REFLECT · SET); the active tab is marked by a gold
+/// icon and a small brass underline that slides between cells along
+/// with the drag gesture.
 struct CustomTabBar: View {
     @Binding var selectedTab: Tab
 
@@ -65,6 +71,14 @@ struct CustomTabBar: View {
     private let underlineHeight: CGFloat = 1.5
 
     var body: some View {
+        TimelineView(.periodic(from: .now, by: 60)) { context in
+            tabBar(referenceDate: context.date)
+        }
+    }
+
+    @ViewBuilder
+    private func tabBar(referenceDate: Date) -> some View {
+        let isDayMode = !IhsanCelestialPalette.isNight(at: referenceDate)
         GeometryReader { proxy in
             let itemWidth = proxy.size.width / CGFloat(Tab.allCases.count)
             let effectiveOffset = rubberBandedOffset(
@@ -108,11 +122,26 @@ struct CustomTabBar: View {
         }
         .frame(height: IhsanSpacing.tabBarHeight)
         .padding(IhsanSpacing.xs)
+        .background {
+            // Daytime: a thin warm-amber backing sits behind the
+            // glass so the bar reads against the cream daylight sky.
+            // The glass effect above refracts this backing along with
+            // the page beneath, producing a visible "footer band".
+            if isDayMode {
+                RoundedRectangle(
+                    cornerRadius: IhsanSpacing.cardRadius,
+                    style: .continuous
+                )
+                .fill(IhsanColor.parchmentDeep.opacity(0.30))
+            }
+        }
         // iOS 26 native Liquid Glass — system iridescence and
         // refraction of the manuscript page beneath. The bare
         // `.glassEffect` (no custom tint) is intentional: chrome
         // surfaces are the only places the platform's native glass
         // appears, and applying our own tint here would muddy that.
+        // Daytime contrast is solved by the backing layer above, not
+        // by tinting the glass itself.
         .glassEffect(
             .regular,
             in: RoundedRectangle(
@@ -141,7 +170,7 @@ struct CustomTabBar: View {
                     .foregroundStyle(
                         isSelected
                             ? IhsanColor.gold
-                            : IhsanColor.brass.opacity(0.50)
+                            : IhsanColor.brass.opacity(0.60)
                     )
 
                 Text(tab.title)
@@ -152,7 +181,7 @@ struct CustomTabBar: View {
                     .foregroundStyle(
                         isSelected
                             ? IhsanColor.brass
-                            : IhsanColor.brass.opacity(0.45)
+                            : IhsanColor.brass.opacity(0.60)
                     )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
