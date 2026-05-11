@@ -128,6 +128,33 @@ struct FocusedPrayerCard: View {
             }
             inscriptionAndCountdown
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabelForDefaultState)
+        .accessibilityHint("Double-tap to log this prayer.")
+    }
+
+    /// Combined VoiceOver label for the default-state card. Reads as
+    /// one phrase so the user gets the full prayer status in a single
+    /// rotor stop — e.g. "Asr prayer, praying now, window ends in 1
+    /// hour 23 minutes. Double-tap to log this prayer."
+    private var accessibilityLabelForDefaultState: String {
+        var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
+
+        if isInWindow {
+            parts.append("praying now")
+        }
+
+        if shouldShowCountdown {
+            let remaining = max(0, countdownTarget.timeIntervalSince(.now))
+            let direction = isInWindow ? "window ends in" : "starts in"
+            parts.append("\(direction) \(spokenCountdown(seconds: remaining))")
+        } else if shouldShowScheduledTime {
+            parts.append("scheduled at \(scheduledTimeFormatted)")
+        } else if let end = windowEndTime, end < .now {
+            parts.append("window closed at \(timeFormatted(end))")
+        }
+
+        return parts.joined(separator: ", ")
     }
 
     @ViewBuilder
