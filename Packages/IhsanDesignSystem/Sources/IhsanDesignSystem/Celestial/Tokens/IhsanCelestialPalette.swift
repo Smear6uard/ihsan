@@ -109,31 +109,35 @@ public extension IhsanCelestialPalette {
     ///
     /// - `sky` parchment cream `#F0E5D0`
     /// - `skyDeep` deeper parchment `#E8DCC0`
-    /// - `surface` panel cream `#F5EBD5`
+    /// - `surface` sunlit-paper cream `#FFFAF0`
     /// - `text` ink deep `#1A1F2E`
     /// - `accent` antique brass `#6F5429`
     /// - `accentBright` mid brass `#C9A876`
     /// - `accentMoon` sun gold `#D4A574`
+    /// - `subterranean` darker cream-amber `#C9B584`
     ///
-    /// The spec's listed `dayAccent` was `#B8956A`, which yields a 2.35:1
-    /// ratio against `surface` (`#F5EBD5`) and against `sky` (`#F0E5D0`)
-    /// — well below the spec's own WCAG AA contract for the inscription
-    /// small caps that consume this token ("PRAYING WINDOW OPENS IN",
-    /// "JAMA·AH · LOGGED 5:14 AM"). The deeper antique-brass `#6F5429`
-    /// stays in the same warm-brass family while clearing AA against
-    /// every day-mode surface and sky stop. The lighter `#B8956A`
-    /// remains available through `IhsanIridescence.brassStroke`, where
-    /// it is used as a non-text decorative stroke for panel borders and
-    /// marker outlines — uses that don't carry text-contrast obligations.
+    /// The surface and subterranean tokens together carve the daytime
+    /// scene into three visibly distinct luminance bands: the sunlit-
+    /// paper card surface (brightest), the cream sky behind it, and
+    /// the warmer subterranean amber beneath the horizon line.
+    ///
+    /// The spec's original `dayAccent` was `#B8956A`, which yields a
+    /// 2.35:1 ratio against the lighter cards and skies — well below
+    /// the WCAG AA contract for the inscription small caps that
+    /// consume this token. The deeper antique-brass `#6F5429` stays
+    /// in the same warm-brass family while clearing AA against every
+    /// day-mode surface and sky stop. The lighter `#B8956A` remains
+    /// available through `IhsanIridescence.brassStroke` as a non-text
+    /// decorative stroke for panel borders and marker outlines.
     static let day = IhsanCelestialPalette(
         sky: Color(celestialHex: 0xF0E5D0),
         skyDeep: Color(celestialHex: 0xE8DCC0),
-        surface: Color(celestialHex: 0xF5EBD5),
+        surface: Color(celestialHex: 0xFFFAF0),
         text: Color(celestialHex: 0x1A1F2E),
         accent: Color(celestialHex: 0x6F5429),
         accentBright: Color(celestialHex: 0xC9A876),
         accentMoon: Color(celestialHex: 0xD4A574),
-        subterranean: Color(celestialHex: 0xB8956A)
+        subterranean: Color(celestialHex: 0xC9B584)
     )
 }
 

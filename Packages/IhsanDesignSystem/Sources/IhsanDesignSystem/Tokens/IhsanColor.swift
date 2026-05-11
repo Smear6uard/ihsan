@@ -83,10 +83,11 @@ public enum IhsanColor {
     /// visible from sunrise through mid-morning.
     public static let parchmentLight = Color(hex: 0xF0E5D0)
 
-    /// Cream parchment `#F5EBD5` — the illuminated-panel body colour during
-    /// daylight hours. Every text-on-panel pair below uses this as the
-    /// surface reference.
-    public static let panelDay = Color(hex: 0xF5EBD5)
+    /// Sunlit-paper cream `#FFFAF0` — the illuminated-panel body colour
+    /// during daylight hours. Brighter than the sky stops so the panel
+    /// reads as a sheet of sunlit paper on a darker desk, with clearly
+    /// visible separation from the page beneath.
+    public static let panelDay = Color(hex: 0xFFFAF0)
 
     /// Amber-cream `#3D3328` — the illuminated-panel body colour at night.
     /// Bone cream reads cleanly on top of this; ink dark would disappear.
@@ -265,8 +266,8 @@ public enum IhsanColor {
         (0.0000, hexRGB(0x3D3328)),  // 00:00 — panelNight
         (0.1667, hexRGB(0x3D3328)),  // 04:00
         (0.2496, hexRGB(0x3D3328)),  // 05:59:25 — last night moment
-        (0.2503, hexRGB(0xF5EBD5)),  // 06:00:25 — SUNRISE flip to panelDay
-        (0.7916, hexRGB(0xF5EBD5)),  // 18:59:51 — last day moment
+        (0.2503, hexRGB(0xFFFAF0)),  // 06:00:25 — SUNRISE flip to panelDay
+        (0.7916, hexRGB(0xFFFAF0)),  // 18:59:51 — last day moment
         (0.7920, hexRGB(0x3D3328)),  // 19:00:29 — MAGHRIB flip to panelNight
         (0.8750, hexRGB(0x3D3328)),  // 21:00
         (1.0000, hexRGB(0x3D3328))   // 24:00

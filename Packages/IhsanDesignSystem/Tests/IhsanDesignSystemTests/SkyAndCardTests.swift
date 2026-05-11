@@ -217,11 +217,11 @@ func cardSurfaceIsDarkThroughDeepNight() {
 
 @Test
 func darkInkOnPanelDayMeetsWCAGAAA() {
-    // Dark ink on the panelDay surface (#F5EBD5) should comfortably
+    // Dark ink on the panelDay surface (#FFFAF0) should comfortably
     // exceed the 7.0:1 AAA threshold — it's the dominant text pair on
     // the Today screen.
     let panelDay: IhsanColor.RGB = (
-        red: 0xF5 / 255.0, green: 0xEB / 255.0, blue: 0xD5 / 255.0
+        red: 0xFF / 255.0, green: 0xFA / 255.0, blue: 0xF0 / 255.0
     )
     let ratio = contrastRatio(textInkRGB, panelDay)
     #expect(ratio >= 7.0, "ink-on-panelDay contrast was \(ratio), expected ≥ 7.0")

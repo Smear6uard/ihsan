@@ -49,7 +49,7 @@ private enum NightHex {
 private enum DayHex {
     static let sky: Int = 0xF0E5D0
     static let skyDeep: Int = 0xE8DCC0
-    static let surface: Int = 0xF5EBD5
+    static let surface: Int = 0xFFFAF0
     static let text: Int = 0x1A1F2E
     // `accent` is one shade deeper than the spec's listed `dayAccent`
     // (`#B8956A`) — see `IhsanCelestialPalette.day` for the rationale.
@@ -59,7 +59,7 @@ private enum DayHex {
     // clears AA on every day-mode surface and sky stop.
     static let accent: Int = 0x6F5429
     static let accentBright: Int = 0xC9A876
-    static let subterranean: Int = 0xB8956A
+    static let subterranean: Int = 0xC9B584
 }
 
 // MARK: - Text on surface — body AA (≥ 4.5)
@@ -231,7 +231,7 @@ func subterraneanHexValuesMatchPaletteTokens() {
     // these values; an inadvertent change should surface as a failed
     // test rather than a silent visual regression.
     #expect(NightHex.subterranean == 0x0A0E20)
-    #expect(DayHex.subterranean == 0xB8956A)
+    #expect(DayHex.subterranean == 0xC9B584)
 }
 
 // MARK: - Helpers

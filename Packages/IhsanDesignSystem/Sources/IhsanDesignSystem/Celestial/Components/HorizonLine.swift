@@ -21,7 +21,7 @@ import SwiftUI
 /// - **Top 120pt:** warm glow fading from transparent at the top to
 ///   `horizonGlow` `#E8945C` at the rule. Visible only when the sun is
 ///   near the horizon (`glowOpacity > 0`).
-/// - **1pt rule:** brass at ~50% opacity, ends feathered to transparent
+/// - **1pt rule:** brass at ~70% opacity, ends feathered to transparent
 ///   so the rule reads as a thread laid on the page rather than a
 ///   hard UI line. Always visible.
 /// - **Bottom 80pt:** rose-gold glow fading from `horizonRose`
@@ -71,15 +71,16 @@ public struct HorizonLine: View {
             .blendMode(.plusLighter)
 
             // The brass rule itself — always visible. 1pt, peaks at
-            // 50% opacity at the centre, feathered ends so it
+            // 70% opacity at the centre, feathered ends so it
             // dissolves into the page rather than terminating in hard
-            // endpoints.
+            // endpoints. Bumped from 50% so the daytime composition's
+            // sky → subterranean boundary reads clearly.
             LinearGradient(
                 colors: [
                     .clear,
-                    IhsanCelestialPalette.day.accent.opacity(0.35),
                     IhsanCelestialPalette.day.accent.opacity(0.50),
-                    IhsanCelestialPalette.day.accent.opacity(0.35),
+                    IhsanCelestialPalette.day.accent.opacity(0.70),
+                    IhsanCelestialPalette.day.accent.opacity(0.50),
                     .clear
                 ],
                 startPoint: .leading,
