@@ -155,6 +155,11 @@ private struct TodayReadyView: View {
     /// before reverting to the next-upcoming prayer per spec.
     private static let focusRevertInterval: TimeInterval = 8
 
+    /// Vertical room the header occupies below the safe area. The plate
+    /// keeps its arc, markers, and labels clear of this band; the
+    /// atmosphere still fills the frame behind it.
+    private static let headerZoneHeight: CGFloat = 92
+
     init(
         snapshot: TodayState.Snapshot,
         viewModel: TodayViewModel
@@ -187,14 +192,15 @@ private struct TodayReadyView: View {
                 + sceneToCardGap
 
             ZStack(alignment: .bottom) {
-                CelestialScene(
+                CelestialPlateScene(
+                    markers: plateMarkers,
+                    solarEvents: solarEvents,
                     latitude: snapshot.place.coordinates.latitude,
                     longitude: snapshot.place.coordinates.longitude,
-                    prayerMarkers: snapshot.dayTimes.allFardh.map {
-                        PrayerMarkerData(prayer: $0.prayer, scheduledTime: $0.scheduledTime)
-                    },
-                    onMarkerTap: handleMarkerTap,
-                    markerZoneBottomInset: markerZoneBottomInset
+                    timeZone: snapshot.place.timeZone,
+                    topInset: proxy.safeAreaInsets.top + Self.headerZoneHeight,
+                    bottomInset: markerZoneBottomInset,
+                    onMarkerTap: handleMarkerTap
                 )
                 .ignoresSafeArea()
 
@@ -243,6 +249,47 @@ private struct TodayReadyView: View {
                 )
             }
         }
+    }
+
+    // MARK: - Plate inputs
+
+    /// The four solar events that anchor the palette phase, taken from
+    /// the day's real schedule. Dhuhr stands in for solar noon — it is
+    /// defined as the moment just after the sun's upper transit, which
+    /// is exactly the anchor `SkyPhase` wants.
+    private var solarEvents: SolarDayEvents {
+        SolarDayEvents(
+            sunrise: snapshot.dayTimes.sunrise,
+            solarNoon: snapshot.dayTimes.dhuhr.scheduledTime,
+            maghrib: snapshot.dayTimes.maghrib.scheduledTime,
+            isha: snapshot.dayTimes.isha.scheduledTime
+        )
+    }
+
+    private var plateMarkers: [CelestialPlateScene.Marker] {
+        snapshot.dayTimes.allFardh.map { time in
+            CelestialPlateScene.Marker(
+                prayer: time.prayer,
+                time: time.scheduledTime,
+                state: markerState(for: time.prayer, scheduledTime: time.scheduledTime)
+            )
+        }
+    }
+
+    /// The luminous marker is always the prayer the card is about, so
+    /// the plate and the card never disagree about where "now" is. A
+    /// logged prayer only reads as logged once its window has moved on.
+    private func markerState(
+        for prayer: Prayer,
+        scheduledTime: Date
+    ) -> PrayerMarkerState {
+        if prayer == currentPlatePrayer { return .current }
+        if log(for: prayer) != nil { return .logged }
+        return scheduledTime > .now ? .upcoming : .passedUnlogged
+    }
+
+    private var currentPlatePrayer: Prayer {
+        snapshot.activePrayer ?? snapshot.nextPrayerTime.prayer
     }
 
     // MARK: - Focused prayer resolution
