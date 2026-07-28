@@ -73,6 +73,7 @@ public struct PrayerMarkerOrnament: View {
                 glowHalo
             }
             glyph
+                .frame(width: size, height: size)
         }
         .frame(width: size, height: size)
         .accessibilityElement(children: .ignore)
