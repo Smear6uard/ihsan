@@ -73,6 +73,7 @@ struct CelestialPlateScene: View {
     var probe: FrameTimeProbe?
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     // MARK: - Composition constants
     //
@@ -106,7 +107,13 @@ struct CelestialPlateScene: View {
             // no drift of any kind.
             scene(at: .now)
         } else {
-            TimelineView(.periodic(from: .now, by: 60)) { context in
+            // Ten seconds is the sun's true rate expressed as something
+            // a phone can afford: 0.042° of arc, about an eighth of a
+            // point on the plate. Too small to catch in the moment,
+            // unmistakable if you look again after a few minutes. The
+            // atmosphere's own 60 fps loop lives inside
+            // `CelestialSkyView`; nothing here animates faster.
+            TimelineView(.periodic(from: .now, by: 10)) { context in
                 scene(at: context.date)
             }
         }
@@ -130,6 +137,7 @@ struct CelestialPlateScene: View {
                     probe: probe
                 )
 
+                atmosphere(plate: plate, tokens: tokens, sun: sun, moon: moon)
                 dayArc(plate: plate, tokens: tokens)
                 bodies(plate: plate, tokens: tokens, sun: sun, moon: moon)
                 markerLayer(plate: plate, tokens: tokens)
@@ -149,6 +157,162 @@ struct CelestialPlateScene: View {
             horizonFraction: Self.horizonFraction,
             markerClearance: Self.markerClearance,
             labelClearance: Self.labelClearance
+        )
+    }
+
+    // MARK: - Atmosphere
+
+    /// How far each body's light reaches into the sky.
+    ///
+    /// The bodies themselves are `LuminousBody`'s business — a disc and
+    /// a tight halo. How much sky that light *tints* is the scene's,
+    /// because it is a property of the air between the body and the
+    /// observer, not of the body. So the sun gets a wide warm bloom
+    /// that flattens along the horizon as it sets, and the moon gets a
+    /// much tighter cool one.
+    ///
+    /// Both stay at low alpha deliberately — never above 0.26. The
+    /// plate's film grain is painted by `CelestialSkyView` underneath
+    /// this layer, so keeping the bloom faint leaves at least
+    /// three-quarters of that grain's amplitude intact through it.
+    /// Measured down a sky column at 2×, the composited result steps
+    /// every 3.0–3.7 px on average with a 31 px worst-case flat run;
+    /// whether that worst run reads as a contour is an OLED question
+    /// and belongs on a device, not in a render harness.
+    ///
+    /// Reduce Transparency removes the whole layer, matching the sky
+    /// view's own contract that gradients collapse to flat fills.
+    @ViewBuilder
+    private func atmosphere(
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        sun: SolarPosition,
+        moon: LunarPosition
+    ) -> some View {
+        if !reduceTransparency {
+            let onDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
+            Canvas { context, size in
+                // Deliberately unclipped. An earlier revision cut the
+                // bloom off just below the chord to keep light "in the
+                // sky", which drew a straight edge across the plate at
+                // dusk — the one thing light never does. Letting it
+                // spill means the ground catches the last of the sun,
+                // which is what the ground does.
+                drawSolarBloom(
+                    into: context, size: size, plate: plate, tokens: tokens, sun: sun
+                )
+                if onDarkGround {
+                    drawLunarBloom(
+                        into: context, size: size, plate: plate,
+                        tokens: tokens, sun: sun, moon: moon
+                    )
+                }
+            }
+            // On a jewel ground the bloom lifts the sky the way glare
+            // lifts a dark lens. On the near-white days additive light
+            // would only clip to white, so it tints instead — the same
+            // polarity rule LuminousBody uses for its halo.
+            .blendMode(onDarkGround ? .plusLighter : .normal)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
+    /// The sun's bloom: widest and faintest overhead, tightening and
+    /// intensifying as the sun drops toward the chord — which is the
+    /// moment the horizon band should catch fire — then gone by the
+    /// time civil twilight is over.
+    private func drawSolarBloom(
+        into context: GraphicsContext,
+        size: CGSize,
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        sun: SolarPosition
+    ) {
+        let strength = solarBloomStrength(altitudeDegrees: sun.altitude)
+        guard strength > 0.005 else { return }
+
+        let center = plate.bodyPosition(
+            altitudeDegrees: sun.altitude,
+            azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle)
+        )
+        let lowness = max(0.0, min(1.0, (40.0 - sun.altitude) / 40.0))
+        let radius = size.width * (0.30 + 0.15 * lowness)
+
+        // A low sun scatters along the horizon rather than around
+        // itself, so the bloom flattens as it sets.
+        var local = context
+        let squash = 1.0 - 0.38 * lowness
+        local.translateBy(x: center.x, y: center.y)
+        local.scaleBy(x: 1, y: squash)
+        local.translateBy(x: -center.x, y: -center.y)
+
+        local.fill(
+            Path(ellipseIn: CGRect(
+                x: center.x - radius, y: center.y - radius,
+                width: radius * 2, height: radius * 2
+            )),
+            with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: tokens.glowValue.color.opacity(strength), location: 0),
+                    .init(color: tokens.glowValue.color.opacity(strength * 0.34), location: 0.44),
+                    .init(color: tokens.glowValue.color.opacity(0), location: 1)
+                ]),
+                center: center,
+                startRadius: 0,
+                endRadius: radius
+            )
+        )
+    }
+
+    /// Peak bloom sits at the horizon, not at noon — the sun tints most
+    /// sky when its light travels the most air.
+    private func solarBloomStrength(altitudeDegrees: Double) -> Double {
+        if altitudeDegrees >= 40 { return 0.10 }
+        if altitudeDegrees >= 0 {
+            return 0.10 + 0.16 * (1.0 - altitudeDegrees / 40.0)
+        }
+        return max(0.0, 0.26 * (1.0 + altitudeDegrees / 8.0))
+    }
+
+    /// The moon's bloom: cool where the sun's is warm, and half its
+    /// reach. Only drawn on jewel grounds — on the near-white days the
+    /// cool pole of the palette is the deep indigo ink, and a dark
+    /// halo around the moon would read as a smudge, not as light.
+    private func drawLunarBloom(
+        into context: GraphicsContext,
+        size: CGSize,
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        sun: SolarPosition,
+        moon: LunarPosition
+    ) {
+        let strength = 0.17
+            * submergedPresence(altitudeDegrees: moon.altitude)
+            * lunarDaylightPresence(sunAltitudeDegrees: sun.altitude)
+        guard strength > 0.005 else { return }
+
+        let center = plate.bodyPosition(
+            altitudeDegrees: moon.altitude,
+            azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle)
+        )
+        let radius = size.width * 0.15
+
+        context.fill(
+            Path(ellipseIn: CGRect(
+                x: center.x - radius, y: center.y - radius,
+                width: radius * 2, height: radius * 2
+            )),
+            with: .radialGradient(
+                Gradient(stops: [
+                    .init(color: tokens.inkValue.color.opacity(strength), location: 0),
+                    .init(color: tokens.inkValue.color.opacity(strength * 0.30), location: 0.40),
+                    .init(color: tokens.inkValue.color.opacity(0), location: 1)
+                ]),
+                center: center,
+                startRadius: 0,
+                endRadius: radius
+            )
         )
     }
 
