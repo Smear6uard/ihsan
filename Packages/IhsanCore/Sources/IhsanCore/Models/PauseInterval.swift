@@ -7,6 +7,9 @@ public final class PauseInterval {
 
     public var startDate: Date = Date.distantPast
     public var endDate: Date?
+    /// Optional user-set expectation of when the pause may end. Informational
+    /// only — a pause never ends without the user ending it.
+    public var expectedEndDate: Date?
     public var loggedTimeZoneIdentifier: String = TimeZone.current.identifier
 
     @Attribute(.allowsCloudEncryption)
@@ -19,6 +22,7 @@ public final class PauseInterval {
         id: UUID = UUID(),
         startDate: Date,
         endDate: Date? = nil,
+        expectedEndDate: Date? = nil,
         loggedTimeZoneIdentifier: String,
         note: String? = nil,
         createdAt: Date = .now,
@@ -27,6 +31,7 @@ public final class PauseInterval {
         self.id = id
         self.startDate = startDate
         self.endDate = endDate
+        self.expectedEndDate = expectedEndDate
         self.loggedTimeZoneIdentifier = loggedTimeZoneIdentifier
         self.note = note
         self.createdAt = createdAt

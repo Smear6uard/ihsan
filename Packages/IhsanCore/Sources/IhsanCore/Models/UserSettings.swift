@@ -52,6 +52,16 @@ public final class UserSettings {
     public var showStreaksUI: Bool = false
     public var aiInsightsEnabled: Bool = true
     public var autoSyncAudioMemos: Bool = false
+    /// Makeup-prayer (qada) tracking is invisible until the user opts in.
+    public var qadaTrackingEnabled: Bool = false
+    public var qadaTracksWitr: Bool = false
+    /// When a day's prayer passes unlogged, whether it flows into the
+    /// makeup ledger. The user chooses this at setup and can change it later.
+    public var qadaMissedFlowEnabled: Bool = false
+    public var qadaPathCardDismissed: Bool = false
+    /// A quiet daily-intention reminder preference — not a tracked goal.
+    public var qadaDailyIntentionEnabled: Bool = false
+    public var qadaSetupCompletedAt: Date?
     public var lastDataExportAt: Date?
     public var lastDataDeletionRequestAt: Date?
     public var schemaVersion: Int = 1
@@ -81,6 +91,12 @@ public final class UserSettings {
         showStreaksUI: Bool = false,
         aiInsightsEnabled: Bool = true,
         autoSyncAudioMemos: Bool = false,
+        qadaTrackingEnabled: Bool = false,
+        qadaTracksWitr: Bool = false,
+        qadaMissedFlowEnabled: Bool = false,
+        qadaPathCardDismissed: Bool = false,
+        qadaDailyIntentionEnabled: Bool = false,
+        qadaSetupCompletedAt: Date? = nil,
         lastDataExportAt: Date? = nil,
         lastDataDeletionRequestAt: Date? = nil,
         schemaVersion: Int = 1,
@@ -109,6 +125,12 @@ public final class UserSettings {
         self.showStreaksUI = showStreaksUI
         self.aiInsightsEnabled = aiInsightsEnabled
         self.autoSyncAudioMemos = autoSyncAudioMemos
+        self.qadaTrackingEnabled = qadaTrackingEnabled
+        self.qadaTracksWitr = qadaTracksWitr
+        self.qadaMissedFlowEnabled = qadaMissedFlowEnabled
+        self.qadaPathCardDismissed = qadaPathCardDismissed
+        self.qadaDailyIntentionEnabled = qadaDailyIntentionEnabled
+        self.qadaSetupCompletedAt = qadaSetupCompletedAt
         self.lastDataExportAt = lastDataExportAt
         self.lastDataDeletionRequestAt = lastDataDeletionRequestAt
         self.schemaVersion = schemaVersion

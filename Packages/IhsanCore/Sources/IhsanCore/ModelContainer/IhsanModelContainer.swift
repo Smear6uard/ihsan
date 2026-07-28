@@ -17,7 +17,7 @@ public enum IhsanModelContainerFactory {
     }
 
     public static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
-        let schema = Schema(IhsanSchemaV1.models)
+        let schema = Schema(IhsanSchemaV2.models)
         let configuration: ModelConfiguration
 
         if inMemory {
