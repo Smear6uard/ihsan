@@ -55,6 +55,7 @@ public struct LuminousBody: View {
         ZStack {
             halo
             core
+                .frame(width: diameter, height: diameter)
         }
         .frame(width: diameter, height: diameter)
         .accessibilityElement(children: .ignore)
