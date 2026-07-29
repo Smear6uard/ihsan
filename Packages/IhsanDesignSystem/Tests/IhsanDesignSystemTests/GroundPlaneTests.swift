@@ -24,6 +24,41 @@ struct GroundPlaneTests {
         )
     }
 
+    // MARK: - Corrective E item 4: the token audit
+
+    /// The ground plane is never a desaturated gray: every state's
+    /// token carries real chroma. The pre-corrective derivation
+    /// (lightness-scaling the cool near-white sky) yielded OKLab
+    /// chroma ≈ 0.005 on the day states — unpainted primer. The
+    /// floor here is set well above that failure mode.
+    @Test(arguments: PaletteState.allCases)
+    func groundPlaneIsNeverGray(state: PaletteState) {
+        let lab = state.tokens.groundPlaneValue.oklab
+        let chroma = (lab.a * lab.a + lab.b * lab.b).squareRoot()
+        #expect(
+            chroma >= 0.02,
+            "\(state) groundPlane chroma \(chroma) reads as gray"
+        )
+    }
+
+    /// Day states stand on warm ivory — the OKLab b-axis (blue−yellow)
+    /// must sit clearly on the yellow side. Night states stay in the
+    /// indigo/plum families of their skies (b ≤ 0 for indigo; sunset's
+    /// plum holds red chroma instead).
+    @Test
+    func groundPlaneFamiliesMatchTheSpec() {
+        let morning = PaletteState.morning.tokens.groundPlaneValue.oklab
+        let afternoon = PaletteState.afternoon.tokens.groundPlaneValue.oklab
+        #expect(morning.b >= 0.02, "morning ground must be warm ivory, not cool gray")
+        #expect(afternoon.b >= 0.02, "afternoon ground must be warm ivory, not cool gray")
+
+        let night = PaletteState.night.tokens.groundPlaneValue.oklab
+        #expect(night.b <= -0.02, "night ground stays in the indigo family")
+
+        let sunset = PaletteState.sunset.tokens.groundPlaneValue.oklab
+        #expect(sunset.a >= 0.02, "sunset ground stays in the plum family")
+    }
+
     /// The horizon wash is a distinct hue/luminance from the sky it
     /// sits on — at the drawn 0.70 peak opacity the composited band
     /// must differ from the plain sky by a noticeable margin.

@@ -42,6 +42,18 @@ struct TodayCompositionMetricsTests {
         }
     }
 
+    /// Corrective E item 4: the chord divides the FULL SCREEN at
+    /// sky : ground ≈ 65 : 35.
+    @Test
+    func horizonHoldsTheScreenLevelProportion() {
+        let m = metrics(size: CGSize(width: 402, height: 874), top: 62, bottom: 34)
+        #expect(abs(m.horizonY / m.size.height - 0.65) < 0.001)
+        // And the plate-level fraction hands PlateGeometry the same
+        // preferred chord.
+        let reconstructed = m.plateTopInset + m.plateHeight * m.plateHorizonFraction
+        #expect(abs(reconstructed - m.horizonY) < 0.5)
+    }
+
     @Test
     func plateKeepsItsMinimumHeight() {
         let m = metrics(size: CGSize(width: 375, height: 667), top: 20, bottom: 0, duha: true)

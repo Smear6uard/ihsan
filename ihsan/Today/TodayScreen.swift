@@ -243,6 +243,7 @@ private struct TodayReadyView: View {
                     now: now,
                     topInset: metrics.plateTopInset,
                     bottomInset: metrics.plateBottomInset,
+                    horizonFraction: metrics.plateHorizonFraction,
                     night: snapshot.night,
                     onMarkerTap: handleMarkerTap
                 )

@@ -28,12 +28,14 @@ struct TodayCompositionMetrics: Equatable {
     /// Spacing between the focused card and the Duha card in the
     /// bottom stack (IhsanSpacing.sm).
     static let cardStackSpacing: CGFloat = IhsanSpacing.sm
-    /// The horizon chord's height as a fraction of the plate. Chosen so
-    /// the ground band between the chord and the focused card stays
-    /// shorter than the card itself — the plate, ground, and card read
-    /// as one page with no void between them. The metrics tests pin
-    /// this across device sizes.
-    static let horizonFraction: CGFloat = 0.78
+    /// The horizon chord's placement measured on the FULL SCREEN:
+    /// sky : ground ≈ 65 : 35 (corrective E item 4). The chord's
+    /// plate-level fraction is derived from this, so the proportion
+    /// holds regardless of header or card height; PlateGeometry's own
+    /// marker/label safety clamps still apply on compact layouts. The
+    /// metrics tests pin the proportion and the dead-zone rule across
+    /// device sizes.
+    static let horizonScreenFraction: CGFloat = 0.65
 
     var plateTopInset: CGFloat {
         safeAreaTop + Self.headerZoneHeight
@@ -51,10 +53,17 @@ struct TodayCompositionMetrics: Equatable {
         max(160, size.height - plateTopInset - plateBottomInset)
     }
 
-    /// The horizon chord's y in screen space — the same preferred-value
-    /// computation `PlateGeometry` applies before its safety clamps.
+    /// The horizon chord's y in screen space — the preferred value
+    /// before `PlateGeometry`'s safety clamps.
     var horizonY: CGFloat {
-        plateTopInset + plateHeight * Self.horizonFraction
+        size.height * Self.horizonScreenFraction
+    }
+
+    /// The screen-level target re-expressed as the plate fraction
+    /// `PlateGeometry` consumes.
+    var plateHorizonFraction: CGFloat {
+        let fraction = (horizonY - plateTopInset) / max(plateHeight, 1)
+        return min(max(fraction, 0.10), 0.95)
     }
 
     /// Top edge of the focused card in screen space. When the Duha

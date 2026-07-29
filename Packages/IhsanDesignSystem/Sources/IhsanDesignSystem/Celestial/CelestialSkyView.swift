@@ -162,10 +162,33 @@ public struct CelestialSkyView: View {
             )
         }
 
-        // Ground plane below the chord — the ground tone, one
-        // lightness step deeper.
+        // Ground plane below the chord — its own token: a deeper
+        // value of the day's ground family, warm ivory on the
+        // near-white days, deeper indigo/plum on the jewel grounds.
         let groundRect = CGRect(x: 0, y: horizonY, width: size.width, height: size.height - horizonY)
-        context.fill(Path(groundRect), with: .color(tokens.subterranean))
+        context.fill(Path(groundRect), with: .color(tokens.groundPlane))
+
+        // The worked earth: three engraved filaments echoing the
+        // terrain mark below the chord, shortening and fading as they
+        // deepen — the ground is drawn, not merely painted.
+        let groundFilaments: [(depth: CGFloat, thickness: CGFloat, inset: CGFloat, opacity: Double)] = [
+            (13, 1.1, 0.11, 0.26),
+            (28, 0.9, 0.17, 0.15),
+            (45, 0.8, 0.24, 0.08)
+        ]
+        for filament in groundFilaments {
+            let y = horizonY + filament.depth
+            guard y < size.height - 4 else { continue }
+            context.fill(
+                Path(PlateGeometry.filamentPath(
+                    in: CGRect(origin: .zero, size: size),
+                    horizonY: y,
+                    thickness: filament.thickness,
+                    insetFraction: filament.inset
+                )),
+                with: .color(tokens.metalValue.color.opacity(filament.opacity))
+            )
+        }
 
         // Horizon band: the atmospheric zone where sky meets ground.
         let washTop = CGRect(

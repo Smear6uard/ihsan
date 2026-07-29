@@ -43,6 +43,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
         var tokens = SkyPaletteTokens(
             groundTop: .mix(a0.groundTopValue, a1.groundTopValue, amount: atm.amount),
             groundBottom: .mix(a0.groundBottomValue, a1.groundBottomValue, amount: atm.amount),
+            groundPlane: .mix(a0.groundPlaneValue, a1.groundPlaneValue, amount: atm.amount),
             horizonWash: .mix(a0.horizonWashValue, a1.horizonWashValue, amount: atm.amount),
             ink: .mix(f0.inkValue, f1.inkValue, amount: fig.amount),
             inkSecondary: .mix(f0.inkSecondaryValue, f1.inkSecondaryValue, amount: fig.amount),
@@ -89,6 +90,11 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var groundTopValue: SRGBValue
     /// Bottom anchor of the sky gradient.
     public var groundBottomValue: SRGBValue
+    /// The band below the horizon chord — the earth the plate stands
+    /// on. A deeper value of the day's ground family: warm ivory on
+    /// the near-white days, deeper indigo/plum on the jewel grounds.
+    /// Never a desaturated gray — the token audit pins its warmth.
+    public var groundPlaneValue: SRGBValue
     /// Atmospheric wash blended into the horizon band only — never a
     /// full-surface fill.
     public var horizonWashValue: SRGBValue
@@ -158,6 +164,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public init(
         groundTop: SRGBValue,
         groundBottom: SRGBValue,
+        groundPlane: SRGBValue,
         horizonWash: SRGBValue,
         ink: SRGBValue,
         inkSecondary: SRGBValue,
@@ -174,6 +181,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     ) {
         self.groundTopValue = groundTop
         self.groundBottomValue = groundBottom
+        self.groundPlaneValue = groundPlane
         self.horizonWashValue = horizonWash
         self.inkValue = ink
         self.inkSecondaryValue = inkSecondary
@@ -221,16 +229,16 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// Light pole of the transition halo at the current strength.
     public var inkHaloLight: Color { inkHaloLightValue.color.opacity(inkHaloStrength) }
 
-    /// The below-horizon ground plane: the ground tone taken one
-    /// lightness step deeper (darker on jewel grounds, still luminous
-    /// on the near-white days) — the same material, deeper, never a
-    /// new color. Deep enough that the plate visibly *terminates* at
-    /// the chord instead of fading into void.
-    public var subterranean: Color { subterraneanValue.color }
-    public var subterraneanValue: SRGBValue {
-        let isLight = groundBottomValue.relativeLuminance > 0.5
-        return groundBottomValue.scalingLightness(by: isLight ? 0.88 : 0.60)
-    }
+    /// The below-horizon ground plane. A real token per state
+    /// (corrective E item 4) — the earlier lightness-scaled derivation
+    /// produced a desaturated gray on the near-white days, which read
+    /// as unpainted primer and muddied the glass chrome sampling it.
+    public var groundPlane: Color { groundPlaneValue.color }
+
+    /// Legacy name for the ground plane, kept so older call sites and
+    /// tests read the same token the sky view fills with.
+    public var subterranean: Color { groundPlaneValue.color }
+    public var subterraneanValue: SRGBValue { groundPlaneValue }
 
 }
 
@@ -244,6 +252,7 @@ extension SkyPaletteTokens {
     static let night = SkyPaletteTokens(
         groundTop: SRGBValue(hex: 0x0E1330),
         groundBottom: SRGBValue(hex: 0x141A3A),
+        groundPlane: SRGBValue(hex: 0x0A0E26),
         horizonWash: SRGBValue(hex: 0x232B5C),
         ink: SRGBValue(hex: 0xECEEF5),
         inkSecondary: SRGBValue(hex: 0xA9AFC4),
@@ -266,6 +275,7 @@ extension SkyPaletteTokens {
     static let morning = SkyPaletteTokens(
         groundTop: SRGBValue(hex: 0xF5F7FA),
         groundBottom: SRGBValue(hex: 0xEEF2F7),
+        groundPlane: SRGBValue(hex: 0xE8E0CB),
         horizonWash: SRGBValue(hex: 0xDCE7F4),
         ink: SRGBValue(hex: 0x1B2350),
         inkSecondary: SRGBValue(hex: 0x4A5378),
@@ -287,6 +297,7 @@ extension SkyPaletteTokens {
     static let afternoon = SkyPaletteTokens(
         groundTop: SRGBValue(hex: 0xFAF8F3),
         groundBottom: SRGBValue(hex: 0xF5F1E9),
+        groundPlane: SRGBValue(hex: 0xE9DFC2),
         horizonWash: SRGBValue(hex: 0xF3EAD6),
         ink: SRGBValue(hex: 0x231F3D),
         inkSecondary: SRGBValue(hex: 0x4C4668),
@@ -307,6 +318,7 @@ extension SkyPaletteTokens {
     static let sunset = SkyPaletteTokens(
         groundTop: SRGBValue(hex: 0x3A1526),
         groundBottom: SRGBValue(hex: 0x7A2233),
+        groundPlane: SRGBValue(hex: 0x38101F),
         horizonWash: SRGBValue(hex: 0x9A4430),
         ink: SRGBValue(hex: 0xF2E9E4),
         inkSecondary: SRGBValue(hex: 0xDCC0C7),
