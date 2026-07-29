@@ -111,7 +111,18 @@ public struct CelestialSkyView: View {
         }
         .overlay {
             if !reduceTransparency {
-                PlateGrainOverlay(tint: tokens.inkValue.color, seed: starSeed)
+                // Vellum grain at the threshold of visibility at
+                // arm's length on the day fields (~4.5%); the night
+                // states keep their quieter film grain. The overlay
+                // sits on the sky/ground field only — ornaments,
+                // filaments, and text render in layers above it.
+                PlateGrainOverlay(
+                    tint: tokens.inkValue.color,
+                    seed: starSeed,
+                    intensity: tokens.groundBottomValue.relativeLuminance > 0.5
+                        ? 0.045
+                        : 0.03
+                )
             }
         }
         .accessibilityHidden(true)
@@ -327,11 +338,11 @@ public struct CelestialSkyView: View {
 
 // MARK: - Grain overlay
 
-/// Static film-grain texture over the full plate — a fixed seeded
-/// speckle field at ≤3% strength. Drawn once (no timeline
-/// dependency), so it costs nothing per frame; under Reduce Motion it
-/// is already static, and under Reduce Transparency the sky view
-/// omits it entirely.
+/// Static film-grain texture over the plate's field — a fixed seeded
+/// speckle at ≤5% strength (day vellum ~4.5%, night film ~3%). Drawn
+/// once (no timeline dependency), so it costs nothing per frame;
+/// under Reduce Motion it is already static, and under Reduce
+/// Transparency the sky view omits it entirely.
 ///
 /// This is the graceful-degradation implementation of the plate
 /// grain. The Metal shader variant (`Celestial/Shaders/
@@ -347,7 +358,7 @@ struct PlateGrainOverlay: View {
     var body: some View {
         Canvas { context, size in
             var rng = SeededGenerator(state: seed ^ 0xF11A_9AA1_77E1_D05B)
-            let strength = min(0.03, intensity)
+            let strength = min(0.05, intensity)
             let count = Int((size.width * size.height / 210).rounded())
             for _ in 0..<count {
                 let x = rng.unit() * size.width

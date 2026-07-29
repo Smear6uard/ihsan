@@ -383,3 +383,35 @@ grounds, tab bar on all four grounds); these need a device:
   at arm's length, and that the full bowl (with labels) still
   appears in layouts that leave it ≥60 pt of depth (paused card,
   larger devices).
+
+
+## Corrective F — the illumination pass (2026-07-29)
+
+Source-side work is token-tested and simulator-verified (gilded
+close-ups, morning before/after, grayscale gate PASS at 0.0165 min /
+0.9994 max relative luminance, entrance + ambient + Reduce Motion
+recordings, host frame-time probe at 0.038 ms avg); these need a
+device:
+
+- **Five-second test, all four SkyPhases.** The pass's whole point:
+  does the day state now read as the manuscript itself rather than a
+  drawing of one — solid leaf with dark keylines, lapis chord,
+  stretched value range, living scene.
+- **Log-materialization in hand.** The outline→gold pour (~300 ms,
+  scaling mask) is implemented as a state-change animation and plays
+  wherever a marker or chip flips logged; simulator runs can only
+  seed logs at launch, so verify the tap-synchronized feel (haptic +
+  pour together, undo reversing) interactively.
+- **Entrance and ambient at device refresh.** Host probe puts the
+  draw closure at 0.038 ms avg / 0.337 ms max (budget 4 ms), and the
+  ambient breaths modulate one layer's opacity at ≤30 Hz — but 60 fps
+  under ProMotion with the breathing glow + corona must be confirmed
+  with Instruments on hardware.
+- **Breathing perceptibility.** The current ornament's ±10% / 5 s
+  glow breath and the corona's ±3% / 7 s variation are tuned to be
+  felt, not seen, at arm's length on OLED — check they neither vanish
+  nor read as pulsing.
+- **Vellum grain at 4.5% on OLED.** Raised to the threshold of
+  visibility at arm's length in the day states; confirm it reads as
+  material, not noise, and that night grain (unchanged 3%) still
+  masks gradient banding.
