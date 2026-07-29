@@ -38,8 +38,11 @@ public struct LuminousBody: View {
 
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.celestialForceReducedTransparency) private var forceReducedTransparency
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.celestialForceReducedMotion) private var forceReducedMotion
 
     private var reduceTransparency: Bool { systemReduceTransparency || forceReducedTransparency }
+    private var reduceMotion: Bool { systemReduceMotion || forceReducedMotion }
 
     public init(kind: Kind, diameter: CGFloat, tokens: SkyPaletteTokens) {
         self.kind = kind
@@ -83,7 +86,19 @@ public struct LuminousBody: View {
     private var halo: some View {
         switch kind {
         case .sun:
-            sunCorona
+            // The corona carries a barely-perceptible radiance
+            // variation (~±3 % on a slow ~7 s cycle) — one of the
+            // scene's two ambient breaths. Static under Reduce
+            // Motion / Reduce Transparency.
+            if reduceMotion || reduceTransparency {
+                sunCorona
+            } else {
+                TimelineView(.animation(minimumInterval: 1.0 / 20.0)) { timeline in
+                    let t = timeline.date.timeIntervalSinceReferenceDate
+                    sunCorona
+                        .opacity(0.97 + 0.03 * sin(t * 2 * .pi / 7.0))
+                }
+            }
         case .moon:
             moonGlow
         }

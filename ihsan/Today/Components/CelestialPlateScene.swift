@@ -85,7 +85,38 @@ struct CelestialPlateScene: View {
     /// Optional render-loop instrumentation.
     var probe: FrameTimeProbe?
 
+    /// Entrance choreography flag: 0 before the scene has entered,
+    /// 1 at rest. The owner flips it 0→1 once per cold open (and per
+    /// foreground after a long absence); each layer animates toward
+    /// it on its own staggered clock — the arc draws in, ornaments
+    /// bloom in prayer order, the celestial glow arrives last,
+    /// ~800 ms in total. Under Reduce Motion every stagger collapses
+    /// to one 300 ms crossfade.
+    var entrance: Double = 1.0
+
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    // MARK: - Entrance choreography
+
+    /// One crossfade under Reduce Motion — the defined equivalent for
+    /// every entrance animation below.
+    private var crossfade: Animation { .easeIn(duration: 0.3) }
+
+    private var arcEntranceAnimation: Animation {
+        reduceMotion ? crossfade : .easeOut(duration: 0.35)
+    }
+
+    private func markerEntranceAnimation(index: Int) -> Animation {
+        reduceMotion
+            ? crossfade
+            : .spring(response: 0.35, dampingFraction: 0.85)
+                .delay(0.18 + 0.09 * Double(index))
+    }
+
+    private var glowEntranceAnimation: Animation {
+        reduceMotion ? crossfade : .easeOut(duration: 0.25).delay(0.55)
+    }
 
     // MARK: - Composition constants
     //
@@ -146,14 +177,37 @@ struct CelestialPlateScene: View {
                     plate: plate, tokens: tokens, sun: sun, moon: moon,
                     apexAltitude: apexAltitude
                 )
+                .opacity(entrance)
+                .animation(glowEntranceAnimation, value: entrance)
+
                 engravedField(plate: plate, tokens: tokens, date: date)
-                if let night, night.contains(date) {
-                    nightLayer(plate: plate, tokens: tokens, night: night, date: date)
+                    .opacity(entrance)
+                    .mask {
+                        // The draw-in: the arc's canvas reveals left to
+                        // right, so the filament traces the day's
+                        // direction. Full-width (static) under Reduce
+                        // Motion — the crossfade above is the entrance.
+                        Rectangle()
+                            .scaleEffect(
+                                x: reduceMotion ? 1 : max(0.0001, entrance),
+                                y: 1,
+                                anchor: .leading
+                            )
+                    }
+                    .animation(arcEntranceAnimation, value: entrance)
+
+                Group {
+                    if let night, night.contains(date) {
+                        nightLayer(plate: plate, tokens: tokens, night: night, date: date)
+                    }
+                    bodies(
+                        plate: plate, tokens: tokens, sun: sun, moon: moon,
+                        apexAltitude: apexAltitude
+                    )
                 }
-                bodies(
-                    plate: plate, tokens: tokens, sun: sun, moon: moon,
-                    apexAltitude: apexAltitude
-                )
+                .opacity(entrance)
+                .animation(glowEntranceAnimation, value: entrance)
+
                 markerLayer(plate: plate, tokens: tokens)
             }
         }
@@ -658,14 +712,20 @@ struct CelestialPlateScene: View {
 
     @ViewBuilder
     private func markerLayer(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
-        ForEach(markers) { marker in
+        ForEach(Array(markers.enumerated()), id: \.element.id) { index, marker in
             let position = plate.markerPosition(for: marker.time)
             let size = marker.state == .current ? Self.currentMarkerSize : Self.markerSize
+            let bloom = markerEntranceAnimation(index: index)
 
             ornamentButton(marker: marker, size: size, tokens: tokens)
+                .scaleEffect(reduceMotion ? 1 : 0.85 + 0.15 * entrance)
+                .opacity(entrance)
+                .animation(bloom, value: entrance)
                 .position(position)
 
             markerLabel(marker: marker, tokens: tokens)
+                .opacity(entrance)
+                .animation(bloom, value: entrance)
                 .position(x: position.x, y: position.y + labelOffset(forMarkerSize: size))
         }
     }
@@ -680,7 +740,8 @@ struct CelestialPlateScene: View {
             prayer: marker.prayer,
             size: size,
             state: marker.state,
-            tokens: tokens
+            tokens: tokens,
+            ambientGlowBreathing: true
         )
         .frame(width: 48, height: 48)
         .contentShape(Rectangle())

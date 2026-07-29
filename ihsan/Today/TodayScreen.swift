@@ -170,6 +170,13 @@ private struct TodayReadyView: View {
     @State private var sheetSelection: LogSheetSelection?
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = false
+    /// Entrance choreography target — 0 until the first frame has a
+    /// chance to render at rest-zero, then 1; the scene's layers
+    /// animate toward it on their staggered clocks. Replays after a
+    /// long absence from the foreground.
+    @State private var entranceProgress: Double = 0
+    @State private var lastActiveAt: Date?
+    @Environment(\.scenePhase) private var scenePhase
     /// A nafl waiting on the rak'ah dialog — only ever set when the user
     /// opted into counts.
     @State private var pendingRakahNafl: PendingNafl?
@@ -177,6 +184,8 @@ private struct TodayReadyView: View {
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
     private static let focusRevertInterval: TimeInterval = 8
+    /// Absence long enough that returning replays the entrance.
+    private static let entranceReplayInterval: TimeInterval = 30 * 60
 
     init(
         snapshot: TodayState.Snapshot,
@@ -253,7 +262,8 @@ private struct TodayReadyView: View {
                     bottomInset: metrics.plateBottomInset,
                     horizonFraction: metrics.plateHorizonFraction,
                     night: snapshot.night,
-                    onMarkerTap: handleMarkerTap
+                    onMarkerTap: handleMarkerTap,
+                    entrance: entranceProgress
                 )
                 .ignoresSafeArea()
 
@@ -332,6 +342,32 @@ private struct TodayReadyView: View {
         .task(id: windowExhausted) {
             if windowExhausted {
                 try? await viewModel.refreshSnapshot()
+            }
+        }
+        // The entrance: fire once after first appearance (the state
+        // starts at 0 so the first frame composes at rest-zero, then
+        // the layers animate in on their staggered clocks), and again
+        // when returning to the foreground after a long absence.
+        .task {
+            if entranceProgress == 0 {
+                entranceProgress = 1
+            }
+            lastActiveAt = nowProvider.now()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            let now = nowProvider.now()
+            if phase == .active {
+                if let last = lastActiveAt,
+                   now.timeIntervalSince(last) > Self.entranceReplayInterval {
+                    entranceProgress = 0
+                    Task { @MainActor in
+                        // One runloop turn at rest-zero, then enter.
+                        entranceProgress = 1
+                    }
+                }
+                lastActiveAt = now
+            } else {
+                lastActiveAt = now
             }
         }
     }

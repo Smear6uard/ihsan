@@ -110,11 +110,16 @@ public struct OKLabValue: Sendable, Equatable {
 
         let c0 = (a * a + b * b).squareRoot()
         let c1 = (other.a * other.a + other.b * other.b).squareRoot()
-        let epsilon = 1e-5
+        // Below this chroma a color is perceptually neutral and its
+        // stored hue angle is noise — a near-white must not drag the
+        // ramp's hue through green on its way to a warm endpoint. Such
+        // endpoints adopt the chromatic side's hue and the mix becomes
+        // a pure chroma fade along it.
+        let neutralChroma = 0.015
         var h0 = atan2(b, a)
         var h1 = atan2(other.b, other.a)
-        if c0 < epsilon { h0 = h1 }
-        if c1 < epsilon { h1 = h0 }
+        if c0 < neutralChroma && c1 >= neutralChroma { h0 = h1 }
+        if c1 < neutralChroma && c0 >= neutralChroma { h1 = h0 }
 
         var dh = h1 - h0
         if dh > .pi { dh -= 2 * .pi }

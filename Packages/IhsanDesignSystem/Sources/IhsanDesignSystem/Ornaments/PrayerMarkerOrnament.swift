@@ -74,8 +74,18 @@ public struct GildedOrnamentGlyph: View {
 /// is drawn here, inside the component, so every composition gets it
 /// for free — and gets the same one.
 ///
-/// The component is static in every state: glow is a fixed radial
-/// halo, not an animation, so Reduce Motion needs no branch here.
+/// Life (the illumination pass):
+///
+/// - **Materialization.** A state change between an outline state and
+///   a gilded state crossfades outline↔solid over ~300 ms, the gold
+///   pouring in from the center (a scaling circular mask). Logging a
+///   prayer plays it forward; undo reverses it. Under Reduce Motion
+///   the mask is static and only the crossfade remains.
+/// - **Breathing.** When `ambientGlowBreathing` is on and the state
+///   is `current`, the glow halo breathes on a slow ~5 s cycle
+///   (±10 % luminance) behind a paused-under-Reduce-Motion timeline.
+///   Off by default so compositions showing the same prayer twice
+///   (plate + card) carry a single breathing element.
 public struct PrayerMarkerOrnament: View {
 
     public let prayer: Prayer
@@ -83,11 +93,16 @@ public struct PrayerMarkerOrnament: View {
     public let state: PrayerMarkerState
     public let tokens: SkyPaletteTokens
     public let lineWeight: CGFloat
+    /// Opt-in ambient breathing for the `current` state's glow.
+    public var ambientGlowBreathing: Bool = false
 
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
     @Environment(\.celestialForceReducedTransparency) private var forceReducedTransparency
+    @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
+    @Environment(\.celestialForceReducedMotion) private var forceReducedMotion
 
     private var reduceTransparency: Bool { systemReduceTransparency || forceReducedTransparency }
+    private var reduceMotion: Bool { systemReduceMotion || forceReducedMotion }
 
     /// - Parameters:
     ///   - prayer: Which of the five ornaments to draw.
@@ -105,19 +120,21 @@ public struct PrayerMarkerOrnament: View {
         size: CGFloat,
         state: PrayerMarkerState,
         tokens: SkyPaletteTokens,
-        lineWeight: CGFloat? = nil
+        lineWeight: CGFloat? = nil,
+        ambientGlowBreathing: Bool = false
     ) {
         self.prayer = prayer
         self.size = size
         self.state = state
         self.tokens = tokens
         self.lineWeight = lineWeight ?? max(0.8, size / 22)
+        self.ambientGlowBreathing = ambientGlowBreathing
     }
 
     public var body: some View {
         ZStack {
             if state == .current {
-                glowHalo
+                breathingHalo
             }
             glyph
                 .frame(width: size, height: size)
@@ -129,20 +146,58 @@ public struct PrayerMarkerOrnament: View {
         )
     }
 
+    private var showsSolid: Bool {
+        state == .current || state == .logged
+    }
+
+    /// Both faces are always present so a state change between an
+    /// outline state and a gilded state is a genuine transition: the
+    /// outline fades as the solid gold materializes from the center,
+    /// ~300 ms, synchronized with the commit haptic that triggered
+    /// it. Undo reverses the same animation.
     @ViewBuilder
     private var glyph: some View {
-        switch state {
-        case .upcoming:
+        ZStack {
             PrayerOrnamentShape(prayer: prayer, mode: .outline)
-                .stroke(tokens.metal.opacity(0.55), lineWidth: lineWeight)
-        case .current, .logged:
-            // The gilded body — solid leaf bounded by the dark
-            // keyline. For `current` the glow halo renders behind it
-            // (see `body`); `logged` carries no glow.
+                .stroke(outlineColor, lineWidth: lineWeight)
+                .opacity(showsSolid ? 0 : 1)
+
             GildedOrnamentGlyph(prayer: prayer, size: size, tokens: tokens)
-        case .passedUnlogged:
-            PrayerOrnamentShape(prayer: prayer, mode: .outline)
-                .stroke(tokens.inkSecondary, lineWidth: lineWeight)
+                .opacity(showsSolid ? 1 : 0)
+                .mask {
+                    // The fill pours in from the center. Static under
+                    // Reduce Motion — the crossfade is the defined
+                    // equivalent.
+                    Circle()
+                        .scaleEffect(
+                            reduceMotion ? 1.5 : (showsSolid ? 1.5 : 0.0001)
+                        )
+                }
+        }
+        .animation(.easeOut(duration: 0.3), value: state)
+    }
+
+    private var outlineColor: Color {
+        state == .passedUnlogged
+            ? tokens.inkSecondary
+            : tokens.metal.opacity(0.55)
+    }
+
+    /// The `current` halo, optionally breathing: a slow ~5 s cycle at
+    /// ±10 % of the glow's strength, behind a timeline that pauses
+    /// under Reduce Motion (static halo, same geometry). Compositions
+    /// opt in per instance so at most one element breathes per prayer
+    /// on screen.
+    @ViewBuilder
+    private var breathingHalo: some View {
+        if ambientGlowBreathing && !reduceMotion && !reduceTransparency {
+            TimelineView(.animation(minimumInterval: 1.0 / 30.0)) { timeline in
+                let t = timeline.date.timeIntervalSinceReferenceDate
+                glowHalo
+                    .opacity(0.90 + 0.10 * sin(t * 2 * .pi / 5.0))
+            }
+        } else {
+            glowHalo
         }
     }
 
