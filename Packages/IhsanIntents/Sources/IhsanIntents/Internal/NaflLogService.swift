@@ -8,6 +8,14 @@ import SwiftData
 /// (`NaflLog.dedupKey`).
 struct NaflLogService {
 
+    /// Same clock discipline as `PrayerLogService`: every stamp
+    /// derives from the process's one clock, never the wall clock.
+    let clock: NowProvider
+
+    init(clock: NowProvider = .active) {
+        self.clock = clock
+    }
+
     /// Toggles the day's record for a kind: absent → recorded,
     /// present → removed. Returns the new log, or nil when the tap
     /// removed one. A rak'ah count is stored only when the caller passes
@@ -36,6 +44,7 @@ struct NaflLogService {
             kind: kind,
             naflDate: naflDate,
             rakahCount: rakahCount,
+            loggedAt: clock.now(),
             sourceSurface: sourceSurface
         )
         context.insert(log)

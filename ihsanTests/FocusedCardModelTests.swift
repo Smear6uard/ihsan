@@ -113,5 +113,10 @@ struct FocusedCardModelTests {
         #expect(text.contains(PlateTimeFormat.time(loggedAt, in: timeZone)))
         #expect(text.uppercased().contains("JAMĀ'AH"))
         #expect(!text.uppercased().contains("PRAYING"))
+        // Corrective E item 6: the logged line renders loggedAt — the
+        // prayer's scheduled time must never be mislabeled as the log
+        // stamp.
+        #expect(!text.contains(PlateTimeFormat.time(scheduled, in: timeZone)))
+        #expect(!text.contains(PlateTimeFormat.time(windowEnd, in: timeZone)))
     }
 }

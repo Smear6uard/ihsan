@@ -9,9 +9,11 @@ import IhsanNotifications
 struct IhsanApp: App {
     let modelContainer: ModelContainer
 
-    /// Resolved once at launch; `.system` unless a debug run passed
-    /// `-IhsanNowOverride <ISO8601>`.
-    private let nowProvider = NowProvider.fromLaunchArguments()
+    /// The process's one clock — `.system` unless a debug run passed
+    /// `-IhsanNowOverride <ISO8601>`. The same instance the intent
+    /// layer stamps `loggedAt` from, so the environment clock and the
+    /// commit clock can never disagree.
+    private let nowProvider = NowProvider.active
 
     init() {
         // Try the shared App-Group store first; fall back to in-memory

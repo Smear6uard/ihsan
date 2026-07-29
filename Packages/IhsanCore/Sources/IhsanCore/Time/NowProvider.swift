@@ -24,6 +24,15 @@ public struct NowProvider: Sendable, Equatable {
     /// The real clock — `resolve` is the identity.
     public static let system = NowProvider(anchor: nil)
 
+    /// The process's one clock, resolved from launch arguments exactly
+    /// once. The app injects this same instance into the SwiftUI
+    /// environment, and the intent layer stamps `loggedAt` from it —
+    /// so a debug now-override moves EVERY clock together, and a
+    /// logged timestamp can never run ahead of the time the rest of
+    /// the surface displays. Extension processes (widgets, Siri) see
+    /// no override argument and get the real clock.
+    public static let active = NowProvider.fromLaunchArguments()
+
     private init(anchor: (overrideStart: Date, systemStart: Date)?) {
         self.anchor = anchor
     }

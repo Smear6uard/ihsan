@@ -5,9 +5,19 @@ import SwiftData
 
 internal struct PrayerLogService: Sendable {
     let prayerTimesProvider: any PrayerTimesProviding
+    /// The clock every timestamp in this service derives from. The
+    /// default is the process's one clock (`NowProvider.active`), so
+    /// a debug now-override moves commit stamps together with the UI
+    /// clock — a logged timestamp can never run ahead of the time the
+    /// Today surface displays. Tests inject a fixed override.
+    let clock: NowProvider
 
-    init(prayerTimesProvider: any PrayerTimesProviding = AdhanPrayerTimesProvider()) {
+    init(
+        prayerTimesProvider: any PrayerTimesProviding = AdhanPrayerTimesProvider(),
+        clock: NowProvider = .active
+    ) {
         self.prayerTimesProvider = prayerTimesProvider
+        self.clock = clock
     }
 
     /// Logs a prayer with the given status. Existing logs for the same
@@ -30,7 +40,7 @@ internal struct PrayerLogService: Sendable {
         )
 
         let timeZone = TimeZone.current
-        let now = Date.now
+        let now = clock.now()
         let prayerDate = Calendar.current.startOfDay(for: now)
         let dedupKey = Self.makeDedupKey(prayer: prayer, prayerDate: prayerDate)
 
@@ -79,7 +89,11 @@ internal struct PrayerLogService: Sendable {
                 existing.withJamaah = withJamaah
             }
             existing.sourceSurface = sourceSurface.rawValue
-            existing.modifiedAt = .now
+            existing.modifiedAt = now
+            // Integrity guard: a re-commit can only move the stamp
+            // backward to the clock, never leave one in the future
+            // (e.g. a record created before a clock correction).
+            existing.loggedAt = min(existing.loggedAt, now)
             try context.save()
             return existing
         }
@@ -94,7 +108,9 @@ internal struct PrayerLogService: Sendable {
             status: status,
             lateBySeconds: lateBySeconds,
             withJamaah: withJamaah ?? false,
-            sourceSurface: sourceSurface
+            sourceSurface: sourceSurface,
+            createdAt: now,
+            modifiedAt: now
         )
         context.insert(log)
         try context.save()
@@ -109,7 +125,8 @@ internal struct PrayerLogService: Sendable {
         sourceSurface: SourceSurface,
         in context: ModelContext
     ) throws -> PrayerLog {
-        let prayerDate = Calendar.current.startOfDay(for: .now)
+        let now = clock.now()
+        let prayerDate = Calendar.current.startOfDay(for: now)
         let dedupKey = Self.makeDedupKey(prayer: prayer, prayerDate: prayerDate)
         let descriptor = FetchDescriptor<PrayerLog>(
             predicate: #Predicate { $0.dedupKey == dedupKey }
@@ -118,7 +135,7 @@ internal struct PrayerLogService: Sendable {
         if let existing = try context.fetch(descriptor).first {
             existing.withJamaah.toggle()
             existing.sourceSurface = sourceSurface.rawValue
-            existing.modifiedAt = .now
+            existing.modifiedAt = now
             try context.save()
             return existing
         }
@@ -149,7 +166,7 @@ internal struct PrayerLogService: Sendable {
             throw IntentError.invalidPrayer(originalLogID.uuidString)
         }
 
-        let now = Date.now
+        let now = clock.now()
         let qadaLog = PrayerLog(
             prayer: originalPrayer,
             prayerDate: Calendar.current.startOfDay(for: now),
@@ -160,7 +177,9 @@ internal struct PrayerLogService: Sendable {
             status: .qada,
             withJamaah: false,
             qadaForPrayerLogID: originalLogID,
-            sourceSurface: sourceSurface
+            sourceSurface: sourceSurface,
+            createdAt: now,
+            modifiedAt: now
         )
 
         context.insert(qadaLog)
