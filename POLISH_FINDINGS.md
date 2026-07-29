@@ -356,3 +356,30 @@ these need a device:
   one launch behind by design). Sign out of iCloud on a device,
   launch twice, and confirm exactly one gate log line and no
   NSCloudKitMirroringDelegate retry spam on the second launch.
+
+
+## Corrective E — ornament, engraving, ground plane (2026-07-29)
+
+Source-side work is unit-tested and simulator-screenshot-verified
+(silhouette grid, knockout close-ups, three-time gilding, all four
+grounds, tab bar on all four grounds); these need a device:
+
+- **Five-second test.** The corrective's closing acceptance is the
+  maintainer's own device read of the reworked page — warm ivory
+  ground, 65:35 chord, gilded passage — across the four states.
+- **Gilded-arc warmth on OLED.** The traversed arc is metalHighlight
+  at 0.62 over base metal 0.34. Confirm the gild reads as light on
+  the line (not a second, thicker line) on OLED gamma, especially in
+  the sunset state where the highlight pole is brightest.
+- **Chrome tint under refraction.** The tab bar's new warm backing
+  (panelFill→horizonWash mix at 0.72 behind the glass) reads warm and
+  quiet in the simulator's glass rendering; verify no olive cast
+  returns under real-device Liquid Glass refraction while scrolling
+  content behind the bar.
+- **Compact night bowl legibility.** With the 65:35 ground the
+  divided-night bowl renders in its compact form (arc + midnight
+  mark + cursor, no region fill, labels hidden). Confirm the
+  miniature still communicates nisf al-layl and the cursor's travel
+  at arm's length, and that the full bowl (with labels) still
+  appears in layouts that leave it ≥60 pt of depth (paused card,
+  larger devices).
