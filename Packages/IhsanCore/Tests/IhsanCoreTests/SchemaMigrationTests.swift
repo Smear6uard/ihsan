@@ -5,6 +5,7 @@ import Testing
 
 private let seededLogID = UUID()
 private let seededPauseID = UUID()
+private let seededQadaEntryID = UUID()
 
 /// Builds and tears down a V1 container in its own scope so the store closes
 /// before the migrating container opens the same file.
@@ -75,105 +76,244 @@ private func seedV1Store(at url: URL) throws {
     try context.save()
 }
 
-@Test
-func migratingSeededV1StoreToV2PreservesEveryRecord() throws {
+/// Seeds a store shaped exactly like a real V2 install — including qada
+/// records, an excused pause, and a witr-tracking settings row — using the
+/// frozen V2 snapshot types, then closes it.
+private func seedV2Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV2.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    context.insert(IhsanSchemaV2.PrayerLog(
+        id: seededLogID,
+        prayer: .fajr,
+        prayerDate: Date(timeIntervalSinceReferenceDate: 700_000_000),
+        loggedTimeZoneIdentifier: "America/Toronto",
+        scheduledTime: Date(timeIntervalSinceReferenceDate: 700_000_100),
+        prayedAt: Date(timeIntervalSinceReferenceDate: 700_000_200),
+        status: .onTime,
+        withJamaah: true,
+        note: "quiet fajr"
+    ))
+    context.insert(IhsanSchemaV2.PrayerLog(
+        id: UUID(),
+        prayer: .isha,
+        prayerDate: Date(timeIntervalSinceReferenceDate: 700_040_000),
+        loggedTimeZoneIdentifier: "America/Toronto",
+        scheduledTime: Date(timeIntervalSinceReferenceDate: 700_040_100),
+        status: .late,
+        lateBySeconds: 1200
+    ))
+    context.insert(IhsanSchemaV2.PauseInterval(
+        id: seededPauseID,
+        startDate: Date(timeIntervalSinceReferenceDate: 699_900_000),
+        expectedEndDate: Date(timeIntervalSinceReferenceDate: 701_000_000),
+        loggedTimeZoneIdentifier: "America/Toronto",
+        note: "resting"
+    ))
+
+    let ledger = IhsanSchemaV2.QadaLedger(category: .isha, remainingCount: 40)
+    ledger.madeUpCount = 3
+    context.insert(ledger)
+    context.insert(IhsanSchemaV2.QadaEntry(
+        id: seededQadaEntryID,
+        category: .isha,
+        kind: .estimated,
+        amount: 40,
+        reason: "first estimate"
+    ))
+    context.insert(IhsanSchemaV2.QadaEntry(
+        id: UUID(),
+        category: .witr,
+        kind: .madeUp,
+        amount: 1,
+        forDate: Date(timeIntervalSinceReferenceDate: 700_040_000)
+    ))
+
+    let settings = IhsanSchemaV2.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.qadaTrackingEnabled = true
+    settings.qadaTracksWitr = true
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
+private func withMigratedStore(
+    seed: (URL) throws -> Void,
+    assertions: (ModelContext) throws -> Void
+) throws {
     let directory = FileManager.default.temporaryDirectory
         .appendingPathComponent("ihsan-migration-\(UUID().uuidString)", isDirectory: true)
     try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     defer { try? FileManager.default.removeItem(at: directory) }
     let storeURL = directory.appendingPathComponent("Ihsan.sqlite")
 
-    try seedV1Store(at: storeURL)
+    try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV2.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV3.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
         migrationPlan: IhsanMigrationPlan.self,
         configurations: configuration
     )
-    let context = ModelContext(container)
+    try assertions(ModelContext(container))
+}
 
-    let logs = try context.fetch(FetchDescriptor<PrayerLog>(sortBy: [SortDescriptor(\.prayerDate)]))
-    #expect(logs.count == 2)
-    let fajr = try #require(logs.first)
-    #expect(fajr.id == seededLogID)
-    #expect(fajr.prayerRaw == Prayer.fajr.rawValue)
-    #expect(fajr.statusRaw == PrayerStatus.onTime.rawValue)
-    #expect(fajr.withJamaah == true)
-    #expect(fajr.note == "quiet fajr")
-    #expect(logs.last?.lateBySeconds == 1200)
+// Each migration test runs in its own child process (exit test): SwiftData
+// caches entity metadata per class *name* process-wide, so the frozen V1 and
+// frozen V2 snapshots — which deliberately reuse the live entity names —
+// would poison each other's containers if seeded in one process.
 
-    let reflections = try context.fetch(FetchDescriptor<Reflection>())
-    #expect(reflections.count == 1)
-    #expect(reflections.first?.typedText == "wrote a few lines")
-
-    let dayRecords = try context.fetch(FetchDescriptor<DayRecord>())
-    #expect(dayRecords.count == 1)
-    #expect(dayRecords.first?.isPaused == true)
-
-    let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
-    #expect(pauses.count == 1)
-    let pause = try #require(pauses.first)
-    #expect(pause.id == seededPauseID)
-    #expect(pause.note == "resting")
-    #expect(pause.endDate == nil)
-    #expect(pause.expectedEndDate == nil)
-
-    let travels = try context.fetch(FetchDescriptor<TravelInterval>())
-    #expect(travels.count == 1)
-    #expect(travels.first?.toLocationLabel == "Chicago")
-
-    let summaries = try context.fetch(FetchDescriptor<PeriodSummary>())
-    #expect(summaries.count == 1)
-    #expect(summaries.first?.expectedPrayerCount == 35)
-    #expect(summaries.first?.loggedPrayerCount == 31)
-
-    let allSettings = try context.fetch(FetchDescriptor<UserSettings>())
-    #expect(allSettings.count == 1)
-    let settings = try #require(allSettings.first)
-    #expect(settings.hasCompletedOnboarding == true)
-    #expect(settings.notificationsEnabled == false)
-    #expect(settings.lastResolvedCityName == "Toronto")
-    #expect(settings.qadaTrackingEnabled == false)
-    #expect(settings.qadaTracksWitr == false)
-    #expect(settings.qadaMissedFlowEnabled == false)
-    #expect(settings.qadaPathCardDismissed == false)
-    #expect(settings.qadaDailyIntentionEnabled == false)
-    #expect(settings.qadaSetupCompletedAt == nil)
-
-    #expect(try context.fetch(FetchDescriptor<QadaLedger>()).isEmpty)
-    #expect(try context.fetch(FetchDescriptor<QadaEntry>()).isEmpty)
+@Test
+func migratingSeededV1StoreToLatestPreservesEveryRecord() async {
+    await #expect(processExitsWith: .success) {
+        try assertV1StoreMigratesToLatest()
+    }
 }
 
 @Test
-func migratedStoreAcceptsNewQadaRecords() throws {
-    let directory = FileManager.default.temporaryDirectory
-        .appendingPathComponent("ihsan-migration-\(UUID().uuidString)", isDirectory: true)
-    try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-    defer { try? FileManager.default.removeItem(at: directory) }
-    let storeURL = directory.appendingPathComponent("Ihsan.sqlite")
+func migratingSeededV2StoreToV3PreservesPrayerLogsQadaEntriesAndPauses() async {
+    await #expect(processExitsWith: .success) {
+        try assertV2StoreMigratesToV3()
+    }
+}
 
-    try seedV1Store(at: storeURL)
+@Test
+func migratedStoreAcceptsNewNaflAndQadaRecords() async {
+    await #expect(processExitsWith: .success) {
+        try assertMigratedStoreIsWritable()
+    }
+}
 
-    let schema = Schema(versionedSchema: IhsanSchemaV2.self)
-    let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
-    let container = try ModelContainer(
-        for: schema,
-        migrationPlan: IhsanMigrationPlan.self,
-        configurations: configuration
-    )
-    let context = ModelContext(container)
+private func assertV1StoreMigratesToLatest() throws {
+    try withMigratedStore(seed: seedV1Store) { context in
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>(sortBy: [SortDescriptor(\.prayerDate)]))
+        #expect(logs.count == 2)
+        let fajr = try #require(logs.first)
+        #expect(fajr.id == seededLogID)
+        #expect(fajr.prayerRaw == Prayer.fajr.rawValue)
+        #expect(fajr.statusRaw == PrayerStatus.onTime.rawValue)
+        #expect(fajr.withJamaah == true)
+        #expect(fajr.note == "quiet fajr")
+        #expect(logs.last?.lateBySeconds == 1200)
 
-    let ledger = QadaLedger(category: .fajr, remainingCount: 120)
-    context.insert(ledger)
-    context.insert(QadaEntry.estimated(category: .fajr, count: 120))
-    try context.save()
+        let reflections = try context.fetch(FetchDescriptor<Reflection>())
+        #expect(reflections.count == 1)
+        #expect(reflections.first?.typedText == "wrote a few lines")
 
-    let ledgers = try context.fetch(FetchDescriptor<QadaLedger>())
-    #expect(ledgers.first?.category == .fajr)
-    #expect(ledgers.first?.remainingCount == 120)
-    let entries = try context.fetch(FetchDescriptor<QadaEntry>())
-    #expect(entries.first?.kind == .estimated)
-    #expect(entries.first?.amount == 120)
+        let dayRecords = try context.fetch(FetchDescriptor<DayRecord>())
+        #expect(dayRecords.count == 1)
+        #expect(dayRecords.first?.isPaused == true)
+
+        let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
+        #expect(pauses.count == 1)
+        let pause = try #require(pauses.first)
+        #expect(pause.id == seededPauseID)
+        #expect(pause.note == "resting")
+        #expect(pause.endDate == nil)
+        #expect(pause.expectedEndDate == nil)
+
+        let travels = try context.fetch(FetchDescriptor<TravelInterval>())
+        #expect(travels.count == 1)
+        #expect(travels.first?.toLocationLabel == "Chicago")
+
+        let summaries = try context.fetch(FetchDescriptor<PeriodSummary>())
+        #expect(summaries.count == 1)
+        #expect(summaries.first?.expectedPrayerCount == 35)
+        #expect(summaries.first?.loggedPrayerCount == 31)
+
+        let allSettings = try context.fetch(FetchDescriptor<UserSettings>())
+        #expect(allSettings.count == 1)
+        let settings = try #require(allSettings.first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.notificationsEnabled == false)
+        #expect(settings.lastResolvedCityName == "Toronto")
+        #expect(settings.qadaTrackingEnabled == false)
+        #expect(settings.qadaTracksWitr == false)
+        #expect(settings.qadaMissedFlowEnabled == false)
+        #expect(settings.qadaPathCardDismissed == false)
+        #expect(settings.qadaDailyIntentionEnabled == false)
+        #expect(settings.qadaSetupCompletedAt == nil)
+
+        #expect(try context.fetch(FetchDescriptor<QadaLedger>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<QadaEntry>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<NaflLog>()).isEmpty)
+    }
+}
+
+private func assertV2StoreMigratesToV3() throws {
+    try withMigratedStore(seed: seedV2Store) { context in
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>(sortBy: [SortDescriptor(\.prayerDate)]))
+        #expect(logs.count == 2)
+        let fajr = try #require(logs.first)
+        #expect(fajr.id == seededLogID)
+        #expect(fajr.note == "quiet fajr")
+        #expect(logs.last?.lateBySeconds == 1200)
+
+        let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
+        #expect(pauses.count == 1)
+        let pause = try #require(pauses.first)
+        #expect(pause.id == seededPauseID)
+        #expect(pause.note == "resting")
+        #expect(pause.expectedEndDate == Date(timeIntervalSinceReferenceDate: 701_000_000))
+        #expect(pause.isActive)
+
+        let entries = try context.fetch(FetchDescriptor<QadaEntry>(sortBy: [SortDescriptor(\.categoryRaw)]))
+        #expect(entries.count == 2)
+        let estimate = try #require(entries.first { $0.id == seededQadaEntryID })
+        #expect(estimate.category == .isha)
+        #expect(estimate.kind == .estimated)
+        #expect(estimate.amount == 40)
+        #expect(estimate.reason == "first estimate")
+        let witr = try #require(entries.first { $0.id != seededQadaEntryID })
+        #expect(witr.category == .witr)
+        #expect(witr.kind == .madeUp)
+
+        let ledgers = try context.fetch(FetchDescriptor<QadaLedger>())
+        #expect(ledgers.count == 1)
+        #expect(ledgers.first?.category == .isha)
+        #expect(ledgers.first?.remainingCount == 40)
+        #expect(ledgers.first?.madeUpCount == 3)
+
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.qadaTrackingEnabled == true)
+        #expect(settings.qadaTracksWitr == true)
+        // Every V3 field lands with its quiet default: the sunnah layer is off.
+        #expect(settings.sunnahLayerEnabled == false)
+        #expect(settings.sunnahRawatibEnabled == false)
+        #expect(settings.sunnahDuhaEnabled == false)
+        #expect(settings.sunnahNightEnabled == false)
+        #expect(settings.sunnahRakahCountsEnabled == false)
+        #expect(settings.pathNaflOverlayEnabled == false)
+        #expect(settings.nightWakeEnabled == false)
+        #expect(settings.nightWakeOffsetMinutes == 0)
+        #expect(settings.duhaSunriseOffsetMinutes == 20)
+        #expect(settings.duhaDhuhrMarginMinutes == 15)
+        #expect(settings.rawatibConfigJSON == UserSettings.defaultRawatibConfigJSON)
+
+        #expect(try context.fetch(FetchDescriptor<NaflLog>()).isEmpty)
+    }
+}
+
+private func assertMigratedStoreIsWritable() throws {
+    try withMigratedStore(seed: seedV2Store) { context in
+        context.insert(QadaEntry.estimated(category: .fajr, count: 120))
+        context.insert(NaflLog(
+            kind: .witr,
+            naflDate: Date(timeIntervalSinceReferenceDate: 700_100_000),
+            rakahCount: 3
+        ))
+        try context.save()
+
+        let entries = try context.fetch(FetchDescriptor<QadaEntry>())
+        #expect(entries.count == 3)
+
+        let nafl = try #require(try context.fetch(FetchDescriptor<NaflLog>()).first)
+        #expect(nafl.kind == .witr)
+        #expect(nafl.rakahCount == 3)
+    }
 }

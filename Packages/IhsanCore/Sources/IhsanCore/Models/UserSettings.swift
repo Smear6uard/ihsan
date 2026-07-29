@@ -20,6 +20,21 @@ public struct PrayerNotificationConfig: Codable, Sendable {
     }
 }
 
+/// Editable rawatib counts around one fard prayer. The defaults are a
+/// commonly kept set, not a ruling — schools differ, and the counts are the
+/// user's to change.
+public struct RawatibConfig: Codable, Sendable, Equatable {
+    public var prayer: Prayer
+    public var beforeCount: Int
+    public var afterCount: Int
+
+    public init(prayer: Prayer, beforeCount: Int, afterCount: Int) {
+        self.prayer = prayer
+        self.beforeCount = beforeCount
+        self.afterCount = afterCount
+    }
+}
+
 @Model
 public final class UserSettings {
     public static let singletonID = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
@@ -62,6 +77,24 @@ public final class UserSettings {
     /// A quiet daily-intention reminder preference — not a tracked goal.
     public var qadaDailyIntentionEnabled: Bool = false
     public var qadaSetupCompletedAt: Date?
+    /// The sunnah layer is invisible until the user turns it on. Nothing in
+    /// the off state hints that anything is missing.
+    public var sunnahLayerEnabled: Bool = false
+    public var sunnahRawatibEnabled: Bool = false
+    public var sunnahDuhaEnabled: Bool = false
+    public var sunnahNightEnabled: Bool = false
+    /// Whether logging a nafl asks for a rak'ah count. Off by default —
+    /// one tap records, nothing prompts.
+    public var sunnahRakahCountsEnabled: Bool = false
+    public var rawatibConfigJSON: String = UserSettings.defaultRawatibConfigJSON
+    public var duhaSunriseOffsetMinutes: Int = 20
+    public var duhaDhuhrMarginMinutes: Int = 15
+    /// Optional nafl overlay on the Path dot rows — visible if sought.
+    public var pathNaflOverlayEnabled: Bool = false
+    /// The gentle wake for the last third of the night. Strictly opt-in.
+    public var nightWakeEnabled: Bool = false
+    /// Minutes before the last third's start to wake; 0 wakes at its start.
+    public var nightWakeOffsetMinutes: Int = 0
     public var lastDataExportAt: Date?
     public var lastDataDeletionRequestAt: Date?
     public var schemaVersion: Int = 1
@@ -97,6 +130,17 @@ public final class UserSettings {
         qadaPathCardDismissed: Bool = false,
         qadaDailyIntentionEnabled: Bool = false,
         qadaSetupCompletedAt: Date? = nil,
+        sunnahLayerEnabled: Bool = false,
+        sunnahRawatibEnabled: Bool = false,
+        sunnahDuhaEnabled: Bool = false,
+        sunnahNightEnabled: Bool = false,
+        sunnahRakahCountsEnabled: Bool = false,
+        rawatibConfigJSON: String = UserSettings.defaultRawatibConfigJSON,
+        duhaSunriseOffsetMinutes: Int = 20,
+        duhaDhuhrMarginMinutes: Int = 15,
+        pathNaflOverlayEnabled: Bool = false,
+        nightWakeEnabled: Bool = false,
+        nightWakeOffsetMinutes: Int = 0,
         lastDataExportAt: Date? = nil,
         lastDataDeletionRequestAt: Date? = nil,
         schemaVersion: Int = 1,
@@ -131,6 +175,17 @@ public final class UserSettings {
         self.qadaPathCardDismissed = qadaPathCardDismissed
         self.qadaDailyIntentionEnabled = qadaDailyIntentionEnabled
         self.qadaSetupCompletedAt = qadaSetupCompletedAt
+        self.sunnahLayerEnabled = sunnahLayerEnabled
+        self.sunnahRawatibEnabled = sunnahRawatibEnabled
+        self.sunnahDuhaEnabled = sunnahDuhaEnabled
+        self.sunnahNightEnabled = sunnahNightEnabled
+        self.sunnahRakahCountsEnabled = sunnahRakahCountsEnabled
+        self.rawatibConfigJSON = rawatibConfigJSON
+        self.duhaSunriseOffsetMinutes = duhaSunriseOffsetMinutes
+        self.duhaDhuhrMarginMinutes = duhaDhuhrMarginMinutes
+        self.pathNaflOverlayEnabled = pathNaflOverlayEnabled
+        self.nightWakeEnabled = nightWakeEnabled
+        self.nightWakeOffsetMinutes = nightWakeOffsetMinutes
         self.lastDataExportAt = lastDataExportAt
         self.lastDataDeletionRequestAt = lastDataDeletionRequestAt
         self.schemaVersion = schemaVersion
@@ -152,6 +207,26 @@ public final class UserSettings {
         let settings = UserSettings()
         context.insert(settings)
         return settings
+    }
+
+    /// A commonly kept rawatib set — Fajr 2 before; Dhuhr 4 before, 2 after;
+    /// Maghrib and Isha 2 after. Schools differ; every count is editable.
+    public static var defaultRawatibConfigJSON: String {
+        let configs = [
+            RawatibConfig(prayer: .fajr, beforeCount: 2, afterCount: 0),
+            RawatibConfig(prayer: .dhuhr, beforeCount: 4, afterCount: 2),
+            RawatibConfig(prayer: .asr, beforeCount: 0, afterCount: 0),
+            RawatibConfig(prayer: .maghrib, beforeCount: 0, afterCount: 2),
+            RawatibConfig(prayer: .isha, beforeCount: 0, afterCount: 2),
+        ]
+
+        guard let data = try? JSONEncoder().encode(configs),
+              let json = String(data: data, encoding: .utf8)
+        else {
+            return "[]"
+        }
+
+        return json
     }
 
     public static var defaultPrayerNotificationsConfigJSON: String {
@@ -184,6 +259,41 @@ public extension UserSettings {
 
     var theme: ThemePreference {
         ThemePreference(rawValue: themeRaw) ?? .auto
+    }
+
+    /// The user's rawatib counts, falling back to the neutral defaults when
+    /// the stored JSON is unreadable.
+    var rawatibConfigs: [RawatibConfig] {
+        guard let data = rawatibConfigJSON.data(using: .utf8),
+              let configs = try? JSONDecoder().decode([RawatibConfig].self, from: data),
+              !configs.isEmpty
+        else {
+            guard let fallback = UserSettings.defaultRawatibConfigJSON.data(using: .utf8),
+                  let configs = try? JSONDecoder().decode([RawatibConfig].self, from: fallback)
+            else {
+                return []
+            }
+            return configs
+        }
+        return configs
+    }
+
+    func rawatibConfig(for prayer: Prayer) -> RawatibConfig {
+        rawatibConfigs.first { $0.prayer == prayer }
+            ?? RawatibConfig(prayer: prayer, beforeCount: 0, afterCount: 0)
+    }
+
+    func setRawatibConfig(_ config: RawatibConfig) {
+        var configs = rawatibConfigs
+        if let index = configs.firstIndex(where: { $0.prayer == config.prayer }) {
+            configs[index] = config
+        } else {
+            configs.append(config)
+        }
+        if let data = try? JSONEncoder().encode(configs),
+           let json = String(data: data, encoding: .utf8) {
+            rawatibConfigJSON = json
+        }
     }
 
     /// Whether the configured adhan sound plays for the given prayer. When
