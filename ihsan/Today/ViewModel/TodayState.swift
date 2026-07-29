@@ -12,9 +12,12 @@ enum TodayState {
     struct Snapshot {
         let place: LocatedPlace
         let dayTimes: DayPrayerTimes
-        let nextPrayerTime: PrayerTime
-        let isWithinFajrToSunriseWindow: Bool
-        let activePrayer: Prayer?
+        /// Three days of schedule bracketing the refresh moment. The
+        /// views derive the current/next prayer, window ends, and
+        /// countdown targets from this on every clock tick — the
+        /// snapshot itself stores no "current" state that could go
+        /// stale between refreshes.
+        let scheduleWindow: PrayerScheduleWindow
         let ramadanContext: RamadanContext
         /// The night relevant to this moment: the one in progress during
         /// the pre-dawn hours, otherwise the night ahead of today. The
@@ -23,18 +26,6 @@ enum TodayState {
 
         var isCurrentlyRamadan: Bool {
             ramadanContext.isCurrentlyRamadan
-        }
-
-        var isWithinSuhoorWindow: Bool {
-            isCurrentlyRamadan
-                && nextPrayerTime.prayer == .fajr
-                && !isWithinFajrToSunriseWindow
-        }
-
-        var isCountingDownToIftar: Bool {
-            isCurrentlyRamadan
-                && nextPrayerTime.prayer == .maghrib
-                && !isWithinFajrToSunriseWindow
         }
     }
 }

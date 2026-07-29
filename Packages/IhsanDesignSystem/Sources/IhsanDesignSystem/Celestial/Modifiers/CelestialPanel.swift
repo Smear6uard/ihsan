@@ -89,6 +89,10 @@ public extension View {
     /// Apply the celestial illuminated-panel material — solid surface,
     /// iridescent brass border, subtle drop shadow.
     ///
+    /// Legacy variant: resolves its own palette from the clock. New
+    /// surfaces should use `celestialPanel(tokens:)`, which takes the
+    /// resolved v2 tokens and follows the flat + luminous rule.
+    ///
     /// - Parameters:
     ///   - cornerRadius: Defaults to 20pt (focused-prayer card spec).
     ///   - isActive: Lifts the border to full opacity and adds an
@@ -104,6 +108,87 @@ public extension View {
                 isActive: isActive
             )
         )
+    }
+
+    /// The v2 illuminated panel: `panelFill` body, a fine 1 pt
+    /// `panelStroke` hairline, the parchment-fiber texture at the
+    /// palette's capped opacity — and, per the flat + luminous rule,
+    /// no drop shadow. An active panel is lifted by a faint interior
+    /// glow, never by depth effects.
+    func celestialPanel(
+        tokens: SkyPaletteTokens,
+        cornerRadius: CGFloat = 20,
+        isActive: Bool = false
+    ) -> some View {
+        modifier(
+            TokenCelestialPanelModifier(
+                tokens: tokens,
+                cornerRadius: cornerRadius,
+                isActive: isActive
+            )
+        )
+    }
+}
+
+/// The v2 panel material. Depth comes from glow and layered opacity
+/// only — no shadow, no specular, no volume gradient.
+public struct TokenCelestialPanelModifier: ViewModifier {
+    let tokens: SkyPaletteTokens
+    let cornerRadius: CGFloat
+    let isActive: Bool
+
+    @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
+    @Environment(\.celestialForceReducedTransparency) private var forceReducedTransparency
+
+    private var reduceTransparency: Bool {
+        systemReduceTransparency || forceReducedTransparency
+    }
+
+    public func body(content: Content) -> some View {
+        let shape = RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+        let onDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
+
+        content
+            .background {
+                ZStack {
+                    shape.fill(tokens.panelFill)
+                    if isActive && !reduceTransparency {
+                        // The active lift: interior glow, clipped to the
+                        // panel, additive only against jewel grounds.
+                        shape.fill(
+                            RadialGradient(
+                                colors: [
+                                    tokens.glow.opacity(onDarkGround ? 0.16 : 0.10),
+                                    tokens.glow.opacity(0.0)
+                                ],
+                                center: .center,
+                                startRadius: 0,
+                                endRadius: 220
+                            )
+                        )
+                        .blendMode(onDarkGround ? .plusLighter : .normal)
+                        .allowsHitTesting(false)
+                    }
+                    if !reduceTransparency {
+                        // Parchment fiber: the seeded grain speckle in the
+                        // palette's texture tint, hard-capped below the
+                        // tokens' 8% ceiling.
+                        PlateGrainOverlay(
+                            tint: tokens.panelTextureValue.color,
+                            seed: 0x9A3F_11C2,
+                            intensity: tokens.panelTextureOpacity
+                        )
+                        .allowsHitTesting(false)
+                    }
+                }
+            }
+            .overlay {
+                shape.strokeBorder(
+                    tokens.panelStroke.opacity(isActive ? 1.0 : 0.75),
+                    lineWidth: 1.0
+                )
+            }
+            .clipShape(shape)
     }
 }
 

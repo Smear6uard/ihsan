@@ -16,46 +16,37 @@ import SwiftUI
 ///         DHU'L-QI'DAH 24, 1447 AH · NEXT: DHUHR 12:50 PM
 ///
 ///   Small caps in brass with letter-spacing, separated by a brass
-///   middle dot. The "NEXT" inscription refreshes once per minute via
-///   `TimelineView` so the user can glance at the screen and see when
-///   the next prayer is without tapping anything.
+///   middle dot. The "NEXT" prayer comes from the same resolved
+///   `PrayerMoment` the plate markers and the focused card use, and
+///   its time goes through the same `PlateTimeFormat` as the marker
+///   labels — one data source, one formatter, no disagreement.
 /// - **Moon-phase glyph** in the top-right corner. Shows the current
 ///   lunar phase as a small brass icon — AND is the tap target for
 ///   the celestial reference / qibla compass overlay. A 44pt
 ///   invisible bounding box keeps the tap target comfortable even
 ///   though the visible glyph is ~22pt.
+///
+/// The header owns no clock: the screen's single timeline hands it
+/// the resolved moment.
 struct TodayHeader: View {
     let cityName: String
-    let date: Date
-    /// The day's five fardh times, used to compute the "NEXT: …"
+    /// The resolved moment from the screen's single clock.
+    let now: Date
+    /// The resolved prayer state at `now` — source of the "NEXT: …"
     /// inscription. Optional so non-ready states can render the
     /// header without prayer data.
-    let dayTimes: DayPrayerTimes?
+    let moment: PrayerMoment?
+    /// Timezone of the place the times belong to.
+    let timeZone: TimeZone
     /// Tap callback for the moon-phase glyph — opens the celestial
     /// reference / qibla compass overlay.
     let onMoonPhaseTap: () -> Void
 
-    @Environment(\.timeOfDayOverride) private var override
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-
     var body: some View {
-        if let override {
-            renderHeader(referenceDate: override)
-        } else if reduceMotion {
-            renderHeader(referenceDate: date)
-        } else {
-            TimelineView(.periodic(from: .now, by: 60)) { context in
-                renderHeader(referenceDate: context.date)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func renderHeader(referenceDate: Date) -> some View {
-        let foreground = IhsanColor.skyForegroundPrimary(at: referenceDate)
-        let foregroundSecondary = IhsanColor.skyForegroundSecondary(at: referenceDate)
+        let foreground = IhsanColor.skyForegroundPrimary(at: now)
+        let foregroundSecondary = IhsanColor.skyForegroundSecondary(at: now)
         let shadowColor = legibilityShadowColor(for: foreground)
-        let nextInscription = nextPrayerInscription(at: referenceDate)
+        let nextInscription = nextPrayerInscription
 
         HStack(alignment: .top, spacing: IhsanSpacing.md) {
             VStack(alignment: .leading, spacing: 4) {
@@ -67,7 +58,6 @@ struct TodayHeader: View {
                     .shadow(color: shadowColor, radius: 2, x: 0, y: 0.5)
 
                 inscriptionLine(
-                    referenceDate: referenceDate,
                     nextInscription: nextInscription,
                     foreground: foregroundSecondary,
                     shadowColor: shadowColor
@@ -77,23 +67,22 @@ struct TodayHeader: View {
             Spacer(minLength: IhsanSpacing.sm)
 
             MoonPhaseTapTarget(
-                date: referenceDate,
+                date: now,
                 onTap: onMoonPhaseTap
             )
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(referenceDate: referenceDate, nextInscription: nextInscription))
+        .accessibilityLabel(accessibilityLabel(nextInscription: nextInscription))
         .accessibilityAddTraits(.isHeader)
     }
 
     @ViewBuilder
     private func inscriptionLine(
-        referenceDate: Date,
         nextInscription: String?,
         foreground: Color,
         shadowColor: Color
     ) -> some View {
-        let hijri = HijriDateFormatter.string(from: referenceDate)
+        let hijri = HijriDateFormatter.string(from: now)
         let combined: String = {
             if let nextInscription {
                 return "\(hijri) · \(nextInscription)"
@@ -110,20 +99,12 @@ struct TodayHeader: View {
             .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
     }
 
-    /// "NEXT: DHUHR 12:50 PM" — the next-upcoming prayer with its
-    /// scheduled time. Returns `nil` when no day times are available
-    /// (loading state) or, theoretically, when every prayer has
-    /// passed (last fallback covers Isha→Fajr-tomorrow).
-    private func nextPrayerInscription(at referenceDate: Date) -> String? {
-        guard let dayTimes else { return nil }
-        let next = dayTimes.allFardh.first { $0.scheduledTime > referenceDate }
-            ?? dayTimes.allFardh.first
-        guard let next else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
-        let time = formatter.string(from: next.scheduledTime).uppercased()
-        let name = next.prayer.displayNameEnglish.uppercased()
+    /// "NEXT: DHUHR 12:50 PM" — the moment's next prayer, formatted by
+    /// the same `PlateTimeFormat` the plate's marker labels use.
+    private var nextPrayerInscription: String? {
+        guard let moment else { return nil }
+        let time = PlateTimeFormat.time(moment.next.scheduledTime, in: timeZone).uppercased()
+        let name = moment.next.prayer.displayNameEnglish.uppercased()
         return "NEXT: \(name) \(time)"
     }
 
@@ -133,15 +114,14 @@ struct TodayHeader: View {
             : .black.opacity(0.48)
     }
 
-    private func accessibilityLabel(referenceDate: Date, nextInscription: String?) -> String {
-        let hijri = HijriDateFormatter.string(from: referenceDate)
+    private func accessibilityLabel(nextInscription: String?) -> String {
+        let hijri = HijriDateFormatter.string(from: now)
         var parts = ["Location: \(cityName)", "Hijri date: \(hijri)"]
-        if let dayTimes,
-           let next = dayTimes.allFardh.first(where: { $0.scheduledTime > referenceDate }) ?? dayTimes.allFardh.first {
-            let formatter = DateFormatter()
-            formatter.timeStyle = .short
-            formatter.dateStyle = .none
-            parts.append("Next prayer: \(next.prayer.displayNameEnglish) at \(formatter.string(from: next.scheduledTime))")
+        if let moment {
+            let time = PlateTimeFormat.time(moment.next.scheduledTime, in: timeZone)
+            parts.append(
+                "Next prayer: \(moment.next.prayer.displayNameEnglish) at \(time)"
+            )
         }
         _ = nextInscription
         parts.append("Tap the moon phase indicator for the celestial reference and qibla compass.")
@@ -184,7 +164,6 @@ private struct MoonPhaseGlyph: View {
         Image(systemName: bucket.symbolName)
             .font(.system(size: 22, weight: .regular))
             .foregroundStyle(IhsanColor.brass.opacity(0.85))
-            .shadow(color: IhsanColor.brass.opacity(0.35), radius: 2, x: 0, y: 0)
             .accessibilityLabel(bucket.spokenLabel)
     }
 }

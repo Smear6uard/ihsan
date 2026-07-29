@@ -1,4 +1,5 @@
 import SwiftUI
+import IhsanCore
 import IhsanDesignSystem
 
 enum Tab: Int, CaseIterable, Hashable, Identifiable {
@@ -70,9 +71,13 @@ struct CustomTabBar: View {
     private let underlineWidth: CGFloat = 22
     private let underlineHeight: CGFloat = 1.5
 
+    @Environment(\.nowProvider) private var nowProvider
+
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 60)) { context in
-            tabBar(referenceDate: context.date)
+        // `.distantPast` is a pure phase anchor; the tick dates arrive
+        // in real time and are mapped through the injected clock.
+        TimelineView(.periodic(from: .distantPast, by: 60)) { context in
+            tabBar(referenceDate: nowProvider.resolve(context.date))
         }
     }
 

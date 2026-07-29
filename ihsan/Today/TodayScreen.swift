@@ -8,13 +8,17 @@ import IhsanPrayerTimes
 
 struct TodayScreen: View {
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.nowProvider) private var nowProvider
     @State private var viewModel: TodayViewModel?
 
     var body: some View {
         content
             .task {
                 if viewModel == nil {
-                    viewModel = TodayViewModel(modelContext: modelContext)
+                    viewModel = TodayViewModel(
+                        nowProvider: nowProvider,
+                        modelContext: modelContext
+                    )
                     Haptics.prepareAll()
                 }
                 await viewModel?.bootstrap()
@@ -34,7 +38,8 @@ struct TodayScreen: View {
             if let viewModel {
                 TodayReadyView(
                     snapshot: snapshot,
-                    viewModel: viewModel
+                    viewModel: viewModel,
+                    dayAnchor: nowProvider.now()
                 )
             }
         case .error(let message):
@@ -126,25 +131,29 @@ private struct TodayErrorView: View {
 
 // MARK: - Ready state: the celestial Today screen
 //
-// New layout per the celestial redesign:
-//
 //   ┌─────────────────────────────┐
 //   │ Zone 1 — refined header     │   ~10% of screen
-//   │ Zone 2 — celestial scene    │   ~65% (sky, sun, moon, markers)
-//   │ Zone 3 — focused-prayer card│   ~25% (single illuminated panel)
+//   │ Zone 2 — celestial scene    │   sky, sun, moon, markers
+//   │ Zone 3 — focused-prayer card│   single illuminated panel
 //   └─────────────────────────────┘
 //
-// The legacy hero countdown, prayer arc, and prayer list are folded
-// into the celestial scene's prayer markers and the focused card's
-// inline expansion. The full PrayerLogSheet remains accessible from
-// the card's chevron and "More options" link for edge cases (qadā,
-// retroactive missed, edit).
+// One clock: a single one-second TimelineView at this level resolves
+// the moment through NowProvider and hands the same `now` — and the
+// same derived `PrayerMoment` and palette tokens — to the header, the
+// scene, the markers, and the focused card. No child owns a timeline
+// or reads the wall clock, so no two surfaces can disagree about what
+// time it is, which prayer is current, or when the window turns.
 
 private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
     let viewModel: TodayViewModel
+    /// Day anchor for the SwiftData queries, resolved by the caller
+    /// through NowProvider at init. A snapshot refresh re-creates this
+    /// view, so the anchor rolls forward with the schedule window.
+    let dayAnchor: Date
 
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.nowProvider) private var nowProvider
 
     @Query private var todaysLogs: [PrayerLog]
     @Query private var settingsRows: [UserSettings]
@@ -169,20 +178,17 @@ private struct TodayReadyView: View {
     /// before reverting to the next-upcoming prayer per spec.
     private static let focusRevertInterval: TimeInterval = 8
 
-    /// Vertical room the header occupies below the safe area. The plate
-    /// keeps its arc, markers, and labels clear of this band; the
-    /// atmosphere still fills the frame behind it.
-    private static let headerZoneHeight: CGFloat = 92
-
     init(
         snapshot: TodayState.Snapshot,
-        viewModel: TodayViewModel
+        viewModel: TodayViewModel,
+        dayAnchor: Date
     ) {
         self.snapshot = snapshot
         self.viewModel = viewModel
+        self.dayAnchor = dayAnchor
 
         let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: .now)
+        let startOfDay = calendar.startOfDay(for: dayAnchor)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
         let predicate = #Predicate<PrayerLog> { log in
             log.prayerDate >= startOfDay && log.prayerDate < endOfDay
@@ -197,30 +203,46 @@ private struct TodayReadyView: View {
     }
 
     var body: some View {
+        // `.distantPast` is a pure phase anchor for the periodic
+        // schedule — the tick dates arrive in real time and are mapped
+        // through NowProvider below. No wall-clock read happens here.
+        TimelineView(.periodic(from: .distantPast, by: 1)) { context in
+            let now = nowProvider.resolve(context.date)
+            let moment = snapshot.scheduleWindow.moment(at: now)
+            let tokens = PaletteState.resolved(
+                for: SkyPhase.resolve(at: now, events: solarEvents)
+            )
+            readyContent(now: now, moment: moment, tokens: tokens)
+        }
+    }
+
+    @ViewBuilder
+    private func readyContent(
+        now: Date,
+        moment: PrayerMoment,
+        tokens: SkyPaletteTokens
+    ) -> some View {
+        let windowExhausted = now >= snapshot.scheduleWindow.tomorrowFajr.scheduledTime
+
         GeometryReader { proxy in
-            // `markerZoneBottomInset` reserves enough vertical space for
-            // the focused card + the 8pt gap above it. Reading the
-            // bottom safe-area inset keeps the gap consistent across
-            // devices — the value picks up both the device's home
-            // indicator inset and the tab-bar inset that RootTabView
-            // adds to this view's parent.
-            let cardBottomPadding: CGFloat = IhsanSpacing.md
-            let sceneToCardGap: CGFloat = 8
-            let markerZoneBottomInset = proxy.safeAreaInsets.bottom
-                + cardBottomPadding
-                + FocusedPrayerCard.cardHeight
-                + sceneToCardGap
-                + (activeDuhaWindow != nil && activePause == nil ? 54 : 0)
+            let metrics = TodayCompositionMetrics(
+                size: proxy.size,
+                safeAreaTop: proxy.safeAreaInsets.top,
+                safeAreaBottom: proxy.safeAreaInsets.bottom,
+                cardHeight: FocusedPrayerCard.cardHeight,
+                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
+            )
 
             ZStack(alignment: .bottom) {
                 CelestialPlateScene(
-                    markers: plateMarkers,
+                    markers: plateMarkers(now: now, moment: moment),
                     solarEvents: solarEvents,
                     latitude: snapshot.place.coordinates.latitude,
                     longitude: snapshot.place.coordinates.longitude,
                     timeZone: snapshot.place.timeZone,
-                    topInset: proxy.safeAreaInsets.top + Self.headerZoneHeight,
-                    bottomInset: markerZoneBottomInset,
+                    now: now,
+                    topInset: metrics.plateTopInset,
+                    bottomInset: metrics.plateBottomInset,
                     night: snapshot.night,
                     onMarkerTap: handleMarkerTap
                 )
@@ -229,8 +251,9 @@ private struct TodayReadyView: View {
                 VStack(spacing: 0) {
                     TodayHeader(
                         cityName: snapshot.place.cityName ?? "Current Location",
-                        date: .now,
-                        dayTimes: snapshot.dayTimes,
+                        now: now,
+                        moment: moment,
+                        timeZone: snapshot.place.timeZone,
                         onMoonPhaseTap: { isCelestialReferencePresented = true }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
@@ -243,34 +266,16 @@ private struct TodayReadyView: View {
                     if let activePause {
                         RepairPausedCard(
                             expectedEndDate: activePause.expectedEndDate,
-                            tokens: PaletteState.resolved(
-                                for: SkyPhase.resolve(at: .now, events: solarEvents)
-                            ),
+                            tokens: tokens,
                             onEndPause: { togglePause() }
                         )
                     } else {
-                        FocusedPrayerCard(
-                            prayer: effectiveFocusedPrayer,
-                            scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
-                            windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
-                            currentStatus: log(for: effectiveFocusedPrayer)?.status,
-                            isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
-                            isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
-                            rawatib: rawatibChips(for: effectiveFocusedPrayer),
-                            nightSet: nightChips,
-                            onToggleNafl: { kind in handleNaflTap(kind) },
-                            onCommit: { status, isJamaah in
-                                commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
-                            },
-                            onMoreOptions: {
-                                sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
-                            }
-                        )
+                        focusedCard(now: now, moment: moment, tokens: tokens)
 
-                        if let duhaWindow = activeDuhaWindow {
+                        if let duhaWindow = activeDuhaWindow(at: now) {
                             DuhaQuietCard(
                                 window: duhaWindow,
-                                isLogged: naflLogged(.duha, on: todayDay),
+                                isLogged: naflLogged(.duha, on: todayDay(at: now)),
                                 timeZone: snapshot.place.timeZone,
                                 onToggle: { handleNaflTap(.duha) }
                             )
@@ -312,6 +317,45 @@ private struct TodayReadyView: View {
                 Button("Cancel", role: .cancel) {}
             }
         }
+        // Once the clock crosses tomorrow's Fajr the schedule window is
+        // exhausted — refresh the snapshot exactly once so a fresh
+        // bracketed window (and fresh day queries) takes over.
+        .task(id: windowExhausted) {
+            if windowExhausted {
+                try? await viewModel.refreshSnapshot()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func focusedCard(
+        now: Date,
+        moment: PrayerMoment,
+        tokens: SkyPaletteTokens
+    ) -> some View {
+        let prayer = effectiveFocusedPrayer(moment: moment)
+        let log = log(for: prayer)
+        FocusedPrayerCard(
+            prayer: prayer,
+            scheduledTime: scheduledTime(for: prayer),
+            windowEndTime: windowEndTime(for: prayer),
+            now: now,
+            timeZone: snapshot.place.timeZone,
+            tokens: tokens,
+            currentStatus: log?.status,
+            loggedAt: log?.loggedAt,
+            isJamaah: log?.withJamaah ?? false,
+            isInWindow: displayCurrentPrayer(moment: moment) == prayer,
+            rawatib: rawatibChips(for: prayer, now: now),
+            nightSet: nightChips(now: now),
+            onToggleNafl: { kind in handleNaflTap(kind) },
+            onCommit: { status, isJamaah in
+                commit(status: status, isJamaah: isJamaah, for: prayer)
+            },
+            onMoreOptions: {
+                sheetSelection = LogSheetSelection(prayer: prayer)
+            }
+        )
     }
 
     // MARK: - Sunnah layer
@@ -320,17 +364,18 @@ private struct TodayReadyView: View {
         settingsRows.first
     }
 
-    private var todayDay: Date {
-        Calendar.current.startOfDay(for: .now)
+    private func todayDay(at now: Date) -> Date {
+        Calendar.current.startOfDay(for: now)
     }
 
     /// The civil day tonight's night acts belong to: before today's Fajr
     /// the night began yesterday evening.
-    private var nightOfDay: Date {
-        if Date.now < snapshot.dayTimes.fajr.scheduledTime {
-            return Calendar.current.date(byAdding: .day, value: -1, to: todayDay) ?? todayDay
+    private func nightOfDay(at now: Date) -> Date {
+        let today = todayDay(at: now)
+        if now < snapshot.dayTimes.fajr.scheduledTime {
+            return Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
         }
-        return todayDay
+        return today
     }
 
     private func naflLogged(_ kind: NaflKind, on day: Date) -> Bool {
@@ -338,7 +383,10 @@ private struct TodayReadyView: View {
         return recentNaflLogs.contains { $0.dedupKey == key }
     }
 
-    private func rawatibChips(for prayer: Prayer) -> FocusedPrayerCard.RawatibChips? {
+    private func rawatibChips(
+        for prayer: Prayer,
+        now: Date
+    ) -> FocusedPrayerCard.RawatibChips? {
         guard let settings = sunnahSettings,
               settings.sunnahLayerEnabled,
               settings.sunnahRawatibEnabled
@@ -347,41 +395,43 @@ private struct TodayReadyView: View {
         let config = settings.rawatibConfig(for: prayer)
         guard config.beforeCount > 0 || config.afterCount > 0 else { return nil }
 
+        let today = todayDay(at: now)
         return FocusedPrayerCard.RawatibChips(
             beforeCount: config.beforeCount,
             afterCount: config.afterCount,
-            beforeLogged: naflLogged(.rawatibBefore(prayer), on: todayDay),
-            afterLogged: naflLogged(.rawatibAfter(prayer), on: todayDay)
+            beforeLogged: naflLogged(.rawatibBefore(prayer), on: today),
+            afterLogged: naflLogged(.rawatibAfter(prayer), on: today)
         )
     }
 
     /// The night set appears once the night is in progress and Isha is
     /// either logged or its emphasis has passed (nisf al-layl). It rides
     /// whichever card is focused — Isha in the evening, Fajr before dawn.
-    private var nightChips: FocusedPrayerCard.NightChips? {
+    private func nightChips(now: Date) -> FocusedPrayerCard.NightChips? {
         guard let settings = sunnahSettings,
               settings.sunnahLayerEnabled,
               settings.sunnahNightEnabled,
               let night = snapshot.night,
-              night.contains(.now)
+              night.contains(now)
         else { return nil }
 
         let ishaLogged = log(for: .isha) != nil
-        guard ishaLogged || Date.now >= night.nisfAlLayl else { return nil }
+        guard ishaLogged || now >= night.nisfAlLayl else { return nil }
 
+        let nightDay = nightOfDay(at: now)
         let witrLogs = recentNaflLogs.filter { $0.kind == .witr }
         return FocusedPrayerCard.NightChips(
-            qiyamLogged: naflLogged(.qiyam, on: nightOfDay),
-            witrLogged: naflLogged(.witr, on: nightOfDay),
+            qiyamLogged: naflLogged(.qiyam, on: nightDay),
+            witrLogged: naflLogged(.witr, on: nightDay),
             witrBridge: NaflWitrBridge.state(
-                forNightOf: nightOfDay,
+                forNightOf: nightDay,
                 witrLogs: witrLogs,
                 tracksWitrQada: settings.qadaTrackingEnabled && settings.qadaTracksWitr
             )
         )
     }
 
-    private var activeDuhaWindow: DuhaWindow? {
+    private func activeDuhaWindow(at now: Date) -> DuhaWindow? {
         guard let settings = sunnahSettings,
               settings.sunnahLayerEnabled,
               settings.sunnahDuhaEnabled,
@@ -391,17 +441,17 @@ private struct TodayReadyView: View {
                   sunriseOffset: TimeInterval(settings.duhaSunriseOffsetMinutes * 60),
                   dhuhrMargin: TimeInterval(settings.duhaDhuhrMarginMinutes * 60)
               ),
-              window.interval.contains(.now)
+              window.interval.contains(now)
         else { return nil }
         return window
     }
 
-    private func naflDay(for kind: NaflKind) -> Date {
+    private func naflDay(for kind: NaflKind, at now: Date) -> Date {
         switch kind {
         case .qiyam, .witr:
-            return nightOfDay
+            return nightOfDay(at: now)
         case .duha, .rawatibBefore, .rawatibAfter:
-            return todayDay
+            return todayDay(at: now)
         }
     }
 
@@ -409,7 +459,7 @@ private struct TodayReadyView: View {
     /// go straight through; the rak'ah dialog appears only when the user
     /// opted into counts and this tap would record something new.
     private func handleNaflTap(_ kind: NaflKind) {
-        let day = naflDay(for: kind)
+        let day = naflDay(for: kind, at: nowProvider.now())
         let isRemoval = naflLogged(kind, on: day)
         if !isRemoval, sunnahSettings?.sunnahRakahCountsEnabled == true {
             pendingRakahNafl = PendingNafl(kind: kind)
@@ -419,7 +469,7 @@ private struct TodayReadyView: View {
     }
 
     private func performNafl(_ kind: NaflKind, rakahCount: Int?) {
-        let day = naflDay(for: kind)
+        let day = naflDay(for: kind, at: nowProvider.now())
         Task {
             await viewModel.toggleNafl(kind: kind, naflDate: day, rakahCount: rakahCount)
         }
@@ -457,12 +507,20 @@ private struct TodayReadyView: View {
         )
     }
 
-    private var plateMarkers: [CelestialPlateScene.Marker] {
+    private func plateMarkers(
+        now: Date,
+        moment: PrayerMoment
+    ) -> [CelestialPlateScene.Marker] {
         snapshot.dayTimes.allFardh.map { time in
             CelestialPlateScene.Marker(
                 prayer: time.prayer,
                 time: time.scheduledTime,
-                state: markerState(for: time.prayer, scheduledTime: time.scheduledTime)
+                state: markerState(
+                    for: time.prayer,
+                    scheduledTime: time.scheduledTime,
+                    now: now,
+                    moment: moment
+                )
             )
         }
     }
@@ -472,19 +530,32 @@ private struct TodayReadyView: View {
     /// logged prayer only reads as logged once its window has moved on.
     private func markerState(
         for prayer: Prayer,
-        scheduledTime: Date
+        scheduledTime: Date,
+        now: Date,
+        moment: PrayerMoment
     ) -> PrayerMarkerState {
         // During an excused pause every marker rests in the neutral outline
         // state — no glow, no passed-unlogged ink. Times stay readable;
         // nothing is asked.
         if activePause != nil { return .upcoming }
-        if prayer == currentPlatePrayer { return .current }
+        if prayer == currentPlatePrayer(moment: moment) { return .current }
         if log(for: prayer) != nil { return .logged }
-        return scheduledTime > .now ? .upcoming : .passedUnlogged
+        return scheduledTime > now ? .upcoming : .passedUnlogged
     }
 
-    private var currentPlatePrayer: Prayer {
-        snapshot.activePrayer ?? snapshot.nextPrayerTime.prayer
+    /// The moment's current prayer projected onto *today's* plate: nil
+    /// when the open window belongs to yesterday's Isha (pre-dawn),
+    /// whose place on this plate is the night bowl, not the markers.
+    private func displayCurrentPrayer(moment: PrayerMoment) -> Prayer? {
+        guard let current = moment.current else { return nil }
+        guard snapshot.dayTimes.time(for: current.prayer) == current.scheduledTime else {
+            return nil
+        }
+        return current.prayer
+    }
+
+    private func currentPlatePrayer(moment: PrayerMoment) -> Prayer {
+        displayCurrentPrayer(moment: moment) ?? moment.next.prayer
     }
 
     // MARK: - Focused prayer resolution
@@ -492,10 +563,8 @@ private struct TodayReadyView: View {
     /// The prayer the focused card is currently displaying. The user
     /// can override the default by tapping a marker on the scene; the
     /// override reverts to the next-upcoming after 8 sec per spec.
-    private var effectiveFocusedPrayer: Prayer {
-        focusedPrayer
-            ?? snapshot.activePrayer
-            ?? snapshot.nextPrayerTime.prayer
+    private func effectiveFocusedPrayer(moment: PrayerMoment) -> Prayer {
+        focusedPrayer ?? currentPlatePrayer(moment: moment)
     }
 
     private func handleMarkerTap(_ prayer: Prayer) {
@@ -517,13 +586,11 @@ private struct TodayReadyView: View {
     // MARK: - Prayer time / log lookups
 
     private func scheduledTime(for prayer: Prayer) -> Date {
-        snapshot.dayTimes.allFardh.first { $0.prayer == prayer }?.scheduledTime
-            ?? snapshot.nextPrayerTime.scheduledTime
+        snapshot.dayTimes.time(for: prayer)
     }
 
     /// End of `prayer`'s window. Fajr ends at sunrise, Dhuhr–Maghrib
-    /// at the next prayer, Isha returns `nil` (the window extends
-    /// past midnight and the card drops the "WINDOW ENDS" clause).
+    /// at the next prayer, Isha at tomorrow's true Fajr.
     private func windowEndTime(for prayer: Prayer) -> Date? {
         switch prayer {
         case .fajr:
@@ -535,7 +602,7 @@ private struct TodayReadyView: View {
         case .maghrib:
             return snapshot.dayTimes.isha.scheduledTime
         case .isha:
-            return nil
+            return snapshot.scheduleWindow.tomorrowFajr.scheduledTime
         }
     }
 
@@ -587,7 +654,7 @@ private struct TodayReadyView: View {
     /// pause without touching any stored preference.
     private func togglePause() {
         Haptics.impact(.medium)
-        let now = Date.now
+        let now = nowProvider.now()
         if let activePause {
             activePause.endDate = now
             activePause.modifiedAt = now

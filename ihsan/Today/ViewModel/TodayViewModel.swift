@@ -15,6 +15,7 @@ final class TodayViewModel {
     private let locationProvider: LocationProviding
     private let prayerTimesProvider: PrayerTimesProviding
     private let hijriCalendar: Calendar
+    private let nowProvider: NowProvider
     private let modelContext: ModelContext
     private var settings: UserSettings?
 
@@ -25,11 +26,13 @@ final class TodayViewModel {
         locationProvider: LocationProviding = CoreLocationCoordinator.shared,
         prayerTimesProvider: PrayerTimesProviding = AdhanPrayerTimesProvider(),
         hijriCalendar: Calendar = RamadanContext.currentHijriCalendar,
+        nowProvider: NowProvider = .system,
         modelContext: ModelContext
     ) {
         self.locationProvider = locationProvider
         self.prayerTimesProvider = prayerTimesProvider
         self.hijriCalendar = hijriCalendar
+        self.nowProvider = nowProvider
         self.modelContext = modelContext
     }
 
@@ -73,12 +76,15 @@ final class TodayViewModel {
         }
 
         let place = try await locationProvider.currentPlace()
-        let now = Date.now
+        let now = nowProvider.now()
         settings.lastResolvedCityName = place.cityName
         settings.lastResolvedCountryCode = place.countryCode
         settings.modifiedAt = now
 
-        let dayTimes = try prayerTimesProvider.dayTimes(
+        // One bracketed three-day window; every per-tick question —
+        // current prayer, next prayer, window end — is derived from it
+        // by the views, so nothing here can go stale between refreshes.
+        let scheduleWindow = try prayerTimesProvider.scheduleWindow(
             for: now,
             coordinates: place.coordinates,
             timeZone: place.timeZone,
@@ -86,29 +92,11 @@ final class TodayViewModel {
             madhab: settings.madhab,
             highLatitudeRule: settings.highLatitudeRule
         )
-        let nextPrayer = try prayerTimesProvider.nextPrayer(
-            from: now,
-            coordinates: place.coordinates,
-            timeZone: place.timeZone,
-            calculationMethod: settings.calculationMethod,
-            madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
-        )
-        let activePrayer = try? prayerTimesProvider.currentPrayer(
-            at: now,
-            coordinates: place.coordinates,
-            timeZone: place.timeZone,
-            calculationMethod: settings.calculationMethod,
-            madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
-        )?.prayer
 
         state = .ready(.init(
             place: place,
-            dayTimes: dayTimes,
-            nextPrayerTime: nextPrayer,
-            isWithinFajrToSunriseWindow: isWithinFajrToSunriseWindow(now: now, dayTimes: dayTimes),
-            activePrayer: activePrayer,
+            dayTimes: scheduleWindow.day,
+            scheduleWindow: scheduleWindow,
             ramadanContext: RamadanContext(at: now, calendar: hijriCalendar),
             night: relevantNight(now: now, place: place, settings: settings)
         ))
@@ -188,7 +176,7 @@ final class TodayViewModel {
         guard let settings else { return }
         let current = settings.adhanEnabled(for: prayer)
         settings.setAdhanEnabled(!current, for: prayer)
-        settings.modifiedAt = .now
+        settings.modifiedAt = nowProvider.now()
         Haptics.impact(.light)
         do {
             try await NotificationScheduler.shared.rebuildSchedule()
@@ -196,10 +184,6 @@ final class TodayViewModel {
             // Best-effort — the next nightly background refresh will
             // pick up the change even if this immediate rebuild fails.
         }
-    }
-
-    private func isWithinFajrToSunriseWindow(now: Date, dayTimes: DayPrayerTimes) -> Bool {
-        now >= dayTimes.fajr.scheduledTime && now < dayTimes.sunrise
     }
 
     private func startObservingLocationChanges() {

@@ -346,7 +346,7 @@ private extension PrayerLogSheet.Choice {
 
 #Preview("Log sheet — Dhuhr, not yet logged") {
     let calendar = Calendar.current
-    let today = calendar.startOfDay(for: .now)
+    let today = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 806_000_000))
     let scheduled = calendar.date(byAdding: .second, value: 12 * 3600 + 38 * 60, to: today) ?? today
     let windowEnd = calendar.date(byAdding: .second, value: 16 * 3600 + 2 * 60, to: today) ?? today
 
@@ -372,7 +372,7 @@ private extension PrayerLogSheet.Choice {
 
 #Preview("Log sheet — Fajr, in jamaʿah") {
     let calendar = Calendar.current
-    let today = calendar.startOfDay(for: .now)
+    let today = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 806_000_000))
     let scheduled = calendar.date(byAdding: .second, value: 5 * 3600 + 14 * 60, to: today) ?? today
     let windowEnd = calendar.date(byAdding: .second, value: 6 * 3600 + 32 * 60, to: today) ?? today
 

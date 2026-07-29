@@ -58,7 +58,7 @@ enum MoonPhase {
 
     /// Fraction of the synodic month that has elapsed at `date`, in
     /// `[0.0, 1.0)`. 0 = new moon, 0.5 = full moon.
-    static func phaseFraction(at date: Date = .now) -> Double {
+    static func phaseFraction(at date: Date) -> Double {
         let elapsedDays = date.timeIntervalSince(referenceNewMoon) / 86_400
         let fraction = elapsedDays / synodicMonth
         let wrapped = fraction.truncatingRemainder(dividingBy: 1.0)
@@ -67,7 +67,7 @@ enum MoonPhase {
 
     /// Maps the phase fraction to one of the eight conventional buckets.
     /// Each bucket spans 1/8th of the cycle (3.69 days).
-    static func bucket(at date: Date = .now) -> Bucket {
+    static func bucket(at date: Date) -> Bucket {
         let fraction = phaseFraction(at: date)
         // Eight evenly-spaced buckets centred on the four cardinal phases.
         let normalized = (fraction + 1.0 / 16.0).truncatingRemainder(dividingBy: 1.0)

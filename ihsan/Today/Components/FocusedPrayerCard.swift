@@ -2,37 +2,34 @@ import IhsanCore
 import IhsanDesignSystem
 import SwiftUI
 
-/// The focused-prayer card on the celestial Today screen.
+/// The focused-prayer card on the celestial Today screen — an
+/// illuminated v2 panel that shares the plate's ornament language.
 ///
-/// Replaces the legacy hero countdown + prayer-list + modal-log-sheet
-/// flow. One illuminated panel at the bottom of the screen showing a
-/// single prayer at a time; tapping a prayer marker on the celestial
-/// scene above swaps the focused prayer. Logging happens inline — no
-/// modal sheet for the 90 % case.
+/// One panel at the bottom of the screen showing a single prayer at a
+/// time; tapping a prayer marker on the celestial scene above swaps
+/// the focused prayer. Logging happens inline — no modal sheet for
+/// the 90% case.
 ///
-/// Three visual states:
+/// State hierarchy (per the corrective spec):
 ///
-/// 1. **Default** — prayer name, an inscription describing window
-///    state ("PRAYING WINDOW OPENS IN", "PRAYING NOW · WINDOW ENDS
-///    IN", etc.), and the countdown / time. A right-side chevron
-///    opens the existing prayer log sheet for the rare edit / qadā /
-///    missed flows.
-/// 2. **Expanded** — appears on card-body tap. Shows a jamaʿah toggle
-///    pill and two timing commit buttons (`On Time`, `Late`). A
-///    "More options..." link opens the full log sheet for the long
-///    tail (qadā, retroactive missed, edit). A close glyph collapses
-///    the card without logging. Auto-collapses after 12 sec of no
-///    interaction.
-/// 3. **Logged** — once the prayer is logged, the icon switches to a
-///    status indicator (brass square with `J` + `✓` / `L` overlay)
-///    and the inscription summarises the combined status
-///    ("JAMA·AH · ON TIME · 4:18 PM"). The chevron now opens the
-///    edit sheet.
+/// 1. **Upcoming** — the prayer's *time* is the primary numeral; the
+///    countdown ticks quietly as an inscription ("OPENS IN · 2:14:09").
+/// 2. **Active** — the prayer *name* (Latin + Arabic pair) is primary;
+///    the window is described in small caps inkSecondary
+///    ("NOW · UNTIL 6:15 AM"). No giant ticking numerals.
+/// 3. **Expanded** — on card tap: jamaʿah toggle, two timing commits,
+///    a quiet MORE OPTIONS link for the long tail (qadā, missed, edit).
+/// 4. **Logged** — the prayer's ornament renders in its logged state
+///    and the inscription summarises ("JAMĀ'AH · ON TIME · 4:18 PM").
+///    Tapping the card opens the edit sheet.
 ///
-/// The two-axis logging respects the existing orthogonal storage:
-/// jamaʿah is a Bool, timing is a `PrayerStatus`. The card simply
-/// exposes them through orthogonal controls (toggle + commit buttons)
-/// rather than the previous flat five-option list.
+/// Copy rule: the card describes the *window*, never the user's act —
+/// "NOW", not "PRAYING NOW".
+///
+/// The card owns no clock: the screen's single timeline hands it the
+/// resolved `now`, and every derived state comes from
+/// `FocusedCardModel`, whose tests pin the no-resting-zero and
+/// atomic-boundary guarantees.
 struct FocusedPrayerCard: View {
     /// The focused prayer's rawatib, present only when the user enabled
     /// the sunnah layer's rawatib component. `nil` renders the card
@@ -58,7 +55,16 @@ struct FocusedPrayerCard: View {
     let prayer: Prayer
     let scheduledTime: Date
     let windowEndTime: Date?
+    /// The resolved moment from the screen's single clock.
+    let now: Date
+    /// Timezone of the place, for every formatted time on the card.
+    let timeZone: TimeZone
+    /// Resolved v2 palette tokens for this moment.
+    let tokens: SkyPaletteTokens
     let currentStatus: PrayerStatus?
+    /// When the existing log was recorded — shown in the logged
+    /// inscription instead of ever reading a clock.
+    let loggedAt: Date?
     let isJamaah: Bool
     let isInWindow: Bool
 
@@ -73,9 +79,9 @@ struct FocusedPrayerCard: View {
     /// model.
     let onCommit: (PrayerStatus, Bool) -> Void
 
-    /// Tap on the chevron, or on "More options..." — opens the full
-    /// existing log sheet for edge cases (qadā, retroactive missed,
-    /// edit, notes).
+    /// Opens the full log sheet for edge cases (qadā, retroactive
+    /// missed, edit, notes) — reached from the logged card's tap and
+    /// the expanded state's MORE OPTIONS link.
     let onMoreOptions: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -92,18 +98,40 @@ struct FocusedPrayerCard: View {
 
     /// Fixed card height — the card never expands upward into the
     /// celestial scene above when transitioning between prayers or
-    /// modes. All three states (default / expanded / logged) lay out
-    /// within this bound.
+    /// modes. All states lay out within this bound.
     static let cardHeight: CGFloat = 140
 
     private var isLogged: Bool { currentStatus != nil }
+
+    private var phase: FocusedCardModel.Phase {
+        FocusedCardModel.resolve(
+            scheduledTime: scheduledTime,
+            windowEndTime: windowEndTime,
+            isInWindow: isInWindow,
+            isLogged: isLogged,
+            now: now
+        )
+    }
+
+    private var inscription: String {
+        FocusedCardModel.inscription(
+            for: phase,
+            status: currentStatus,
+            loggedAt: loggedAt,
+            isJamaah: isJamaah,
+            windowEndTime: windowEndTime,
+            scheduledTime: scheduledTime,
+            now: now,
+            timeZone: timeZone
+        )
+    }
 
     var body: some View {
         contentForMode
             .padding(14)
             .frame(maxWidth: .infinity)
             .frame(height: Self.cardHeight)
-            .celestialPanel(cornerRadius: 20, isActive: isInWindow)
+            .celestialPanel(tokens: tokens, cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
             .animation(
                 reduceMotion ? nil : .smooth(duration: 0.28),
@@ -139,6 +167,10 @@ struct FocusedPrayerCard: View {
         if isLogged {
             loggedContent
                 .transition(.opacity)
+                .onTapGesture {
+                    Haptics.impact(.light)
+                    onMoreOptions()
+                }
         } else if mode == .expanded {
             expandedContent
                 .transition(.opacity)
@@ -152,19 +184,43 @@ struct FocusedPrayerCard: View {
         }
     }
 
-    // MARK: - Default state
+    // MARK: - Ornament (shared plate language)
+
+    /// The prayer's own ornament, in the same lifecycle state the
+    /// plate's marker shows — the card and the plate visibly share
+    /// one language.
+    private var ornamentState: PrayerMarkerState {
+        switch phase {
+        case .logged: return .logged
+        case .active: return .current
+        case .upcoming: return .upcoming
+        case .windowClosed: return .passedUnlogged
+        }
+    }
+
+    private var ornament: some View {
+        PrayerMarkerOrnament(
+            prayer: prayer,
+            size: 30,
+            state: ornamentState,
+            tokens: tokens
+        )
+        .frame(width: 38, height: 38)
+        .accessibilityHidden(true)
+    }
+
+    // MARK: - Default (collapsed) state
 
     @ViewBuilder
     private var defaultContent: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
             VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
                 HStack(spacing: IhsanSpacing.md) {
-                    PrayerSymbolBadge(prayer: prayer)
-                    prayerNameStack
+                    ornament
+                    prayerNameRow
                     Spacer()
-                    chevronButton
                 }
-                inscriptionAndCountdown
+                phaseDetail
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabelForDefaultState)
@@ -176,74 +232,68 @@ struct FocusedPrayerCard: View {
         }
     }
 
-    /// Combined VoiceOver label for the default-state card. Reads as
-    /// one phrase so the user gets the full prayer status in a single
-    /// rotor stop — e.g. "Asr prayer, praying now, window ends in 1
-    /// hour 23 minutes. Double-tap to log this prayer."
-    private var accessibilityLabelForDefaultState: String {
-        var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
-
-        if isInWindow {
-            parts.append("praying now")
-        }
-
-        if shouldShowCountdown {
-            let remaining = max(0, countdownTarget.timeIntervalSince(.now))
-            let direction = isInWindow ? "window ends in" : "starts in"
-            parts.append("\(direction) \(spokenCountdown(seconds: remaining))")
-        } else if shouldShowScheduledTime {
-            parts.append("scheduled at \(scheduledTimeFormatted)")
-        } else if let end = windowEndTime, end < .now {
-            parts.append("window closed at \(timeFormatted(end))")
-        }
-
-        return parts.joined(separator: ", ")
-    }
-
+    /// The card's second line, per the state hierarchy: upcoming keeps
+    /// the prayer time as the primary numeral with the countdown as an
+    /// inscription; the active window is described in small caps only.
     @ViewBuilder
-    private var inscriptionAndCountdown: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(defaultInscription.uppercased())
-                .font(IhsanFont.inscription)
-                .tracking(1.4)
-                .foregroundStyle(IhsanCelestialPalette.current().accent)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-
-            if shouldShowCountdown {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    let remaining = max(0, countdownTarget.timeIntervalSince(context.date))
-                    Text(formattedCountdown(seconds: remaining))
-                        .font(.system(.title, design: .monospaced).monospacedDigit())
-                        .fontWeight(.light)
-                        .foregroundStyle(IhsanCelestialPalette.current().text)
-                        .contentTransition(.numericText())
-                        .accessibilityLabel(spokenCountdown(seconds: remaining))
-                }
-            } else if shouldShowScheduledTime {
-                Text(scheduledTimeFormatted)
+    private var phaseDetail: some View {
+        switch phase {
+        case .upcoming:
+            VStack(alignment: .leading, spacing: 4) {
+                Text(PlateTimeFormat.time(scheduledTime, in: timeZone))
                     .font(.system(.title, design: .monospaced).monospacedDigit())
                     .fontWeight(.light)
-                    .foregroundStyle(IhsanCelestialPalette.current().text)
+                    .foregroundStyle(tokens.ink)
+                    .contentTransition(.numericText())
+                Text(inscription.uppercased())
+                    .font(IhsanFont.inscription)
+                    .monospacedDigit()
+                    .tracking(1.4)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .contentTransition(.numericText())
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
             }
+        case .active, .windowClosed, .logged:
+            Text(inscription.uppercased())
+                .font(IhsanFont.inscription)
+                .tracking(1.4)
+                .foregroundStyle(tokens.inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
+    }
+
+    /// Combined VoiceOver label for the default-state card, phrased by
+    /// the same copy rule the visual inscription follows.
+    private var accessibilityLabelForDefaultState: String {
+        var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
+        switch phase {
+        case .active(let until):
+            parts.append("in its window until \(PlateTimeFormat.time(until, in: timeZone))")
+        case .upcoming(let opensAt):
+            parts.append("opens in \(FocusedCardModel.spokenCountdown(until: opensAt, now: now))")
+            parts.append("scheduled at \(PlateTimeFormat.time(scheduledTime, in: timeZone))")
+        case .windowClosed(let end):
+            if let end {
+                parts.append("window closed at \(PlateTimeFormat.time(end, in: timeZone))")
+            } else {
+                parts.append("window closed")
+            }
+        case .logged:
+            break
+        }
+        return parts.joined(separator: ", ")
     }
 
     // MARK: - Expanded state
 
     @ViewBuilder
     private var expandedContent: some View {
-        // The expanded state lays out tightly so the prayer name,
-        // jamaʿah toggle, and two timing commit buttons all fit
-        // within the card's fixed 140pt bound. The "HOW DID YOU
-        // PRAY?" inscription and "More options…" link from prior
-        // iterations are omitted here — the prayer name and the
-        // chevron on the collapsed card already deliver that
-        // information / affordance.
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: IhsanSpacing.sm) {
-                PrayerSymbolBadge(prayer: prayer)
-                prayerNameStack
+                ornament
+                prayerNameRow
                 Spacer()
                 Button {
                     Haptics.impact(.light)
@@ -251,20 +301,36 @@ struct FocusedPrayerCard: View {
                 } label: {
                     Image(systemName: "xmark")
                         .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.85))
+                        .foregroundStyle(tokens.metal.opacity(0.85))
                         .frame(width: 28, height: 28)
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
             }
 
-            if let rawatib, rawatib.hasAnySlot {
-                rawatibStrip(rawatib)
+            HStack(spacing: IhsanSpacing.sm) {
+                if let rawatib, rawatib.hasAnySlot {
+                    rawatibStrip(rawatib)
+                }
+                Spacer(minLength: 0)
+                Button {
+                    Haptics.impact(.light)
+                    onMoreOptions()
+                } label: {
+                    Text("MORE OPTIONS")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                        .foregroundStyle(tokens.metal.opacity(0.60))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("More options")
+                .accessibilityHint("Opens the full prayer log sheet.")
             }
+            .frame(height: 20)
 
             Spacer(minLength: 0)
 
-            JamaahToggle(isOn: $jamaahPending)
+            JamaahToggleControl(isOn: $jamaahPending, tokens: tokens)
                 .frame(maxWidth: .infinity, alignment: .center)
                 .onChange(of: jamaahPending) { _, _ in
                     scheduleAutoCollapse()
@@ -274,14 +340,16 @@ struct FocusedPrayerCard: View {
                 TimingCommitButton(
                     label: "On Time",
                     glyph: "checkmark",
-                    accent: .gold
+                    prominent: true,
+                    tokens: tokens
                 ) {
                     commit(.onTime)
                 }
                 TimingCommitButton(
                     label: "Late",
                     glyph: "L",
-                    accent: .brass
+                    prominent: false,
+                    tokens: tokens
                 ) {
                     commit(.late)
                 }
@@ -319,7 +387,6 @@ struct FocusedPrayerCard: View {
                         caption: "\(rawatib.afterCount) AFTER"
                     )
                 }
-                Spacer(minLength: 0)
             } else {
                 Button {
                     Haptics.impact(.light)
@@ -333,15 +400,13 @@ struct FocusedPrayerCard: View {
                         Image(systemName: "chevron.down")
                             .font(.system(size: 8, weight: .semibold))
                     }
-                    .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.60))
+                    .foregroundStyle(tokens.metal.opacity(0.60))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Rawatib")
                 .accessibilityHint("Shows the before and after chips.")
-                Spacer(minLength: 0)
             }
         }
-        .frame(height: 20)
     }
 
     @ViewBuilder
@@ -363,7 +428,7 @@ struct FocusedPrayerCard: View {
                 Text("TONIGHT'S WITR · CURRENT")
                     .font(IhsanFont.inscription)
                     .tracking(1.2)
-                    .foregroundStyle(IhsanCelestialPalette.current().text.opacity(0.55))
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.75))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -388,13 +453,13 @@ struct FocusedPrayerCard: View {
                     if logged {
                         PrayerOrnamentShape(prayer: ornament, mode: .filled)
                             .fill(
-                                IhsanCelestialPalette.current().accent,
+                                tokens.metal,
                                 style: FillStyle(eoFill: true)
                             )
                     } else {
                         PrayerOrnamentShape(prayer: ornament, mode: .outline)
                             .stroke(
-                                IhsanCelestialPalette.current().accent.opacity(0.55),
+                                tokens.metal.opacity(0.55),
                                 lineWidth: 0.9
                             )
                     }
@@ -405,7 +470,7 @@ struct FocusedPrayerCard: View {
                     .font(IhsanFont.inscription)
                     .tracking(1.2)
                     .foregroundStyle(
-                        IhsanCelestialPalette.current().accent.opacity(logged ? 0.95 : 0.65)
+                        tokens.metal.opacity(logged ? 0.95 : 0.65)
                     )
             }
             .padding(.horizontal, 8)
@@ -413,7 +478,7 @@ struct FocusedPrayerCard: View {
             .overlay {
                 Capsule()
                     .strokeBorder(
-                        IhsanCelestialPalette.current().accent.opacity(logged ? 0.55 : 0.30),
+                        tokens.metal.opacity(logged ? 0.55 : 0.30),
                         lineWidth: 0.8
                     )
             }
@@ -430,24 +495,21 @@ struct FocusedPrayerCard: View {
     private var loggedContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: IhsanSpacing.md) {
-                LoggedStatusIndicator(
-                    status: currentStatus ?? .missed,
-                    isJamaah: isJamaah
-                )
+                ornament
                 VStack(alignment: .leading, spacing: 4) {
                     prayerNameRow
-                    Text(loggedInscription.uppercased())
+                    Text(inscription.uppercased())
                         .font(IhsanFont.inscription)
                         .tracking(1.4)
-                        .foregroundStyle(IhsanCelestialPalette.current().accent)
+                        .foregroundStyle(tokens.inkSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
                 }
                 Spacer()
-                chevronButton
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel(accessibilityLabelForLoggedState)
+            .accessibilityHint("Double-tap to edit.")
 
             if let nightSet {
                 nightRow(nightSet)
@@ -465,44 +527,21 @@ struct FocusedPrayerCard: View {
         if let status = currentStatus {
             parts.append(status.spokenLabel)
         }
-        parts.append("Double-tap to edit")
         return parts.joined(separator: ", ")
     }
 
     // MARK: - Shared subviews
 
     @ViewBuilder
-    private var prayerNameStack: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            prayerNameRow
-        }
-    }
-
-    @ViewBuilder
     private var prayerNameRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
             Text(prayer.displayNameEnglish)
                 .font(IhsanFont.heroPrayerName)
-                .foregroundStyle(IhsanCelestialPalette.current().text)
+                .foregroundStyle(tokens.ink)
             Text(prayer.displayNameArabic)
                 .font(IhsanFont.bodyArabic)
-                .foregroundStyle(IhsanCelestialPalette.current().text.opacity(0.72))
+                .foregroundStyle(tokens.ink.opacity(0.72))
         }
-    }
-
-    @ViewBuilder
-    private var chevronButton: some View {
-        Button {
-            Haptics.impact(.light)
-            onMoreOptions()
-        } label: {
-            Image(systemName: "chevron.right")
-                .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.65))
-                .frame(width: 28, height: 28)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Open prayer log options")
     }
 
     // MARK: - State transitions
@@ -523,190 +562,16 @@ struct FocusedPrayerCard: View {
             }
         }
     }
-
-    // MARK: - Inscription strings
-
-    private var defaultInscription: String {
-        if isInWindow {
-            if windowEndTime != nil {
-                return "Praying now · window ends in"
-            }
-            return "Praying now"
-        }
-        if scheduledTime > .now {
-            return "Praying window opens in"
-        }
-        if let end = windowEndTime, end < .now {
-            return "Missed · window closed \(timeFormatted(end))"
-        }
-        return "Scheduled at"
-    }
-
-    private var loggedInscription: String {
-        guard let status = currentStatus else { return "" }
-        let jamaahPrefix = isJamaah ? "JAMA·AH · " : ""
-        switch status {
-        case .onTime:
-            return "\(jamaahPrefix)ON TIME · \(timeFormatted(.now))"
-        case .late:
-            return "\(jamaahPrefix)LATE · \(timeFormatted(.now))"
-        case .qada:
-            return "QADĀ · LOGGED \(dateFormatted(.now))"
-        case .missed:
-            return "MISSED · WINDOW CLOSED \(timeFormatted(windowEndTime ?? scheduledTime))"
-        }
-    }
-
-    private var shouldShowCountdown: Bool {
-        // Show a countdown when the user is waiting for an event:
-        // either the prayer's window to open, or the window's end
-        // if currently in it.
-        if isInWindow, windowEndTime != nil { return true }
-        if scheduledTime > .now { return true }
-        return false
-    }
-
-    private var shouldShowScheduledTime: Bool {
-        // No countdown to show, and the prayer hasn't opened yet.
-        scheduledTime > .now && !shouldShowCountdown
-    }
-
-    private var countdownTarget: Date {
-        if isInWindow, let end = windowEndTime {
-            return end
-        }
-        return scheduledTime
-    }
-
-    // MARK: - Formatting helpers
-
-    private var scheduledTimeFormatted: String {
-        timeFormatted(scheduledTime)
-    }
-
-    private func timeFormatted(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        return formatter.string(from: date)
-    }
-
-    private func dateFormatted(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "d MMM"
-        return formatter.string(from: date).uppercased()
-    }
-
-    private func formattedCountdown(seconds: TimeInterval) -> String {
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return String(format: "%d:%02d:%02d", h, m, s)
-    }
-
-    private func spokenCountdown(seconds: TimeInterval) -> String {
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        var parts: [String] = []
-        if h > 0 { parts.append("\(h) hour\(h == 1 ? "" : "s")") }
-        if m > 0 { parts.append("\(m) minute\(m == 1 ? "" : "s")") }
-        if h == 0 { parts.append("\(s) second\(s == 1 ? "" : "s")") }
-        return parts.isEmpty ? "0 seconds" : parts.joined(separator: ", ")
-    }
-}
-
-// MARK: - Prayer symbol badge (left side of card)
-
-/// A small SF Symbol badge for the prayer — sunrise, zenith, sunset
-/// glyph at 28pt, brass tint at 80% opacity. Reads as the unlogged
-/// state on the card's left side.
-private struct PrayerSymbolBadge: View {
-    let prayer: Prayer
-
-    var body: some View {
-        Image(systemName: symbolName)
-            .font(.system(size: 22, weight: .regular))
-            .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.85))
-            .frame(width: 36, height: 36)
-            .accessibilityHidden(true)
-    }
-
-    private var symbolName: String {
-        switch prayer {
-        case .fajr: return "sunrise.fill"
-        case .dhuhr: return "sun.max.fill"
-        case .asr: return "sun.haze.fill"
-        case .maghrib: return "sunset.fill"
-        case .isha: return "moon.stars.fill"
-        }
-    }
-}
-
-// MARK: - Logged status indicator
-
-/// A small brass-filled square containing the status glyph(s).
-/// `J + ✓` for jamaʿah on-time, `J + L` for jamaʿah late, plain `✓`
-/// or `L` for individual, `Q` for qadā, `—` for missed.
-private struct LoggedStatusIndicator: View {
-    let status: PrayerStatus
-    let isJamaah: Bool
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        ZStack {
-            shape.fill(IhsanIridescence.brassStroke(opacity: 0.95))
-            shape.strokeBorder(
-                IhsanIridescence.brassStroke(opacity: 0.95),
-                lineWidth: 0.8
-            )
-            glyphStack
-                .foregroundStyle(IhsanColor.inkDeep)
-        }
-        .frame(width: 36, height: 36)
-        .accessibilityHidden(true)
-    }
-
-    @ViewBuilder
-    private var glyphStack: some View {
-        if isJamaah {
-            HStack(spacing: 1) {
-                Text("J")
-                    .font(.system(size: 13, weight: .bold, design: .serif))
-                timingGlyph(size: 11)
-            }
-        } else {
-            timingGlyph(size: 14)
-        }
-    }
-
-    @ViewBuilder
-    private func timingGlyph(size: CGFloat) -> some View {
-        switch status {
-        case .onTime:
-            Image(systemName: "checkmark")
-                .font(.system(size: size, weight: .bold))
-        case .late:
-            Text("L")
-                .font(.system(size: size + 1, weight: .bold, design: .serif))
-        case .qada:
-            Text("Q")
-                .font(.system(size: size + 1, weight: .bold, design: .serif))
-        case .missed:
-            Image(systemName: "minus")
-                .font(.system(size: size + 2, weight: .bold))
-        }
-    }
 }
 
 // MARK: - Jamaʿah toggle pill
 
 /// A horizontal pill that toggles jamaʿah. Off state outlines the
-/// pill in brass at 50% opacity; on state fills with the iridescent
-/// brass angular gradient. State changes carry a soft haptic.
-private struct JamaahToggle: View {
+/// pill in metal; on state fills flat metal with deep ink text —
+/// flat + luminous, no iridescence, no depth.
+private struct JamaahToggleControl: View {
     @Binding var isOn: Bool
+    let tokens: SkyPaletteTokens
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -720,21 +585,19 @@ private struct JamaahToggle: View {
             Text("JAMA·AH")
                 .font(IhsanFont.inscription)
                 .tracking(2.0)
-                .foregroundStyle(labelColor)
+                .foregroundStyle(isOn ? tokens.panelFill : tokens.metal)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 6)
                 .frame(minWidth: 110)
                 .background {
                     Capsule()
-                        .fill(filling)
+                        .fill(tokens.metal)
                         .opacity(isOn ? 1 : 0)
                 }
                 .overlay {
                     Capsule()
                         .strokeBorder(
-                            isOn
-                                ? IhsanCelestialPalette.current().accent.opacity(0.95)
-                                : IhsanCelestialPalette.current().accent.opacity(0.55),
+                            tokens.metal.opacity(isOn ? 0.95 : 0.55),
                             lineWidth: 1
                         )
                 }
@@ -744,29 +607,18 @@ private struct JamaahToggle: View {
         .accessibilityValue(isOn ? "on" : "off")
         .accessibilityHint("Double-tap to toggle jamaʿah selection.")
     }
-
-    private var labelColor: Color {
-        isOn
-            ? IhsanColor.inkDeep
-            : IhsanCelestialPalette.current().accent
-    }
-
-    private var filling: some ShapeStyle {
-        IhsanIridescence.brassStroke(opacity: 0.92)
-    }
 }
 
 // MARK: - Timing commit button
 
-/// One of the two pill buttons in the expanded state. Tap → fill
-/// animation → call `action`. The two buttons are visually balanced;
-/// On Time uses the gold accent and Late uses brass.
+/// One of the two pill buttons in the expanded state. Tap → flat
+/// metal fill → call `action`. On Time takes the brighter metal pole,
+/// Late the base metal.
 private struct TimingCommitButton: View {
-    enum Accent { case gold, brass }
-
     let label: String
     let glyph: String
-    let accent: Accent
+    let prominent: Bool
+    let tokens: SkyPaletteTokens
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -779,7 +631,8 @@ private struct TimingCommitButton: View {
             }
             // Slight delay so the fill animation is visible before
             // the card transitions to the logged state.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            Task { @MainActor in
+                try? await Task.sleep(nanoseconds: 120_000_000)
                 action()
             }
         } label: {
@@ -795,40 +648,27 @@ private struct TimingCommitButton: View {
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
             }
-            .foregroundStyle(foregroundColor)
+            .foregroundStyle(isPressing ? tokens.panelFill : tokens.ink)
             .padding(.vertical, 9)
             .frame(maxWidth: .infinity)
             .background {
                 Capsule()
-                    .fill(filling)
+                    .fill(tokens.metal)
                     .opacity(isPressing ? 1 : 0)
             }
             .overlay {
                 Capsule()
-                    .strokeBorder(borderColor, lineWidth: 1)
+                    .strokeBorder(
+                        prominent
+                            ? tokens.metalHighlight.opacity(0.95)
+                            : tokens.metal.opacity(0.75),
+                        lineWidth: 1
+                    )
             }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Log as \(label)")
         .accessibilityHint("Double-tap to log as \(label.lowercased()).")
-    }
-
-    private var borderColor: Color {
-        switch accent {
-        case .gold:
-            return IhsanCelestialPalette.current().accentBright.opacity(0.95)
-        case .brass:
-            return IhsanCelestialPalette.current().accent.opacity(0.75)
-        }
-    }
-
-    private var foregroundColor: Color {
-        if isPressing { return IhsanColor.inkDeep }
-        return IhsanCelestialPalette.current().text
-    }
-
-    private var filling: some ShapeStyle {
-        IhsanIridescence.brassStroke(opacity: 0.92)
     }
 }
 

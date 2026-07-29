@@ -58,6 +58,11 @@ struct CelestialPlateScene: View {
     /// absolute instants; the plate is the UI layer that localises them.
     let timeZone: TimeZone
 
+    /// The moment to render. The scene owns no clock — the Today
+    /// screen's single timeline resolves this through NowProvider and
+    /// hands the same instant to every layer.
+    let now: Date
+
     /// Room reserved at the top of the frame for the header, and at the
     /// bottom for the focused card. The atmosphere still fills the whole
     /// frame — only the arc, the markers, and the horizon respect these.
@@ -69,27 +74,22 @@ struct CelestialPlateScene: View {
     /// span — between Maghrib and the next true Fajr. `nil`, or any
     /// daytime instant, renders exactly the pre-night plate.
     var night: NightIntervals?
-
-    /// Fixed instant, for previews and snapshot renders. `nil` drives
-    /// the scene from the clock.
-    var timeOverride: Date?
     /// Marker tap — the Today screen swaps the focused card to this
     /// prayer. `nil` makes the plate non-interactive.
     var onMarkerTap: ((Prayer) -> Void)?
     /// Optional render-loop instrumentation.
     var probe: FrameTimeProbe?
 
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     // MARK: - Composition constants
     //
     // Sizes only. Every *position* comes from PlateGeometry.
 
-    /// The plate's chord sits at 62% of the instrument zone — high
-    /// enough that the arc carries the composition, low enough that the
-    /// ground plane reads as ground rather than as a border.
-    private static let horizonFraction: CGFloat = 0.62
+    /// The chord height comes from the page's composition metrics so
+    /// the plate, the ground band, and the focused card are one
+    /// composition with a single source of truth.
+    private static let horizonFraction = TodayCompositionMetrics.horizonFraction
     private static let markerSize: CGFloat = 24
     /// The prayer happening now is drawn larger as well as luminous;
     /// size and light together make it the focal point at arm's length.
@@ -106,24 +106,13 @@ struct CelestialPlateScene: View {
     // MARK: - Body
 
     var body: some View {
-        if let timeOverride {
-            scene(at: timeOverride)
-        } else if reduceMotion {
-            // Reduce Motion takes a single evaluation: the scene is a
-            // snapshot of the sky at the moment the screen opened, with
-            // no drift of any kind.
-            scene(at: .now)
-        } else {
-            // Ten seconds is the sun's true rate expressed as something
-            // a phone can afford: 0.042° of arc, about an eighth of a
-            // point on the plate. Too small to catch in the moment,
-            // unmistakable if you look again after a few minutes. The
-            // atmosphere's own 60 fps loop lives inside
-            // `CelestialSkyView`; nothing here animates faster.
-            TimelineView(.periodic(from: .now, by: 10)) { context in
-                scene(at: context.date)
-            }
-        }
+        // The scene is a pure function of `now` — the Today screen's
+        // single one-second timeline drives it, so the sun, markers,
+        // and palette can never lag the card or the header. The
+        // atmosphere's own decorative loop lives inside
+        // `CelestialSkyView` and freezes under Reduce Motion; state
+        // updates here are correctness, not motion, and never pause.
+        scene(at: now)
     }
 
     @ViewBuilder
@@ -641,9 +630,10 @@ struct CelestialPlateScene: View {
         size: 10, weight: .semibold
     ).smallCaps().monospacedDigit()
 
+    /// All marker times go through the shared Today formatter — the
+    /// same one the header's "NEXT:" inscription uses — so the two can
+    /// never disagree to the minute.
     private static func timeString(_ date: Date, in timeZone: TimeZone) -> String {
-        var style = Date.FormatStyle(date: .omitted, time: .shortened)
-        style.timeZone = timeZone
-        return date.formatted(style)
+        PlateTimeFormat.time(date, in: timeZone)
     }
 }
