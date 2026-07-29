@@ -13,11 +13,12 @@ struct SkyPhaseTests {
     /// Two-part anti-snapping contract.
     ///
     /// Part 1 — bounded speed: at 2,000 samples/cycle no channel may
-    /// move more than 0.06/step. The fastest legitimate motion is a
+    /// move more than 0.10/step. The fastest legitimate motion is a
     /// figure token (ink/panel) crossing its narrow window: ≈0.85 of
-    /// channel range over 0.02 of the cycle = 40 samples, times
-    /// smootherstep's 1.875× peak slope ≈ 0.04/step. v1's sunrise flip
-    /// crossed the same distance in ~1 sample (≈0.85/step).
+    /// channel range over 0.01 of the cycle (figureHalfWidth 0.005)
+    /// = 20 samples, times smootherstep's 1.875× peak slope
+    /// ≈ 0.08/step. v1's sunrise flip crossed the same distance in
+    /// ~1 sample (≈0.85/step).
     ///
     /// Part 2 — true continuity: quadrupling the sampling density must
     /// cut the worst per-step delta by ≈4× (any continuous curve
@@ -40,7 +41,7 @@ struct SkyPhaseTests {
         }
 
         let coarse = maxStepDelta(samples: 2_000)
-        #expect(coarse <= 0.06, "worst per-step channel delta \(coarse) exceeds continuous-motion bound")
+        #expect(coarse <= 0.10, "worst per-step channel delta \(coarse) exceeds continuous-motion bound")
 
         let fine = maxStepDelta(samples: 8_000)
         #expect(

@@ -138,8 +138,10 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     /// short "the lamps come on" moment while the sky drifts on its
     /// own longer clock, and `inkHaloStrength` covers legibility
     /// through the passage. Still smootherstep-eased and fully
-    /// continuous — the flip is quick, never a snap.
-    static let figureHalfWidth = 0.010
+    /// continuous — the flip is quick, never a snap. 0.005 of the
+    /// cycle keeps the whole flip inside ±9 real minutes around
+    /// maghrib on a mid-latitude summer day.
+    static let figureHalfWidth = 0.005
 
     private static let boundaries: [(center: Double, from: PaletteState, to: PaletteState)] = [
         (SkyPhase.sunriseUnit, .night, .morning),

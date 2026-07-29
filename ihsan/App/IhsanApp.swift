@@ -89,6 +89,7 @@ private struct RootGate: View {
         }
         .task {
             ensureSingletonExists()
+            applyDebugLaunchArguments()
             sweepOrphanReflectionAudio()
             didResolveInitialSettings = true
         }
@@ -136,6 +137,41 @@ private struct RootGate: View {
             // re-show setup once than to hide it from a brand new
             // install.
         }
+    }
+
+    /// Debug-only verification hooks, driven by launch arguments so a
+    /// screenshot run can reach the Today screen without walking
+    /// onboarding, and can show the logged card state:
+    ///
+    /// - `-IhsanDebugCompletedOnboarding` marks onboarding complete.
+    /// - `-IhsanDebugLogPrayer dhuhr:onTime` logs one prayer through
+    ///   the standard intent funnel (dedup and idempotency hold).
+    ///
+    /// Release builds compile this to a no-op.
+    private func applyDebugLaunchArguments() {
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-IhsanDebugCompletedOnboarding") {
+            if let settings = try? UserSettings.fetchOrCreate(in: modelContext),
+               !settings.hasCompletedOnboarding {
+                settings.hasCompletedOnboarding = true
+                try? modelContext.save()
+            }
+        }
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugLogPrayer"),
+           arguments.indices.contains(flagIndex + 1) {
+            let parts = arguments[flagIndex + 1].split(separator: ":")
+            if parts.count == 2,
+               let prayer = Prayer(rawValue: String(parts[0])),
+               let status = PrayerStatus(rawValue: String(parts[1])) {
+                Task {
+                    _ = try? await LogPrayerWithStatusIntent(
+                        prayer: prayer, status: status
+                    ).perform()
+                }
+            }
+        }
+        #endif
     }
 
     /// Force-quit during a recording leaves an .m4a in the App Group

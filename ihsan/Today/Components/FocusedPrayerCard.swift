@@ -245,6 +245,8 @@ struct FocusedPrayerCard: View {
                     .fontWeight(.light)
                     .foregroundStyle(tokens.ink)
                     .contentTransition(.numericText())
+                    .shadow(color: tokens.inkHaloDark, radius: 1)
+                    .shadow(color: tokens.inkHaloLight, radius: 3)
                 Text(inscription.uppercased())
                     .font(IhsanFont.inscription)
                     .monospacedDigit()
@@ -253,6 +255,7 @@ struct FocusedPrayerCard: View {
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
+                    .shadow(color: tokens.inkHalo, radius: 1.5)
             }
         case .active, .windowClosed, .logged:
             Text(inscription.uppercased())
@@ -261,6 +264,8 @@ struct FocusedPrayerCard: View {
                 .foregroundStyle(tokens.inkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+                .shadow(color: tokens.inkHaloDark, radius: 1)
+                .shadow(color: tokens.inkHaloLight, radius: 3)
         }
     }
 
@@ -504,6 +509,8 @@ struct FocusedPrayerCard: View {
                         .foregroundStyle(tokens.inkSecondary)
                         .lineLimit(1)
                         .minimumScaleFactor(0.8)
+                        .shadow(color: tokens.inkHaloDark, radius: 1)
+                        .shadow(color: tokens.inkHaloLight, radius: 3)
                 }
                 Spacer()
             }
@@ -542,6 +549,9 @@ struct FocusedPrayerCard: View {
                 .font(IhsanFont.bodyArabic)
                 .foregroundStyle(tokens.ink.opacity(0.72))
         }
+        .shadow(color: tokens.inkHaloDark, radius: 1)
+        .shadow(color: tokens.inkHaloLight, radius: 2.5)
+        .shadow(color: tokens.inkHaloLight, radius: 6)
     }
 
     // MARK: - State transitions

@@ -638,7 +638,9 @@ struct CelestialPlateScene: View {
                 .tracking(0.9)
                 .foregroundStyle(tokens.inkSecondary)
         }
-        .shadow(color: tokens.inkHalo, radius: 2)
+        .shadow(color: tokens.inkHaloDark, radius: 1)
+        .shadow(color: tokens.inkHaloLight, radius: 2.5)
+        .shadow(color: tokens.inkHaloLight, radius: 6)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

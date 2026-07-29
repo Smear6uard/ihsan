@@ -59,6 +59,17 @@ public enum PaletteState: String, CaseIterable, Sendable {
             inkHalo: .mix(f0.inkHaloValue, f1.inkHaloValue, amount: fig.amount)
         )
         tokens.inkHaloStrength = phase.inkHaloStrength
+        // Keep the two halo poles un-blended through a crossing:
+        // darker and lighter of the crossing states' halo tints. On a
+        // plateau (fig.from == fig.to) both poles collapse to the
+        // canonical halo, matching the fixed-state tokens exactly.
+        if f0.inkHaloValue.relativeLuminance <= f1.inkHaloValue.relativeLuminance {
+            tokens.inkHaloDarkValue = f0.inkHaloValue
+            tokens.inkHaloLightValue = f1.inkHaloValue
+        } else {
+            tokens.inkHaloDarkValue = f1.inkHaloValue
+            tokens.inkHaloLightValue = f0.inkHaloValue
+        }
         return tokens
     }
 
@@ -134,6 +145,16 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// transitions.
     public var inkHaloStrength: Double = 0
 
+    /// The two halo poles, preserved un-blended through a transition.
+    /// Blending the halo colors would produce a mid-tone exactly when
+    /// the halo is needed most (both figure states' halos average to
+    /// mush at the crossing) — so text draws BOTH poles: the dark one
+    /// crisps the glyph edge, the light one lifts it off the ground,
+    /// and whichever matches the local ground simply disappears. On a
+    /// plateau both poles equal `inkHaloValue` (and strength is zero).
+    public var inkHaloDarkValue: SRGBValue
+    public var inkHaloLightValue: SRGBValue
+
     public init(
         groundTop: SRGBValue,
         groundBottom: SRGBValue,
@@ -166,6 +187,8 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         self.positiveValue = positive
         self.attentionValue = attention
         self.inkHaloValue = inkHalo
+        self.inkHaloDarkValue = inkHalo
+        self.inkHaloLightValue = inkHalo
     }
 
     // MARK: - SwiftUI accessors
@@ -193,6 +216,10 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var positive: Color { positiveValue.color }
     public var attention: Color { attentionValue.color }
     public var inkHalo: Color { inkHaloValue.color.opacity(inkHaloStrength) }
+    /// Dark pole of the transition halo at the current strength.
+    public var inkHaloDark: Color { inkHaloDarkValue.color.opacity(inkHaloStrength) }
+    /// Light pole of the transition halo at the current strength.
+    public var inkHaloLight: Color { inkHaloLightValue.color.opacity(inkHaloStrength) }
 
     /// The below-horizon ground plane: the ground tone taken one
     /// lightness step deeper (darker on jewel grounds, still luminous
