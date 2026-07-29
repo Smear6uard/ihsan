@@ -17,20 +17,23 @@ enum GestaltAggregation {
     /// status the user logged for that prayer across the seven days in
     /// that week.
     static func yearWeekColumns(days: [DayCompletion]) -> [[PrayerCompletion]] {
-        // Bucket trailing-7s from the end of the array so today lands in
-        // the final bucket. With 365 days we get 52 full sevens plus one
-        // leading-day remainder, which we drop — the user's expectation
-        // is "52 weeks", not "52.14 chunks".
-        let trailingFull = (days.count / 7) * 7
-        let trimmed = Array(days.suffix(trailingFull))
-        let weeks: [[DayCompletion]] = stride(from: 0, to: trimmed.count, by: 7).map { start in
-            Array(trimmed[start..<min(start + 7, trimmed.count)])
-        }
-
-        return weeks.map { week in
+        yearWeekDayGroups(days: days).map { week in
             Prayer.allCases.map { prayer in
                 modeCompletion(for: prayer, in: week)
             }
+        }
+    }
+
+    /// The YEAR view's week buckets themselves, for overlays that need
+    /// per-column day membership rather than the reduced completion.
+    /// Bucketing is trailing-7s from the end of the array so today lands
+    /// in the final bucket; the leading remainder is dropped — the
+    /// user's expectation is "52 weeks", not "52.14 chunks".
+    static func yearWeekDayGroups(days: [DayCompletion]) -> [[DayCompletion]] {
+        let trailingFull = (days.count / 7) * 7
+        let trimmed = Array(days.suffix(trailingFull))
+        return stride(from: 0, to: trimmed.count, by: 7).map { start in
+            Array(trimmed[start..<min(start + 7, trimmed.count)])
         }
     }
 

@@ -149,6 +149,9 @@ private struct TodayReadyView: View {
     @Query private var todaysLogs: [PrayerLog]
     @Query private var settingsRows: [UserSettings]
     @Query(sort: \PauseInterval.startDate, order: .reverse) private var pauses: [PauseInterval]
+    /// Yesterday's and today's voluntary records — yesterday's because a
+    /// night act logged after midnight belongs to the night-of day.
+    @Query private var recentNaflLogs: [NaflLog]
 
     private var activePause: PauseInterval? {
         pauses.first(where: \.isActive)
@@ -158,6 +161,9 @@ private struct TodayReadyView: View {
     @State private var sheetSelection: LogSheetSelection?
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = false
+    /// A nafl waiting on the rak'ah dialog — only ever set when the user
+    /// opted into counts.
+    @State private var pendingRakahNafl: PendingNafl?
 
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
@@ -182,6 +188,12 @@ private struct TodayReadyView: View {
             log.prayerDate >= startOfDay && log.prayerDate < endOfDay
         }
         self._todaysLogs = Query(filter: predicate, sort: \PrayerLog.prayerDate)
+
+        let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfDay) ?? startOfDay
+        let naflPredicate = #Predicate<NaflLog> { log in
+            log.naflDate >= startOfYesterday && log.naflDate < endOfDay
+        }
+        self._recentNaflLogs = Query(filter: naflPredicate, sort: \NaflLog.naflDate)
     }
 
     var body: some View {
@@ -198,6 +210,7 @@ private struct TodayReadyView: View {
                 + cardBottomPadding
                 + FocusedPrayerCard.cardHeight
                 + sceneToCardGap
+                + (activeDuhaWindow != nil && activePause == nil ? 54 : 0)
 
             ZStack(alignment: .bottom) {
                 CelestialPlateScene(
@@ -243,6 +256,9 @@ private struct TodayReadyView: View {
                             currentStatus: log(for: effectiveFocusedPrayer)?.status,
                             isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
                             isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
+                            rawatib: rawatibChips(for: effectiveFocusedPrayer),
+                            nightSet: nightChips,
+                            onToggleNafl: { kind in handleNaflTap(kind) },
                             onCommit: { status, isJamaah in
                                 commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
                             },
@@ -250,6 +266,15 @@ private struct TodayReadyView: View {
                                 sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
                             }
                         )
+
+                        if let duhaWindow = activeDuhaWindow {
+                            DuhaQuietCard(
+                                window: duhaWindow,
+                                isLogged: naflLogged(.duha, on: todayDay),
+                                timeZone: snapshot.place.timeZone,
+                                onToggle: { handleNaflTap(.duha) }
+                            )
+                        }
                     }
                 }
                 .padding(.bottom, IhsanSpacing.md)
@@ -267,6 +292,153 @@ private struct TodayReadyView: View {
                     onDismiss: { isCelestialReferencePresented = false }
                 )
             }
+            .confirmationDialog(
+                "How many rak'ah?",
+                isPresented: Binding(
+                    get: { pendingRakahNafl != nil },
+                    set: { if !$0 { pendingRakahNafl = nil } }
+                ),
+                titleVisibility: .visible,
+                presenting: pendingRakahNafl
+            ) { pending in
+                ForEach(rakahOptions(for: pending.kind), id: \.self) { count in
+                    Button("\(count) rak'ah") {
+                        performNafl(pending.kind, rakahCount: count)
+                    }
+                }
+                Button("Just record") {
+                    performNafl(pending.kind, rakahCount: nil)
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+        }
+    }
+
+    // MARK: - Sunnah layer
+
+    private var sunnahSettings: UserSettings? {
+        settingsRows.first
+    }
+
+    private var todayDay: Date {
+        Calendar.current.startOfDay(for: .now)
+    }
+
+    /// The civil day tonight's night acts belong to: before today's Fajr
+    /// the night began yesterday evening.
+    private var nightOfDay: Date {
+        if Date.now < snapshot.dayTimes.fajr.scheduledTime {
+            return Calendar.current.date(byAdding: .day, value: -1, to: todayDay) ?? todayDay
+        }
+        return todayDay
+    }
+
+    private func naflLogged(_ kind: NaflKind, on day: Date) -> Bool {
+        let key = NaflLog.makeDedupKey(kind: kind, naflDate: day)
+        return recentNaflLogs.contains { $0.dedupKey == key }
+    }
+
+    private func rawatibChips(for prayer: Prayer) -> FocusedPrayerCard.RawatibChips? {
+        guard let settings = sunnahSettings,
+              settings.sunnahLayerEnabled,
+              settings.sunnahRawatibEnabled
+        else { return nil }
+
+        let config = settings.rawatibConfig(for: prayer)
+        guard config.beforeCount > 0 || config.afterCount > 0 else { return nil }
+
+        return FocusedPrayerCard.RawatibChips(
+            beforeCount: config.beforeCount,
+            afterCount: config.afterCount,
+            beforeLogged: naflLogged(.rawatibBefore(prayer), on: todayDay),
+            afterLogged: naflLogged(.rawatibAfter(prayer), on: todayDay)
+        )
+    }
+
+    /// The night set appears once the night is in progress and Isha is
+    /// either logged or its emphasis has passed (nisf al-layl). It rides
+    /// whichever card is focused — Isha in the evening, Fajr before dawn.
+    private var nightChips: FocusedPrayerCard.NightChips? {
+        guard let settings = sunnahSettings,
+              settings.sunnahLayerEnabled,
+              settings.sunnahNightEnabled,
+              let night = snapshot.night,
+              night.contains(.now)
+        else { return nil }
+
+        let ishaLogged = log(for: .isha) != nil
+        guard ishaLogged || Date.now >= night.nisfAlLayl else { return nil }
+
+        let witrLogs = recentNaflLogs.filter { $0.kind == .witr }
+        return FocusedPrayerCard.NightChips(
+            qiyamLogged: naflLogged(.qiyam, on: nightOfDay),
+            witrLogged: naflLogged(.witr, on: nightOfDay),
+            witrBridge: NaflWitrBridge.state(
+                forNightOf: nightOfDay,
+                witrLogs: witrLogs,
+                tracksWitrQada: settings.qadaTrackingEnabled && settings.qadaTracksWitr
+            )
+        )
+    }
+
+    private var activeDuhaWindow: DuhaWindow? {
+        guard let settings = sunnahSettings,
+              settings.sunnahLayerEnabled,
+              settings.sunnahDuhaEnabled,
+              let window = DuhaWindow(
+                  sunrise: snapshot.dayTimes.sunrise,
+                  dhuhr: snapshot.dayTimes.dhuhr.scheduledTime,
+                  sunriseOffset: TimeInterval(settings.duhaSunriseOffsetMinutes * 60),
+                  dhuhrMargin: TimeInterval(settings.duhaDhuhrMarginMinutes * 60)
+              ),
+              window.interval.contains(.now)
+        else { return nil }
+        return window
+    }
+
+    private func naflDay(for kind: NaflKind) -> Date {
+        switch kind {
+        case .qiyam, .witr:
+            return nightOfDay
+        case .duha, .rawatibBefore, .rawatibAfter:
+            return todayDay
+        }
+    }
+
+    /// The chip already fired its haptic. Removal and count-free logging
+    /// go straight through; the rak'ah dialog appears only when the user
+    /// opted into counts and this tap would record something new.
+    private func handleNaflTap(_ kind: NaflKind) {
+        let day = naflDay(for: kind)
+        let isRemoval = naflLogged(kind, on: day)
+        if !isRemoval, sunnahSettings?.sunnahRakahCountsEnabled == true {
+            pendingRakahNafl = PendingNafl(kind: kind)
+            return
+        }
+        performNafl(kind, rakahCount: nil)
+    }
+
+    private func performNafl(_ kind: NaflKind, rakahCount: Int?) {
+        let day = naflDay(for: kind)
+        Task {
+            await viewModel.toggleNafl(kind: kind, naflDate: day, rakahCount: rakahCount)
+        }
+    }
+
+    private func rakahOptions(for kind: NaflKind) -> [Int] {
+        switch kind {
+        case .rawatibBefore(let prayer):
+            let configured = sunnahSettings?.rawatibConfig(for: prayer).beforeCount ?? 2
+            return Array(Set([configured, 2, 4]).subtracting([0])).sorted()
+        case .rawatibAfter(let prayer):
+            let configured = sunnahSettings?.rawatibConfig(for: prayer).afterCount ?? 2
+            return Array(Set([configured, 2, 4]).subtracting([0])).sorted()
+        case .duha:
+            return [2, 4, 6, 8]
+        case .qiyam:
+            return [2, 4, 8, 12]
+        case .witr:
+            return [1, 3, 5, 7, 9, 11]
         }
     }
 
@@ -459,4 +631,10 @@ private struct TodayReadyView: View {
 private struct LogSheetSelection: Identifiable, Hashable {
     let prayer: Prayer
     var id: Prayer { prayer }
+}
+
+/// A nafl waiting on the rak'ah-count dialog.
+private struct PendingNafl: Identifiable {
+    let kind: NaflKind
+    var id: String { kind.storageKey }
 }

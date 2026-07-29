@@ -76,6 +76,7 @@ struct SettingsScreen: View {
                                 showingRepairSetup = true
                             }
                         )
+                        SunnahSection(settings: settings, path: $path)
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
                         PrivacySection(
@@ -210,6 +211,10 @@ struct SettingsScreen: View {
             }
         case .theme:
             ThemePicker(settings: settings)
+        case .rawatibCounts:
+            RawatibCountsPicker(settings: settings)
+        case .duhaWindow:
+            DuhaWindowPicker(settings: settings)
         }
     }
 
@@ -441,6 +446,8 @@ private enum SettingsRoute: Hashable {
     case adhanSound
     case jamPolicy
     case theme
+    case rawatibCounts
+    case duhaWindow
 }
 
 // MARK: - Sections
@@ -787,6 +794,280 @@ private struct MakeupPrayersSection: View {
 
                 SettingsDescriptionText("If you carry prayers to return to, Ihsan can hold the count with you. Nothing is shown until you choose it.")
             }
+        }
+    }
+}
+
+private struct SunnahSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        SettingsSectionCard("Sunnah & Night Prayer") {
+            SettingsRow(title: "Sunnah & night prayer", icon: "moon.stars") {
+                Toggle("", isOn: Binding(
+                    get: { settings.sunnahLayerEnabled },
+                    set: { enabled in
+                        settings.sunnahLayerEnabled = enabled
+                        if enabled,
+                           !settings.sunnahRawatibEnabled,
+                           !settings.sunnahDuhaEnabled,
+                           !settings.sunnahNightEnabled {
+                            // First enable turns the whole layer on; each
+                            // component stays individually switchable below.
+                            settings.sunnahRawatibEnabled = true
+                            settings.sunnahDuhaEnabled = true
+                            settings.sunnahNightEnabled = true
+                        }
+                        settings.modifiedAt = .now
+                    }
+                ))
+                .labelsHidden()
+                .tint(IhsanColor.brass)
+                .accessibilityLabel("Sunnah and night prayer")
+            }
+
+            if settings.sunnahLayerEnabled {
+                SettingsRow(title: "Rawatib", subtitle: "Around each fard", icon: "circle.grid.cross") {
+                    Toggle("", isOn: Binding(
+                        get: { settings.sunnahRawatibEnabled },
+                        set: {
+                            settings.sunnahRawatibEnabled = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Rawatib")
+                }
+
+                if settings.sunnahRawatibEnabled {
+                    SettingsRow(
+                        title: "Rawatib counts",
+                        subtitle: "Yours to set",
+                        icon: "plusminus",
+                        action: {
+                            Haptics.impact(.light)
+                            path.append(.rawatibCounts)
+                        }
+                    )
+                }
+
+                SettingsRow(title: "Duha", subtitle: "The forenoon prayer", icon: "sun.min") {
+                    Toggle("", isOn: Binding(
+                        get: { settings.sunnahDuhaEnabled },
+                        set: {
+                            settings.sunnahDuhaEnabled = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Duha")
+                }
+
+                if settings.sunnahDuhaEnabled {
+                    SettingsRow(
+                        title: "Duha window",
+                        subtitle: duhaWindowSubtitle,
+                        icon: "clock",
+                        action: {
+                            Haptics.impact(.light)
+                            path.append(.duhaWindow)
+                        }
+                    )
+                }
+
+                SettingsRow(title: "Night prayer", subtitle: "Qiyam and witr", icon: "moon.zzz") {
+                    Toggle("", isOn: Binding(
+                        get: { settings.sunnahNightEnabled },
+                        set: {
+                            settings.sunnahNightEnabled = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Night prayer")
+                }
+
+                SettingsRow(title: "Ask for rak'ah counts", subtitle: "Off: one tap records", icon: "number") {
+                    Toggle("", isOn: Binding(
+                        get: { settings.sunnahRakahCountsEnabled },
+                        set: {
+                            settings.sunnahRakahCountsEnabled = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Ask for rak'ah counts")
+                }
+
+                SettingsDescriptionText("Recorded, never scored. Voluntary prayer keeps its own quiet ledger and counts toward nothing.")
+            } else {
+                SettingsDescriptionText("Rawatib, duha, and the night prayer, held as quietly as the rest. Nothing is shown until you choose it.")
+            }
+        }
+    }
+
+    private var duhaWindowSubtitle: String {
+        "Sunrise +\(settings.duhaSunriseOffsetMinutes) min to Dhuhr −\(settings.duhaDhuhrMarginMinutes) min"
+    }
+}
+
+private struct RawatibCountsPicker: View {
+    let settings: UserSettings
+
+    var body: some View {
+        PickerScaffold(title: "Rawatib Counts") {
+            SettingsSectionCard("Before and after each fard") {
+                ForEach(Prayer.allCases, id: \.self) { prayer in
+                    RawatibCountRow(prayer: prayer, settings: settings)
+                }
+
+                SettingsDescriptionText("Schools differ on rawatib counts; the ones here are a common set, and every count is yours to change.")
+            }
+        }
+    }
+}
+
+private struct RawatibCountRow: View {
+    let prayer: Prayer
+    let settings: UserSettings
+
+    var body: some View {
+        let config = settings.rawatibConfig(for: prayer)
+        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+            Divider()
+                .overlay(IhsanColor.brass.opacity(0.18))
+            Text(prayer.displayNameEnglish)
+                .font(IhsanFont.bodyEnglish)
+                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+            HStack(spacing: IhsanSpacing.lg) {
+                miniCountControl(
+                    label: "Before",
+                    value: config.beforeCount,
+                    accessibilityLabel: "Rak'ah before \(prayer.displayNameEnglish)"
+                ) { newValue in
+                    var updated = config
+                    updated.beforeCount = newValue
+                    settings.setRawatibConfig(updated)
+                    settings.modifiedAt = .now
+                }
+                miniCountControl(
+                    label: "After",
+                    value: config.afterCount,
+                    accessibilityLabel: "Rak'ah after \(prayer.displayNameEnglish)"
+                ) { newValue in
+                    var updated = config
+                    updated.afterCount = newValue
+                    settings.setRawatibConfig(updated)
+                    settings.modifiedAt = .now
+                }
+                Spacer()
+            }
+        }
+        .padding(.vertical, IhsanSpacing.xs)
+    }
+}
+
+private struct DuhaWindowPicker: View {
+    let settings: UserSettings
+
+    var body: some View {
+        PickerScaffold(title: "Duha Window") {
+            SettingsSectionCard("The forenoon window") {
+                VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+                    miniCountControl(
+                        label: "Begins after sunrise (min)",
+                        value: settings.duhaSunriseOffsetMinutes,
+                        step: 5,
+                        range: 5...60,
+                        accessibilityLabel: "Minutes after sunrise the duha window begins"
+                    ) {
+                        settings.duhaSunriseOffsetMinutes = $0
+                        settings.modifiedAt = .now
+                    }
+                    miniCountControl(
+                        label: "Ends before Dhuhr (min)",
+                        value: settings.duhaDhuhrMarginMinutes,
+                        step: 5,
+                        range: 5...60,
+                        accessibilityLabel: "Minutes before Dhuhr the duha window ends"
+                    ) {
+                        settings.duhaDhuhrMarginMinutes = $0
+                        settings.modifiedAt = .now
+                    }
+                }
+                .padding(.vertical, IhsanSpacing.xs)
+
+                SettingsDescriptionText("Schools differ on the window's edges; both offsets are yours to set.")
+            }
+        }
+    }
+}
+
+/// A compact −/+ count control in the settings idiom: quiet label above,
+/// two 28pt brass buttons around a monospaced value.
+private func miniCountControl(
+    label: String,
+    value: Int,
+    step: Int = 1,
+    range: ClosedRange<Int> = 0...12,
+    accessibilityLabel: String,
+    onChange: @escaping (Int) -> Void
+) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+        Text(label.uppercased())
+            .font(IhsanFont.inscription)
+            .tracking(1.2)
+            .foregroundStyle(IhsanColor.skyForegroundMuted())
+        HStack(spacing: IhsanSpacing.sm) {
+            Button {
+                Haptics.impact(.light)
+                onChange(max(range.lowerBound, value - step))
+            } label: {
+                Image(systemName: "minus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IhsanColor.brass)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().strokeBorder(IhsanColor.brass.opacity(0.45), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+
+            Text("\(value)")
+                .font(.system(.body, design: .monospaced).monospacedDigit())
+                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .frame(minWidth: 28)
+                .contentTransition(.numericText())
+
+            Button {
+                Haptics.impact(.light)
+                onChange(min(range.upperBound, value + step))
+            } label: {
+                Image(systemName: "plus")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(IhsanColor.brass)
+                    .frame(width: 28, height: 28)
+                    .background(Circle().strokeBorder(IhsanColor.brass.opacity(0.45), lineWidth: 1))
+            }
+            .buttonStyle(.plain)
+            .accessibilityHidden(true)
+        }
+    }
+    .accessibilityElement(children: .ignore)
+    .accessibilityLabel(accessibilityLabel)
+    .accessibilityValue("\(value)")
+    .accessibilityAdjustableAction { direction in
+        switch direction {
+        case .increment:
+            onChange(min(range.upperBound, value + step))
+        case .decrement:
+            onChange(max(range.lowerBound, value - step))
+        @unknown default:
+            break
         }
     }
 }

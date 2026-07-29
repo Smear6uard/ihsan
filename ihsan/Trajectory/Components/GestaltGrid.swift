@@ -24,6 +24,10 @@ import IhsanDesignSystem
 struct GestaltGrid: View {
     let days: [DayCompletion]
     let period: TrajectoryPeriod
+    /// Days carrying any voluntary record. Non-nil only when the user
+    /// turned the Path overlay on; it adds a sixth, quieter row beneath
+    /// the five fardh rows — presence only, no denominator, no figure.
+    var naflDays: Set<Date>? = nil
 
     var body: some View {
         GeometryReader { proxy in
@@ -43,6 +47,7 @@ struct GestaltGrid: View {
 
     // MARK: - Grid
 
+    @ViewBuilder
     private func grid(
         columns: [[PrayerCompletion]],
         metrics: Metrics
@@ -58,6 +63,31 @@ struct GestaltGrid: View {
                     }
                 }
             }
+
+            if let naflColumns, naflColumns.count == columns.count {
+                HStack(spacing: metrics.spacing) {
+                    ForEach(0..<naflColumns.count, id: \.self) { col in
+                        NaflOverlayDot(
+                            present: naflColumns[col],
+                            size: metrics.dotSize
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /// Per-column presence of any voluntary record, aligned 1:1 with the
+    /// fardh columns.
+    private var naflColumns: [Bool]? {
+        guard let naflDays else { return nil }
+        switch period {
+        case .year:
+            return GestaltAggregation.yearWeekDayGroups(days: days).map { week in
+                week.contains { naflDays.contains($0.date) }
+            }
+        default:
+            return days.map { naflDays.contains($0.date) }
         }
     }
 
@@ -167,7 +197,8 @@ struct GestaltGrid: View {
         case .ninetyDays: dot = 3;  spacing = 1.0
         case .year:       dot = 5;  spacing = 1.5
         }
-        let rows = 5 * dot + 4 * spacing
+        let rowCount: CGFloat = naflDays == nil ? 5 : 6
+        let rows = rowCount * dot + (rowCount - 1) * spacing
         let starSize = max(6, min(10, dot + 4))
         return rows + IhsanSpacing.sm + starSize
     }
@@ -182,7 +213,37 @@ struct GestaltGrid: View {
         case .ninetyDays: span = "the last ninety days"
         case .year: span = "the last year, aggregated by week"
         }
-        return "Pattern of prayer across \(span). Five rows, Fajr at top through Isha at bottom. Today is the rightmost column."
+        var label = "Pattern of prayer across \(span). Five rows, Fajr at top through Isha at bottom. Today is the rightmost column."
+        if naflDays != nil {
+            label += " A quieter sixth row marks days with voluntary prayer."
+        }
+        return label
+    }
+}
+
+// MARK: - Nafl overlay dot
+
+/// One cell of the optional sixth row: a small outlined four-pointed
+/// star where the day (or week) holds any voluntary record, empty space
+/// where it doesn't. Always the quieter state — outline only, never a
+/// fill — so the row is visible if sought and invisible if not.
+private struct NaflOverlayDot: View {
+    let present: Bool
+    let size: CGFloat
+
+    var body: some View {
+        Group {
+            if present {
+                FourPointedStar()
+                    .stroke(
+                        IhsanColor.brass.opacity(0.40),
+                        lineWidth: max(0.5, size * 0.14)
+                    )
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: size, height: size)
     }
 }
 

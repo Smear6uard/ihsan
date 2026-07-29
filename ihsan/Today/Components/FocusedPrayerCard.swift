@@ -34,12 +34,39 @@ import SwiftUI
 /// exposes them through orthogonal controls (toggle + commit buttons)
 /// rather than the previous flat five-option list.
 struct FocusedPrayerCard: View {
+    /// The focused prayer's rawatib, present only when the user enabled
+    /// the sunnah layer's rawatib component. `nil` renders the card
+    /// exactly as it was before the layer existed.
+    struct RawatibChips: Equatable {
+        let beforeCount: Int
+        let afterCount: Int
+        let beforeLogged: Bool
+        let afterLogged: Bool
+
+        var hasAnySlot: Bool { beforeCount > 0 || afterCount > 0 }
+    }
+
+    /// The night set offered after Isha, present only when the user
+    /// enabled the night component and the night has begun.
+    struct NightChips: Equatable {
+        let qiyamLogged: Bool
+        let witrLogged: Bool
+        /// Informational only — the ledger is never mutated from here.
+        let witrBridge: WitrNightState
+    }
+
     let prayer: Prayer
     let scheduledTime: Date
     let windowEndTime: Date?
     let currentStatus: PrayerStatus?
     let isJamaah: Bool
     let isInWindow: Bool
+
+    /// Sunnah-layer surfaces; all default off so the five-prayer card
+    /// is untouched until the user opts in.
+    var rawatib: RawatibChips?
+    var nightSet: NightChips?
+    var onToggleNafl: ((NaflKind) -> Void)?
 
     /// Commit a `(timing, jamaʿah)` pair. The parent translates this
     /// into a `setStatus` + `toggleJamaah` pair against the view
@@ -55,6 +82,7 @@ struct FocusedPrayerCard: View {
     @State private var mode: Mode = .collapsed
     @State private var jamaahPending: Bool = false
     @State private var autoCollapseTask: Task<Void, Never>?
+    @State private var rawatibRevealed: Bool = false
 
     /// Time the user must be idle in the expanded state before the
     /// card auto-collapses without committing. 12 sec per spec.
@@ -91,12 +119,14 @@ struct FocusedPrayerCard: View {
                     scheduleAutoCollapse()
                 } else {
                     autoCollapseTask?.cancel()
+                    rawatibRevealed = false
                 }
             }
             .onChange(of: prayer) { _, _ in
                 // Marker tap switches the focused prayer; collapse
                 // any in-progress expansion since the controls now
                 // reference a different prayer.
+                rawatibRevealed = false
                 if mode == .expanded {
                     mode = .collapsed
                 }
@@ -127,17 +157,23 @@ struct FocusedPrayerCard: View {
     @ViewBuilder
     private var defaultContent: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            HStack(spacing: IhsanSpacing.md) {
-                PrayerSymbolBadge(prayer: prayer)
-                prayerNameStack
-                Spacer()
-                chevronButton
+            VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+                HStack(spacing: IhsanSpacing.md) {
+                    PrayerSymbolBadge(prayer: prayer)
+                    prayerNameStack
+                    Spacer()
+                    chevronButton
+                }
+                inscriptionAndCountdown
             }
-            inscriptionAndCountdown
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabelForDefaultState)
+            .accessibilityHint("Double-tap to log this prayer.")
+
+            if let nightSet {
+                nightRow(nightSet)
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabelForDefaultState)
-        .accessibilityHint("Double-tap to log this prayer.")
     }
 
     /// Combined VoiceOver label for the default-state card. Reads as
@@ -222,6 +258,10 @@ struct FocusedPrayerCard: View {
                 .accessibilityLabel("Close")
             }
 
+            if let rawatib, rawatib.hasAnySlot {
+                rawatibStrip(rawatib)
+            }
+
             Spacer(minLength: 0)
 
             JamaahToggle(isOn: $jamaahPending)
@@ -249,29 +289,170 @@ struct FocusedPrayerCard: View {
         }
     }
 
+    // MARK: - Sunnah chips
+    //
+    // Both rows render only when the parent hands them a model, which it
+    // does only after the user turns the layer on. One tap records; a
+    // second tap removes. Filled ornament = recorded, outline = not —
+    // the same vocabulary as the plate's markers.
+
+    /// One slim row inside the expanded state. Collapsed by default: a
+    /// small inscription affordance; revealed: the before/after ornament
+    /// chips in place.
+    @ViewBuilder
+    private func rawatibStrip(_ rawatib: RawatibChips) -> some View {
+        HStack(spacing: IhsanSpacing.sm) {
+            if rawatibRevealed {
+                if rawatib.beforeCount > 0 {
+                    naflChip(
+                        kind: .rawatibBefore(prayer),
+                        ornament: prayer,
+                        logged: rawatib.beforeLogged,
+                        caption: "\(rawatib.beforeCount) BEFORE"
+                    )
+                }
+                if rawatib.afterCount > 0 {
+                    naflChip(
+                        kind: .rawatibAfter(prayer),
+                        ornament: prayer,
+                        logged: rawatib.afterLogged,
+                        caption: "\(rawatib.afterCount) AFTER"
+                    )
+                }
+                Spacer(minLength: 0)
+            } else {
+                Button {
+                    Haptics.impact(.light)
+                    rawatibRevealed = true
+                    scheduleAutoCollapse()
+                } label: {
+                    HStack(spacing: 5) {
+                        Text("RAWATIB")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .foregroundStyle(IhsanCelestialPalette.current().accent.opacity(0.60))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Rawatib")
+                .accessibilityHint("Shows the before and after chips.")
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(height: 20)
+    }
+
+    @ViewBuilder
+    private func nightRow(_ nightSet: NightChips) -> some View {
+        HStack(spacing: IhsanSpacing.sm) {
+            naflChip(
+                kind: .qiyam,
+                ornament: .isha,
+                logged: nightSet.qiyamLogged,
+                caption: "QIYAM"
+            )
+            naflChip(
+                kind: .witr,
+                ornament: .maghrib,
+                logged: nightSet.witrLogged,
+                caption: "WITR"
+            )
+            if nightSet.witrBridge == .current {
+                Text("TONIGHT'S WITR · CURRENT")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.2)
+                    .foregroundStyle(IhsanCelestialPalette.current().text.opacity(0.55))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: 20)
+    }
+
+    @ViewBuilder
+    private func naflChip(
+        kind: NaflKind,
+        ornament: Prayer,
+        logged: Bool,
+        caption: String
+    ) -> some View {
+        Button {
+            Haptics.impact(.soft)
+            onToggleNafl?(kind)
+        } label: {
+            HStack(spacing: 5) {
+                ZStack {
+                    if logged {
+                        PrayerOrnamentShape(prayer: ornament, mode: .filled)
+                            .fill(
+                                IhsanCelestialPalette.current().accent,
+                                style: FillStyle(eoFill: true)
+                            )
+                    } else {
+                        PrayerOrnamentShape(prayer: ornament, mode: .outline)
+                            .stroke(
+                                IhsanCelestialPalette.current().accent.opacity(0.55),
+                                lineWidth: 0.9
+                            )
+                    }
+                }
+                .frame(width: 14, height: 14)
+
+                Text(caption)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.2)
+                    .foregroundStyle(
+                        IhsanCelestialPalette.current().accent.opacity(logged ? 0.95 : 0.65)
+                    )
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        IhsanCelestialPalette.current().accent.opacity(logged ? 0.55 : 0.30),
+                        lineWidth: 0.8
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(kind.displayNameEnglish)
+        .accessibilityValue(logged ? "recorded" : "not recorded")
+        .accessibilityHint("Double-tap to \(logged ? "remove" : "record").")
+    }
+
     // MARK: - Logged state
 
     @ViewBuilder
     private var loggedContent: some View {
-        HStack(spacing: IhsanSpacing.md) {
-            LoggedStatusIndicator(
-                status: currentStatus ?? .missed,
-                isJamaah: isJamaah
-            )
-            VStack(alignment: .leading, spacing: 4) {
-                prayerNameRow
-                Text(loggedInscription.uppercased())
-                    .font(IhsanFont.inscription)
-                    .tracking(1.4)
-                    .foregroundStyle(IhsanCelestialPalette.current().accent)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: IhsanSpacing.md) {
+                LoggedStatusIndicator(
+                    status: currentStatus ?? .missed,
+                    isJamaah: isJamaah
+                )
+                VStack(alignment: .leading, spacing: 4) {
+                    prayerNameRow
+                    Text(loggedInscription.uppercased())
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .foregroundStyle(IhsanCelestialPalette.current().accent)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+                Spacer()
+                chevronButton
             }
-            Spacer()
-            chevronButton
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabelForLoggedState)
+
+            if let nightSet {
+                nightRow(nightSet)
+            }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(accessibilityLabelForLoggedState)
     }
 
     private var accessibilityLabelForLoggedState: String {

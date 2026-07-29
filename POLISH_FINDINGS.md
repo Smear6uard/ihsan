@@ -258,3 +258,32 @@ Items needing pure device verification (no source change possible):
   static per evaluation (no new animation; the cursor halo is a fixed
   radial, not a pulse). Under Reduce Transparency the halo collapses to
   a flat disc. Spot-check both toggles during the last third.
+
+## Sunnah layer (phase 4) — device verification needed
+
+- **Off-state pixel parity**. Every sunnah surface is gated on
+  `sunnahLayerEnabled` (default false): the focused card's rawatib
+  strip and night row take `nil` models, the duha card and Path toggle
+  render nothing, and Set shows only the single opt-in row with its
+  quiet description. The acceptance criterion is a walkthrough of a
+  fresh install against a pre-phase build — screens must be
+  indistinguishable. Verify on device.
+- **Focused card fixed bound with the strip revealed**. The expanded
+  state adds a 20 pt rawatib row inside the fixed 140 pt card; layout
+  compresses the spacer, but the jamaʿah pill + commit buttons must
+  stay fully visible with the strip revealed at default type size —
+  and degrade gracefully at Dynamic Type .accessibility5 (fixed-size
+  IhsanFont inscriptions, same standing caveat as the rest of the
+  card).
+- **Chip haptic latency**. `Haptics.impact(.soft)` is the first
+  statement in every nafl chip tap (card chips, duha card) before the
+  intent Task — <50 ms by construction; confirm by recording.
+- **Duha card and the plate**. When the duha window is open the plate's
+  bottom inset grows by 54 pt; confirm no marker or label slips behind
+  the card during the window, across all four palette states.
+- **Rak'ah dialog**. Only appears when "Ask for rak'ah counts" is on
+  and the tap would record (never on removal). Confirm VoiceOver reads
+  the chip value change after the dialog commits.
+- **Path overlay row alignment**. The sixth row's outlined stars must
+  sit exactly under their columns at 7D/30D/90D/YEAR on device widths
+  where the grid squeezes (mini-width iPhones, 90 columns).

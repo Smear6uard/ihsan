@@ -5,6 +5,7 @@ public enum IntentError: Swift.Error, CustomLocalizedStringResourceConvertible {
     case prayerLogServiceUnavailable
     case invalidPrayer(String)
     case invalidStatus(String)
+    case invalidNaflKind(String)
     case prayerTimesCalculationFailed(underlying: String)
     case noActiveSettings
 
@@ -18,6 +19,8 @@ public enum IntentError: Swift.Error, CustomLocalizedStringResourceConvertible {
             return "Unknown prayer: \(raw)."
         case .invalidStatus(let raw):
             return "Unknown status: \(raw)."
+        case .invalidNaflKind(let raw):
+            return "Unknown voluntary prayer: \(raw)."
         case .prayerTimesCalculationFailed(let underlying):
             return "Could not compute prayer times: \(underlying)."
         case .noActiveSettings:

@@ -153,6 +153,18 @@ final class TodayViewModel {
         }
     }
 
+    /// Records or removes one voluntary act through the single nafl
+    /// funnel. The chip's haptic fires before this runs; the @Query
+    /// re-render carries the visual truth.
+    func toggleNafl(kind: NaflKind, naflDate: Date, rakahCount: Int? = nil) async {
+        do {
+            let intent = LogNaflIntent(kind: kind, naflDate: naflDate, rakahCount: rakahCount)
+            _ = try await intent.perform()
+        } catch {
+            print("toggleNafl failed: \(error)")
+        }
+    }
+
     func toggleJamaah(for prayer: Prayer) async {
         do {
             let intent = ToggleJamaahIntent(prayer: prayer)

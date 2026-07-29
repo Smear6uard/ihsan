@@ -34,6 +34,9 @@ struct TrajectoryScreen: View {
 
     @Query private var settingsRows: [UserSettings]
 
+    @Query(sort: \NaflLog.naflDate, order: .reverse)
+    private var naflLogs: [NaflLog]
+
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
@@ -166,6 +169,14 @@ struct TrajectoryScreen: View {
 
         case .ready(let snapshot):
             VStack(spacing: IhsanSpacing.lg) {
+                if settings?.sunnahLayerEnabled == true {
+                    HStack {
+                        Spacer()
+                        naflOverlayToggle
+                    }
+                    .padding(.horizontal, IhsanSpacing.md)
+                }
+
                 gestaltPanel(snapshot: snapshot)
                     .padding(.horizontal, IhsanSpacing.md)
 
@@ -189,10 +200,59 @@ struct TrajectoryScreen: View {
     /// the page.
     @ViewBuilder
     private func gestaltPanel(snapshot: TrajectoryState.Snapshot) -> some View {
-        GestaltGrid(days: snapshot.days, period: snapshot.period)
-            .padding(IhsanSpacing.lg)
-            .frame(maxWidth: .infinity)
-            .ihsanIlluminatedPanel(intensity: .regular)
+        GestaltGrid(
+            days: snapshot.days,
+            period: snapshot.period,
+            naflDays: overlayNaflDays
+        )
+        .padding(IhsanSpacing.lg)
+        .frame(maxWidth: .infinity)
+        .ihsanIlluminatedPanel(intensity: .regular)
+    }
+
+    // MARK: - Nafl overlay
+
+    /// Days with any voluntary record, when the overlay is on. Presence
+    /// only — the overlay never carries a count or a share.
+    private var overlayNaflDays: Set<Date>? {
+        guard let settings,
+              settings.sunnahLayerEnabled,
+              settings.pathNaflOverlayEnabled
+        else { return nil }
+        let calendar = Calendar.current
+        return Set(naflLogs.map { calendar.startOfDay(for: $0.naflDate) })
+    }
+
+    /// The quiet in-Path switch for the overlay: a small outlined chip,
+    /// filled while the sixth row shows. Visible only when the sunnah
+    /// layer itself is on.
+    private var naflOverlayToggle: some View {
+        let isOn = settings?.pathNaflOverlayEnabled == true
+        return Button {
+            Haptics.impact(.light)
+            settings?.pathNaflOverlayEnabled.toggle()
+            settings?.modifiedAt = .now
+        } label: {
+            HStack(spacing: 5) {
+                FourPointedStar()
+                    .stroke(IhsanColor.brass.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
+                    .frame(width: 9, height: 9)
+                Text("NAFL")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(IhsanColor.brass.opacity(isOn ? 0.95 : 0.6))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .overlay {
+                Capsule()
+                    .strokeBorder(IhsanColor.brass.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Voluntary prayer overlay")
+        .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityHint("Adds a quieter sixth row to the pattern.")
     }
 }
 
