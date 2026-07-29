@@ -33,6 +33,16 @@ public struct IhsanAppShortcuts: AppShortcutsProvider {
             shortTitle: "Begin Reflection",
             systemImageName: "book.closed.fill"
         )
+        AppShortcut(
+            intent: LogMakeupPrayerIntent(),
+            phrases: [
+                "Log a makeup prayer in \(.applicationName)",
+                "I made up a prayer in \(.applicationName)",
+                "Log \(\.$category) made up in \(.applicationName)"
+            ],
+            shortTitle: "Log Makeup Prayer",
+            systemImageName: "arrow.uturn.backward"
+        )
     }
 
     public static let shortcutTileColor: ShortcutTileColor = .grayBlue

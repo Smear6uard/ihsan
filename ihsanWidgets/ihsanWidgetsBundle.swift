@@ -14,6 +14,9 @@ struct IhsanWidgetsBundle: WidgetBundle {
         NextPrayerRectangularWidget()
         PrayerProgressCircularWidget()
         NextPrayerInlineWidget()
+        RepairMakeupCircularWidget()
+        // Control Center
+        RepairMakeupControl()
         #if canImport(ActivityKit) && os(iOS)
         if #available(iOSApplicationExtension 16.2, *) {
             PrayerActivityWidget()

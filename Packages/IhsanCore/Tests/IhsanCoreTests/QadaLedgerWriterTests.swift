@@ -178,3 +178,29 @@ func mostActiveCategoryFallsBackToLargestRemaining() throws {
 
     #expect(try writer.mostActiveCategory(in: context) == .maghrib)
 }
+
+/// A widget or intent process can append entries while the app holds stale
+/// materialized rows (each process saves its own ledger update — last
+/// writer wins on the row, never on the log). Reconcile re-derives every
+/// row from the append-only log, so the next foreground heals any drift.
+@Test
+@MainActor
+func reconcileHealsMaterializedRowsFromTheLog() throws {
+    let context = try makeContext()
+    let writer = QadaLedgerWriter()
+    try writer.recordEstimate([.fajr: 10], sourceSurface: .app, in: context)
+    try writer.recordMadeUp(category: .fajr, count: 2, in: context)
+
+    // Simulate another process's row clobber: the log is right, the row is
+    // stale.
+    let row = try #require(try ledger(for: .fajr, in: context))
+    row.remainingCount = 10
+    row.madeUpCount = 0
+    try context.save()
+
+    try writer.reconcile(in: context)
+
+    let healed = try #require(try ledger(for: .fajr, in: context))
+    #expect(healed.remainingCount == 8)
+    #expect(healed.madeUpCount == 2)
+}

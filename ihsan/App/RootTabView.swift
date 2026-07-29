@@ -54,10 +54,13 @@ struct RootTabView: View {
         }
     }
 
-    /// Flows silent prayers from ended days into the makeup ledger, when
-    /// the user chose that at setup. Idempotent and pause-aware inside
-    /// `QadaMissedFlowSweep`, so calling on every foreground is safe.
+    /// Foreground reconciliation for the makeup ledger: first heal any
+    /// drift from widget or intent writes made while backgrounded (the log
+    /// is the source of truth), then flow silent prayers from ended days if
+    /// the user chose that at setup. Both are idempotent and pause-aware,
+    /// so calling on every foreground is safe.
     private func runMissedFlowSweep() {
+        try? QadaLedgerWriter().reconcile(in: modelContext)
         try? QadaMissedFlowSweep().sweep(in: modelContext)
     }
 

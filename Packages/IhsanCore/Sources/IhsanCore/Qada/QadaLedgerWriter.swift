@@ -146,6 +146,30 @@ public struct QadaLedgerWriter {
         return ledgers.max { $0.remainingCount < $1.remainingCount }?.category
     }
 
+    /// Re-derives every materialized row from the append-only log. Entries
+    /// are the source of truth: a widget or intent process may have
+    /// appended while this process held stale rows, and row updates are
+    /// last-writer-wins. Called on app foreground so external writes
+    /// reconcile instantly.
+    public func reconcile(in context: ModelContext) throws {
+        let allEntries = try context.fetch(FetchDescriptor<QadaEntry>())
+        let totals = QadaMath.materialize(allEntries)
+
+        var touched = false
+        for (category, expected) in totals {
+            let ledger = try fetchOrCreateLedger(for: category, in: context)
+            if ledger.remainingCount != expected.remaining || ledger.madeUpCount != expected.madeUp {
+                ledger.remainingCount = expected.remaining
+                ledger.madeUpCount = expected.madeUp
+                ledger.modifiedAt = .now
+                touched = true
+            }
+        }
+        if touched {
+            try context.save()
+        }
+    }
+
     private func fetchOrCreateLedger(
         for category: QadaCategory,
         in context: ModelContext
