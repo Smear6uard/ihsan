@@ -22,6 +22,46 @@ public enum PrayerMarkerState: String, Sendable, CaseIterable, Equatable {
     }
 }
 
+/// The manuscript gold-leaf treatment as ONE unit (the `.gilded`
+/// style of the illumination pass): a solid burnished `leafGold`
+/// fill bounded by a fine deep-ultramarine keyline, with the form's
+/// even-odd interior cutouts reading as drawn linework. Any glow a
+/// caller adds must render BEHIND this glyph — `PrayerMarkerOrnament`
+/// composes it that way; other call sites use this view rather than
+/// re-layering fills ad hoc.
+public struct GildedOrnamentGlyph: View {
+
+    public let prayer: Prayer
+    public let size: CGFloat
+    public let tokens: SkyPaletteTokens
+    /// The keyline holds ~0.75 pt at marker sizes and thins gently
+    /// below 20 pt so chips stay linework, not outlines.
+    public var keylineWidth: CGFloat
+
+    public init(
+        prayer: Prayer,
+        size: CGFloat,
+        tokens: SkyPaletteTokens,
+        keylineWidth: CGFloat? = nil
+    ) {
+        self.prayer = prayer
+        self.size = size
+        self.tokens = tokens
+        self.keylineWidth = keylineWidth ?? min(0.75, max(0.5, size / 40))
+    }
+
+    public var body: some View {
+        ZStack {
+            PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                .fill(tokens.leafGold, style: FillStyle(eoFill: true))
+            PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                .stroke(tokens.keyline, lineWidth: keylineWidth)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
 /// A prayer's ornament rendered in one of its four marker states,
 /// against the current palette. The glow halo for the `current` state
 /// is drawn here, inside the component, so every composition gets it
@@ -88,26 +128,15 @@ public struct PrayerMarkerOrnament: View {
         case .upcoming:
             PrayerOrnamentShape(prayer: prayer, mode: .outline)
                 .stroke(tokens.metal.opacity(0.55), lineWidth: lineWeight)
-        case .current:
-            PrayerOrnamentShape(prayer: prayer, mode: .filled)
-                .fill(luminousFill, style: FillStyle(eoFill: true))
-        case .logged:
-            PrayerOrnamentShape(prayer: prayer, mode: .filled)
-                .fill(tokens.metal, style: FillStyle(eoFill: true))
+        case .current, .logged:
+            // The gilded body — solid leaf bounded by the dark
+            // keyline. For `current` the glow halo renders behind it
+            // (see `body`); `logged` carries no glow.
+            GildedOrnamentGlyph(prayer: prayer, size: size, tokens: tokens)
         case .passedUnlogged:
             PrayerOrnamentShape(prayer: prayer, mode: .outline)
                 .stroke(tokens.inkSecondary, lineWidth: lineWeight)
         }
-    }
-
-    /// The current prayer's body carries the light: metal shading
-    /// toward the highlight at the top edge, like leaf catching sun.
-    private var luminousFill: LinearGradient {
-        LinearGradient(
-            colors: [tokens.metalHighlight, tokens.metal],
-            startPoint: .top,
-            endPoint: .bottom
-        )
     }
 
     /// Soft radial glow behind the current prayer — warm and

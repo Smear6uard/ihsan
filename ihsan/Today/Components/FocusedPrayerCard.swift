@@ -456,11 +456,9 @@ struct FocusedPrayerCard: View {
             HStack(spacing: 5) {
                 ZStack {
                     if logged {
-                        PrayerOrnamentShape(prayer: ornament, mode: .filled)
-                            .fill(
-                                tokens.metal,
-                                style: FillStyle(eoFill: true)
-                            )
+                        // Recorded = the gilded body, same unit the
+                        // plate's logged markers use, at chip scale.
+                        GildedOrnamentGlyph(prayer: ornament, size: 14, tokens: tokens)
                     } else {
                         PrayerOrnamentShape(prayer: ornament, mode: .outline)
                             .stroke(

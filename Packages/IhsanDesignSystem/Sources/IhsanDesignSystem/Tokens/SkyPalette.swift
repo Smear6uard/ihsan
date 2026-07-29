@@ -49,6 +49,8 @@ public enum PaletteState: String, CaseIterable, Sendable {
             inkSecondary: .mix(f0.inkSecondaryValue, f1.inkSecondaryValue, amount: fig.amount),
             metal: .mix(a0.metalValue, a1.metalValue, amount: atm.amount),
             metalHighlight: .mix(a0.metalHighlightValue, a1.metalHighlightValue, amount: atm.amount),
+            leafGold: .mix(a0.leafGoldValue, a1.leafGoldValue, amount: atm.amount),
+            keyline: .mix(f0.keylineValue, f1.keylineValue, amount: fig.amount),
             glow: .mix(a0.glowValue, a1.glowValue, amount: atm.amount),
             panelFill: .mix(f0.panelFillValue, f1.panelFillValue, amount: fig.amount),
             panelStroke: .mix(a0.panelStrokeValue, a1.panelStrokeValue, amount: atm.amount),
@@ -113,6 +115,17 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// The bright pole of the metal, for specular edges and the lit
     /// side of ornaments.
     public var metalHighlightValue: SRGBValue
+    /// Solid burnished gold — the manuscript gold-leaf FILL of a
+    /// gilded ornament. Richer than `metal` (which is linework) so a
+    /// solid field of it reads as leaf, not tan.
+    public var leafGoldValue: SRGBValue
+
+    // MARK: Keyline
+
+    /// The fine dark boundary of every gilded form — deep ultramarine
+    /// (#1B2350 family). The dark edge is what makes gold read as
+    /// gold rather than tan; ~0.75 pt around solid fills.
+    public var keylineValue: SRGBValue
 
     // MARK: Light
 
@@ -170,6 +183,8 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         inkSecondary: SRGBValue,
         metal: SRGBValue,
         metalHighlight: SRGBValue,
+        leafGold: SRGBValue,
+        keyline: SRGBValue,
         glow: SRGBValue,
         panelFill: SRGBValue,
         panelStroke: SRGBValue,
@@ -187,6 +202,8 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         self.inkSecondaryValue = inkSecondary
         self.metalValue = metal
         self.metalHighlightValue = metalHighlight
+        self.leafGoldValue = leafGold
+        self.keylineValue = keyline
         self.glowValue = glow
         self.panelFillValue = panelFill
         self.panelStrokeValue = panelStroke
@@ -217,6 +234,8 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var inkSecondary: Color { inkSecondaryValue.color }
     public var metal: Color { metalValue.color }
     public var metalHighlight: Color { metalHighlightValue.color }
+    public var leafGold: Color { leafGoldValue.color }
+    public var keyline: Color { keylineValue.color }
     public var glow: Color { glowValue.color }
     public var panelFill: Color { panelFillValue.color }
     public var panelStroke: Color { panelStrokeValue.color }
@@ -271,6 +290,8 @@ extension SkyPaletteTokens {
         inkSecondary: SRGBValue(hex: 0xA9AFC4),
         metal: SRGBValue(hex: 0xC9A96A),
         metalHighlight: SRGBValue(hex: 0xE8D5A3),
+        leafGold: SRGBValue(hex: 0xD2AC5C),
+        keyline: SRGBValue(hex: 0x10163A),
         glow: SRGBValue(hex: 0xF0D18B),
         panelFill: SRGBValue(hex: 0x191F46),
         panelStroke: SRGBValue(hex: 0x5F5654),
@@ -294,6 +315,8 @@ extension SkyPaletteTokens {
         inkSecondary: SRGBValue(hex: 0x4A5378),
         metal: SRGBValue(hex: 0xA8895A),
         metalHighlight: SRGBValue(hex: 0xC9A96A),
+        leafGold: SRGBValue(hex: 0xC29B4C),
+        keyline: SRGBValue(hex: 0x1B2350),
         glow: SRGBValue(hex: 0xE7A93E),
         panelFill: SRGBValue(hex: 0xFBFCFE),
         panelStroke: SRGBValue(hex: 0xD6C8B4),
@@ -316,6 +339,8 @@ extension SkyPaletteTokens {
         inkSecondary: SRGBValue(hex: 0x4C4668),
         metal: SRGBValue(hex: 0xB8923F),
         metalHighlight: SRGBValue(hex: 0xE0BC6A),
+        leafGold: SRGBValue(hex: 0xC79E45),
+        keyline: SRGBValue(hex: 0x201D48),
         glow: SRGBValue(hex: 0xECBB55),
         panelFill: SRGBValue(hex: 0xFEFCF7),
         panelStroke: SRGBValue(hex: 0xDECCA4),
@@ -337,6 +362,8 @@ extension SkyPaletteTokens {
         inkSecondary: SRGBValue(hex: 0xDCC0C7),
         metal: SRGBValue(hex: 0xD4A94E),
         metalHighlight: SRGBValue(hex: 0xF0CC80),
+        leafGold: SRGBValue(hex: 0xDCAF54),
+        keyline: SRGBValue(hex: 0x191F4A),
         glow: SRGBValue(hex: 0xF6B96E),
         panelFill: SRGBValue(hex: 0x4C1F30),
         panelStroke: SRGBValue(hex: 0x82563C),
