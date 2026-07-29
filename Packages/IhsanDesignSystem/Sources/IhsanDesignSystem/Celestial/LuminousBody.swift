@@ -73,38 +73,85 @@ public struct LuminousBody: View {
 
     // MARK: - Halo
 
-    private var haloStrength: Double {
-        switch kind {
-        case .sun: return 1.0
-        case .moon: return 0.55
-        }
-    }
+    /// The sun's near-white core color — #FFF9EC, warming toward pure
+    /// white at the very center.
+    private static let sunCoreColor = Color(
+        red: 1.0, green: 0.976, blue: 0.925
+    )
 
     @ViewBuilder
     private var halo: some View {
-        let haloDiameter = diameter * 2.6
+        switch kind {
+        case .sun:
+            sunCorona
+        case .moon:
+            moonGlow
+        }
+    }
+
+    /// The sun's corona: warm saturated gold dissolving outward, its
+    /// inner region opaque enough to overlap the core's own falloff —
+    /// so there is no radius at which a disc edge exists.
+    @ViewBuilder
+    private var sunCorona: some View {
+        let coronaDiameter = diameter * 2.6
         if reduceTransparency {
             Circle()
-                .fill(tokens.glow.opacity(0.14 * haloStrength))
+                .fill(tokens.glow.opacity(0.14))
                 .frame(width: diameter * 2.0, height: diameter * 2.0)
                 .allowsHitTesting(false)
         } else {
             Circle()
                 .fill(
                     RadialGradient(
-                        colors: [
-                            tokens.glow.opacity(0.50 * haloStrength),
-                            tokens.glow.opacity(0.16 * haloStrength),
-                            tokens.glow.opacity(0.0)
+                        stops: [
+                            .init(color: tokens.glow.opacity(0.85), location: 0.0),
+                            .init(color: tokens.glow.opacity(0.45), location: 0.28),
+                            .init(color: tokens.glow.opacity(0.14), location: 0.62),
+                            .init(color: tokens.glow.opacity(0.0), location: 1.0)
                         ],
                         center: .center,
-                        startRadius: diameter * 0.30,
-                        endRadius: haloDiameter / 2
+                        startRadius: 0,
+                        endRadius: coronaDiameter / 2
                     )
                 )
-                .frame(width: haloDiameter, height: haloDiameter)
+                .frame(width: coronaDiameter, height: coronaDiameter)
                 .blendMode(onDarkGround ? .plusLighter : .normal)
                 .allowsHitTesting(false)
+        }
+    }
+
+    /// The moon's glow is cool where the sun's is warm — the ink pole
+    /// of the palette, additive against jewel grounds. On the luminous
+    /// day grounds the ink is a deep indigo and a dark halo would read
+    /// as a smudge, so the moon stands as a lit object with no glow.
+    @ViewBuilder
+    private var moonGlow: some View {
+        if onDarkGround {
+            let glowDiameter = diameter * 2.2
+            if reduceTransparency {
+                Circle()
+                    .fill(tokens.ink.opacity(0.10))
+                    .frame(width: diameter * 1.8, height: diameter * 1.8)
+                    .allowsHitTesting(false)
+            } else {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                tokens.ink.opacity(0.30),
+                                tokens.ink.opacity(0.10),
+                                tokens.ink.opacity(0.0)
+                            ],
+                            center: .center,
+                            startRadius: diameter * 0.34,
+                            endRadius: glowDiameter / 2
+                        )
+                    )
+                    .frame(width: glowDiameter, height: glowDiameter)
+                    .blendMode(.plusLighter)
+                    .allowsHitTesting(false)
+            }
         }
     }
 
@@ -120,36 +167,48 @@ public struct LuminousBody: View {
         }
     }
 
-    /// White-hot center (capped short of pure white), glow body,
-    /// metal rim — three layered radial stops that read as an
-    /// incandescent disc.
+    /// The sun as light, not object: a small near-white core (#FFF9EC
+    /// toward white at center, ~45% of the body diameter) whose own
+    /// radial falloff dissolves before the corona's inner region ends.
+    /// No stroke, no offset shading, no radius where an edge lives —
+    /// zoomed in, there is no pixel at which the sun "stops".
+    @ViewBuilder
     private var sunCore: some View {
-        let center = tokens.glowValue.scalingLightness(by: 1.22).color
-        return Circle()
-            .fill(
-                RadialGradient(
-                    colors: [center, tokens.glow, tokens.metal],
-                    center: UnitPoint(x: 0.42, y: 0.38),
-                    startRadius: 0,
-                    endRadius: diameter * 0.62
+        if reduceTransparency {
+            // Flat-fill contract: a plain small disc; the corona above
+            // is likewise flat.
+            Circle()
+                .fill(Self.sunCoreColor)
+                .frame(width: diameter * 0.45, height: diameter * 0.45)
+        } else {
+            Circle()
+                .fill(
+                    RadialGradient(
+                        stops: [
+                            .init(color: .white, location: 0.0),
+                            .init(color: Self.sunCoreColor, location: 0.30),
+                            .init(color: Self.sunCoreColor.opacity(0.55), location: 0.62),
+                            .init(color: Self.sunCoreColor.opacity(0.0), location: 1.0)
+                        ],
+                        center: .center,
+                        startRadius: 0,
+                        endRadius: diameter * 0.45
+                    )
                 )
-            )
-            .overlay {
-                if !reduceTransparency {
-                    Circle()
-                        .stroke(tokens.metalHighlight.opacity(0.55), lineWidth: 0.8)
-                        .blur(radius: 0.4)
-                }
-            }
+                .frame(width: diameter * 0.9, height: diameter * 0.9)
+                .blendMode(onDarkGround ? .plusLighter : .normal)
+        }
     }
 
     /// The lit limb at its true phase over a faint earthshine disc.
+    /// The moon keeps its defined edge — it is a lit object, not a
+    /// light source.
     private func moonCore(illuminatedFraction: Double, isWaxing: Bool) -> some View {
         let litColor = SRGBValue.mix(tokens.inkValue, tokens.metalHighlightValue, amount: 0.35).color
-        let shadowColor = tokens.groundTopValue.scalingLightness(by: 1.35).color
+        let earthshine = tokens.groundTopValue.scalingLightness(by: 1.35).color
         return ZStack {
             Circle()
-                .fill(shadowColor.opacity(0.55))
+                .fill(earthshine.opacity(0.55))
             CrescentShape(
                 illuminatedFraction: illuminatedFraction,
                 isWaxing: isWaxing

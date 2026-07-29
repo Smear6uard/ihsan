@@ -145,6 +145,7 @@ struct CelestialPlateScene: View {
                     plate: plate, tokens: tokens, sun: sun, moon: moon,
                     apexAltitude: apexAltitude
                 )
+                almucantars(plate: plate, tokens: tokens)
                 dayArc(plate: plate, tokens: tokens)
                 if let night, night.contains(date) {
                     nightLayer(plate: plate, tokens: tokens, night: night, date: date)
@@ -337,17 +338,31 @@ struct CelestialPlateScene: View {
 
     // MARK: - The engraved arc
 
-    /// The day's scale, drawn as a fine dotted engraving. It is the one
-    /// line that tells the eye the five ornaments belong to a single
-    /// path rather than floating independently.
+    /// The day's scale: a continuous engraved filament in metal, full
+    /// hairline through its middle and tapered to points at both ends,
+    /// passing through every marker position. It is the one line that
+    /// tells the eye the five ornaments belong to a single path rather
+    /// than floating independently. No dots, no dashes, anywhere.
     private func dayArc(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
-        Path(plate.arcPath())
-            .stroke(
-                tokens.metal.opacity(0.22),
-                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, dash: [1, 5])
-            )
+        Path(plate.arcFilamentPath())
+            .fill(tokens.metal.opacity(0.34))
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+
+    /// The engraved field: two almucantar arcs — concentric altitude
+    /// lines nested under the day arc — in metal at very low opacity.
+    /// Restraint rule: the field should feel worked, not patterned;
+    /// these must never compete with the ornaments.
+    private func almucantars(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
+        ZStack {
+            Path(plate.almucantarPath(riseFraction: 0.36))
+                .stroke(tokens.metal.opacity(0.09), lineWidth: 0.6)
+            Path(plate.almucantarPath(riseFraction: 0.68))
+                .stroke(tokens.metal.opacity(0.09), lineWidth: 0.6)
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
     // MARK: - The divided night
@@ -391,11 +406,11 @@ struct CelestialPlateScene: View {
                 with: .color(lift.color)
             )
 
-            // The night's engraved scale, quieter than the day's.
-            context.stroke(
-                Path(plate.nightArcPath()),
-                with: .color(tokens.metal.opacity(0.16)),
-                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, dash: [1, 6])
+            // The night's engraved scale — the same tapered filament
+            // as the day's, quieter. No dashes.
+            context.fill(
+                Path(plate.nightArcFilamentPath()),
+                with: .color(tokens.metal.opacity(0.22))
             )
 
             // Nisf al-layl: a fine metal filament crossing the arc.

@@ -168,6 +168,83 @@ public struct PlateGeometry: Sendable, Equatable {
         return path
     }
 
+    // MARK: - Engraved filaments
+
+    /// A tapered ribbon along a polyline: full `maxThickness` at the
+    /// middle, dissolving to a point at both ends — the engraved-
+    /// filament construction. To be FILLED, never stroked, so the
+    /// line genuinely tapers instead of ending in a butt cap.
+    static func taperedRibbonPath(
+        along points: [CGPoint],
+        maxThickness: CGFloat
+    ) -> CGPath {
+        let path = CGMutablePath()
+        guard points.count >= 2 else { return path }
+
+        var upper: [CGPoint] = []
+        var lower: [CGPoint] = []
+        let last = points.count - 1
+        for (i, p) in points.enumerated() {
+            let t = Double(i) / Double(last)
+            // sin taper: zero-width at both ends, eased so the middle
+            // holds its hairline weight for most of the run.
+            let halfWidth = maxThickness * CGFloat(pow(sin(.pi * t), 0.7)) / 2
+            let previous = points[max(0, i - 1)]
+            let next = points[min(last, i + 1)]
+            let dx = next.x - previous.x
+            let dy = next.y - previous.y
+            let length = max(0.0001, (dx * dx + dy * dy).squareRoot())
+            let nx = -dy / length
+            let ny = dx / length
+            upper.append(CGPoint(x: p.x + nx * halfWidth, y: p.y + ny * halfWidth))
+            lower.append(CGPoint(x: p.x - nx * halfWidth, y: p.y - ny * halfWidth))
+        }
+
+        path.move(to: upper[0])
+        for p in upper.dropFirst() { path.addLine(to: p) }
+        for p in lower.reversed() { path.addLine(to: p) }
+        path.closeSubpath()
+        return path
+    }
+
+    /// The day arc as an engraved filament — a continuous hairline in
+    /// metal, tapered at both ends, passing through every marker
+    /// position (markers sit on this arc by construction).
+    public func arcFilamentPath(
+        samples: Int = 64,
+        maxThickness: CGFloat = 1.6
+    ) -> CGPath {
+        guard samples >= 2 else { return CGMutablePath() }
+        let insetSpan = 1 - 2 * angularInsetFraction
+        let points = (0...samples).map { i in
+            arcPoint(at: angularInsetFraction + insetSpan * Double(i) / Double(samples))
+        }
+        return Self.taperedRibbonPath(along: points, maxThickness: maxThickness)
+    }
+
+    /// One almucantar: the altitude line at `riseFraction` of the
+    /// arc's rise, nested under the day arc — the structural linework
+    /// that makes the sky read as an instrument plate.
+    public func almucantarPath(
+        riseFraction: CGFloat,
+        samples: Int = 48
+    ) -> CGPath {
+        let path = CGMutablePath()
+        guard samples >= 2 else { return path }
+        let fraction = max(0.05, min(0.95, riseFraction))
+        let insetSpan = 1 - 2 * angularInsetFraction
+        for i in 0...samples {
+            let u = angularInsetFraction + insetSpan * Double(i) / Double(samples)
+            let theta = Double.pi * (1 - u)
+            let point = CGPoint(
+                x: centerX + semiWidth * CGFloat(cos(theta)),
+                y: horizonY - rise * fraction * CGFloat(sin(theta))
+            )
+            if i == 0 { path.move(to: point) } else { path.addLine(to: point) }
+        }
+        return path
+    }
+
     // MARK: - Celestial bodies
 
     /// Map a body's (altitude, azimuth) into plate space.

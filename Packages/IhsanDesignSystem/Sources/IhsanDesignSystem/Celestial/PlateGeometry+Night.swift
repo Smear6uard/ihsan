@@ -65,6 +65,20 @@ public extension PlateGeometry {
         return path
     }
 
+    /// The night arc as an engraved filament — quieter sibling of the
+    /// day arc's, same tapered construction, no dashes anywhere.
+    func nightArcFilamentPath(
+        samples: Int = 64,
+        maxThickness: CGFloat = 1.4
+    ) -> CGPath {
+        guard samples >= 2 else { return CGMutablePath() }
+        let insetSpan = 1 - 2 * angularInsetFraction
+        let points = (0...samples).map { i in
+            nightArcPoint(at: angularInsetFraction + insetSpan * Double(i) / Double(samples))
+        }
+        return PlateGeometry.taperedRibbonPath(along: points, maxThickness: maxThickness)
+    }
+
     /// The region between the last third's start and dawn, bounded by the
     /// chord above and the night arc below — the surface that receives the
     /// quiet luminance lift.

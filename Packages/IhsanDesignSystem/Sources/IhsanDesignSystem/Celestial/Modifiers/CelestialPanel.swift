@@ -75,12 +75,9 @@ public struct CelestialPanelModifier: ViewModifier {
                     )
                 }
                 .clipShape(shape)
-                .shadow(
-                    color: .black.opacity(0.10),
-                    radius: 8,
-                    x: 0,
-                    y: 2
-                )
+                // Flat + luminous: no drop shadow — the panel sits on
+                // the page by its border and fill, lifted only by the
+                // active state's interior glow.
         }
     }
 }
