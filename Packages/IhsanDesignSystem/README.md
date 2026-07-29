@@ -4,6 +4,32 @@ The visual primitives that every Ihsan screen is built from — design
 tokens (color, typography, spacing, material) and reusable SwiftUI
 components built on iOS 26's Liquid Glass design language.
 
+## Flat + luminous — the global rendering rule
+
+The celestial layer's visual language is **flat + luminous**. Applied
+everywhere, no exceptions without a spec change:
+
+- **No 3D shading.** No offset-center radial gradients implying a lit
+  sphere, no simulated volume on any body or ornament.
+- **No specular highlights.** No rim strokes, no glints, no
+  iridescent sheen standing in for reflected light.
+- **No drop shadows** on celestial bodies, ornaments, or panels.
+  Panels sit on the page by fill and hairline border alone.
+- **Depth comes from glow, bloom, and layered opacity only.** A body
+  that must read as bright gets a corona; a panel that must read as
+  active gets an interior glow; a region that must read as deeper
+  gets the same material one lightness step down.
+- **Sanctioned exception:** the text-legibility ink halo
+  (`SkyPaletteTokens.inkHalo`) — it is itself a glow, not a shadow,
+  and exists only to keep engraved labels readable through palette
+  transitions.
+
+Concretely: the sun is three layers of light (near-white core
+dissolving into a warm corona into the atmospheric wash) with no
+radius at which an edge exists; the moon is a lit object with a
+defined limb, earthshine, and a cool glow on jewel grounds; arcs are
+continuous tapered metal filaments — never dotted, never dashed.
+
 ## What this design system encodes
 
 Ihsan is a private personal ibadah ledger for practicing Muslims. The

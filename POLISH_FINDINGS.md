@@ -318,3 +318,41 @@ Items needing pure device verification (no source change possible):
   device untouched past midnight, and confirm the alarm still fires at
   the last third computed from *yesterday's* Maghrib (the
   candidate-nights logic covers it; verify end-to-end on device).
+
+
+## Today corrective — state integrity + composition (2026-07-29)
+
+Source-side work is unit-tested and simulator-screenshot-verified;
+these need a device:
+
+- **One-second full-scene tick.** TodayReadyView now drives the whole
+  page (sky canvas, markers, card) from a single 1 s TimelineView.
+  Simulator profiling shows nothing alarming, but verify power/thermal
+  behavior and scroll-adjacent jank on device, especially with the
+  always-animating horizon-glow band near sunset.
+- **Sun edge-lessness on OLED.** The rebuilt sun (core dissolving into
+  corona, plusLighter on jewel grounds) must show no detectable disc
+  edge at 2× zoom on a real OLED — the acceptance test in the spec.
+  Screenshot analysis passes in the simulator's sRGB pipeline; OLED
+  gamma may differ.
+- **Horizon band + ground step visibility.** Wash opacities were
+  raised (0.70/0.42) and the subterranean step deepened (×0.60 dark /
+  ×0.88 light). Confirm the band reads as atmosphere, not banding, on
+  device — and that the deepened night ground doesn't posterize.
+- **Marker two-line labels at large Dynamic Type.** Name-over-time
+  labels are fixed 10 pt engravings (decorative, VoiceOver-hidden);
+  confirm the ornament + label block doesn't collide with the card at
+  accessibility sizes on compact devices.
+- **VoiceOver phrasing changes.** Card now says "in its window until
+  6:15 PM" (copy rule: describe the window); markers unchanged.
+  Verify pronunciation of "Jamā'ah" and "Qadā" clauses in the logged
+  card inscription.
+- **Arabic optical size on the card.** The Latin+Arabic name pair uses
+  IhsanFont.heroPrayerName + bodyArabic (system Arabic, +2 pt optical
+  match). Verify the pair reads balanced on device; a dedicated Naskh
+  face is a future asset decision, not a source change.
+- **Cold-launch after iCloud sign-out.** CloudAccountGate runs
+  local-only from the launch *after* the account disappears (cache is
+  one launch behind by design). Sign out of iCloud on a device,
+  launch twice, and confirm exactly one gate log line and no
+  NSCloudKitMirroringDelegate retry spam on the second launch.
