@@ -117,7 +117,10 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         madhab: MadhabChoice,
         highLatitudeRule: IhsanCore.HighLatitudeRule
     ) throws -> PrayerTime? {
-        let today = try dayTimes(
+        // Window-aware: pre-dawn hours belong to yesterday's Isha, the
+        // forenoon gap [sunrise, dhuhr) belongs to no one, and every
+        // window is half-open so boundaries transition atomically.
+        let window = try scheduleWindow(
             for: referenceDate,
             coordinates: coordinates,
             timeZone: timeZone,
@@ -125,12 +128,7 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
             madhab: madhab,
             highLatitudeRule: highLatitudeRule
         )
-
-        for prayerTime in today.allFardh.reversed() where referenceDate >= prayerTime.scheduledTime {
-            return prayerTime
-        }
-
-        return nil
+        return window.moment(at: referenceDate).current
     }
 
     public func dayTimesRange(

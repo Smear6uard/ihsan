@@ -1,7 +1,7 @@
 import Foundation
 import IhsanCore
 
-public struct DayPrayerTimes: Sendable {
+public struct DayPrayerTimes: Sendable, Equatable {
     /// Civil date this set of times belongs to, represented as start of day in `timeZoneIdentifier`.
     public let date: Date
     public let timeZoneIdentifier: String

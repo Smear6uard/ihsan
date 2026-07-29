@@ -4,7 +4,7 @@ import Testing
 @testable import IhsanPrayerTimes
 
 @Test
-func beforeFajrNextPrayerIsFajrAndCurrentPrayerIsNil() throws {
+func beforeFajrNextPrayerIsFajrAndCurrentPrayerIsYesterdaysIsha() throws {
     let provider = AdhanPrayerTimesProvider()
     let times = try makeChicagoTimes()
     let referenceDate = times.fajr.scheduledTime.addingTimeInterval(-60)
@@ -27,7 +27,10 @@ func beforeFajrNextPrayerIsFajrAndCurrentPrayerIsNil() throws {
     )
 
     #expect(next.prayer == .fajr)
-    #expect(current == nil)
+    // One minute before today's Fajr the night's Isha window is still
+    // open — the window-aware resolver reports yesterday's Isha.
+    #expect(current?.prayer == .isha)
+    #expect((current?.scheduledTime ?? .distantFuture) < referenceDate)
 }
 
 @Test
