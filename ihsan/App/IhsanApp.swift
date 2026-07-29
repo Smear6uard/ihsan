@@ -14,10 +14,14 @@ struct IhsanApp: App {
     private let nowProvider = NowProvider.fromLaunchArguments()
 
     init() {
-        // Try the shared App-Group + CloudKit store first; fall back to in-memory
+        // Try the shared App-Group store first; fall back to in-memory
         // when the app group entitlement isn't yet wired (e.g. early development).
+        // CloudKit mirroring follows the account gate's cached answer, so a
+        // device with no iCloud account runs local-only instead of spinning.
         do {
-            modelContainer = try IhsanModelContainerFactory.makeContainer()
+            modelContainer = try IhsanModelContainerFactory.makeContainer(
+                cloudSync: CloudAccountGate.shouldEnableCloudSync()
+            )
         } catch {
             print("Falling back to in-memory ModelContainer: \(error)")
             do {
@@ -43,6 +47,10 @@ struct IhsanApp: App {
                     // Pre-warm the location coordinator so authorization and
                     // significant-change monitoring are ready by the time Today appears.
                     _ = CoreLocationCoordinator.shared
+                    // One account-status query per launch; afterwards only
+                    // CKAccountChanged re-checks. No retry loops.
+                    await CloudAccountGate.refreshAccountStatus()
+                    await CloudAccountGate.observeAccountChanges()
                 }
         }
         .modelContainer(modelContainer)

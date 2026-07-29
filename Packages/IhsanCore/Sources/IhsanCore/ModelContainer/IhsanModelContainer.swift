@@ -16,7 +16,15 @@ public enum IhsanModelContainerFactory {
             .appendingPathComponent(storeFileName)
     }
 
-    public static func makeContainer(inMemory: Bool = false) throws -> ModelContainer {
+    /// - Parameter cloudSync: When `false` the store opens without
+    ///   CloudKit mirroring — the local-only mode used when the device
+    ///   has no iCloud account, so SwiftData never spins on a sync it
+    ///   can't perform. The same on-disk store is used either way;
+    ///   sync resumes on a later launch once an account exists.
+    public static func makeContainer(
+        inMemory: Bool = false,
+        cloudSync: Bool = true
+    ) throws -> ModelContainer {
         let schema = Schema(IhsanSchemaV3.models)
         let configuration: ModelConfiguration
 
@@ -34,7 +42,9 @@ public enum IhsanModelContainerFactory {
             configuration = ModelConfiguration(
                 schema: schema,
                 url: storeURL,
-                cloudKitDatabase: .private(cloudKitContainerIdentifier)
+                cloudKitDatabase: cloudSync
+                    ? .private(cloudKitContainerIdentifier)
+                    : .none
             )
         }
 
