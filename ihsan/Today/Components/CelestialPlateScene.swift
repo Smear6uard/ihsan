@@ -69,6 +69,11 @@ struct CelestialPlateScene: View {
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
 
+    /// Preferred horizon chord height as a fraction of the plate,
+    /// handed down from `TodayCompositionMetrics` so the 65:35
+    /// screen-level proportion has one source of truth.
+    var horizonFraction: CGFloat = 0.72
+
     /// Tonight's divided night, when the caller has computed it. The plate
     /// gains its night geometry only while the moment lies inside this
     /// span — between Maghrib and the next true Fajr. `nil`, or any
@@ -86,10 +91,6 @@ struct CelestialPlateScene: View {
     //
     // Sizes only. Every *position* comes from PlateGeometry.
 
-    /// The chord height comes from the page's composition metrics so
-    /// the plate, the ground band, and the focused card are one
-    /// composition with a single source of truth.
-    private static let horizonFraction = TodayCompositionMetrics.horizonFraction
     private static let markerSize: CGFloat = 29
     /// The prayer happening now is drawn larger as well as luminous;
     /// size and light together make it the focal point at arm's length.
@@ -145,8 +146,7 @@ struct CelestialPlateScene: View {
                     plate: plate, tokens: tokens, sun: sun, moon: moon,
                     apexAltitude: apexAltitude
                 )
-                almucantars(plate: plate, tokens: tokens)
-                dayArc(plate: plate, tokens: tokens)
+                engravedField(plate: plate, tokens: tokens, date: date)
                 if let night, night.contains(date) {
                     nightLayer(plate: plate, tokens: tokens, night: night, date: date)
                 }
@@ -168,7 +168,7 @@ struct CelestialPlateScene: View {
         return PlateGeometry(
             rect: CGRect(x: 0, y: topInset, width: size.width, height: height),
             eventTimes: markers.map(\.time),
-            horizonFraction: Self.horizonFraction,
+            horizonFraction: horizonFraction,
             markerClearance: Self.markerClearance,
             labelClearance: Self.labelClearance
         )
@@ -336,30 +336,94 @@ struct CelestialPlateScene: View {
         )
     }
 
-    // MARK: - The engraved arc
+    // MARK: - The engraved field
 
-    /// The day's scale: a continuous engraved filament in metal, full
-    /// hairline through its middle and tapered to points at both ends,
-    /// passing through every marker position. It is the one line that
-    /// tells the eye the five ornaments belong to a single path rather
-    /// than floating independently. No dots, no dashes, anywhere.
-    private func dayArc(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
-        Path(plate.arcFilamentPath())
-            .fill(tokens.metal.opacity(0.34))
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+    /// Almucantar heights for the engraved field. Two only — the
+    /// field should feel worked, not patterned.
+    private static let almucantarRises: [CGFloat] = [0.36, 0.68]
+    /// The knockout rule: linework terminates this far short of every
+    /// ornament's and label's bounding form (spec: 6–8 pt).
+    private static let filamentClearance: CGFloat = 7
+
+    /// The bounding forms filaments must terminate at: each marker's
+    /// ornament box and its two-line label block. Real geometry for
+    /// `PlateGeometry`'s segmentation — never background patches.
+    private func knockoutRects(plate: PlateGeometry) -> [CGRect] {
+        markers.flatMap { marker -> [CGRect] in
+            let position = plate.markerPosition(for: marker.time)
+            let size = marker.state == .current ? Self.currentMarkerSize : Self.markerSize
+            let ornament = CGRect(
+                x: position.x - size / 2, y: position.y - size / 2,
+                width: size, height: size
+            )
+            let labelCenterY = position.y + labelOffset(forMarkerSize: size)
+            let label = CGRect(
+                x: position.x - 28, y: labelCenterY - 13,
+                width: 56, height: 26
+            )
+            return [ornament, label]
+        }
     }
 
-    /// The engraved field: two almucantar arcs — concentric altitude
-    /// lines nested under the day arc — in metal at very low opacity.
-    /// Restraint rule: the field should feel worked, not patterned;
-    /// these must never compete with the ornaments.
-    private func almucantars(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
-        ZStack {
-            Path(plate.almucantarPath(riseFraction: 0.36))
-                .stroke(tokens.metal.opacity(0.09), lineWidth: 0.6)
-            Path(plate.almucantarPath(riseFraction: 0.68))
-                .stroke(tokens.metal.opacity(0.09), lineWidth: 0.6)
+    /// The day's scale and its field, engraved with knockout
+    /// discipline: the arc and both almucantars terminate short of
+    /// every ornament and label (each kept run is its own tapered
+    /// ribbon, dissolving to a point at every termination), and the
+    /// portion of the day already traveled is gilded — metalHighlight
+    /// over the base metal, the transition fading across the moment's
+    /// position on the arc. Driven by the scene's `now`; it advances
+    /// continuously with the screen's one-second timeline.
+    private func engravedField(
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        date: Date
+    ) -> some View {
+        let knockouts = knockoutRects(plate: plate)
+        let arcSegments = plate.arcFilamentSegments(
+            avoiding: knockouts, clearance: Self.filamentClearance
+        )
+        let almucantarSegments = Self.almucantarRises.flatMap {
+            plate.almucantarFilamentSegments(
+                riseFraction: $0, avoiding: knockouts,
+                clearance: Self.filamentClearance
+            )
+        }
+        let gildEdgeX: CGFloat? = markers.first.flatMap { first in
+            date >= first.time ? plate.markerPosition(for: date).x : nil
+        }
+
+        return Canvas { context, size in
+            for segment in almucantarSegments {
+                context.fill(Path(segment), with: .color(tokens.metal.opacity(0.10)))
+            }
+            for segment in arcSegments {
+                context.fill(Path(segment), with: .color(tokens.metal.opacity(0.34)))
+            }
+
+            // The gilded passage: the same segments, warmer and
+            // ~2× stronger, masked to the traversed side of `now`.
+            if let gildEdgeX, size.width > 0 {
+                var clip = Path()
+                for segment in arcSegments { clip.addPath(Path(segment)) }
+                var gilded = context
+                gilded.clip(to: clip)
+
+                let fade = size.width * 0.10
+                let solidUntil = max(0.0, (gildEdgeX - fade) / size.width)
+                let fadedBy = min(1.0, max(solidUntil, (gildEdgeX + fade) / size.width))
+                gilded.fill(
+                    Path(CGRect(origin: .zero, size: size)),
+                    with: .linearGradient(
+                        Gradient(stops: [
+                            .init(color: tokens.metalHighlight.opacity(0.62), location: 0),
+                            .init(color: tokens.metalHighlight.opacity(0.62), location: solidUntil),
+                            .init(color: tokens.metalHighlight.opacity(0), location: fadedBy)
+                        ]),
+                        startPoint: .zero,
+                        endPoint: CGPoint(x: size.width, y: 0)
+                    )
+                )
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)

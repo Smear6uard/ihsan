@@ -150,13 +150,15 @@ public struct PlateGeometry: Sendable, Equatable {
 
     /// Shared filament construction — `CelestialSkyView` uses this
     /// directly so the atmosphere and the plate draw the identical
-    /// terrain mark.
+    /// terrain mark. `insetFraction` widens for the ground-plane
+    /// echoes below the chord, which shorten as they deepen.
     public static func filamentPath(
         in rect: CGRect,
         horizonY: CGFloat,
-        thickness: CGFloat = 1.4
+        thickness: CGFloat = 1.4,
+        insetFraction: CGFloat = 0.06
     ) -> CGPath {
-        let inset = rect.width * 0.06
+        let inset = rect.width * insetFraction
         let start = CGPoint(x: rect.minX + inset, y: horizonY)
         let end = CGPoint(x: rect.maxX - inset, y: horizonY)
         let path = CGMutablePath()
@@ -220,6 +222,87 @@ public struct PlateGeometry: Sendable, Equatable {
             arcPoint(at: angularInsetFraction + insetSpan * Double(i) / Double(samples))
         }
         return Self.taperedRibbonPath(along: points, maxThickness: maxThickness)
+    }
+
+    // MARK: - Filament knockouts
+
+    /// Engraved lines never pass through ornaments: on classical
+    /// instruments, linework terminates at medallions. A knockout is
+    /// the bounding form of an ornament or its label; every filament
+    /// the plate draws terminates `clearance` points short of it.
+    ///
+    /// Segmentation is real geometry — the polyline is cut into kept
+    /// runs and each run is rebuilt as its own tapered ribbon, so the
+    /// line dissolves to a point at every termination. No
+    /// background-colored patches anywhere.
+    static func segments(
+        of points: [CGPoint],
+        avoiding knockouts: [CGRect],
+        clearance: CGFloat
+    ) -> [[CGPoint]] {
+        guard !knockouts.isEmpty else { return points.count >= 2 ? [points] : [] }
+        let zones = knockouts.map { $0.insetBy(dx: -clearance, dy: -clearance) }
+
+        var runs: [[CGPoint]] = []
+        var current: [CGPoint] = []
+        for point in points {
+            if zones.contains(where: { $0.contains(point) }) {
+                if current.count >= 2 { runs.append(current) }
+                current = []
+            } else {
+                current.append(point)
+            }
+        }
+        if current.count >= 2 { runs.append(current) }
+        return runs
+    }
+
+    /// Sample points along the day arc's inset angular span.
+    func arcPolyline(samples: Int) -> [CGPoint] {
+        guard samples >= 2 else { return [] }
+        let insetSpan = 1 - 2 * angularInsetFraction
+        return (0...samples).map { i in
+            arcPoint(at: angularInsetFraction + insetSpan * Double(i) / Double(samples))
+        }
+    }
+
+    /// The day arc as engraved filament segments that terminate short
+    /// of every knockout — one tapered ribbon per kept run.
+    public func arcFilamentSegments(
+        avoiding knockouts: [CGRect],
+        clearance: CGFloat = 7,
+        samples: Int = 128,
+        maxThickness: CGFloat = 1.6
+    ) -> [CGPath] {
+        Self.segments(
+            of: arcPolyline(samples: samples),
+            avoiding: knockouts,
+            clearance: clearance
+        ).map { Self.taperedRibbonPath(along: $0, maxThickness: maxThickness) }
+    }
+
+    /// One almucantar as engraved filament segments, same termination
+    /// rule as the day arc.
+    public func almucantarFilamentSegments(
+        riseFraction: CGFloat,
+        avoiding knockouts: [CGRect],
+        clearance: CGFloat = 7,
+        samples: Int = 96,
+        maxThickness: CGFloat = 0.8
+    ) -> [CGPath] {
+        guard samples >= 2 else { return [] }
+        let fraction = max(0.05, min(0.95, riseFraction))
+        let insetSpan = 1 - 2 * angularInsetFraction
+        let points = (0...samples).map { i -> CGPoint in
+            let u = angularInsetFraction + insetSpan * Double(i) / Double(samples)
+            let theta = Double.pi * (1 - u)
+            return CGPoint(
+                x: centerX + semiWidth * CGFloat(cos(theta)),
+                y: horizonY - rise * fraction * CGFloat(sin(theta))
+            )
+        }
+        return Self.segments(of: points, avoiding: knockouts, clearance: clearance)
+            .map { Self.taperedRibbonPath(along: $0, maxThickness: maxThickness) }
     }
 
     /// One almucantar: the altitude line at `riseFraction` of the

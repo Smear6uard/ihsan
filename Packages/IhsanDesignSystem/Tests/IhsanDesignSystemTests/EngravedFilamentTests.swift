@@ -40,6 +40,76 @@ struct EngravedFilamentTests {
         #expect(!ribbon.contains(CGPoint(x: 196, y: 51.5)))
     }
 
+    // MARK: - Knockouts (corrective E item 2)
+
+    /// Every point of every kept segment stays clear of every
+    /// knockout's expanded bounding form — the linework genuinely
+    /// terminates at medallions instead of passing under them.
+    @Test
+    func arcSegmentsTerminateShortOfKnockouts() {
+        let plate = plate
+        let apex = plate.arcApex
+        let knockout = CGRect(x: apex.x - 15, y: apex.y - 15, width: 30, height: 30)
+        let clearance: CGFloat = 7
+        let segments = plate.arcFilamentSegments(
+            avoiding: [knockout], clearance: clearance
+        )
+
+        #expect(segments.count >= 2, "a knockout at the apex must split the arc")
+        let zone = knockout.insetBy(dx: -clearance + 0.5, dy: -clearance + 0.5)
+        for segment in segments {
+            #expect(
+                !segment.boundingBox.intersects(zone) || !zoneOverlapsRibbon(segment, zone),
+                "segment ribbon enters the knockout zone"
+            )
+        }
+    }
+
+    /// With no knockouts, segmentation returns the whole arc as one
+    /// ribbon spanning the same extent as the continuous filament.
+    @Test
+    func segmentationWithoutKnockoutsIsTheWholeArc() {
+        let segments = plate.arcFilamentSegments(avoiding: [])
+        #expect(segments.count == 1)
+        let whole = plate.arcFilamentPath().boundingBox
+        let only = segments[0].boundingBox
+        #expect(abs(only.minX - whole.minX) < 4.0)
+        #expect(abs(only.maxX - whole.maxX) < 4.0)
+    }
+
+    /// Almucantar segments obey the same termination rule.
+    @Test
+    func almucantarSegmentsAvoidKnockouts() {
+        let plate = plate
+        // Knock out a box straddling the low almucantar's apex.
+        let apexY = plate.almucantarPath(riseFraction: 0.36).boundingBox.minY
+        let knockout = CGRect(x: plate.rect.midX - 14, y: apexY - 14, width: 28, height: 28)
+        let segments = plate.almucantarFilamentSegments(
+            riseFraction: 0.36, avoiding: [knockout]
+        )
+        #expect(segments.count >= 2)
+        let zone = knockout.insetBy(dx: -6.5, dy: -6.5)
+        for segment in segments {
+            #expect(!zoneOverlapsRibbon(segment, zone))
+        }
+    }
+
+    /// Sample the zone on a fine grid and ask the ribbon path whether
+    /// it covers any sampled point.
+    private func zoneOverlapsRibbon(_ ribbon: CGPath, _ zone: CGRect) -> Bool {
+        let steps = 24
+        for i in 0...steps {
+            for j in 0...steps {
+                let probe = CGPoint(
+                    x: zone.minX + zone.width * CGFloat(i) / CGFloat(steps),
+                    y: zone.minY + zone.height * CGFloat(j) / CGFloat(steps)
+                )
+                if ribbon.contains(probe) { return true }
+            }
+        }
+        return false
+    }
+
     @Test
     func almucantarsNestStrictlyUnderTheDayArc() {
         let low = plate.almucantarPath(riseFraction: 0.36).boundingBox
