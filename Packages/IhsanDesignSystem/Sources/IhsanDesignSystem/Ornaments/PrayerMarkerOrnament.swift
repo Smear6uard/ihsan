@@ -110,15 +110,22 @@ public struct PrayerMarkerOrnament: View {
         )
     }
 
-    /// Soft radial glow behind the current prayer. Under Reduce
-    /// Transparency the gradient collapses to a single faint disc so
-    /// the state remains marked without a translucency ramp.
+    /// Soft radial glow behind the current prayer — warm and
+    /// metal-toned, never neutral: the halo carries the same brass
+    /// family as the ornament it lights. Under Reduce Transparency the
+    /// gradient collapses to a single faint disc so the state remains
+    /// marked without a translucency ramp.
+    private var warmGlow: SRGBValue {
+        SRGBValue.mix(tokens.glowValue, tokens.metalValue, amount: 0.45)
+    }
+
     @ViewBuilder
     private var glowHalo: some View {
         let radius = size * 1.35
+        let glow = warmGlow.color
         if reduceTransparency {
             Circle()
-                .fill(tokens.glow.opacity(0.22))
+                .fill(glow.opacity(0.22))
                 .frame(width: radius * 1.4, height: radius * 1.4)
                 .allowsHitTesting(false)
         } else {
@@ -126,9 +133,9 @@ public struct PrayerMarkerOrnament: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            tokens.glow.opacity(0.55),
-                            tokens.glow.opacity(0.18),
-                            tokens.glow.opacity(0.0)
+                            glow.opacity(0.55),
+                            glow.opacity(0.18),
+                            glow.opacity(0.0)
                         ],
                         center: .center,
                         startRadius: size * 0.1,

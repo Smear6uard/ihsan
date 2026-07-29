@@ -90,16 +90,17 @@ struct CelestialPlateScene: View {
     /// the plate, the ground band, and the focused card are one
     /// composition with a single source of truth.
     private static let horizonFraction = TodayCompositionMetrics.horizonFraction
-    private static let markerSize: CGFloat = 24
+    private static let markerSize: CGFloat = 29
     /// The prayer happening now is drawn larger as well as luminous;
     /// size and light together make it the focal point at arm's length.
-    private static let currentMarkerSize: CGFloat = 34
+    private static let currentMarkerSize: CGFloat = 41
     /// Half-extent PlateGeometry reserves around every marker position.
-    /// Comfortably clears the 34 pt ornament; the decorative glow halo
+    /// Comfortably clears the 41 pt ornament; the decorative glow halo
     /// is allowed to bleed past it.
-    private static let markerClearance: CGFloat = 32
-    /// Vertical room reserved below markers for their time labels.
-    private static let labelClearance: CGFloat = 56
+    private static let markerClearance: CGFloat = 36
+    /// Vertical room reserved below markers for their two-line
+    /// name-over-time labels.
+    private static let labelClearance: CGFloat = 68
     private static let sunDiameter: CGFloat = 56
     private static let moonDiameter: CGFloat = 44
 
@@ -588,7 +589,7 @@ struct CelestialPlateScene: View {
             state: marker.state,
             tokens: tokens
         )
-        .frame(width: 44, height: 44)
+        .frame(width: 48, height: 48)
         .contentShape(Rectangle())
 
         if let onMarkerTap {
@@ -607,25 +608,32 @@ struct CelestialPlateScene: View {
         }
     }
 
-    /// The engraved time under each marker. The prayer happening now
-    /// is identified by its light and its size, and named in serif on
-    /// the card directly below — engraving the name here as well would
-    /// be the one accessory to take off before leaving the house.
+    /// The engraved inscription under each marker: the prayer's name
+    /// in small caps above its time — name primary in ink, time
+    /// secondary in inkSecondary — per the corrective spec.
     private func markerLabel(marker: Marker, tokens: SkyPaletteTokens) -> some View {
-        Text(Self.timeString(marker.time, in: timeZone))
-            .font(Self.labelFont)
-            .tracking(0.9)
-            .foregroundStyle(marker.state == .current ? tokens.ink : tokens.inkSecondary)
-            .shadow(color: tokens.inkHalo, radius: 2)
-            .allowsHitTesting(false)
-            .accessibilityHidden(true)
+        VStack(spacing: 2) {
+            Text(marker.prayer.displayNameEnglish)
+                .font(Self.labelFont)
+                .textCase(.uppercase)
+                .tracking(1.2)
+                .foregroundStyle(tokens.ink)
+            Text(Self.timeString(marker.time, in: timeZone))
+                .font(Self.labelFont)
+                .tracking(0.9)
+                .foregroundStyle(tokens.inkSecondary)
+        }
+        .shadow(color: tokens.inkHalo, radius: 2)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
     }
 
-    /// The label hangs off the bottom of the ornament's box with a
-    /// constant optical gap, inside the `labelClearance` the plate
-    /// reserves below every marker position.
+    /// The label block hangs off the bottom of the ornament's box with
+    /// a constant optical gap, inside the `labelClearance` the plate
+    /// reserves below every marker position. The offset positions the
+    /// block's center: half the ornament, the gap, half the block.
     private func labelOffset(forMarkerSize size: CGFloat) -> CGFloat {
-        size / 2 + 11
+        size / 2 + 8 + 13
     }
 
     private func accessibilityLabel(for marker: Marker) -> String {
