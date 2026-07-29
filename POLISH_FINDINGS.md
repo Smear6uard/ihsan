@@ -198,3 +198,31 @@ Items needing pure device verification (no source change possible):
   — `'nonisolated(unsafe)' has no effect on property
   'interruptionObserver'`. Compiler suggests `nonisolated`. Pre-existing,
   unrelated to this polish pass.
+
+## Repair feature (feat/repair) — device verification needed
+
+- **Haptic-to-tap latency on "+1 made up"**. `Haptics.impact(.soft)` is
+  the first statement in `RepairViewModel.logMadeUp` — before any
+  SwiftData write — so the <50ms budget holds by construction, but the
+  acceptance criterion is a screen recording. This Mac cannot build the
+  app scheme (watchOS platform unavailable); record on device.
+- **Dynamic Type .accessibility3 on every setup screen and
+  .accessibility5 on the Repair detail screen**. All Repair text is
+  multiline-friendly (`fixedSize(horizontal: false, vertical: true)`,
+  no fixed text frames), but `IhsanFont` tokens are fixed-size by
+  design — confirm legibility on device like the rest of the app.
+- **Reduce Motion on the thread**. `RepairThreadView` gates its growth
+  animation on `accessibilityReduceMotion`; the `withAnimation` wrap
+  around row collapse in `RepairDetailScreen` should also be spot-checked
+  with Reduce Motion on.
+- **VoiceOver order** on the Repair detail screen (thread → quiet counts
+  → pace line → category rows) and the zero moment's single line.
+- **Control Center glyph**: controls only accept symbol images, so the
+  control ships with `arrow.uturn.backward` (the app's canonical qadā
+  mark per `StatusPill`). If a bespoke ornament is wanted there, author
+  a custom SF Symbol asset from the Lawzina outline in a follow-up.
+- **Excused-pause serene state**: confirm on device that the paused
+  Today card reads as rest (marker outlines, no glow) across all four
+  palette states, and that beginning/ending a pause from the log sheet
+  droplet suppresses/restores scheduled notifications (inspect Pending
+  Notifications in Console or the debug scheduler dump).
