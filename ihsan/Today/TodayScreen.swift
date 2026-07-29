@@ -225,8 +225,16 @@ private struct TodayReadyView: View {
         let windowExhausted = now >= snapshot.scheduleWindow.tomorrowFajr.scheduledTime
 
         GeometryReader { proxy in
+            // The proxy is safe-area-bounded (the tab bar adds a
+            // bottom inset); the metrics live in full-screen
+            // coordinates, matching the edge-to-edge plate scene.
             let metrics = TodayCompositionMetrics(
-                size: proxy.size,
+                size: CGSize(
+                    width: proxy.size.width,
+                    height: proxy.size.height
+                        + proxy.safeAreaInsets.top
+                        + proxy.safeAreaInsets.bottom
+                ),
                 safeAreaTop: proxy.safeAreaInsets.top,
                 safeAreaBottom: proxy.safeAreaInsets.bottom,
                 cardHeight: FocusedPrayerCard.cardHeight,

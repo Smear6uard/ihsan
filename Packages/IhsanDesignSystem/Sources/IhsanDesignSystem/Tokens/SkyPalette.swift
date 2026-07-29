@@ -235,6 +235,19 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// as unpainted primer and muddied the glass chrome sampling it.
     public var groundPlane: Color { groundPlaneValue.color }
 
+    /// Backing tint for Liquid Glass chrome standing on the ground
+    /// plane (corrective E item 5). On the near-white days, bare
+    /// glass sampling the warm-ivory ground reads olive; this warm
+    /// near-white lift keeps the bar warm and quiet. Jewel grounds
+    /// return clear — platform glass over a dark page needs no help.
+    /// A backing layer, never a tint of the glass itself: chrome
+    /// remains the only surface carrying the platform's native glass.
+    public var chromeTint: Color {
+        groundPlaneValue.relativeLuminance > 0.5
+            ? SRGBValue.mix(panelFillValue, horizonWashValue, amount: 0.45).color.opacity(0.72)
+            : .clear
+    }
+
     /// Legacy name for the ground plane, kept so older call sites and
     /// tests read the same token the sky view fills with.
     public var subterranean: Color { groundPlaneValue.color }

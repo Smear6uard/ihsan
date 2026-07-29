@@ -9,8 +9,14 @@ import IhsanDesignSystem
 /// — and so the "no dead zone taller than the focused card" rule is a
 /// unit test instead of a hope.
 struct TodayCompositionMetrics: Equatable {
+    /// The FULL screen size — the plate scene renders edge to edge
+    /// (`.ignoresSafeArea()`), so every metric here lives in screen
+    /// coordinates. Callers reading a safe-area-bounded GeometryReader
+    /// must add the insets back before constructing metrics.
     let size: CGSize
     let safeAreaTop: CGFloat
+    /// Bottom safe area as the Today content sees it — includes the
+    /// tab bar's `safeAreaInset` zone, not just the home indicator.
     let safeAreaBottom: CGFloat
     let cardHeight: CGFloat
     let hasDuhaCard: Bool
@@ -63,7 +69,7 @@ struct TodayCompositionMetrics: Equatable {
     /// `PlateGeometry` consumes.
     var plateHorizonFraction: CGFloat {
         let fraction = (horizonY - plateTopInset) / max(plateHeight, 1)
-        return min(max(fraction, 0.10), 0.95)
+        return min(max(fraction, 0.10), 0.98)
     }
 
     /// Top edge of the focused card in screen space. When the Duha

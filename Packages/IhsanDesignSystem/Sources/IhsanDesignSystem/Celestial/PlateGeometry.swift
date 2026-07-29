@@ -73,11 +73,21 @@ public struct PlateGeometry: Sendable, Equatable {
         domainSpan = max(60, end - start)
 
         // The safe frame: positions must keep a full marker box (and
-        // label, below) inside the rect.
+        // label, below) inside the rect. The lowest markers are the
+        // arc's endpoint events, which sit ABOVE the chord by
+        // rise·sin(π·inset) — so the chord itself may go deeper than
+        // the marker-safe line by exactly that margin. Solving
+        //   chord − (chord − topSafe)·s ≤ bottomSafe,  s = sin(π·inset)
+        // for the chord gives the true bound.
         let topSafeY = rect.minY + markerClearance + 4
         let bottomSafeY = rect.maxY - markerClearance - labelClearance
-        let preferred = rect.minY + rect.height * min(max(horizonFraction, 0.10), 0.95)
-        let base = min(preferred, bottomSafeY)
+        let s = CGFloat(sin(.pi * self.angularInsetFraction))
+        let chordBound = min(
+            (bottomSafeY - topSafeY * s) / max(1 - s, 0.01),
+            rect.maxY - 4
+        )
+        let preferred = rect.minY + rect.height * min(max(horizonFraction, 0.10), 0.98)
+        let base = min(preferred, max(bottomSafeY, chordBound))
         horizonY = max(base, topSafeY + 24)
 
         centerX = rect.midX

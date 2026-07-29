@@ -128,17 +128,19 @@ struct CustomTabBar: View {
         .frame(height: IhsanSpacing.tabBarHeight)
         .padding(IhsanSpacing.xs)
         .background {
-            // Daytime: a thin warm-amber backing sits behind the
-            // glass so the bar reads against the cream daylight sky.
-            // The glass effect above refracts this backing along with
-            // the page beneath, producing a visible "footer band".
-            if isDayMode {
-                RoundedRectangle(
-                    cornerRadius: IhsanSpacing.cardRadius,
-                    style: .continuous
-                )
-                .fill(IhsanColor.parchmentDeep.opacity(0.30))
-            }
+            // Daytime: the palette-v2 chrome tint sits BEHIND the
+            // glass so the bar reads warm and quiet against the
+            // warm-ivory ground plane — without it the glass samples
+            // the ground into an olive cast. Night and sunset return
+            // a clear tint: glass over a jewel ground stands as-is.
+            RoundedRectangle(
+                cornerRadius: IhsanSpacing.cardRadius,
+                style: .continuous
+            )
+            .fill(
+                (isDayMode ? PaletteState.afternoon : PaletteState.night)
+                    .tokens.chromeTint
+            )
         }
         // iOS 26 native Liquid Glass — system iridescence and
         // refraction of the manuscript page beneath. The bare

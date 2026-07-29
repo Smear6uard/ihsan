@@ -458,17 +458,25 @@ struct CelestialPlateScene: View {
         let isDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
         let lift = tokens.groundBottomValue
             .scalingLightness(by: isDarkGround ? 0.82 : 0.90)
+        // With the 65:35 ground plane the bowl is a miniature under
+        // the chord. Below this depth the last-third region fill
+        // compresses into a wedge that reads as an artifact, so the
+        // compact bowl keeps only its linework: arc, midnight mark,
+        // cursor. The labels have their own depth gate below.
+        let compactBowl = plate.nightDepth < 40
 
         Canvas { context, _ in
             // The last third: a barely-brighter region within the ground.
-            context.fill(
-                Path(plate.lastThirdRegionPath(
-                    nightStart: night.start,
-                    lastThirdStart: night.lastThirdStart,
-                    nightEnd: night.end
-                )),
-                with: .color(lift.color)
-            )
+            if !compactBowl {
+                context.fill(
+                    Path(plate.lastThirdRegionPath(
+                        nightStart: night.start,
+                        lastThirdStart: night.lastThirdStart,
+                        nightEnd: night.end
+                    )),
+                    with: .color(lift.color)
+                )
+            }
 
             // The night's engraved scale — the same tapered filament
             // as the day's, quieter. No dashes.

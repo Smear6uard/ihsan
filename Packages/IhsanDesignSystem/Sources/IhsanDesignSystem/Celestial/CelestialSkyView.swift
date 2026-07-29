@@ -170,11 +170,13 @@ public struct CelestialSkyView: View {
 
         // The worked earth: three engraved filaments echoing the
         // terrain mark below the chord, shortening and fading as they
-        // deepen — the ground is drawn, not merely painted.
+        // deepen — the ground is drawn, not merely painted. Depths
+        // stay within the exposed strip between the chord and the
+        // focused card (~24 pt in the Today composition).
         let groundFilaments: [(depth: CGFloat, thickness: CGFloat, inset: CGFloat, opacity: Double)] = [
-            (13, 1.1, 0.11, 0.26),
-            (28, 0.9, 0.17, 0.15),
-            (45, 0.8, 0.24, 0.08)
+            (7, 1.1, 0.11, 0.26),
+            (14, 0.9, 0.17, 0.15),
+            (21, 0.8, 0.24, 0.08)
         ]
         for filament in groundFilaments {
             let y = horizonY + filament.depth
