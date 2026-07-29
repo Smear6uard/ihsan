@@ -8,7 +8,7 @@ import SwiftUI
 ///
 /// - **Fajr** — a half-sun + three rising rays.
 /// - **Dhuhr** — an eight-pointed star.
-/// - **Asr** — a six-pointed star.
+/// - **Asr** — a six-petal rosette.
 /// - **Maghrib** — a half-sun + three descending rays.
 /// - **Isha** — a crescent with a small star in its opening.
 ///

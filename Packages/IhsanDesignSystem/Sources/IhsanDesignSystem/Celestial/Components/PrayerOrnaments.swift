@@ -12,7 +12,7 @@ import SwiftUI
 ///   radiating rays above (dawn).
 /// - **Dhuhr** — an eight-pointed star, the classical Islamic solar
 ///   emblem at the zenith.
-/// - **Asr** — a six-pointed star, geometrically distinct from Dhuhr
+/// - **Asr** — a six-petal rosette, geometrically distinct from Dhuhr
 ///   so the eye reads "sun descending, less than zenith".
 /// - **Maghrib** — a half-sun on the horizon with three short rays
 ///   going downward beneath (sunset / descent). The Fajr shape mirrored
@@ -133,7 +133,7 @@ private struct DhuhrOrnament: View {
     }
 }
 
-// MARK: - Asr — six-pointed star (sun descending past its zenith)
+// MARK: - Asr — six-petal rosette (sun descending past its zenith)
 
 private struct AsrOrnament: View {
     let size: CGFloat
@@ -143,11 +143,11 @@ private struct AsrOrnament: View {
         Group {
             switch style.mode {
             case .stroked:
-                SixPointedStar()
+                SixPetalRosette(mode: .outline)
                     .stroke(style.body, lineWidth: style.lineWidth)
             case .filled:
-                SixPointedStar()
-                    .fill(style.body)
+                SixPetalRosette(mode: .filled)
+                    .fill(style.body, style: FillStyle(eoFill: true))
             }
         }
         .frame(width: size, height: size)
@@ -204,44 +204,6 @@ private struct IshaOrnament: View {
             }
         }
         .frame(width: size, height: size)
-    }
-}
-
-// MARK: - Six-pointed star (hexagram outline)
-
-/// A six-pointed star — two overlapping triangles drawn as one
-/// 12-point polygon outline (alternating outer and inner radii). Used
-/// by `Asr` to read as "sun past the zenith, less brilliant than Dhuhr".
-public struct SixPointedStar: Shape {
-    public var innerRatio: CGFloat
-
-    public init(innerRatio: CGFloat = 0.50) {
-        self.innerRatio = innerRatio
-    }
-
-    public func path(in rect: CGRect) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let outerRadius = min(rect.width, rect.height) / 2
-        let innerRadius = outerRadius * innerRatio
-
-        // 12 points alternating outer (6 cardinal star points) and
-        // inner (6 troughs between points). Step 30° per index.
-        var points: [CGPoint] = []
-        for i in 0..<12 {
-            let isOuter = i % 2 == 0
-            let radius = isOuter ? outerRadius : innerRadius
-            let angle = (-90.0 + Double(i) * 30.0) * .pi / 180.0
-            points.append(CGPoint(
-                x: center.x + CGFloat(cos(angle)) * radius,
-                y: center.y + CGFloat(sin(angle)) * radius
-            ))
-        }
-
-        var path = Path()
-        path.move(to: points[0])
-        for p in points.dropFirst() { path.addLine(to: p) }
-        path.closeSubpath()
-        return path
     }
 }
 

@@ -15,12 +15,14 @@ public enum OrnamentRenderMode: Sendable, Equatable {
 }
 
 /// The five marker ornaments, one per prayer, all derived from the
-/// same star-polygon construction language but each with a distinct
-/// silhouette — the acceptance criterion this library exists to meet:
+/// same compass-and-straightedge construction language but each with a
+/// distinct silhouette — the acceptance criterion this library exists
+/// to meet:
 ///
-/// - **Fajr — Najma.** Six-pointed star: two overlapping equilateral
-///   triangles with fine ray extensions. The simplest form; first
-///   light.
+/// - **Fajr — Warda.** Six-petal rosette: the classical compass-drawn
+///   flower — six circle-arcs about a center, petals converging at
+///   the heart. Open linework petals only: no rays, no medallion, no
+///   enclosing circle. The simplest form; first light.
 /// - **Dhuhr — Shamsa.** Twelve-lobed sun rosette with radiating
 ///   rays — the manuscript illuminator's "little sun," the richest
 ///   form, for the zenith. The one deliberate manuscript quotation
@@ -47,7 +49,7 @@ public struct PrayerOrnamentShape: Shape {
 
     public func path(in rect: CGRect) -> Path {
         switch prayer {
-        case .fajr: return Self.najma(in: rect, mode: mode)
+        case .fajr: return SixPetalRosette.path(in: rect, mode: mode)
         case .dhuhr: return Self.shamsa(in: rect, mode: mode)
         case .asr: return Self.khatam(in: rect, mode: mode)
         case .maghrib: return Self.lawzina(in: rect, mode: mode)
@@ -125,47 +127,6 @@ public struct PrayerOrnamentShape: Shape {
         path.addLine(to: point(around: center, radius: toRadius, degrees: degrees))
         path.addLine(to: point(around: center, radius: fromRadius, degrees: degrees + halfWidthDegrees))
         path.closeSubpath()
-        return path
-    }
-
-    // MARK: - Fajr: Najma (six-pointed star, fine rays)
-
-    static func najma(in rect: CGRect, mode: OrnamentRenderMode) -> Path {
-        let center = CGPoint(x: rect.midX, y: rect.midY)
-        let side = min(rect.width, rect.height)
-        let pointRadius = side * 0.34
-        let rayStart = side * 0.40
-        let rayEnd = side * 0.485
-
-        var path = Path()
-        switch mode {
-        case .outline:
-            // The construction: two interlocking equilateral triangles.
-            path.addPath(regularPolygon(center: center, sides: 3, radius: pointRadius, startDegrees: -90))
-            path.addPath(regularPolygon(center: center, sides: 3, radius: pointRadius, startDegrees: 90))
-            // Fine open rays extending each of the six points.
-            for i in 0..<6 {
-                let degrees = -90.0 + Double(i) * 60.0
-                path.move(to: point(around: center, radius: rayStart, degrees: degrees))
-                path.addLine(to: point(around: center, radius: rayEnd, degrees: degrees))
-            }
-        case .filled:
-            // Union silhouette of the hexagram (inner ratio 1/√3) plus
-            // sliver spikes for the rays.
-            path.addPath(starPolygon(
-                center: center, count: 6,
-                outerRadius: pointRadius,
-                innerRadius: pointRadius * 0.5774,
-                startDegrees: -90
-            ))
-            for i in 0..<6 {
-                let degrees = -90.0 + Double(i) * 60.0
-                path.addPath(spike(
-                    center: center, fromRadius: rayStart, toRadius: rayEnd,
-                    degrees: degrees, halfWidthDegrees: 2.4
-                ))
-            }
-        }
         return path
     }
 
@@ -340,6 +301,91 @@ public struct PrayerOrnamentShape: Shape {
                 startDegrees: -90
             ))
         }
+        return path
+    }
+}
+
+// MARK: - Six-petal rosette (Fajr — Warda)
+
+/// The classical compass-drawn six-petal rosette.
+///
+/// True construction, not an approximation: six circles of radius `r`
+/// centered on the vertices of a hexagon of circumradius `r` all pass
+/// through the shared center, and each adjacent pair intersects again
+/// at radius `r·√3`. Each petal is the vesica between two adjacent
+/// arcs — so all six petals converge at the heart and reach their
+/// tips at `r·√3`, exactly as drawn with a compass on vellum.
+///
+/// Petals only, per the ornament spec: no rays, no lobed medallion,
+/// no enclosing circle — at 16 pt this reads as a flower where the
+/// Dhuhr Shamsa reads as a sun.
+public struct SixPetalRosette: Shape {
+
+    public var mode: OrnamentRenderMode
+
+    public init(mode: OrnamentRenderMode = .filled) {
+        self.mode = mode
+    }
+
+    public func path(in rect: CGRect) -> Path {
+        Self.path(in: rect, mode: mode)
+    }
+
+    /// Both render modes trace the same six petal boundaries; the
+    /// outline is the construction, the fill is its union (petals are
+    /// disjoint except at the shared center, so even-odd is safe).
+    static func path(in rect: CGRect, mode: OrnamentRenderMode) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let side = min(rect.width, rect.height)
+        let tipRadius = side * 0.46
+        let compassRadius = tipRadius / sqrt(3.0)
+
+        var path = Path()
+        for k in 0..<6 {
+            let phi = -90.0 + Double(k) * 60.0
+            path.addPath(petal(
+                center: center,
+                compassRadius: compassRadius,
+                tipDegrees: phi
+            ))
+        }
+        return path
+    }
+
+    /// One petal: from the shared center out to the tip along the arc
+    /// of the circle at `tipDegrees − 30°`, back along the arc of the
+    /// circle at `tipDegrees + 30°`. Arcs are sampled as fine
+    /// polylines so the construction is coordinate-convention-proof;
+    /// at marker sizes the sampling is far below a pixel.
+    private static func petal(
+        center: CGPoint,
+        compassRadius r: CGFloat,
+        tipDegrees phi: Double
+    ) -> Path {
+        let samples = 14
+        var path = Path()
+        path.move(to: center)
+
+        // Outbound edge: circle centered at the hexagon vertex at
+        // φ − 30°; the center sits on it at angle φ + 150°, the tip at
+        // angle φ + 30°.
+        let c1 = PrayerOrnamentShape.point(around: center, radius: r, degrees: phi - 30)
+        for i in 1...samples {
+            let t = Double(i) / Double(samples)
+            let degrees = (phi + 150) - 120 * t
+            path.addLine(to: PrayerOrnamentShape.point(around: c1, radius: r, degrees: degrees))
+        }
+
+        // Return edge: circle centered at φ + 30°; the tip sits on it
+        // at angle φ − 30°, the center at angle φ − 150°.
+        let c2 = PrayerOrnamentShape.point(around: center, radius: r, degrees: phi + 30)
+        for i in 1...samples {
+            let t = Double(i) / Double(samples)
+            let degrees = (phi - 30) - 120 * t
+            path.addLine(to: PrayerOrnamentShape.point(around: c2, radius: r, degrees: degrees))
+        }
+
+        path.closeSubpath()
         return path
     }
 }
