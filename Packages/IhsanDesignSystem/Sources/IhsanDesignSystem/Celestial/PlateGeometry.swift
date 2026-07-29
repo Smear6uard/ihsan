@@ -180,11 +180,23 @@ public struct PlateGeometry: Sendable, Equatable {
     ///   - azimuthUnit: Horizontal position across the plate in
     ///     `0...1` (the caller maps its hour-angle convention into
     ///     this; the plate does not care which).
-    public func bodyPosition(altitudeDegrees: Double, azimuthUnit: Double) -> CGPoint {
+    ///   - apexAltitudeDegrees: The day's solar culmination altitude.
+    ///     The vertical scale is normalised to it, so at solar noon
+    ///     the sun sits exactly at the arc's apex — the arc is the
+    ///     day's own road, not a fixed 90° protractor. Bodies higher
+    ///     than the apex (a high moon) clamp to the apex height. The
+    ///     default keeps the legacy 90° scale for callers that have
+    ///     no ephemeris.
+    public func bodyPosition(
+        altitudeDegrees: Double,
+        azimuthUnit: Double,
+        apexAltitudeDegrees: Double = 90.0
+    ) -> CGPoint {
         let clampedAzimuth = max(0.0, min(1.0, azimuthUnit))
         let x = centerX + semiWidth * CGFloat(clampedAzimuth * 2 - 1)
         if altitudeDegrees >= 0 {
-            let a = min(90.0, altitudeDegrees) / 90.0
+            let apex = max(1.0, min(90.0, apexAltitudeDegrees))
+            let a = min(1.0, min(90.0, altitudeDegrees) / apex)
             return CGPoint(x: x, y: horizonY - rise * CGFloat(a))
         }
         let depth = max(8, rect.maxY - markerClearance - horizonY)

@@ -204,3 +204,83 @@ struct PlateGeometryTests {
         #expect(bounds.height <= 3.0, "filament reads as a band, not a fine line")
     }
 }
+
+/// Part-A item 5: the plate's vertical mapping is normalised to the
+/// day's own solar culmination, so at solar noon the sun sits exactly
+/// at the arc's apex — the arc is the sun's road, and noon is its
+/// highest point, at any latitude and season.
+struct BodyApexMappingTests {
+
+    private var plate: PlateGeometry {
+        let base = Date(timeIntervalSinceReferenceDate: 700_000_000)
+        return PlateGeometry(
+            rect: CGRect(x: 0, y: 100, width: 402, height: 520),
+            eventTimes: (0..<5).map { base.addingTimeInterval(Double($0) * 3 * 3600) }
+        )
+    }
+
+    @Test
+    func sunSitsAtTheArcApexAtSolarNoon() {
+        // Chicago mid-summer noon altitude ≈ 71°; the apex altitude IS
+        // the noon altitude, so the mapped point is the apex itself.
+        let apexAltitude = 71.3
+        let p = plate.bodyPosition(
+            altitudeDegrees: apexAltitude,
+            azimuthUnit: 0.5,
+            apexAltitudeDegrees: apexAltitude
+        )
+        let apex = plate.arcApex
+        #expect(abs(p.x - apex.x) < 0.5)
+        #expect(abs(p.y - apex.y) < 0.5)
+    }
+
+    @Test
+    func winterNoonStillReachesTheApex() {
+        // A low winter culmination (18°) still tops out at the apex —
+        // the plate renders the day's own arc, not a fixed 90° scale.
+        let p = plate.bodyPosition(
+            altitudeDegrees: 18.0,
+            azimuthUnit: 0.5,
+            apexAltitudeDegrees: 18.0
+        )
+        #expect(abs(p.y - plate.arcApex.y) < 0.5)
+    }
+
+    @Test
+    func altitudeMappingIsMonotonicUpToTheApex() {
+        let apexAltitude = 60.0
+        var lastY = CGFloat.greatestFiniteMagnitude
+        for altitude in stride(from: 0.0, through: 60.0, by: 5.0) {
+            let y = plate.bodyPosition(
+                altitudeDegrees: altitude,
+                azimuthUnit: 0.5,
+                apexAltitudeDegrees: apexAltitude
+            ).y
+            #expect(y < lastY, "higher sun must sit higher on the plate")
+            lastY = y
+        }
+    }
+
+    /// A body above the day's solar apex (the moon can culminate
+    /// higher than the sun) clamps to the apex height rather than
+    /// escaping the plate.
+    @Test
+    func bodiesAboveTheApexClampToIt() {
+        let p = plate.bodyPosition(
+            altitudeDegrees: 80.0,
+            azimuthUnit: 0.5,
+            apexAltitudeDegrees: 40.0
+        )
+        #expect(abs(p.y - plate.arcApex.y) < 0.5)
+    }
+
+    /// Below-horizon mapping is unchanged by the apex parameter.
+    @Test
+    func submergedMappingIgnoresTheApex() {
+        let with = plate.bodyPosition(
+            altitudeDegrees: -9.0, azimuthUnit: 0.3, apexAltitudeDegrees: 45.0
+        )
+        let without = plate.bodyPosition(altitudeDegrees: -9.0, azimuthUnit: 0.3)
+        #expect(with == without)
+    }
+}

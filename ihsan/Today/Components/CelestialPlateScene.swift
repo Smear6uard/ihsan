@@ -121,6 +121,12 @@ struct CelestialPlateScene: View {
         let tokens = PaletteState.resolved(for: phase)
         let sun = SolarPosition.compute(at: date, latitude: latitude, longitude: longitude)
         let moon = LunarPosition.compute(at: date, latitude: latitude, longitude: longitude)
+        // The day's solar culmination — the plate's vertical scale is
+        // normalised to it so the sun tops the arc exactly at solar
+        // noon. Dhuhr is the schedule's stand-in for the transit.
+        let apexAltitude = SolarPosition.compute(
+            at: solarEvents.solarNoon, latitude: latitude, longitude: longitude
+        ).altitude
 
         GeometryReader { geometry in
             let plate = plateGeometry(in: geometry.size)
@@ -133,12 +139,18 @@ struct CelestialPlateScene: View {
                     probe: probe
                 )
 
-                atmosphere(plate: plate, tokens: tokens, sun: sun, moon: moon)
+                atmosphere(
+                    plate: plate, tokens: tokens, sun: sun, moon: moon,
+                    apexAltitude: apexAltitude
+                )
                 dayArc(plate: plate, tokens: tokens)
                 if let night, night.contains(date) {
                     nightLayer(plate: plate, tokens: tokens, night: night, date: date)
                 }
-                bodies(plate: plate, tokens: tokens, sun: sun, moon: moon)
+                bodies(
+                    plate: plate, tokens: tokens, sun: sun, moon: moon,
+                    apexAltitude: apexAltitude
+                )
                 markerLayer(plate: plate, tokens: tokens)
             }
         }
@@ -186,7 +198,8 @@ struct CelestialPlateScene: View {
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
         sun: SolarPosition,
-        moon: LunarPosition
+        moon: LunarPosition,
+        apexAltitude: Double
     ) -> some View {
         if !reduceTransparency {
             let onDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
@@ -198,12 +211,14 @@ struct CelestialPlateScene: View {
                 // spill means the ground catches the last of the sun,
                 // which is what the ground does.
                 drawSolarBloom(
-                    into: context, size: size, plate: plate, tokens: tokens, sun: sun
+                    into: context, size: size, plate: plate, tokens: tokens,
+                    sun: sun, apexAltitude: apexAltitude
                 )
                 if onDarkGround {
                     drawLunarBloom(
                         into: context, size: size, plate: plate,
-                        tokens: tokens, sun: sun, moon: moon
+                        tokens: tokens, sun: sun, moon: moon,
+                        apexAltitude: apexAltitude
                     )
                 }
             }
@@ -226,7 +241,8 @@ struct CelestialPlateScene: View {
         size: CGSize,
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
-        sun: SolarPosition
+        sun: SolarPosition,
+        apexAltitude: Double
     ) {
         let strength = solarBloomStrength(altitudeDegrees: sun.altitude)
         guard strength > 0.005 else { return }
@@ -284,7 +300,8 @@ struct CelestialPlateScene: View {
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
         sun: SolarPosition,
-        moon: LunarPosition
+        moon: LunarPosition,
+        apexAltitude: Double
     ) {
         let strength = 0.17
             * submergedPresence(altitudeDegrees: moon.altitude)
@@ -293,7 +310,8 @@ struct CelestialPlateScene: View {
 
         let center = plate.bodyPosition(
             altitudeDegrees: moon.altitude,
-            azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle)
+            azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle),
+            apexAltitudeDegrees: apexAltitude
         )
         let radius = size.width * 0.15
 
@@ -472,7 +490,8 @@ struct CelestialPlateScene: View {
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
         sun: SolarPosition,
-        moon: LunarPosition
+        moon: LunarPosition,
+        apexAltitude: Double
     ) -> some View {
         // The moon is drawn first so the sun's halo passes over it
         // during the daytime conjunctions rather than under it.
@@ -491,7 +510,8 @@ struct CelestialPlateScene: View {
         .position(
             plate.bodyPosition(
                 altitudeDegrees: moon.altitude,
-                azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle)
+                azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle),
+                apexAltitudeDegrees: apexAltitude
             )
         )
 
@@ -500,7 +520,8 @@ struct CelestialPlateScene: View {
             .position(
                 plate.bodyPosition(
                     altitudeDegrees: sun.altitude,
-                    azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle)
+                    azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
+                    apexAltitudeDegrees: apexAltitude
                 )
             )
     }
