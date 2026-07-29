@@ -29,6 +29,7 @@ struct SettingsScreen: View {
     @State private var confirmingDeleteAllData = false
     @State private var exportItem: ExportItem?
     @State private var exportError: String?
+    @State private var showingRepairSetup = false
 
     #if DEBUG
     @State private var showingCoordinates = false
@@ -67,6 +68,13 @@ struct SettingsScreen: View {
                             path: $path,
                             onToggle: handleTravelToggle(_:)
                         )
+                        MakeupPrayersSection(
+                            settings: settings,
+                            onBeginSetup: {
+                                Haptics.impact(.light)
+                                showingRepairSetup = true
+                            }
+                        )
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
                         PrivacySection(
@@ -101,6 +109,9 @@ struct SettingsScreen: View {
             bootstrapSettings()
             latestPlace = locationCoordinator.mostRecentResolvedPlace()
             await loadFiqhFraming()
+        }
+        .fullScreenCover(isPresented: $showingRepairSetup) {
+            RepairSetupFlow()
         }
         .confirmationDialog(
             "Pause prayer tracking?",
@@ -670,6 +681,58 @@ private struct TravelModeSection: View {
             }
 
             SettingsDescriptionText(description)
+        }
+    }
+}
+
+private struct MakeupPrayersSection: View {
+    let settings: UserSettings
+    let onBeginSetup: () -> Void
+
+    var body: some View {
+        SettingsSectionCard("Makeup Prayers") {
+            if settings.qadaTrackingEnabled {
+                SettingsRow(
+                    title: "Unlogged prayers flow here",
+                    subtitle: "When a day passes without a record",
+                    icon: "arrow.uturn.backward"
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { settings.qadaMissedFlowEnabled },
+                        set: {
+                            settings.qadaMissedFlowEnabled = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Unlogged prayers flow into makeup count")
+                }
+
+                SettingsRow(title: "Track witr", icon: "moon.haze.fill") {
+                    Toggle("", isOn: Binding(
+                        get: { settings.qadaTracksWitr },
+                        set: {
+                            settings.qadaTracksWitr = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Track witr makeups")
+                }
+
+                SettingsDescriptionText("Your makeup counts live on the Path screen, at your pace.")
+            } else {
+                SettingsRow(
+                    title: "Makeup prayers",
+                    subtitle: "At your pace",
+                    icon: "arrow.uturn.backward",
+                    action: onBeginSetup
+                )
+
+                SettingsDescriptionText("If you carry prayers to return to, Ihsan can hold the count with you. Nothing is shown until you choose it.")
+            }
         }
     }
 }

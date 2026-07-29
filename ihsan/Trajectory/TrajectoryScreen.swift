@@ -32,8 +32,15 @@ struct TrajectoryScreen: View {
     @Query(sort: \TravelInterval.startDate, order: .reverse)
     private var travels: [TravelInterval]
 
+    @Query private var settingsRows: [UserSettings]
+
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
+    @State private var showingRepairSetup = false
+
+    private var settings: UserSettings? {
+        settingsRows.first
+    }
 
     var body: some View {
         ScrollView {
@@ -43,6 +50,17 @@ struct TrajectoryScreen: View {
 
                 PeriodSelector(period: $viewModel.period)
                     .padding(.horizontal, IhsanSpacing.md)
+
+                if let settings, !settings.qadaTrackingEnabled, !settings.qadaPathCardDismissed {
+                    RepairInviteCard(
+                        onBegin: { showingRepairSetup = true },
+                        onDismiss: {
+                            settings.qadaPathCardDismissed = true
+                            settings.modifiedAt = .now
+                        }
+                    )
+                    .padding(.horizontal, IhsanSpacing.md)
+                }
 
                 content
 
@@ -84,6 +102,9 @@ struct TrajectoryScreen: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+        }
+        .fullScreenCover(isPresented: $showingRepairSetup) {
+            RepairSetupFlow()
         }
     }
 
