@@ -159,6 +159,17 @@ func highLatitudeSummerNightResolvesWheneverFardTimesDo() throws {
 }
 
 @Test
+func nightContainsItsInstantsHalfOpen() throws {
+    let night = try chicagoNight()
+
+    #expect(night.contains(night.start))
+    #expect(night.contains(night.nisfAlLayl))
+    #expect(night.contains(night.end.addingTimeInterval(-1)))
+    #expect(!night.contains(night.end))
+    #expect(!night.contains(night.start.addingTimeInterval(-1)))
+}
+
+@Test
 func invertedNightInputsThrow() {
     let maghrib = Date(timeIntervalSince1970: 1_778_893_440)
     #expect(throws: PrayerTimesError.self) {

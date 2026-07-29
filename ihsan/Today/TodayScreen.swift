@@ -208,6 +208,7 @@ private struct TodayReadyView: View {
                     timeZone: snapshot.place.timeZone,
                     topInset: proxy.safeAreaInsets.top + Self.headerZoneHeight,
                     bottomInset: markerZoneBottomInset,
+                    night: snapshot.night,
                     onMarkerTap: handleMarkerTap
                 )
                 .ignoresSafeArea()

@@ -226,3 +226,35 @@ Items needing pure device verification (no source change possible):
   palette states, and that beginning/ending a pause from the log sheet
   droplet suppresses/restores scheduled notifications (inspect Pending
   Notifications in Console or the debug scheduler dump).
+
+## Night intelligence (phase 3, divided night) — device verification needed
+
+- **Screenshots at the three night moments**. The acceptance criteria
+  are device captures at post-Isha, at nisf al-layl, and inside the
+  last third. This Mac cannot build the app scheme (watchOS platform
+  unavailable); capture on device. The last-third capture should show
+  the luminance lift, the brighter cursor halo, and both small-caps
+  inscriptions clear of the sinking sun/moon traces.
+- **Daytime pixel diff**. The night layer is compiled behind
+  `if let night, night.contains(date)` in `CelestialPlateScene.scene(at:)`
+  and no daytime drawing path changed (verify with `git diff 8774eba..`
+  on the scene: additions only). The acceptance criterion is still a
+  screenshot diff of a daytime capture against a pre-phase build —
+  take both on device at a fixed `timeOverride`.
+- **Luminance lift subtlety on OLED**. The last-third region fills with
+  `groundBottom.scalingLightness(by: 0.82)` against the subterranean
+  plane at `0.72` — one lightness step apart, same hue. Whether the
+  step reads as "barely brighter" or as a hard contour at night-time
+  brightness is an OLED question; check at minimum screen brightness
+  with True Tone off.
+- **Night inscriptions at Dynamic Type .accessibility5**. "Midnight"
+  and "Last third" are engraved at the plate's fixed 10 pt small-caps
+  size (matching the marker time labels, which are also fixed) and are
+  `accessibilityHidden`; the information is carried by a VoiceOver
+  summary element ("Night. Islamic midnight 12:58 AM; the last third
+  begins 2:52 AM."). Confirm VoiceOver reads the summary once, and
+  that the fixed-size engravings stay legible on device.
+- **Reduce Motion / Reduce Transparency at night**. The night layer is
+  static per evaluation (no new animation; the cursor halo is a fixed
+  radial, not a pulse). Under Reduce Transparency the halo collapses to
+  a flat disc. Spot-check both toggles during the last third.

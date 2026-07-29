@@ -109,8 +109,38 @@ final class TodayViewModel {
             nextPrayerTime: nextPrayer,
             isWithinFajrToSunriseWindow: isWithinFajrToSunriseWindow(now: now, dayTimes: dayTimes),
             activePrayer: activePrayer,
-            ramadanContext: RamadanContext(at: now, calendar: hijriCalendar)
+            ramadanContext: RamadanContext(at: now, calendar: hijriCalendar),
+            night: relevantNight(now: now, place: place, settings: settings)
         ))
+    }
+
+    /// The night the plate should know about: before Fajr that is the
+    /// night already in progress (yesterday's Maghrib onward); the rest
+    /// of the day it is the night ahead, ready the moment Maghrib passes.
+    private func relevantNight(
+        now: Date,
+        place: LocatedPlace,
+        settings: UserSettings
+    ) -> NightIntervals? {
+        func night(for date: Date) -> NightIntervals? {
+            try? prayerTimesProvider.nightIntervals(
+                for: date,
+                coordinates: place.coordinates,
+                timeZone: place.timeZone,
+                calculationMethod: settings.calculationMethod,
+                madhab: settings.madhab,
+                highLatitudeRule: settings.highLatitudeRule
+            )
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = place.timeZone
+        if let yesterday = calendar.date(byAdding: .day, value: -1, to: now),
+           let previous = night(for: yesterday),
+           previous.contains(now) {
+            return previous
+        }
+        return night(for: now)
     }
 
     func setStatus(_ status: PrayerStatus, for prayer: Prayer) async {

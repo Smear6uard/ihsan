@@ -1,5 +1,6 @@
 import IhsanCore
 import IhsanDesignSystem
+import IhsanPrayerTimes
 import SwiftUI
 
 /// The Today screen's instrument: palette-v2 atmosphere, the engraved
@@ -62,6 +63,12 @@ struct CelestialPlateScene: View {
     /// frame — only the arc, the markers, and the horizon respect these.
     var topInset: CGFloat = 0
     var bottomInset: CGFloat = 0
+
+    /// Tonight's divided night, when the caller has computed it. The plate
+    /// gains its night geometry only while the moment lies inside this
+    /// span — between Maghrib and the next true Fajr. `nil`, or any
+    /// daytime instant, renders exactly the pre-night plate.
+    var night: NightIntervals?
 
     /// Fixed instant, for previews and snapshot renders. `nil` drives
     /// the scene from the clock.
@@ -139,6 +146,9 @@ struct CelestialPlateScene: View {
 
                 atmosphere(plate: plate, tokens: tokens, sun: sun, moon: moon)
                 dayArc(plate: plate, tokens: tokens)
+                if let night, night.contains(date) {
+                    nightLayer(plate: plate, tokens: tokens, night: night, date: date)
+                }
                 bodies(plate: plate, tokens: tokens, sun: sun, moon: moon)
                 markerLayer(plate: plate, tokens: tokens)
             }
@@ -329,6 +339,141 @@ struct CelestialPlateScene: View {
             )
             .allowsHitTesting(false)
             .accessibilityHidden(true)
+    }
+
+    // MARK: - The divided night
+
+    /// The night's geometry, drawn only between Maghrib and the next true
+    /// Fajr: a mirrored arc beneath the chord, a fine metal filament at
+    /// nisf al-layl, a soft luminance lift over the last third — the same
+    /// ground material, one step brighter, never a colored overlay — and a
+    /// quiet cursor for the present moment.
+    ///
+    /// Everything here is static per evaluation; the scene's own timeline
+    /// (or its Reduce Motion snapshot) is the only clock. Reduce
+    /// Transparency drops the cursor's glow to a flat disc; the region
+    /// lift is already a flat fill.
+    @ViewBuilder
+    private func nightLayer(
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        night: NightIntervals,
+        date: Date
+    ) -> some View {
+        let geometry = plate.nightGeometry(
+            nightStart: night.start,
+            nisfAlLayl: night.nisfAlLayl,
+            lastThirdStart: night.lastThirdStart,
+            nightEnd: night.end
+        )
+        let inLastThird = date >= night.lastThirdStart
+        let isDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
+        let lift = tokens.groundBottomValue
+            .scalingLightness(by: isDarkGround ? 0.82 : 0.90)
+
+        Canvas { context, _ in
+            // The last third: a barely-brighter region within the ground.
+            context.fill(
+                Path(plate.lastThirdRegionPath(
+                    nightStart: night.start,
+                    lastThirdStart: night.lastThirdStart,
+                    nightEnd: night.end
+                )),
+                with: .color(lift.color)
+            )
+
+            // The night's engraved scale, quieter than the day's.
+            context.stroke(
+                Path(plate.nightArcPath()),
+                with: .color(tokens.metal.opacity(0.16)),
+                style: StrokeStyle(lineWidth: 0.8, lineCap: .round, dash: [1, 6])
+            )
+
+            // Nisf al-layl: a fine metal filament crossing the arc.
+            context.fill(
+                Path(plate.midnightFilamentPath(at: geometry.midnightPoint)),
+                with: .color(tokens.metal.opacity(0.60))
+            )
+        }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+
+        if plate.nightDepth >= 60 {
+            nightInscription("Midnight", tokens: tokens)
+                .position(geometry.midnightLabelAnchor)
+            nightInscription("Last third", tokens: tokens)
+                .position(geometry.lastThirdLabelAnchor)
+        }
+
+        nightCursor(tokens: tokens, luminous: inLastThird)
+            .position(
+                plate.nightPosition(for: date, nightStart: night.start, nightEnd: night.end)
+            )
+
+        // One summary element carries the divided night for VoiceOver; the
+        // engraved labels above are decorative duplicates at fixed size.
+        Color.clear
+            .frame(width: 1, height: 1)
+            .position(geometry.midnightPoint)
+            .accessibilityElement()
+            .accessibilityLabel(nightAccessibilitySummary(night: night, inLastThird: inLastThird))
+
+    }
+
+    private func nightInscription(_ text: String, tokens: SkyPaletteTokens) -> some View {
+        Text(text)
+            .font(Self.labelFont)
+            .textCase(.uppercase)
+            .tracking(1.4)
+            .foregroundStyle(tokens.inkSecondary)
+            .shadow(color: tokens.inkHalo, radius: 2)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
+
+    /// The present moment on the night arc. Through the first two thirds
+    /// it is a faint engraving; inside the last third it takes the quiet
+    /// luminous treatment — a fixed halo, not an animation, so Reduce
+    /// Motion needs no branch here.
+    @ViewBuilder
+    private func nightCursor(tokens: SkyPaletteTokens, luminous: Bool) -> some View {
+        if luminous {
+            Circle()
+                .fill(tokens.metalHighlight)
+                .frame(width: 5, height: 5)
+                .background {
+                    if !reduceTransparency {
+                        RadialGradient(
+                            colors: [tokens.glow.opacity(0.38), tokens.glow.opacity(0)],
+                            center: .center,
+                            startRadius: 0,
+                            endRadius: 16
+                        )
+                        .frame(width: 32, height: 32)
+                    } else {
+                        Circle()
+                            .fill(tokens.glow.opacity(0.20))
+                            .frame(width: 14, height: 14)
+                    }
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        } else {
+            Circle()
+                .fill(tokens.metal.opacity(0.45))
+                .frame(width: 4, height: 4)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
+    }
+
+    private func nightAccessibilitySummary(night: NightIntervals, inLastThird: Bool) -> String {
+        let midnight = Self.timeString(night.nisfAlLayl, in: timeZone)
+        let lastThird = Self.timeString(night.lastThirdStart, in: timeZone)
+        if inLastThird {
+            return "The last third of the night, since \(lastThird). Islamic midnight was \(midnight)."
+        }
+        return "Night. Islamic midnight \(midnight); the last third begins \(lastThird)."
     }
 
     // MARK: - Sun and moon

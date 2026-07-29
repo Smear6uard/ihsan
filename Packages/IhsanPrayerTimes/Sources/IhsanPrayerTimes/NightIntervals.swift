@@ -31,6 +31,12 @@ public struct NightIntervals: Sendable, Hashable {
         lastThird.start
     }
 
+    /// Whether an instant falls in this night, half-open at Fajr so a
+    /// moment belongs to exactly one night.
+    public func contains(_ date: Date) -> Bool {
+        date >= start && date < end
+    }
+
     public init(maghrib: Date, nextFajr: Date) throws {
         guard nextFajr > maghrib else {
             throw PrayerTimesError.invalidDate(
