@@ -9,6 +9,10 @@ import IhsanNotifications
 struct IhsanApp: App {
     let modelContainer: ModelContainer
 
+    /// Resolved once at launch; `.system` unless a debug run passed
+    /// `-IhsanNowOverride <ISO8601>`.
+    private let nowProvider = NowProvider.fromLaunchArguments()
+
     init() {
         // Try the shared App-Group + CloudKit store first; fall back to in-memory
         // when the app group entitlement isn't yet wired (e.g. early development).
@@ -33,6 +37,7 @@ struct IhsanApp: App {
     var body: some Scene {
         WindowGroup {
             RootGate()
+                .environment(\.nowProvider, nowProvider)
                 .preferredColorScheme(.dark)
                 .task {
                     // Pre-warm the location coordinator so authorization and
