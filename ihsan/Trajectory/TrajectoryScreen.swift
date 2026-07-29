@@ -37,6 +37,7 @@ struct TrajectoryScreen: View {
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
+    @State private var showingRepairDetail = false
 
     private var settings: UserSettings? {
         settingsRows.first
@@ -63,6 +64,11 @@ struct TrajectoryScreen: View {
                 }
 
                 content
+
+                if settings?.qadaTrackingEnabled == true {
+                    RepairSection(onOpen: { showingRepairDetail = true })
+                        .padding(.horizontal, IhsanSpacing.md)
+                }
 
                 Color.clear.frame(height: IhsanSpacing.xl)
             }
@@ -105,6 +111,11 @@ struct TrajectoryScreen: View {
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
+        }
+        .sheet(isPresented: $showingRepairDetail) {
+            RepairDetailScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
         }
     }
 
