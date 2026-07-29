@@ -43,6 +43,11 @@ public struct CelestialSkyView: View {
     /// when composing a full scene so the atmosphere and the markers
     /// agree). `nil` derives it from `horizonFraction`.
     public let horizonYOverride: CGFloat?
+    /// Height of the instrument zone the horizon band is sized
+    /// against. The band spec is 6–10% *of the plate*, not of the
+    /// whole frame — pass `PlateGeometry.rect.height` when composing
+    /// a full scene. `nil` falls back to the view's own height.
+    public let plateHeight: CGFloat?
     /// Seed for the star field. Fixed by default so the night sky is
     /// the same sky every launch.
     public let starSeed: UInt64
@@ -62,6 +67,7 @@ public struct CelestialSkyView: View {
         sunAltitudeDegrees: Double,
         horizonFraction: CGFloat = 0.62,
         horizonY: CGFloat? = nil,
+        plateHeight: CGFloat? = nil,
         starSeed: UInt64 = 0x1A5F_0426,
         probe: FrameTimeProbe? = nil
     ) {
@@ -69,6 +75,7 @@ public struct CelestialSkyView: View {
         self.sunAltitudeDegrees = sunAltitudeDegrees
         self.horizonFraction = horizonFraction
         self.horizonYOverride = horizonY
+        self.plateHeight = plateHeight
         self.starSeed = starSeed
         self.probe = probe
     }
@@ -94,6 +101,7 @@ public struct CelestialSkyView: View {
                     nightness: phase.nightness,
                     sunAltitudeDegrees: sunAltitudeDegrees,
                     horizonY: horizonYOverride ?? size.height * horizonFraction,
+                    plateHeight: plateHeight ?? size.height,
                     time: time,
                     flat: reduceTransparency,
                     seed: starSeed
@@ -118,11 +126,14 @@ public struct CelestialSkyView: View {
         nightness: Double,
         sunAltitudeDegrees: Double,
         horizonY: CGFloat,
+        plateHeight: CGFloat? = nil,
         time: TimeInterval,
         flat: Bool,
         seed: UInt64
     ) {
-        let bandHeight = size.height * 0.08
+        // The horizon band: ~8% of the *plate* height, inside the
+        // spec's 6–10% window.
+        let bandHeight = (plateHeight ?? size.height) * 0.08
 
         // Sky.
         let skyRect = CGRect(origin: .zero, size: size)
@@ -171,7 +182,7 @@ public struct CelestialSkyView: View {
                 with: .linearGradient(
                     Gradient(colors: [
                         tokens.horizonWashValue.color.opacity(0.0),
-                        tokens.horizonWashValue.color.opacity(0.55)
+                        tokens.horizonWashValue.color.opacity(0.70)
                     ]),
                     startPoint: CGPoint(x: 0, y: washTop.minY),
                     endPoint: CGPoint(x: 0, y: washTop.maxY)
@@ -184,7 +195,7 @@ public struct CelestialSkyView: View {
                 Path(washBelow),
                 with: .linearGradient(
                     Gradient(colors: [
-                        tokens.horizonWashValue.color.opacity(0.30),
+                        tokens.horizonWashValue.color.opacity(0.42),
                         tokens.horizonWashValue.color.opacity(0.0)
                     ]),
                     startPoint: CGPoint(x: 0, y: washBelow.minY),

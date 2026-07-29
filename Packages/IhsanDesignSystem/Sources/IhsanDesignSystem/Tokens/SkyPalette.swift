@@ -197,11 +197,12 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// The below-horizon ground plane: the ground tone taken one
     /// lightness step deeper (darker on jewel grounds, still luminous
     /// on the near-white days) — the same material, deeper, never a
-    /// new color.
+    /// new color. Deep enough that the plate visibly *terminates* at
+    /// the chord instead of fading into void.
     public var subterranean: Color { subterraneanValue.color }
     public var subterraneanValue: SRGBValue {
         let isLight = groundBottomValue.relativeLuminance > 0.5
-        return groundBottomValue.scalingLightness(by: isLight ? 0.94 : 0.72)
+        return groundBottomValue.scalingLightness(by: isLight ? 0.88 : 0.60)
     }
 
 }

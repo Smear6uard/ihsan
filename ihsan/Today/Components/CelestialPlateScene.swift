@@ -136,6 +136,7 @@ struct CelestialPlateScene: View {
                     phase: phase,
                     sunAltitudeDegrees: sun.altitude,
                     horizonY: plate.horizonY,
+                    plateHeight: plate.rect.height,
                     probe: probe
                 )
 
