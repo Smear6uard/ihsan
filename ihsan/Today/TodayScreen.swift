@@ -602,6 +602,7 @@ private struct TodayReadyView: View {
         Haptics.notification(.success)
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
+            await NightWakeService.shared.refresh(using: modelContext)
         }
     }
 

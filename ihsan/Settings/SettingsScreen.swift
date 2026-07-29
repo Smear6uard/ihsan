@@ -31,6 +31,7 @@ struct SettingsScreen: View {
     @State private var exportItem: ExportItem?
     @State private var exportError: String?
     @State private var showingRepairSetup = false
+    @State private var nightWakeUsesFallback = false
 
     #if DEBUG
     @State private var showingCoordinates = false
@@ -76,7 +77,12 @@ struct SettingsScreen: View {
                                 showingRepairSetup = true
                             }
                         )
-                        SunnahSection(settings: settings, path: $path)
+                        SunnahSection(
+                            settings: settings,
+                            path: $path,
+                            wakeFallbackNote: nightWakeFallbackNote,
+                            onWakeSettingsChanged: { refreshNightWake(for: settings) }
+                        )
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
                         PrivacySection(
@@ -110,6 +116,7 @@ struct SettingsScreen: View {
         .task {
             bootstrapSettings()
             latestPlace = locationCoordinator.mostRecentResolvedPlace()
+            nightWakeUsesFallback = NightWakeService.shared.usesNotificationFallback
             await loadFiqhFraming()
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
@@ -215,6 +222,23 @@ struct SettingsScreen: View {
             RawatibCountsPicker(settings: settings)
         case .duhaWindow:
             DuhaWindowPicker(settings: settings)
+        }
+    }
+
+    private var nightWakeFallbackNote: String? {
+        guard settings?.nightWakeEnabled == true, nightWakeUsesFallback else { return nil }
+        return "Alarms aren't permitted on this device, so the wake arrives as a time-sensitive notification instead."
+    }
+
+    /// Re-syncs the standing wake after any wake-related change in Set,
+    /// requesting alarm permission the moment the user turns it on.
+    private func refreshNightWake(for settings: UserSettings) {
+        Task {
+            if settings.nightWakeEnabled {
+                await NightWakeService.shared.requestAlarmAuthorizationIfNeeded()
+            }
+            await NightWakeService.shared.refresh(using: modelContext)
+            nightWakeUsesFallback = NightWakeService.shared.usesNotificationFallback
         }
     }
 
@@ -348,6 +372,9 @@ struct SettingsScreen: View {
     private func rebuildNotificationSchedule() {
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
+            // The gentle wake honors the same pause the notification
+            // schedule does — re-sync it whenever the schedule rebuilds.
+            await NightWakeService.shared.refresh(using: modelContext)
         }
     }
 
@@ -801,6 +828,10 @@ private struct MakeupPrayersSection: View {
 private struct SunnahSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
+    /// Plain-spoken note shown when the wake will arrive as a
+    /// time-sensitive notification rather than a true alarm.
+    var wakeFallbackNote: String?
+    var onWakeSettingsChanged: () -> Void = {}
 
     var body: some View {
         SettingsSectionCard("Sunnah & Night Prayer") {
@@ -820,6 +851,7 @@ private struct SunnahSection: View {
                             settings.sunnahNightEnabled = true
                         }
                         settings.modifiedAt = .now
+                        onWakeSettingsChanged()
                     }
                 ))
                 .labelsHidden()
@@ -884,11 +916,52 @@ private struct SunnahSection: View {
                         set: {
                             settings.sunnahNightEnabled = $0
                             settings.modifiedAt = .now
+                            onWakeSettingsChanged()
                         }
                     ))
                     .labelsHidden()
                     .tint(IhsanColor.brass)
                     .accessibilityLabel("Night prayer")
+                }
+
+                if settings.sunnahNightEnabled {
+                    SettingsRow(title: "Gentle wake", subtitle: "For the last third", icon: "alarm") {
+                        Toggle("", isOn: Binding(
+                            get: { settings.nightWakeEnabled },
+                            set: {
+                                settings.nightWakeEnabled = $0
+                                settings.modifiedAt = .now
+                                onWakeSettingsChanged()
+                            }
+                        ))
+                        .labelsHidden()
+                        .tint(IhsanColor.brass)
+                        .accessibilityLabel("Gentle wake")
+                    }
+
+                    if settings.nightWakeEnabled {
+                        HStack {
+                            miniCountControl(
+                                label: "Wake before it begins (min)",
+                                value: settings.nightWakeOffsetMinutes,
+                                step: 5,
+                                range: 0...60,
+                                accessibilityLabel: "Minutes before the last third to wake"
+                            ) {
+                                settings.nightWakeOffsetMinutes = $0
+                                settings.modifiedAt = .now
+                                onWakeSettingsChanged()
+                            }
+                            Spacer()
+                        }
+                        .padding(.vertical, IhsanSpacing.xs)
+
+                        SettingsDescriptionText("The last third of the night is computed from each night's own span, Maghrib to the coming Fajr — the wake follows it, softly, and never rings during a pause.")
+
+                        if let wakeFallbackNote {
+                            SettingsDescriptionText(wakeFallbackNote)
+                        }
+                    }
                 }
 
                 SettingsRow(title: "Ask for rak'ah counts", subtitle: "Off: one tap records", icon: "number") {

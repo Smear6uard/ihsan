@@ -293,7 +293,17 @@ private func assertV2StoreMigratesToV3() throws {
         #expect(settings.nightWakeOffsetMinutes == 0)
         #expect(settings.duhaSunriseOffsetMinutes == 20)
         #expect(settings.duhaDhuhrMarginMinutes == 15)
-        #expect(settings.rawatibConfigJSON == UserSettings.defaultRawatibConfigJSON)
+        // Compare decoded configs, not raw JSON — encoder key order is
+        // not part of the contract.
+        let storedConfigs = try JSONDecoder().decode(
+            [RawatibConfig].self,
+            from: #require(settings.rawatibConfigJSON.data(using: .utf8))
+        )
+        let defaultConfigs = try JSONDecoder().decode(
+            [RawatibConfig].self,
+            from: #require(UserSettings.defaultRawatibConfigJSON.data(using: .utf8))
+        )
+        #expect(storedConfigs == defaultConfigs)
 
         #expect(try context.fetch(FetchDescriptor<NaflLog>()).isEmpty)
     }

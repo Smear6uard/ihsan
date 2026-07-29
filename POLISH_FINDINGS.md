@@ -287,3 +287,34 @@ Items needing pure device verification (no source change possible):
 - **Path overlay row alignment**. The sixth row's outlined stars must
   sit exactly under their columns at 7D/30D/90D/YEAR on device widths
   where the grid squeezes (mini-width iPhones, 90 columns).
+
+## Gentle wake (phase 5) — device verification needed
+
+- **Timed alarm test at a simulated last third**. The acceptance
+  criterion is a device run: set the device clock (or a debug offset)
+  so the last third begins minutes away, enable the wake in Set, lock
+  the device, and confirm the AlarmKit alarm fires with the bundled
+  chime and the "Rise" stop button. This Mac cannot build the app
+  scheme; the planner/coordinator logic (pause suppression, offset,
+  reschedule-on-location, tonight→tomorrow fallover) is covered by
+  unit tests in IhsanNotifications.
+- **Fallback path on device**. Deny alarm permission, re-enable the
+  wake, and confirm (a) Set shows the plain fallback note, (b) a
+  time-sensitive notification `ihsan.nightwake` is pending instead of
+  an alarm, and (c) it survives a prayer-notification rebuild (its
+  identifier sits outside the `ihsan.prayer.` prefix).
+- **Time-sensitive entitlement**. `com.apple.developer.usernotifications.time-sensitive`
+  was added to ihsan.entitlements; the App ID in the Developer Portal
+  must have Time-Sensitive Notifications enabled before archiving.
+- **Placeholder chime quality**. `ihsan/Night/night-wake-chime.caf` is
+  a synthesized 12-second bell (soft strikes, gently rising) meant as
+  a stand-in. Confirm it plays for both AlarmKit (`.named`) and
+  UNNotificationSound on device — asset-name resolution for AlarmKit
+  sounds is undocumented territory; if the alarm falls back to the
+  default tone, try the name without the `.caf` extension in
+  `NightWakeSound.assetName`. Replace with the final asset at the
+  same constant.
+- **Cross-midnight wake**. Enable the wake in the evening, keep the
+  device untouched past midnight, and confirm the alarm still fires at
+  the last third computed from *yesterday's* Maghrib (the
+  candidate-nights logic covers it; verify end-to-end on device).

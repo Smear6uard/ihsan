@@ -220,7 +220,11 @@ public final class UserSettings {
             RawatibConfig(prayer: .isha, beforeCount: 0, afterCount: 2),
         ]
 
-        guard let data = try? JSONEncoder().encode(configs),
+        // Sorted keys so the stored default is byte-stable across
+        // processes — JSONEncoder's unsorted output varies per run.
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        guard let data = try? encoder.encode(configs),
               let json = String(data: data, encoding: .utf8)
         else {
             return "[]"

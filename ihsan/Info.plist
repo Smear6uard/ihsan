@@ -28,6 +28,8 @@
 	<true/>
 	<key>MinimumOSVersion</key>
 	<string>26.0</string>
+	<key>NSAlarmKitUsageDescription</key>
+	<string>Ihsan can wake you for the last third of the night with a gentle alarm you schedule yourself. The alarm is computed on-device from your prayer times and rings only if you turn it on.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ihsan calculates accurate prayer times for your current location. Your coordinates are used in the moment and never stored or shared. Only your city name is saved for display.</string>
 	<key>NSMicrophoneUsageDescription</key>

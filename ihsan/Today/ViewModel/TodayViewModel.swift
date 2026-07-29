@@ -112,6 +112,11 @@ final class TodayViewModel {
             ramadanContext: RamadanContext(at: now, calendar: hijriCalendar),
             night: relevantNight(now: now, place: place, settings: settings)
         ))
+
+        // Snapshot refreshes fire on foreground and on significant
+        // location change — exactly the moments the wake must recompute
+        // from the (possibly new) night.
+        await NightWakeService.shared.refresh(using: modelContext)
     }
 
     /// The night the plate should know about: before Fajr that is the
