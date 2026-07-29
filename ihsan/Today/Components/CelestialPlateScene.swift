@@ -410,13 +410,19 @@ struct CelestialPlateScene: View {
 
                 let fade = size.width * 0.10
                 let solidUntil = max(0.0, (gildEdgeX - fade) / size.width)
-                let fadedBy = min(1.0, max(solidUntil, (gildEdgeX + fade) / size.width))
+                // The burning tip: the line is brightest exactly where
+                // the day currently is — a true metalHighlight pole at
+                // the leading edge of the gild (the value-range work of
+                // the illumination pass), dissolving ahead of it.
+                let tip = min(1.0, max(solidUntil, (gildEdgeX - fade * 0.15) / size.width))
+                let fadedBy = min(1.0, max(tip, (gildEdgeX + fade) / size.width))
                 gilded.fill(
                     Path(CGRect(origin: .zero, size: size)),
                     with: .linearGradient(
                         Gradient(stops: [
                             .init(color: tokens.metalHighlight.opacity(0.62), location: 0),
                             .init(color: tokens.metalHighlight.opacity(0.62), location: solidUntil),
+                            .init(color: tokens.metalHighlight.opacity(0.95), location: tip),
                             .init(color: tokens.metalHighlight.opacity(0), location: fadedBy)
                         ]),
                         startPoint: .zero,
