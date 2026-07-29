@@ -41,6 +41,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
         let f1 = fig.to.tokens
 
         var tokens = SkyPaletteTokens(
+            skyZenith: .mix(a0.skyZenithValue, a1.skyZenithValue, amount: atm.amount),
             groundTop: .mix(a0.groundTopValue, a1.groundTopValue, amount: atm.amount),
             groundBottom: .mix(a0.groundBottomValue, a1.groundBottomValue, amount: atm.amount),
             groundPlane: .mix(a0.groundPlaneValue, a1.groundPlaneValue, amount: atm.amount),
@@ -51,6 +52,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
             metalHighlight: .mix(a0.metalHighlightValue, a1.metalHighlightValue, amount: atm.amount),
             leafGold: .mix(a0.leafGoldValue, a1.leafGoldValue, amount: atm.amount),
             keyline: .mix(f0.keylineValue, f1.keylineValue, amount: fig.amount),
+            lapis: .mix(a0.lapisValue, a1.lapisValue, amount: atm.amount),
             glow: .mix(a0.glowValue, a1.glowValue, amount: atm.amount),
             panelFill: .mix(f0.panelFillValue, f1.panelFillValue, amount: fig.amount),
             panelStroke: .mix(a0.panelStrokeValue, a1.panelStrokeValue, amount: atm.amount),
@@ -88,6 +90,13 @@ public struct SkyPaletteTokens: Sendable, Equatable {
 
     // MARK: Ground
 
+    /// The very top of the sky — the manuscript chord's blue pole.
+    /// On the day states this is a genuine faint blue (it is a SKY),
+    /// blending down through `groundTop` to the warm horizon; the
+    /// jewel states carry a deeper zenith of their own family. Sky
+    /// gradient stops between zenith and ground are generated in
+    /// OKLCH so the blue→warm ramp never grays out.
+    public var skyZenithValue: SRGBValue
     /// Top anchor of the sky gradient.
     public var groundTopValue: SRGBValue
     /// Bottom anchor of the sky gradient.
@@ -126,6 +135,13 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// (#1B2350 family). The dark edge is what makes gold read as
     /// gold rather than tan; ~0.75 pt around solid fills.
     public var keylineValue: SRGBValue
+
+    // MARK: Lapis
+
+    /// Ultramarine pigment — the chord's second voice beside the
+    /// gold. Fills the interiors of gilded ornaments and draws the
+    /// lapis filament paired with the gold horizon filament.
+    public var lapisValue: SRGBValue
 
     // MARK: Light
 
@@ -175,6 +191,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var inkHaloLightValue: SRGBValue
 
     public init(
+        skyZenith: SRGBValue? = nil,
         groundTop: SRGBValue,
         groundBottom: SRGBValue,
         groundPlane: SRGBValue,
@@ -185,6 +202,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         metalHighlight: SRGBValue,
         leafGold: SRGBValue,
         keyline: SRGBValue,
+        lapis: SRGBValue,
         glow: SRGBValue,
         panelFill: SRGBValue,
         panelStroke: SRGBValue,
@@ -194,6 +212,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         attention: SRGBValue,
         inkHalo: SRGBValue
     ) {
+        self.skyZenithValue = skyZenith ?? groundTop
         self.groundTopValue = groundTop
         self.groundBottomValue = groundBottom
         self.groundPlaneValue = groundPlane
@@ -204,6 +223,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         self.metalHighlightValue = metalHighlight
         self.leafGoldValue = leafGold
         self.keylineValue = keyline
+        self.lapisValue = lapis
         self.glowValue = glow
         self.panelFillValue = panelFill
         self.panelStrokeValue = panelStroke
@@ -234,8 +254,10 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var inkSecondary: Color { inkSecondaryValue.color }
     public var metal: Color { metalValue.color }
     public var metalHighlight: Color { metalHighlightValue.color }
+    public var skyZenith: Color { skyZenithValue.color }
     public var leafGold: Color { leafGoldValue.color }
     public var keyline: Color { keylineValue.color }
+    public var lapis: Color { lapisValue.color }
     public var glow: Color { glowValue.color }
     public var panelFill: Color { panelFillValue.color }
     public var panelStroke: Color { panelStrokeValue.color }
@@ -282,6 +304,7 @@ extension SkyPaletteTokens {
     /// never pure black, so panels don't float and OLED halation stays
     /// controlled. Warmth lives in the brass and the glow.
     static let night = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0x0A0E28),
         groundTop: SRGBValue(hex: 0x0E1330),
         groundBottom: SRGBValue(hex: 0x141A3A),
         groundPlane: SRGBValue(hex: 0x0A0E26),
@@ -292,6 +315,7 @@ extension SkyPaletteTokens {
         metalHighlight: SRGBValue(hex: 0xE8D5A3),
         leafGold: SRGBValue(hex: 0xD2AC5C),
         keyline: SRGBValue(hex: 0x10163A),
+        lapis: SRGBValue(hex: 0x39447F),
         glow: SRGBValue(hex: 0xF0D18B),
         panelFill: SRGBValue(hex: 0x191F46),
         panelStroke: SRGBValue(hex: 0x5F5654),
@@ -307,6 +331,7 @@ extension SkyPaletteTokens {
     /// light on cool air, not antique paper. Saturation sits in the
     /// deep-indigo ink and the warm sun glow, never in the ground.
     static let morning = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0xC3D8F0),
         groundTop: SRGBValue(hex: 0xF5F7FA),
         groundBottom: SRGBValue(hex: 0xEEF2F7),
         groundPlane: SRGBValue(hex: 0xE8E0CB),
@@ -317,6 +342,7 @@ extension SkyPaletteTokens {
         metalHighlight: SRGBValue(hex: 0xC9A96A),
         leafGold: SRGBValue(hex: 0xC29B4C),
         keyline: SRGBValue(hex: 0x1B2350),
+        lapis: SRGBValue(hex: 0x2A3780),
         glow: SRGBValue(hex: 0xE7A93E),
         panelFill: SRGBValue(hex: 0xFBFCFE),
         panelStroke: SRGBValue(hex: 0xD6C8B4),
@@ -331,6 +357,7 @@ extension SkyPaletteTokens {
     /// near-white — deliberately one step from morning, nowhere near
     /// beige. Ink stays in the indigo family for continuity.
     static let afternoon = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0xCBD8EB),
         groundTop: SRGBValue(hex: 0xFAF8F3),
         groundBottom: SRGBValue(hex: 0xF5F1E9),
         groundPlane: SRGBValue(hex: 0xE9DFC2),
@@ -341,6 +368,7 @@ extension SkyPaletteTokens {
         metalHighlight: SRGBValue(hex: 0xE0BC6A),
         leafGold: SRGBValue(hex: 0xC79E45),
         keyline: SRGBValue(hex: 0x201D48),
+        lapis: SRGBValue(hex: 0x2C3579),
         glow: SRGBValue(hex: 0xECBB55),
         panelFill: SRGBValue(hex: 0xFEFCF7),
         panelStroke: SRGBValue(hex: 0xDECCA4),
@@ -354,6 +382,7 @@ extension SkyPaletteTokens {
     /// Sunset (maghrib window → isha). Deep plum-vermillion jewel
     /// ground; the gold carries the light.
     static let sunset = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0x2C1128),
         groundTop: SRGBValue(hex: 0x3A1526),
         groundBottom: SRGBValue(hex: 0x7A2233),
         groundPlane: SRGBValue(hex: 0x38101F),
@@ -364,6 +393,7 @@ extension SkyPaletteTokens {
         metalHighlight: SRGBValue(hex: 0xF0CC80),
         leafGold: SRGBValue(hex: 0xDCAF54),
         keyline: SRGBValue(hex: 0x191F4A),
+        lapis: SRGBValue(hex: 0x333C74),
         glow: SRGBValue(hex: 0xF6B96E),
         panelFill: SRGBValue(hex: 0x4C1F30),
         panelStroke: SRGBValue(hex: 0x82563C),

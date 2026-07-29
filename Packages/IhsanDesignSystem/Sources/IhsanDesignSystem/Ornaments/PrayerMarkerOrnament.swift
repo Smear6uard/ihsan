@@ -52,6 +52,13 @@ public struct GildedOrnamentGlyph: View {
 
     public var body: some View {
         ZStack {
+            // Lapis under-layer: the nonzero-winding fill covers the
+            // whole silhouette, so wherever the even-odd gold leaves
+            // an interior cutout (the Shamsa's heart, the Lawzina's
+            // slit, the night star's field inside its ring), the
+            // ultramarine shows through — pigment inside the leaf.
+            PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                .fill(tokens.lapis, style: FillStyle(eoFill: false))
             PrayerOrnamentShape(prayer: prayer, mode: .filled)
                 .fill(tokens.leafGold, style: FillStyle(eoFill: true))
             PrayerOrnamentShape(prayer: prayer, mode: .filled)

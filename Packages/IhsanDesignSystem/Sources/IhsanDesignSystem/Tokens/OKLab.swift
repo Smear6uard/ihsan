@@ -96,6 +96,36 @@ public struct OKLabValue: Sendable, Equatable {
         )
     }
 
+    /// Interpolation in OKLCH — the cylindrical form of OKLab, with
+    /// hue traveling the SHORTER arc. Rectangular OKLab mixing pulls
+    /// a blue→gold ramp through the achromatic center (the gray dead
+    /// zone that kills sky gradients); OKLCH keeps chroma alive along
+    /// the way. Endpoints are returned exactly. When either endpoint
+    /// is effectively achromatic its hue snaps to the other's so the
+    /// arc is well defined.
+    public func mixedOKLCH(with other: OKLabValue, amount t: Double) -> OKLabValue {
+        let clamped = max(0.0, min(1.0, t))
+        if clamped <= 0 { return self }
+        if clamped >= 1 { return other }
+
+        let c0 = (a * a + b * b).squareRoot()
+        let c1 = (other.a * other.a + other.b * other.b).squareRoot()
+        let epsilon = 1e-5
+        var h0 = atan2(b, a)
+        var h1 = atan2(other.b, other.a)
+        if c0 < epsilon { h0 = h1 }
+        if c1 < epsilon { h1 = h0 }
+
+        var dh = h1 - h0
+        if dh > .pi { dh -= 2 * .pi }
+        if dh < -.pi { dh += 2 * .pi }
+
+        let lm = l + (other.l - l) * clamped
+        let cm = c0 + (c1 - c0) * clamped
+        let hm = h0 + dh * clamped
+        return OKLabValue(l: lm, a: cm * cos(hm), b: cm * sin(hm))
+    }
+
     /// Convert back to gamma-encoded sRGB, clamping any slightly
     /// out-of-gamut interpolation results into range.
     public var srgb: SRGBValue {
@@ -128,6 +158,15 @@ public extension SRGBValue {
         if t <= 0 { return x }
         if t >= 1 { return y }
         return x.oklab.mixed(with: y.oklab, amount: t).srgb
+    }
+
+    /// Mix through OKLCH — for gradient STOP generation, where a
+    /// blue→warm ramp must hold its chroma instead of graying out in
+    /// the middle. Token-state blending stays on `mix`.
+    static func mixOKLCH(_ x: SRGBValue, _ y: SRGBValue, amount t: Double) -> SRGBValue {
+        if t <= 0 { return x }
+        if t >= 1 { return y }
+        return x.oklab.mixedOKLCH(with: y.oklab, amount: t).srgb
     }
 
     /// A copy with its OKLab lightness scaled by `factor` (< 1 darkens,

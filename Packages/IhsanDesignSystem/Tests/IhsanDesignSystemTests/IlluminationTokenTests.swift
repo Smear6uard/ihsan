@@ -48,4 +48,39 @@ struct IlluminationTokenTests {
         )
         #expect(ratio >= 4.5, "\(state) keyline/leaf contrast \(ratio) too soft")
     }
+
+    // MARK: - Phase 2: the chord
+
+    /// The day-state zenith is a genuine faint blue — a SKY — while
+    /// staying light enough that the field remains luminous.
+    @Test
+    func dayZenithsCarryRealBlue() {
+        for state in [PaletteState.morning, .afternoon] {
+            let zenith = state.tokens.skyZenithValue
+            #expect(zenith.oklab.b <= -0.02, "\(state) zenith is not blue")
+            #expect(zenith.relativeLuminance >= 0.55, "\(state) zenith too heavy")
+        }
+    }
+
+    /// Lapis is ultramarine in every state: blue-side hue, real
+    /// chroma, deep enough to read as pigment beside the gold.
+    @Test(arguments: PaletteState.allCases)
+    func lapisIsUltramarine(state: PaletteState) {
+        let lapis = state.tokens.lapisValue.oklab
+        #expect(lapis.b <= -0.05, "\(state) lapis is not on the blue side")
+        let chroma = (lapis.a * lapis.a + lapis.b * lapis.b).squareRoot()
+        #expect(chroma >= 0.06, "\(state) lapis is undersaturated")
+    }
+
+    /// Text over the zenith stays legible: primary ink at AAA,
+    /// secondary at AA, on every state's zenith (the header sits on
+    /// this field).
+    @Test(arguments: PaletteState.allCases)
+    func textHoldsContrastOnTheZenith(state: PaletteState) {
+        let tokens = state.tokens
+        let primary = tokens.inkValue.contrastRatio(against: tokens.skyZenithValue)
+        let secondary = tokens.inkSecondaryValue.contrastRatio(against: tokens.skyZenithValue)
+        #expect(primary >= 7.0, "\(state) ink on zenith \(primary) below AAA")
+        #expect(secondary >= 4.5, "\(state) inkSecondary on zenith \(secondary) below AA")
+    }
 }

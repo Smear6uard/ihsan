@@ -135,17 +135,34 @@ public struct CelestialSkyView: View {
         // spec's 6–10% window.
         let bandHeight = (plateHeight ?? size.height) * 0.08
 
-        // Sky.
+        // Sky: zenith blue at the top blending down to the warm
+        // horizon — the manuscript chord's other voice, present even
+        // on the day states. Stops are sampled through OKLCH so the
+        // blue→warm ramp keeps its chroma instead of graying out in
+        // the middle; the gradient is anchored to the chord, and the
+        // ground plane paints over everything beneath it.
         let skyRect = CGRect(origin: .zero, size: size)
         if flat {
             context.fill(Path(skyRect), with: .color(tokens.ground))
         } else {
+            let zenith = tokens.skyZenithValue
+            let upper = tokens.groundTopValue
+            let lower = tokens.groundBottomValue
+            let breakpoint = 0.55
+            var stops: [Gradient.Stop] = []
+            for i in 0...6 {
+                let t = Double(i) / 6.0
+                let value: SRGBValue = t <= breakpoint
+                    ? .mixOKLCH(zenith, upper, amount: t / breakpoint)
+                    : .mixOKLCH(upper, lower, amount: (t - breakpoint) / (1 - breakpoint))
+                stops.append(.init(color: value.color, location: t))
+            }
             context.fill(
                 Path(skyRect),
                 with: .linearGradient(
-                    Gradient(colors: [tokens.groundTopValue.color, tokens.groundBottomValue.color]),
+                    Gradient(stops: stops),
                     startPoint: .zero,
-                    endPoint: CGPoint(x: 0, y: size.height)
+                    endPoint: CGPoint(x: 0, y: max(horizonY, 1))
                 )
             )
         }
@@ -260,6 +277,17 @@ public struct CelestialSkyView: View {
             thickness: 1.4
         )
         context.fill(Path(filament), with: .color(tokens.metalValue.color.opacity(0.85)))
+
+        // The chord's paired voice: one fine lapis filament riding
+        // just beneath the gold, slightly shorter — ultramarine and
+        // gold together, as on the page.
+        let lapisFilament = PlateGeometry.filamentPath(
+            in: CGRect(origin: .zero, size: size),
+            horizonY: horizonY + 3,
+            thickness: 0.9,
+            insetFraction: 0.085
+        )
+        context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.55)))
     }
 
     private static func drawStars(
