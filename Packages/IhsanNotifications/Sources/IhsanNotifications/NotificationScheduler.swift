@@ -63,14 +63,17 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
 }
 
 extension NotificationScheduleSettings {
-    init(userSettings: UserSettings) {
+    /// `isPaused` suppresses the whole schedule without touching any stored
+    /// preference — per-prayer overrides come back exactly as the user left
+    /// them when the pause ends.
+    init(userSettings: UserSettings, isPaused: Bool = false) {
         let decodedConfigs = (try? JSONDecoder().decode(
             [PrayerNotificationConfig].self,
             from: Data(userSettings.prayerNotificationsConfigJSON.utf8)
         )) ?? Prayer.allCases.map { PrayerNotificationConfig(prayer: $0) }
 
         self.init(
-            notificationsEnabled: userSettings.notificationsEnabled,
+            notificationsEnabled: userSettings.notificationsEnabled && !isPaused,
             calculationMethod: userSettings.calculationMethod,
             madhab: userSettings.madhab,
             highLatitudeRule: userSettings.highLatitudeRule,
@@ -119,7 +122,15 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
         let container = try IhsanModelContainerFactory.makeContainer(inMemory: false)
         let context = ModelContext(container)
         let settings = try UserSettings.fetchOrCreate(in: context)
-        return NotificationScheduleSettings(userSettings: settings)
+
+        let activePauses = try context.fetch(FetchDescriptor<PauseInterval>(
+            predicate: #Predicate { $0.endDate == nil }
+        ))
+
+        return NotificationScheduleSettings(
+            userSettings: settings,
+            isPaused: !activePauses.isEmpty
+        )
     }
 }
 

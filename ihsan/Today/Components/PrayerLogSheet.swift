@@ -26,9 +26,11 @@ struct PrayerLogSheet: View {
     let currentStatus: PrayerStatus?
     let isJamaah: Bool
     let adhanEnabled: Bool
+    var isPaused: Bool = false
 
     let onSelect: (Choice) -> Void
     let onToggleAdhan: () -> Void
+    var onTogglePause: () -> Void = {}
     let onCancel: () -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -162,6 +164,26 @@ struct PrayerLogSheet: View {
             .accessibilityLabel("Cancel")
 
             Spacer()
+
+            // The excused-pause droplet: discreet, unlabeled, one tap to
+            // begin a pause and the same control to end it. Ihsan does not
+            // ask why.
+            Button {
+                Haptics.impact(.medium)
+                onTogglePause()
+                dismiss()
+            } label: {
+                Image(systemName: isPaused ? "drop.fill" : "drop")
+                    .font(.system(size: 15, weight: .regular))
+                    .foregroundStyle(IhsanColor.brassDark)
+                    .frame(width: 40, height: 40)
+                    .overlay {
+                        Circle()
+                            .strokeBorder(IhsanColor.brassDark.opacity(0.4), lineWidth: 0.5)
+                    }
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(isPaused ? "End the pause" : "Begin a pause")
 
             Button {
                 Haptics.impact(.light)

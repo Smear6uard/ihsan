@@ -46,7 +46,6 @@ public enum InsightPromptBuilder {
         - missedCount: \(summary.missedCount)
         - qadaLoggedCount: \(summary.qadaLoggedCount)
         - jamaahCount: \(summary.jamaahCount)
-        - pausedDayCount: \(summary.pausedDayCount)
         - traveledDayCount: \(summary.traveledDayCount)
 
         Per-prayer statistics:

@@ -3,6 +3,7 @@ import SwiftData
 import IhsanCore
 import IhsanDesignSystem
 import IhsanLocation
+import IhsanNotifications
 import IhsanPrayerTimes
 
 struct TodayScreen: View {
@@ -143,8 +144,15 @@ private struct TodayReadyView: View {
     let snapshot: TodayState.Snapshot
     let viewModel: TodayViewModel
 
+    @Environment(\.modelContext) private var modelContext
+
     @Query private var todaysLogs: [PrayerLog]
     @Query private var settingsRows: [UserSettings]
+    @Query(sort: \PauseInterval.startDate, order: .reverse) private var pauses: [PauseInterval]
+
+    private var activePause: PauseInterval? {
+        pauses.first(where: \.isActive)
+    }
 
     @State private var focusedPrayer: Prayer?
     @State private var sheetSelection: LogSheetSelection?
@@ -218,20 +226,30 @@ private struct TodayReadyView: View {
                 }
 
                 VStack(spacing: IhsanSpacing.sm) {
-                    FocusedPrayerCard(
-                        prayer: effectiveFocusedPrayer,
-                        scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
-                        windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
-                        currentStatus: log(for: effectiveFocusedPrayer)?.status,
-                        isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
-                        isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
-                        onCommit: { status, isJamaah in
-                            commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
-                        },
-                        onMoreOptions: {
-                            sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
-                        }
-                    )
+                    if let activePause {
+                        RepairPausedCard(
+                            expectedEndDate: activePause.expectedEndDate,
+                            tokens: PaletteState.resolved(
+                                for: SkyPhase.resolve(at: .now, events: solarEvents)
+                            ),
+                            onEndPause: { togglePause() }
+                        )
+                    } else {
+                        FocusedPrayerCard(
+                            prayer: effectiveFocusedPrayer,
+                            scheduledTime: scheduledTime(for: effectiveFocusedPrayer),
+                            windowEndTime: windowEndTime(for: effectiveFocusedPrayer),
+                            currentStatus: log(for: effectiveFocusedPrayer)?.status,
+                            isJamaah: log(for: effectiveFocusedPrayer)?.withJamaah ?? false,
+                            isInWindow: snapshot.activePrayer == effectiveFocusedPrayer,
+                            onCommit: { status, isJamaah in
+                                commit(status: status, isJamaah: isJamaah, for: effectiveFocusedPrayer)
+                            },
+                            onMoreOptions: {
+                                sheetSelection = LogSheetSelection(prayer: effectiveFocusedPrayer)
+                            }
+                        )
+                    }
                 }
                 .padding(.bottom, IhsanSpacing.md)
             }
@@ -283,6 +301,10 @@ private struct TodayReadyView: View {
         for prayer: Prayer,
         scheduledTime: Date
     ) -> PrayerMarkerState {
+        // During an excused pause every marker rests in the neutral outline
+        // state — no glow, no passed-unlogged ink. Times stay readable;
+        // nothing is asked.
+        if activePause != nil { return .upcoming }
         if prayer == currentPlatePrayer { return .current }
         if log(for: prayer) != nil { return .logged }
         return scheduledTime > .now ? .upcoming : .passedUnlogged
@@ -378,10 +400,35 @@ private struct TodayReadyView: View {
                 currentStatus: log?.status,
                 isJamaah: log?.withJamaah ?? false,
                 adhanEnabled: adhanEnabled,
+                isPaused: activePause != nil,
                 onSelect: { choice in handleSheetChoice(choice, for: prayer) },
                 onToggleAdhan: { Task { await viewModel.toggleAdhanEnabled(for: prayer) } },
+                onTogglePause: { togglePause() },
                 onCancel: {}
             )
+        }
+    }
+
+    /// One tap begins an excused pause; the same control ends it. The
+    /// notification schedule rebuilds either way, so suppression tracks the
+    /// pause without touching any stored preference.
+    private func togglePause() {
+        Haptics.impact(.medium)
+        let now = Date.now
+        if let activePause {
+            activePause.endDate = now
+            activePause.modifiedAt = now
+        } else {
+            modelContext.insert(PauseInterval(
+                startDate: now,
+                loggedTimeZoneIdentifier: TimeZone.current.identifier,
+                createdAt: now,
+                modifiedAt: now
+            ))
+        }
+        Haptics.notification(.success)
+        Task {
+            try? await NotificationScheduler.shared.rebuildSchedule()
         }
     }
 

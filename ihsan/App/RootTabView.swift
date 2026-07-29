@@ -7,6 +7,7 @@ struct RootTabView: View {
     @State private var selectedTab: Tab = .today
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.modelContext) private var modelContext
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -30,6 +31,7 @@ struct RootTabView: View {
             if hasFreshReflectionDeeplink() {
                 selectedTab = .reflection
             }
+            runMissedFlowSweep()
         }
         .onReceive(
             NotificationCenter.default.publisher(
@@ -43,10 +45,20 @@ struct RootTabView: View {
         .onChange(of: scenePhase) { _, newPhase in
             // If the app comes back to foreground because of a Siri /
             // Shortcut invocation, the flag is already set; re-check.
-            if newPhase == .active, hasFreshReflectionDeeplink() {
-                selectedTab = .reflection
+            if newPhase == .active {
+                if hasFreshReflectionDeeplink() {
+                    selectedTab = .reflection
+                }
+                runMissedFlowSweep()
             }
         }
+    }
+
+    /// Flows silent prayers from ended days into the makeup ledger, when
+    /// the user chose that at setup. Idempotent and pause-aware inside
+    /// `QadaMissedFlowSweep`, so calling on every foreground is safe.
+    private func runMissedFlowSweep() {
+        try? QadaMissedFlowSweep().sweep(in: modelContext)
     }
 
     @ViewBuilder

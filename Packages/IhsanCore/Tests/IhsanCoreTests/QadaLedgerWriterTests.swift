@@ -6,7 +6,10 @@ import Testing
 @MainActor
 private func makeContext() throws -> ModelContext {
     let schema = Schema(IhsanSchemaV2.models)
+    // Unique store name per test — unnamed in-memory configurations share
+    // one backing store within a process, which corrupts parallel runs.
     let configuration = ModelConfiguration(
+        UUID().uuidString,
         schema: schema,
         isStoredInMemoryOnly: true,
         cloudKitDatabase: .none

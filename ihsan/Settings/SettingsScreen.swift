@@ -6,6 +6,7 @@ import IhsanCore
 import IhsanDesignSystem
 import IhsanFiqhConfig
 import IhsanLocation
+import IhsanNotifications
 import IhsanPrayerTimes
 
 @MainActor
@@ -324,6 +325,7 @@ struct SettingsScreen: View {
             modifiedAt: now
         ))
         Haptics.notification(.success)
+        rebuildNotificationSchedule()
     }
 
     private func closePauseInterval() {
@@ -332,6 +334,16 @@ struct SettingsScreen: View {
         activePause.endDate = now
         activePause.modifiedAt = now
         Haptics.notification(.success)
+        rebuildNotificationSchedule()
+    }
+
+    /// Prayer notifications suppress for the duration of a pause and return
+    /// untouched when it ends; the schedule is derived, so a rebuild is all
+    /// either transition needs.
+    private func rebuildNotificationSchedule() {
+        Task {
+            try? await NotificationScheduler.shared.rebuildSchedule()
+        }
     }
 
     private func handleTravelToggle(_ isEnabled: Bool) {
@@ -395,6 +407,8 @@ struct SettingsScreen: View {
             try deleteAll(PauseInterval.self)
             try deleteAll(TravelInterval.self)
             try deleteAll(PeriodSummary.self)
+            try deleteAll(QadaEntry.self)
+            try deleteAll(QadaLedger.self)
             try deleteAll(UserSettings.self)
             _ = try UserSettings.fetchOrCreate(in: modelContext)
             Haptics.notification(.success)
@@ -626,6 +640,46 @@ private struct PauseModeSection: View {
                 .labelsHidden()
                 .tint(IhsanColor.brass)
                 .accessibilityLabel("Pause Mode")
+            }
+
+            if let activePause {
+                SettingsRow(
+                    title: "Expected end",
+                    subtitle: "Nothing ends without you",
+                    icon: "calendar"
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { activePause.expectedEndDate != nil },
+                        set: { hasExpectedEnd in
+                            activePause.expectedEndDate = hasExpectedEnd
+                                ? Calendar.current.date(byAdding: .day, value: 7, to: .now)
+                                : nil
+                            activePause.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanColor.brass)
+                    .accessibilityLabel("Expected end date")
+                }
+
+                if let expectedEnd = activePause.expectedEndDate {
+                    SettingsRow(title: "Around", icon: "clock") {
+                        DatePicker(
+                            "",
+                            selection: Binding(
+                                get: { expectedEnd },
+                                set: {
+                                    activePause.expectedEndDate = $0
+                                    activePause.modifiedAt = .now
+                                }
+                            ),
+                            in: Date.now...,
+                            displayedComponents: .date
+                        )
+                        .labelsHidden()
+                        .accessibilityLabel("Expected end date picker")
+                    }
+                }
             }
 
             SettingsDescriptionText(description)
