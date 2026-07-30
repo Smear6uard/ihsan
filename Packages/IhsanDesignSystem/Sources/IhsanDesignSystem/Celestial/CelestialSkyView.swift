@@ -15,13 +15,18 @@ extension EnvironmentValues {
 ///
 /// Composition rules this view enforces:
 ///
-/// - **The horizon is a band, not a line.** An atmospheric gradient
-///   zone (~8% of plate height) where the sky meets the ground plane,
-///   with a glow that intensifies as the sun approaches the chord.
+/// - **Light is painted, never filmed.** The sun's horizon
+///   interaction is a radial bloom centered on the sun's own
+///   position, dying to nothing within ~35% of the width. The
+///   banned list (see the package README): lens flares, horizontal
+///   light streaks, anamorphic effects, specular hotspots, bokeh,
+///   any camera-artifact rendering.
 /// - **The ground plane is the same material, deeper** — the ground
-///   tone one lightness step down, never a new color.
+///   deepens smoothly away from the chord, one value step down at
+///   the bottom, never a new color.
 /// - **The terrain mark is a filament** — a single fine metal lens
-///   with tapered ends, never an edge-to-edge rule.
+///   with tapered ends, never an edge-to-edge rule. It brightens and
+///   warms only inside the sun's local bloom.
 /// - **Stars belong to the night** — two depth layers, fixed seed, no
 ///   shimmer; they fade in with `SkyPhase.nightness` rather than
 ///   popping at a threshold.
@@ -36,6 +41,13 @@ public struct CelestialSkyView: View {
     public let phase: SkyPhase
     /// Current sun altitude in degrees — drives the horizon glow.
     public let sunAltitudeDegrees: Double
+    /// The sun's horizontal position in this view's coordinate space,
+    /// when the composer knows it (pass the x of
+    /// `PlateGeometry.bodyPosition` for the sun). The horizon's light
+    /// is LOCAL — a radial bloom around this point, dying to nothing
+    /// within ~35% of the width — so without it the filament simply
+    /// stays quiet. Never a full-width band either way.
+    public let sunX: CGFloat?
     /// Preferred horizon height as a fraction of the view height,
     /// used when no explicit `horizonY` is given.
     public let horizonFraction: CGFloat
@@ -65,6 +77,7 @@ public struct CelestialSkyView: View {
     public init(
         phase: SkyPhase,
         sunAltitudeDegrees: Double,
+        sunX: CGFloat? = nil,
         horizonFraction: CGFloat = 0.62,
         horizonY: CGFloat? = nil,
         plateHeight: CGFloat? = nil,
@@ -73,6 +86,7 @@ public struct CelestialSkyView: View {
     ) {
         self.phase = phase
         self.sunAltitudeDegrees = sunAltitudeDegrees
+        self.sunX = sunX
         self.horizonFraction = horizonFraction
         self.horizonYOverride = horizonY
         self.plateHeight = plateHeight
@@ -100,6 +114,7 @@ public struct CelestialSkyView: View {
                     tokens: tokens,
                     nightness: phase.nightness,
                     sunAltitudeDegrees: sunAltitudeDegrees,
+                    sunX: sunX,
                     horizonY: horizonYOverride ?? size.height * horizonFraction,
                     plateHeight: plateHeight ?? size.height,
                     time: time,
@@ -136,6 +151,7 @@ public struct CelestialSkyView: View {
         tokens: SkyPaletteTokens,
         nightness: Double,
         sunAltitudeDegrees: Double,
+        sunX: CGFloat? = nil,
         horizonY: CGFloat,
         plateHeight: CGFloat? = nil,
         time: TimeInterval,
@@ -145,6 +161,7 @@ public struct CelestialSkyView: View {
         // The horizon band: ~8% of the *plate* height, inside the
         // spec's 6–10% window.
         let bandHeight = (plateHeight ?? size.height) * 0.08
+        let onDarkGround = tokens.groundBottomValue.relativeLuminance < 0.5
 
         // Sky: zenith blue at the top blending down to the warm
         // horizon — the manuscript chord's other voice, present even
@@ -190,22 +207,46 @@ public struct CelestialSkyView: View {
             )
         }
 
-        // Ground plane below the chord — its own token: a deeper
-        // value of the day's ground family, warm ivory on the
-        // near-white days, deeper indigo/plum on the jewel grounds.
+        // Ground plane below the chord — its own token, deepening
+        // smoothly away from the horizon so the focused card sits on
+        // calm ground. Same material, one value step down at the
+        // bottom; never a new color. Flat under Reduce Transparency.
         let groundRect = CGRect(x: 0, y: horizonY, width: size.width, height: size.height - horizonY)
-        context.fill(Path(groundRect), with: .color(tokens.groundPlane))
+        if flat {
+            context.fill(Path(groundRect), with: .color(tokens.groundPlane))
+        } else {
+            let deep = tokens.groundPlaneValue
+                .scalingLightness(by: onDarkGround ? 0.78 : 0.94)
+            context.fill(
+                Path(groundRect),
+                with: .linearGradient(
+                    Gradient(colors: [tokens.groundPlane, deep.color]),
+                    startPoint: CGPoint(x: 0, y: horizonY),
+                    endPoint: CGPoint(x: 0, y: size.height)
+                )
+            )
+        }
 
         // The worked earth: three engraved filaments echoing the
         // terrain mark below the chord, shortening and fading as they
         // deepen — the ground is drawn, not merely painted. Depths
         // stay within the exposed strip between the chord and the
-        // focused card (~24 pt in the Today composition).
-        let groundFilaments: [(depth: CGFloat, thickness: CGFloat, inset: CGFloat, opacity: Double)] = [
-            (7, 1.1, 0.11, 0.26),
-            (14, 0.9, 0.17, 0.15),
-            (21, 0.8, 0.24, 0.08)
-        ]
+        // focused card (~24 pt in the Today composition). On the
+        // jewel grounds (sunset, night) the engraving is lifted to
+        // visible-at-arm's-length; the near-white days keep the
+        // quieter weights.
+        let groundFilaments: [(depth: CGFloat, thickness: CGFloat, inset: CGFloat, opacity: Double)] =
+            onDarkGround
+                ? [
+                    (7, 1.2, 0.11, 0.46),
+                    (14, 1.0, 0.17, 0.30),
+                    (21, 0.9, 0.24, 0.18)
+                ]
+                : [
+                    (7, 1.1, 0.11, 0.26),
+                    (14, 0.9, 0.17, 0.15),
+                    (21, 0.8, 0.24, 0.08)
+                ]
         for filament in groundFilaments {
             let y = horizonY + filament.depth
             guard y < size.height - 4 else { continue }
@@ -218,67 +259,6 @@ public struct CelestialSkyView: View {
                 )),
                 with: .color(tokens.metalValue.color.opacity(filament.opacity))
             )
-        }
-
-        // Horizon band: the atmospheric zone where sky meets ground.
-        let washTop = CGRect(
-            x: 0, y: horizonY - bandHeight, width: size.width, height: bandHeight
-        )
-        if flat {
-            context.fill(
-                Path(CGRect(x: 0, y: horizonY - bandHeight * 0.5, width: size.width, height: bandHeight * 0.5)),
-                with: .color(tokens.horizonWashValue.color.opacity(0.35))
-            )
-        } else {
-            context.fill(
-                Path(washTop),
-                with: .linearGradient(
-                    Gradient(colors: [
-                        tokens.horizonWashValue.color.opacity(0.0),
-                        tokens.horizonWashValue.color.opacity(0.70)
-                    ]),
-                    startPoint: CGPoint(x: 0, y: washTop.minY),
-                    endPoint: CGPoint(x: 0, y: washTop.maxY)
-                )
-            )
-            // A shallower echo of the wash bleeds below the chord so
-            // the band straddles the boundary instead of stopping at it.
-            let washBelow = CGRect(x: 0, y: horizonY, width: size.width, height: bandHeight * 0.4)
-            context.fill(
-                Path(washBelow),
-                with: .linearGradient(
-                    Gradient(colors: [
-                        tokens.horizonWashValue.color.opacity(0.42),
-                        tokens.horizonWashValue.color.opacity(0.0)
-                    ]),
-                    startPoint: CGPoint(x: 0, y: washBelow.minY),
-                    endPoint: CGPoint(x: 0, y: washBelow.maxY)
-                )
-            )
-
-            // Sun-approach glow: strongest when the sun sits on the
-            // chord, fading as it climbs or sinks away. Breathes very
-            // gently; frozen when the timeline is paused.
-            let proximity = exp(-pow(sunAltitudeDegrees / 9.0, 2))
-            if proximity > 0.01 {
-                let breathing = time == 0 ? 1.0 : 1.0 + 0.06 * sin(time * 0.7)
-                let glowRect = CGRect(
-                    x: 0, y: horizonY - bandHeight * 1.4,
-                    width: size.width, height: bandHeight * 2.2
-                )
-                context.fill(
-                    Path(glowRect),
-                    with: .radialGradient(
-                        Gradient(colors: [
-                            tokens.glowValue.color.opacity(0.42 * proximity * breathing),
-                            tokens.glowValue.color.opacity(0.0)
-                        ]),
-                        center: CGPoint(x: size.width / 2, y: horizonY),
-                        startRadius: 0,
-                        endRadius: max(size.width * 0.55, bandHeight * 2.2)
-                    )
-                )
-            }
         }
 
         // Terrain filament: one fine metal lens, tapered ends.
@@ -299,6 +279,71 @@ public struct CelestialSkyView: View {
             insetFraction: 0.085
         )
         context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.55)))
+
+        // The sun's horizon interaction — PAINTED light, strictly
+        // local. No full-width band, no screen-center hotspot: a
+        // radial bloom centered on the sun's own position, dying to
+        // nothing within ~35% of the width. Inside that radius the
+        // horizon filament brightens and warms and the glow bleeds a
+        // few points into the ground; outside it, the chord stays the
+        // quiet tapered gold above its lapis hairline. Gone under
+        // Reduce Transparency (the filaments above are the flat
+        // fallback), and gone with the sun — the strength peaks at
+        // the chord and dies as the sun climbs away or sinks below
+        // civil twilight.
+        if !flat, let sunX {
+            let proximity = exp(-pow(sunAltitudeDegrees / 9.0, 2))
+            let breathing = time == 0 ? 1.0 : 1.0 + 0.06 * sin(time * 0.7)
+            let strength = proximity * breathing
+            if strength > 0.02 {
+                let bloomRadius = size.width * 0.35
+                let bloomCenter = CGPoint(x: sunX, y: horizonY)
+                let warmed = SRGBValue.mix(
+                    tokens.metalHighlightValue, tokens.glowValue, amount: 0.55
+                ).color
+
+                // The filament brightens ONLY within the bloom.
+                var lit = context
+                lit.clip(to: Path(PlateGeometry.filamentPath(
+                    in: CGRect(origin: .zero, size: size),
+                    horizonY: horizonY,
+                    thickness: 1.8
+                )))
+                lit.fill(
+                    Path(CGRect(origin: .zero, size: size)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: warmed.opacity(0.95 * strength), location: 0),
+                            .init(color: warmed.opacity(0.40 * strength), location: 0.55),
+                            .init(color: warmed.opacity(0), location: 1)
+                        ]),
+                        center: bloomCenter,
+                        startRadius: 0,
+                        endRadius: bloomRadius
+                    )
+                )
+
+                // The ground catches the glow — a few points deep,
+                // the same local radius, nothing more.
+                let bleedDepth: CGFloat = 7
+                var bleed = context
+                bleed.clip(to: Path(CGRect(
+                    x: 0, y: horizonY, width: size.width, height: bleedDepth
+                )))
+                bleed.fill(
+                    Path(CGRect(origin: .zero, size: size)),
+                    with: .radialGradient(
+                        Gradient(stops: [
+                            .init(color: tokens.glowValue.color.opacity(0.30 * strength), location: 0),
+                            .init(color: tokens.glowValue.color.opacity(0), location: 1)
+                        ]),
+                        center: bloomCenter,
+                        startRadius: 0,
+                        endRadius: bloomRadius * 0.8
+                    )
+                )
+            }
+        }
     }
 
     private static func drawStars(

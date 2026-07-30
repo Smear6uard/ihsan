@@ -182,6 +182,11 @@ struct CelestialPlateScene: View {
                 CelestialSkyView(
                     phase: phase,
                     sunAltitudeDegrees: sun.altitude,
+                    sunX: plate.bodyPosition(
+                        altitudeDegrees: sun.altitude,
+                        azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
+                        apexAltitudeDegrees: apexAltitude
+                    ).x,
                     horizonY: plate.horizonY,
                     plateHeight: plate.rect.height,
                     probe: probe
@@ -377,6 +382,7 @@ struct CelestialPlateScene: View {
         let strength = 0.17
             * submergedPresence(altitudeDegrees: moon.altitude)
             * lunarDaylightPresence(sunAltitudeDegrees: sun.altitude)
+            * lunarDeference(plate: plate, sun: sun, moon: moon, apexAltitude: apexAltitude)
         guard strength > 0.005 else { return }
 
         let center = plate.bodyPosition(
@@ -696,6 +702,7 @@ struct CelestialPlateScene: View {
         .opacity(
             submergedPresence(altitudeDegrees: moon.altitude)
                 * lunarDaylightPresence(sunAltitudeDegrees: sun.altitude)
+                * lunarDeference(plate: plate, sun: sun, moon: moon, apexAltitude: apexAltitude)
         )
         .position(
             plate.bodyPosition(
@@ -747,6 +754,39 @@ struct CelestialPlateScene: View {
     private func lunarDaylightPresence(sunAltitudeDegrees: Double) -> Double {
         let t = max(0.0, min(1.0, (6.0 - sunAltitudeDegrees) / 24.0))
         return 0.28 + 0.72 * t
+    }
+
+    /// One voice leads the sky: when the moon stands inside the sun's
+    /// horizon bloom (the sun near the chord, the moon within the
+    /// bloom's ~35%-width radius), the moon's presence yields — down
+    /// to ~35% at a dead-center conjunction — so the sunset belongs
+    /// to the sun. Away from the bloom, or with the sun high or long
+    /// set, the factor is exactly 1.
+    private func lunarDeference(
+        plate: PlateGeometry,
+        sun: SolarPosition,
+        moon: LunarPosition,
+        apexAltitude: Double
+    ) -> Double {
+        let sunNearHorizon = exp(-pow(sun.altitude / 9.0, 2))
+        guard sunNearHorizon > 0.02 else { return 1 }
+        let sunPosition = plate.bodyPosition(
+            altitudeDegrees: sun.altitude,
+            azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
+            apexAltitudeDegrees: apexAltitude
+        )
+        let moonPosition = plate.bodyPosition(
+            altitudeDegrees: moon.altitude,
+            azimuthUnit: azimuthUnit(hourAngle: moon.hourAngle),
+            apexAltitudeDegrees: apexAltitude
+        )
+        let bloomRadius = plate.rect.width * 0.35
+        let separation = hypot(
+            moonPosition.x - sunPosition.x, moonPosition.y - sunPosition.y
+        )
+        guard separation < bloomRadius else { return 1 }
+        let closeness = 1 - separation / bloomRadius
+        return 1 - 0.65 * closeness * sunNearHorizon
     }
 
     // MARK: - Markers

@@ -30,6 +30,29 @@ radius at which an edge exists; the moon is a lit object with a
 defined limb, earthshine, and a cool glow on jewel grounds; arcs are
 continuous tapered metal filaments — never dotted, never dashed.
 
+### Painted light — the permanent ban list
+
+Ihsan **paints** light; it does not film it. Light on the plate is
+one of three things: a radial bloom, a graded wash, or gilding.
+Everything a camera adds to light is banned **permanently,
+app-wide** (corrective G, hard rule 3):
+
+- lens flares
+- horizontal light streaks (any full-width band of light, at the
+  horizon or anywhere else)
+- anamorphic effects
+- specular hotspots (including any glow anchored to the screen's
+  geometry — center, edges — instead of to a body's own position)
+- bokeh
+- any other camera-artifact rendering
+
+The sun's horizon interaction is the reference implementation: a
+radial bloom centered on the sun's own position, falloff dying to
+nothing within ~35% of the screen width, brightening the horizon
+filament and bleeding a few points into the ground **only** inside
+that radius. Elsewhere the chord stays the quiet tapered gold with
+its paired lapis hairline.
+
 ## What this design system encodes
 
 Ihsan is a private personal ibadah ledger for practicing Muslims. The

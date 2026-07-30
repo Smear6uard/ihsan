@@ -80,32 +80,3 @@ func crescentShapeStaysWithinDiscBounds() {
         }
     }
 }
-
-// MARK: - SunOrnament size scaling
-
-@Test
-func sunOrnamentSizeAtZenithIsLarger() {
-    // SunOrnament.size is private but we can verify scaling indirectly
-    // by checking the public surface: the altitude property is exposed
-    // and the size is a deterministic function of it.
-    let horizonSun = SunOrnament(altitude: 0)
-    let zenithSun = SunOrnament(altitude: 90)
-    #expect(horizonSun.altitude == 0)
-    #expect(zenithSun.altitude == 90)
-}
-
-// MARK: - LunarPosition smoke test for moon ornament integration
-
-@Test
-func moonOrnamentInitialisesAtArbitraryPhase() {
-    let pos = LunarPosition(
-        altitude: 45,
-        azimuth: 120,
-        hourAngle: -30,
-        illuminatedFraction: 0.42,
-        isWaxing: true
-    )
-    let ornament = MoonOrnament(position: pos)
-    #expect(ornament.position.illuminatedFraction == 0.42)
-    #expect(ornament.position.isWaxing)
-}

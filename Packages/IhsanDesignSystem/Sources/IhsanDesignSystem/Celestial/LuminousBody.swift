@@ -136,30 +136,41 @@ public struct LuminousBody: View {
         }
     }
 
-    /// The moon's glow is cool where the sun's is warm — the ink pole
-    /// of the palette, additive against jewel grounds. On the luminous
-    /// day grounds the ink is a deep indigo and a dark halo would read
-    /// as a smudge, so the moon stands as a lit object with no glow.
+    /// The moon's glow is COOL — always. The ink pole alone won't do:
+    /// on the sunset ground the ink is a warm near-white and a raw
+    /// ink halo blazed like a second sun. Mixing toward a lightened
+    /// lapis keeps the halo moonlight-cold in every phase, and it
+    /// stays tight — clearly quieter than the sun's corona. On the
+    /// luminous day grounds a dark halo would read as a smudge, so
+    /// the moon stands as a lit object with no glow.
+    private var moonGlowTint: Color {
+        SRGBValue.mix(
+            tokens.inkValue,
+            tokens.lapisValue.scalingLightness(by: 1.55),
+            amount: 0.45
+        ).color
+    }
+
     @ViewBuilder
     private var moonGlow: some View {
         if onDarkGround {
-            let glowDiameter = diameter * 2.2
+            let glowDiameter = diameter * 1.9
             if reduceTransparency {
                 Circle()
-                    .fill(tokens.ink.opacity(0.10))
-                    .frame(width: diameter * 1.8, height: diameter * 1.8)
+                    .fill(moonGlowTint.opacity(0.10))
+                    .frame(width: diameter * 1.6, height: diameter * 1.6)
                     .allowsHitTesting(false)
             } else {
                 Circle()
                     .fill(
                         RadialGradient(
                             colors: [
-                                tokens.ink.opacity(0.30),
-                                tokens.ink.opacity(0.10),
-                                tokens.ink.opacity(0.0)
+                                moonGlowTint.opacity(0.26),
+                                moonGlowTint.opacity(0.08),
+                                moonGlowTint.opacity(0.0)
                             ],
                             center: .center,
-                            startRadius: diameter * 0.34,
+                            startRadius: diameter * 0.42,
                             endRadius: glowDiameter / 2
                         )
                     )
@@ -215,20 +226,27 @@ public struct LuminousBody: View {
         }
     }
 
-    /// The lit limb at its true phase over a faint earthshine disc.
-    /// The moon keeps its defined edge — it is a lit object, not a
-    /// light source.
+    /// The moon is a lit object, not a light source: the lit limb at
+    /// its true phase, a FAINT earthshine holding the dark limb's
+    /// form, and a defined edge — the hairline limb rim that light
+    /// sources are forbidden (the sun has no pixel where it stops;
+    /// the moon has exactly one).
     private func moonCore(illuminatedFraction: Double, isWaxing: Bool) -> some View {
         let litColor = SRGBValue.mix(tokens.inkValue, tokens.metalHighlightValue, amount: 0.35).color
         let earthshine = tokens.groundTopValue.scalingLightness(by: 1.35).color
         return ZStack {
+            // Earthshine: the dark limb barely-there, never bright
+            // enough to dissolve the phase.
             Circle()
-                .fill(earthshine.opacity(0.55))
+                .fill(earthshine.opacity(0.30))
             CrescentShape(
                 illuminatedFraction: illuminatedFraction,
                 isWaxing: isWaxing
             )
             .fill(litColor)
+            // The defined edge.
+            Circle()
+                .strokeBorder(litColor.opacity(0.45), lineWidth: 0.75)
         }
     }
 }
