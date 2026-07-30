@@ -33,6 +33,15 @@ struct PrayerLogSheet: View {
     let currentStatus: PrayerStatus?
     let isJamaah: Bool
     var isPaused: Bool = false
+    /// The timing choices that can be true at this moment for this
+    /// prayer and day — `TimingAvailability`'s answer. Tiles outside
+    /// the set render quiet and disabled: visible for learnability,
+    /// not selectable.
+    let availableStatuses: Set<PrayerStatus>
+    /// Set when the sheet logs a day other than today (the Path
+    /// ledger): the header inscribes the date instead of the window's
+    /// clock times.
+    var displayDate: Date? = nil
 
     /// One commit: the chosen timing plus the jamāʿah flag, together.
     let onCommit: (PrayerStatus, Bool) -> Void
@@ -59,6 +68,8 @@ struct PrayerLogSheet: View {
         currentStatus: PrayerStatus?,
         isJamaah: Bool,
         isPaused: Bool = false,
+        availableStatuses: Set<PrayerStatus>,
+        displayDate: Date? = nil,
         onCommit: @escaping (PrayerStatus, Bool) -> Void,
         onTogglePause: @escaping () -> Void = {},
         onCancel: @escaping () -> Void
@@ -71,12 +82,23 @@ struct PrayerLogSheet: View {
         self.currentStatus = currentStatus
         self.isJamaah = isJamaah
         self.isPaused = isPaused
+        self.availableStatuses = availableStatuses
+        self.displayDate = displayDate
         self.onCommit = onCommit
         self.onTogglePause = onTogglePause
         self.onCancel = onCancel
         // Editing an existing log opens with its state preselected.
         _selectedTiming = State(initialValue: currentStatus)
         _jamaahOn = State(initialValue: isJamaah)
+    }
+
+    // MARK: - Commit copy
+
+    /// The commit names the act: a fresh entry logs THIS prayer; an
+    /// edit saves changes. Pinned by `PrayerLogSheetCopyTests` and
+    /// asserted through the live UI by `PrayerLogCommitUITests`.
+    static func commitTitle(prayer: Prayer, isEditing: Bool) -> String {
+        isEditing ? "Save Changes" : "Log \(prayer.displayNameEnglish)"
     }
 
     var body: some View {
@@ -128,8 +150,12 @@ struct PrayerLogSheet: View {
 
     // MARK: - Header
 
-    /// "12:38 PM · ENDS 5:06 PM" — the place's clock, always.
+    /// "12:38 PM · ENDS 5:06 PM" — the place's clock, always. A
+    /// retroactive day has no clock to show; it inscribes its date.
     private var timeRangeInscription: String {
+        if let displayDate {
+            return PlateTimeFormat.dayMonth(displayDate, in: timeZone).uppercased()
+        }
         let start = PlateTimeFormat.time(scheduledTime, in: timeZone).uppercased()
         guard let end = windowEndTime else { return start }
         return "\(start) · ENDS \(PlateTimeFormat.time(end, in: timeZone).uppercased())"
@@ -172,7 +198,7 @@ struct PrayerLogSheet: View {
         let disabled = selectedTiming == .missed
         return HStack(spacing: IhsanSpacing.md) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("In Jamāʿah")
+                Text(IhsanVocabulary.inJamaahTitle)
                     .font(IhsanFont.rowPrayerName)
                     .foregroundStyle(tokens.ink.opacity(disabled ? 0.4 : 1))
                 Text("PRAYED IN CONGREGATION")
@@ -190,7 +216,7 @@ struct PrayerLogSheet: View {
         .padding(.vertical, IhsanSpacing.sm + 2)
         .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: jamaahOn && !disabled)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("In jamāʿah, prayed in congregation")
+        .accessibilityLabel("\(IhsanVocabulary.inJamaahTitle), prayed in congregation")
         .accessibilityValue(disabled ? "unavailable for missed" : (jamaahOn ? "on" : "off"))
         .accessibilityAddTraits(.isToggle)
         .onTapGesture {
@@ -215,10 +241,19 @@ struct PrayerLogSheet: View {
         }
     }
 
+    /// Opacity applied to a tile whose timing cannot be true at this
+    /// moment — quiet, never invisible. Static so the contrast test
+    /// audits the exact value the tiles render; 0.5 is the floor at
+    /// which every dimmed ornament still holds ≥1.9:1 on its tile in
+    /// all four palettes (0.45 dropped the afternoon late outline to
+    /// 1.86).
+    static let unavailableTileOpacity: Double = 0.5
+
     private func timingTile(
         _ timing: PrayerStatus, title: String, caption: String
     ) -> some View {
         let selected = selectedTiming == timing
+        let available = availableStatuses.contains(timing)
         return Button {
             Haptics.impact(.light)
             selectedTiming = timing
@@ -243,8 +278,13 @@ struct PrayerLogSheet: View {
             .padding(.vertical, IhsanSpacing.md)
             .padding(.horizontal, IhsanSpacing.xs)
             .contentShape(Rectangle())
+            // The whole face quiets together — ornament, title, and
+            // caption stay legible as one muted unit, teaching what
+            // the state means even while it cannot be chosen.
+            .opacity(available ? 1 : Self.unavailableTileOpacity)
         }
         .buttonStyle(.plain)
+        .disabled(!available)
         .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: selected)
         .overlay {
             // Selection is form + weight, never hue alone: the chosen
@@ -260,6 +300,7 @@ struct PrayerLogSheet: View {
             }
         }
         .accessibilityLabel("\(title), \(caption.lowercased())")
+        .accessibilityValue(available ? "" : "not available now")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
@@ -340,7 +381,7 @@ struct PrayerLogSheet: View {
             onCommit(timing, jamaahOn)
             dismiss()
         } label: {
-            Text(currentStatus == nil ? "LOG PRAYER" : "SAVE CHANGES")
+            Text(Self.commitTitle(prayer: prayer, isEditing: currentStatus != nil).uppercased())
                 .font(IhsanFont.inscription)
                 .tracking(2.2)
                 .foregroundStyle(commitEnabled ? tokens.keyline : tokens.inkSecondary.opacity(0.5))
@@ -360,7 +401,7 @@ struct PrayerLogSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(!commitEnabled)
-        .accessibilityLabel(currentStatus == nil ? "Log prayer" : "Save changes")
+        .accessibilityLabel(Self.commitTitle(prayer: prayer, isEditing: currentStatus != nil))
         .accessibilityHint(commitEnabled ? "" : "Choose a timing first.")
     }
 
@@ -388,24 +429,27 @@ struct PrayerLogSheet: View {
 
             // The excused-pause droplet, with its quiet name. One tap
             // begins a pause, the same control ends it. Ihsan does
-            // not ask why.
-            Button {
-                Haptics.impact(.medium)
-                onTogglePause()
-                dismiss()
-            } label: {
-                HStack(spacing: IhsanSpacing.xs) {
-                    Image(systemName: isPaused ? "drop.fill" : "drop")
-                        .font(.system(size: 14, weight: .regular))
-                    Text(isPaused ? "PAUSED" : "PAUSE")
-                        .font(IhsanFont.inscription)
-                        .tracking(1.6)
+            // not ask why. A pause is a statement about NOW — the
+            // retroactive sheet (a past day) does not offer it.
+            if displayDate == nil {
+                Button {
+                    Haptics.impact(.medium)
+                    onTogglePause()
+                    dismiss()
+                } label: {
+                    HStack(spacing: IhsanSpacing.xs) {
+                        Image(systemName: isPaused ? "drop.fill" : "drop")
+                            .font(.system(size: 14, weight: .regular))
+                        Text(isPaused ? "PAUSED" : "PAUSE")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                    }
+                    .foregroundStyle(tokens.inkSecondary)
+                    .padding(.vertical, IhsanSpacing.sm)
                 }
-                .foregroundStyle(tokens.inkSecondary)
-                .padding(.vertical, IhsanSpacing.sm)
+                .buttonStyle(.plain)
+                .accessibilityLabel(isPaused ? "End the pause" : "Begin a pause")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel(isPaused ? "End the pause" : "Begin a pause")
         }
     }
 }

@@ -707,19 +707,29 @@ private struct TodayReadyView: View {
         )
 
         if prayerTime != nil {
+            let scheduledTime = TodayDisplaySchedule.displayTime(
+                for: prayer, window: snapshot.scheduleWindow, now: now
+            )
             PrayerLogSheet(
                 prayer: prayer,
                 // The same display instant the plate label, header,
                 // and card show — one source, one formatter.
-                scheduledTime: TodayDisplaySchedule.displayTime(
-                    for: prayer, window: snapshot.scheduleWindow, now: now
-                ),
+                scheduledTime: scheduledTime,
                 windowEndTime: windowEndTime(for: prayer),
                 timeZone: snapshot.place.timeZone,
                 tokens: tokens,
                 currentStatus: log?.status,
                 isJamaah: log?.withJamaah ?? false,
                 isPaused: activePause != nil,
+                // The truth rule: what can be true at this moment for
+                // this prayer today decides which tiles are live.
+                availableStatuses: TimingAvailability.allowedStatuses(
+                    now: now,
+                    dayBeingLogged: now,
+                    scheduledTime: scheduledTime,
+                    windowEndTime: windowEndTime(for: prayer),
+                    currentStatus: log?.status
+                ),
                 onCommit: { status, jamaah in
                     commit(status: status, isJamaah: jamaah, for: prayer)
                 },

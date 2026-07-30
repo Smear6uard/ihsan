@@ -4,13 +4,17 @@ import OSLog
 import SwiftData
 
 public struct ToggleJamaahIntent: AppIntent {
-    public static let title: LocalizedStringResource = "Toggle Jama'ah"
-    public static let description = IntentDescription("Toggle whether a prayer was performed in jama'ah.")
+    public static let title: LocalizedStringResource = "Toggle Jamāʿah"
+    public static let description = IntentDescription("Toggle whether a prayer was performed in jamāʿah.")
     public static let openAppWhenRun: Bool = false
     public static let isDiscoverable: Bool = true
 
     @Parameter(title: "Prayer")
     public var prayer: PrayerEntity
+
+    /// The civil day whose entry is toggled. Nil means today.
+    @Parameter(title: "Date")
+    public var date: Date?
 
     private static let logger = Logger(
         subsystem: "com.sameerstudios.ihsan.intents",
@@ -23,8 +27,9 @@ public struct ToggleJamaahIntent: AppIntent {
 
     public init() {}
 
-    public init(prayer: Prayer) {
+    public init(prayer: Prayer, date: Date? = nil) {
         self.prayer = PrayerEntity(prayer: prayer)
+        self.date = date
     }
 
     @MainActor
@@ -45,13 +50,14 @@ public struct ToggleJamaahIntent: AppIntent {
 
         let log = try service.toggleJamaah(
             for: prayer,
+            prayerDate: date,
             sourceSurface: .widget,
             in: context
         )
 
         let dialog = log.withJamaah
-            ? "\(prayer.displayNameEnglish) marked as jama'ah."
-            : "\(prayer.displayNameEnglish) jama'ah cleared."
+            ? "\(prayer.displayNameEnglish) marked as jamāʿah."
+            : "\(prayer.displayNameEnglish) jamāʿah cleared."
         return .result(dialog: IntentDialog(stringLiteral: dialog))
     }
 }

@@ -506,3 +506,21 @@ account-gated); these need eyes on signed-in hardware:
 - **Materialize + haptic fire once.** The ornament-materialize
   animation and the success haptic on commit fire exactly once per
   commit (haptics are untestable in the simulator).
+
+## House phase 0.25 — sheet truth pass + retroactive logging (2026-07-30)
+
+Availability math, commit copy, and both retroactive entry points are
+pinned by tests (TimingAvailabilityTests property sweep,
+PrayerLogCommitUITests, RetroactiveLogUITests); these need hardware:
+
+- **Dimmed tiles at 50% brightness.** Unavailable timing tiles render
+  at 0.5 opacity — mathematically ≥1.9:1 in all four palettes
+  (`unavailableTilesStayPerceptibleInEveryPhase`). Confirm on OLED at
+  ~50% brightness that a disabled tile still reads as present-but-
+  quiet, day and night, and that the qadā roundel specifically
+  survives the dimming.
+- **Retro sheet from Path.** The ledger sheet rides the clock-derived
+  approximate SkyPhase (no solar schedule on Path yet). Confirm the
+  sheet's backing doesn't clash against the Today plate when
+  switching tabs at sunset (the approximation can lag the real sky
+  by tens of minutes).

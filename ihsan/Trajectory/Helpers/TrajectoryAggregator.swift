@@ -33,10 +33,16 @@ enum TrajectoryAggregator {
             let isTraveling = travelIntervals.contains { $0.contains(cursor) }
 
             let completions = Prayer.allCases.map { prayer -> PrayerCompletion in
-                // Qada is tracked separately — exclude it from the day's
-                // 5-prayer slate so a made-up Fajr from yesterday doesn't
-                // overwrite today's actual Fajr status.
-                let log = dayLogs.first { $0.prayer == prayer && $0.status != .qada }
+                // Two kinds of qadā row exist. A LINKED makeup act
+                // (qadaForPrayerLogID set) records a repair performed
+                // on this day for an EARLIER day's prayer — it must
+                // not overwrite this day's own slate. A direct qadā
+                // status (no link) says THIS day's prayer was made up
+                // later — that is this day's truth and renders here.
+                let log = dayLogs.first {
+                    $0.prayer == prayer
+                        && ($0.status != .qada || $0.qadaForPrayerLogID == nil)
+                }
                 return PrayerCompletion(
                     prayer: prayer,
                     status: log?.status,

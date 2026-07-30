@@ -149,7 +149,9 @@ struct FocusedCardModelTests {
             now: scheduled.addingTimeInterval(9_999), timeZone: timeZone
         )
         #expect(text.contains(PlateTimeFormat.time(loggedAt, in: timeZone)))
-        #expect(text.uppercased().contains("JAMĀ'AH"))
+        // One romanization app-wide — the inscription must carry the
+        // vocabulary's canonical form, never a local respelling.
+        #expect(text.uppercased().contains(IhsanVocabulary.jamaahInscription))
         #expect(!text.uppercased().contains("PRAYING"))
         // Corrective E item 6: the logged line renders loggedAt — the
         // prayer's scheduled time must never be mislabeled as the log

@@ -105,7 +105,7 @@ enum FocusedCardModel {
         timeZone: TimeZone
     ) -> String {
         guard let status else { return "" }
-        let jamaahPrefix = isJamaah ? "Jamā'ah · " : ""
+        let jamaahPrefix = isJamaah ? "\(IhsanVocabulary.jamaahTitle) · " : ""
         let loggedClause = loggedAt.map { " · \(PlateTimeFormat.time($0, in: timeZone))" } ?? ""
         switch status {
         case .onTime:

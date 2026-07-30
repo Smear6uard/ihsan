@@ -86,7 +86,7 @@ struct PrayerActionSheet: View {
                     .foregroundStyle(
                         isJamaah ? IhsanColor.statusQada : IhsanColor.textSecondary
                     )
-                Text(isJamaah ? "Jama'ah on" : "Jama'ah off")
+                Text(isJamaah ? "\(IhsanVocabulary.jamaahTitle) on" : "\(IhsanVocabulary.jamaahTitle) off")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundStyle(IhsanColor.textPrimary)
                 Spacer(minLength: 0)
@@ -107,7 +107,7 @@ struct PrayerActionSheet: View {
             )
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(isJamaah ? "Turn jama'ah off" : "Mark as jama'ah")
+        .accessibilityLabel(isJamaah ? "Turn \(IhsanVocabulary.jamaah) off" : "Mark as \(IhsanVocabulary.jamaah)")
     }
 
     private func label(_ status: PrayerStatus) -> String {

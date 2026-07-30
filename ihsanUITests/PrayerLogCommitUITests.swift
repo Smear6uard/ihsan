@@ -11,8 +11,12 @@ import XCTest
 /// auto-present argument.
 final class PrayerLogCommitUITests: XCTestCase {
 
+    @MainActor
     override func setUpWithError() throws {
         continueAfterFailure = false
+        // Orientation is device state that leaks between test runs; a
+        // landscape leftover pushes the sheet's commit bar offscreen.
+        XCUIDevice.shared.orientation = .portrait
     }
 
     /// 17:30Z = 13:30 EDT at the New York fixture — inside Dhuhr's
@@ -72,8 +76,8 @@ final class PrayerLogCommitUITests: XCTestCase {
         )
         onTimeTile.tap()
 
-        let commit = app.buttons["Log prayer"]
-        XCTAssertTrue(commit.waitForExistence(timeout: 3), "Fresh path should title the commit 'Log prayer'.")
+        let commit = app.buttons["Log Dhuhr"]
+        XCTAssertTrue(commit.waitForExistence(timeout: 3), "Fresh path should name the act: 'Log Dhuhr'.")
         XCTAssertTrue(commit.isEnabled, "Choosing a timing must enable the commit.")
         commit.tap()
 
@@ -104,10 +108,10 @@ final class PrayerLogCommitUITests: XCTestCase {
             "The log sheet should auto-present with the timing tiles."
         )
 
-        let save = app.buttons["Save changes"]
+        let save = app.buttons["Save Changes"]
         XCTAssertTrue(
             save.waitForExistence(timeout: 5),
-            "Editing an existing entry should title the commit 'Save changes'."
+            "Editing an existing entry should title the commit 'Save Changes'."
         )
 
         onTimeTile.tap()

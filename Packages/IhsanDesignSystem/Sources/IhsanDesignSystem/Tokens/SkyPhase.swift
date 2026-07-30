@@ -64,6 +64,45 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     static let maghribUnit = 0.625
     static let ishaUnit = 0.875
 
+    /// Chrome fallback for surfaces that have no solar schedule (the
+    /// secondary pages, whose grounds follow the hour, not the sun):
+    /// maps the local clock onto palette space through fixed anchor
+    /// hours — 6:00 sunrise, 13:00 solar noon, 19:00 maghrib, 20:30
+    /// isha. Surfaces that DO know the day's real events must use
+    /// `resolve(at:events:)`; this is deliberately coarse, and only
+    /// ever drives ground/panel tints — never the celestial plate.
+    public static func approximate(
+        at date: Date, timeZone: TimeZone = .current
+    ) -> SkyPhase {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let midnight = calendar.startOfDay(for: date)
+        let seconds = date.timeIntervalSince(midnight)
+
+        // (hour anchor, palette unit), with the previous isha and the
+        // next sunrise wrapping the night exactly like resolve(at:).
+        let anchors: [(time: TimeInterval, unit: Double)] = [
+            (20.5 * 3600 - 86_400, ishaUnit - 1.0),
+            (6.0 * 3600, sunriseUnit),
+            (13.0 * 3600, solarNoonUnit),
+            (19.0 * 3600, maghribUnit),
+            (20.5 * 3600, ishaUnit),
+            (6.0 * 3600 + 86_400, sunriseUnit + 1.0),
+        ]
+
+        if seconds <= anchors[0].time {
+            return SkyPhase(unit: anchors[0].unit)
+        }
+        for i in 0..<(anchors.count - 1) {
+            let a = anchors[i], b = anchors[i + 1]
+            if seconds <= b.time {
+                let f = (seconds - a.time) / (b.time - a.time)
+                return SkyPhase(unit: a.unit + f * (b.unit - a.unit))
+            }
+        }
+        return SkyPhase(unit: anchors[anchors.count - 1].unit)
+    }
+
     /// Map a real moment onto palette space using the day's solar
     /// events. Times before sunrise interpolate from the previous
     /// night's isha (approximated one day earlier); times after isha

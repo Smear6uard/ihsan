@@ -17,6 +17,11 @@ public struct LogPrayerWithStatusIntent: AppIntent {
     @Parameter(title: "Status")
     public var status: PrayerStatusEntity
 
+    /// The civil day being logged. Nil means today; the Path ledger
+    /// passes a past day for retroactive entries.
+    @Parameter(title: "Date")
+    public var date: Date?
+
     private static let logger = Logger(
         subsystem: "com.sameerstudios.ihsan.intents",
         category: "LogPrayerWithStatusIntent"
@@ -28,9 +33,10 @@ public struct LogPrayerWithStatusIntent: AppIntent {
 
     public init() {}
 
-    public init(prayer: Prayer, status: PrayerStatus) {
+    public init(prayer: Prayer, status: PrayerStatus, date: Date? = nil) {
         self.prayer = PrayerEntity(prayer: prayer)
         self.status = PrayerStatusEntity(status: status)
+        self.date = date
     }
 
     @MainActor
@@ -55,6 +61,7 @@ public struct LogPrayerWithStatusIntent: AppIntent {
         _ = try service.logPrayer(
             prayer,
             status: status,
+            prayerDate: date,
             sourceSurface: .app,
             in: context
         )

@@ -71,6 +71,38 @@ struct PrayerLogSheetContrastTests {
         }
     }
 
+    /// The truth pass quiets unavailable tiles to
+    /// `unavailableTileOpacity` — quiet must still never mean
+    /// invisible. Compositing each ornament's strongest boundary at
+    /// that opacity over its tile must keep a ≥1.9:1 presence in
+    /// every phase, and the qadā roundel specifically must survive
+    /// the dimming on day and night grounds.
+    @Test
+    func unavailableTilesStayPerceptibleInEveryPhase() {
+        let alpha = PrayerLogSheet.unavailableTileOpacity
+        for state in states {
+            let tokens = state.tokens
+            let panel = tokens.panelFillValue
+
+            let boundaries: [(String, [SRGBValue])] = [
+                ("onTime", [tokens.leafGoldValue, tokens.keylineValue]),
+                ("late", [PrayerLogSheet.lateOutlineValue(for: tokens)]),
+                ("qada", [
+                    PrayerLogSheet.qadaBodyValue(for: tokens),
+                    PrayerLogSheet.qadaEdgeValue(for: tokens)
+                ]),
+                ("missed", [PrayerLogSheet.missedOutlineValue(for: tokens)]),
+            ]
+
+            for (name, candidates) in boundaries {
+                let dimmed = candidates
+                    .map { SRGBValue.mix(panel, $0, amount: alpha) }
+                let strongest = silhouette(dimmed, against: panel)
+                #expect(strongest >= 1.9, "\(state) dimmed \(name) \(strongest)")
+            }
+        }
+    }
+
     /// Title and inscriptions on the sheet's glass: ink ≥7:1 and
     /// secondary ink ≥4.5:1 against the sheet backing composited over
     /// the darkest thing the glass can sample (the ground plane), in

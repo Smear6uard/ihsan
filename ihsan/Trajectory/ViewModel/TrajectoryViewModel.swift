@@ -15,6 +15,12 @@ final class TrajectoryViewModel {
         }
     }
 
+    /// The screen's clock — the same injectable NowProvider every
+    /// other surface reads, so a debug now-override moves the period
+    /// window together with the rest of the app. `.system` until the
+    /// screen injects the environment's provider.
+    var nowProvider: NowProvider = .system
+
     private var cachedLogs: [PrayerLog] = []
     private var cachedPauses: [PauseInterval] = []
     private var cachedTravels: [TravelInterval] = []
@@ -41,7 +47,8 @@ final class TrajectoryViewModel {
             period: period,
             logs: cachedLogs,
             pauseIntervals: cachedPauses,
-            travelIntervals: cachedTravels
+            travelIntervals: cachedTravels,
+            now: nowProvider.now()
         )
 
         let qadaLogs = cachedLogs.filter { $0.status == .qada }

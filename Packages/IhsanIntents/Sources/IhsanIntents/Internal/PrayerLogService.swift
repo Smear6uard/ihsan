@@ -22,12 +22,18 @@ internal struct PrayerLogService: Sendable {
 
     /// Logs a prayer with the given status. Existing logs for the same
     /// (prayer, prayerDate) tuple are updated in place rather than duplicated.
+    ///
+    /// `prayerDate` names the civil day being logged — nil means
+    /// today. Retroactive entries (a passed day repaired from the
+    /// Path ledger) pass the day explicitly; dedup then holds per
+    /// (prayer, that day).
     @MainActor
     func logPrayer(
         _ prayer: Prayer,
         status: PrayerStatus,
         withJamaah: Bool? = nil,
         prayedAt: Date? = nil,
+        prayerDate explicitPrayerDate: Date? = nil,
         coordinates: Coordinates? = nil,
         sourceSurface: SourceSurface,
         in context: ModelContext
@@ -41,7 +47,7 @@ internal struct PrayerLogService: Sendable {
 
         let timeZone = TimeZone.current
         let now = clock.now()
-        let prayerDate = Calendar.current.startOfDay(for: now)
+        let prayerDate = Calendar.current.startOfDay(for: explicitPrayerDate ?? now)
         let dedupKey = Self.makeDedupKey(prayer: prayer, prayerDate: prayerDate)
 
         let descriptor = FetchDescriptor<PrayerLog>(
@@ -53,7 +59,7 @@ internal struct PrayerLogService: Sendable {
         if let coordinates {
             do {
                 let dayTimes = try prayerTimesProvider.dayTimes(
-                    for: now,
+                    for: explicitPrayerDate ?? now,
                     coordinates: coordinates,
                     timeZone: timeZone,
                     calculationMethod: calculationConfiguration.0,
@@ -68,8 +74,10 @@ internal struct PrayerLogService: Sendable {
             // MARK: TODO
             // v1 placeholder: the application-layer coordinator that owns
             // CoreLocation should pass coordinates so this can save real
-            // scheduled prayer times before shipping.
-            scheduledTime = now
+            // scheduled prayer times before shipping. Retroactive
+            // entries stamp the day itself — coordinates for a past
+            // day are gone by design (transient, never stored).
+            scheduledTime = explicitPrayerDate.map { Calendar.current.startOfDay(for: $0) } ?? now
         }
 
         let lateBySeconds: Int? = {
@@ -117,16 +125,18 @@ internal struct PrayerLogService: Sendable {
         return log
     }
 
-    /// Toggles the jama'ah flag on today's log for the given prayer.
-    /// Creates an on-time log when no log exists yet.
+    /// Toggles the jama'ah flag on the given day's log for the given
+    /// prayer (today when `prayerDate` is nil). Creates an on-time
+    /// log when no log exists yet.
     @MainActor
     func toggleJamaah(
         for prayer: Prayer,
+        prayerDate explicitPrayerDate: Date? = nil,
         sourceSurface: SourceSurface,
         in context: ModelContext
     ) throws -> PrayerLog {
         let now = clock.now()
-        let prayerDate = Calendar.current.startOfDay(for: now)
+        let prayerDate = Calendar.current.startOfDay(for: explicitPrayerDate ?? now)
         let dedupKey = Self.makeDedupKey(prayer: prayer, prayerDate: prayerDate)
         let descriptor = FetchDescriptor<PrayerLog>(
             predicate: #Predicate { $0.dedupKey == dedupKey }
@@ -144,6 +154,7 @@ internal struct PrayerLogService: Sendable {
             prayer,
             status: .onTime,
             withJamaah: true,
+            prayerDate: explicitPrayerDate,
             sourceSurface: sourceSurface,
             in: context
         )

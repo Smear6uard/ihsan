@@ -175,15 +175,23 @@ private struct RootGate: View {
                 try? modelContext.save()
             }
         }
+        // `-IhsanDebugLogPrayer dhuhr:late` seeds today; an optional
+        // third component is a day offset — `dhuhr:late:-1` seeds
+        // yesterday (relative to the NowProvider clock, so it
+        // composes with -IhsanNowOverride).
         if let flagIndex = arguments.firstIndex(of: "-IhsanDebugLogPrayer"),
            arguments.indices.contains(flagIndex + 1) {
             let parts = arguments[flagIndex + 1].split(separator: ":")
-            if parts.count == 2,
+            if parts.count >= 2,
                let prayer = Prayer(rawValue: String(parts[0])),
                let status = PrayerStatus(rawValue: String(parts[1])) {
+                let dayOffset = parts.count >= 3 ? Int(parts[2]) ?? 0 : 0
+                let date: Date? = dayOffset == 0 ? nil : Calendar.current.date(
+                    byAdding: .day, value: dayOffset, to: NowProvider.active.now()
+                )
                 Task {
                     _ = try? await LogPrayerWithStatusIntent(
-                        prayer: prayer, status: status
+                        prayer: prayer, status: status, date: date
                     ).perform()
                 }
             }

@@ -17,6 +17,9 @@ import IhsanDesignSystem
 struct DailyPracticeGrid: View {
     let days: [DayCompletion]
     let onDayTap: (DayCompletion) -> Void
+    /// A cell tap opens the log sheet for that prayer and day — the
+    /// canonical way to log yesterday and earlier.
+    let onCellTap: (DayCompletion, PrayerCompletion) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.md) {
@@ -87,25 +90,58 @@ struct DailyPracticeGrid: View {
 
     // MARK: - Row
 
+    /// The date label opens the day's breakdown; each cell is its own
+    /// button opening the log sheet for that prayer and day. Buttons
+    /// are siblings, never nested.
     private func row(for day: DayCompletion) -> some View {
-        let isToday = Calendar.current.isDateInToday(day.date)
-        return Button {
-            Haptics.tap()
-            onDayTap(day)
-        } label: {
-            HStack(spacing: cellSpacing) {
+        // The aggregator's newest day IS today — deriving the marker
+        // from the data keeps it truthful under a debug now-override
+        // (the wall clock may disagree with the app's clock).
+        let isToday = day.date == days.last?.date
+        return HStack(spacing: cellSpacing) {
+            Button {
+                Haptics.tap()
+                onDayTap(day)
+            } label: {
                 dateLabel(for: day, isToday: isToday)
-                ForEach(day.prayerCompletions, id: \.prayer) { completion in
-                    DayPrayerCell(completion: completion, size: cellSize)
-                }
-                Spacer(minLength: 0)
+                    .contentShape(Rectangle())
             }
-            .contentShape(Rectangle())
+            .buttonStyle(.plain)
+            .accessibilityLabel(rowAccessibilityLabel(day: day))
+            .accessibilityHint("Show breakdown for this day")
+
+            ForEach(day.prayerCompletions, id: \.prayer) { completion in
+                Button {
+                    Haptics.tap()
+                    onCellTap(day, completion)
+                } label: {
+                    DayPrayerCell(completion: completion, size: cellSize)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(cellAccessibilityLabel(day: day, completion: completion))
+                .accessibilityHint("Opens the log sheet for this prayer and day.")
+            }
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(rowAccessibilityLabel(day: day))
-        .accessibilityHint("Show breakdown for this day")
-        .accessibilityAddTraits(.isButton)
+    }
+
+    private func cellAccessibilityLabel(
+        day: DayCompletion, completion: PrayerCompletion
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEEE, MMMM d"
+        let dateText = formatter.string(from: day.date)
+        let statusText: String
+        switch completion.status {
+        case .onTime: statusText = completion.withJamaah
+            ? "on time, in \(IhsanVocabulary.jamaah)" : "on time"
+        case .late: statusText = "late"
+        case .missed: statusText = "missed"
+        case .qada: statusText = "qadā"
+        case nil: statusText = "not logged"
+        }
+        return "\(completion.prayer.displayNameEnglish), \(dateText), \(statusText)"
     }
 
     private func dateLabel(for day: DayCompletion, isToday: Bool) -> some View {
@@ -230,7 +266,7 @@ private extension Prayer {
         )
     }
     return ScrollView {
-        DailyPracticeGrid(days: days, onDayTap: { _ in })
+        DailyPracticeGrid(days: days, onDayTap: { _ in }, onCellTap: { _, _ in })
             .padding()
     }
     .ihsanManuscriptPage()

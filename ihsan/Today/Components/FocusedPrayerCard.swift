@@ -163,10 +163,26 @@ struct FocusedPrayerCard: View {
             .accessibilityElement(children: .contain)
     }
 
+    private var isWindowClosed: Bool {
+        if case .windowClosed = phase { return true }
+        return false
+    }
+
     @ViewBuilder
     private var contentForMode: some View {
         if isLogged {
             loggedContent
+                .transition(.opacity)
+                .onTapGesture {
+                    Haptics.impact(.light)
+                    onMoreOptions()
+                }
+        } else if isWindowClosed {
+            // A passed, unlogged prayer goes straight to the sheet —
+            // the expanded quick buttons speak the open window's
+            // language (On Time), which can no longer be true here.
+            // The sheet's tiles carry the temporal-availability rule.
+            defaultContent
                 .transition(.opacity)
                 .onTapGesture {
                     Haptics.impact(.light)
@@ -263,7 +279,34 @@ struct FocusedPrayerCard: View {
                     .minimumScaleFactor(0.8)
                     .shadow(color: tokens.inkHalo, radius: 1.5)
             }
-        case .active, .windowClosed, .logged:
+        case .windowClosed:
+            // The passed prayer still asks to be recorded: the
+            // inscription states the fact, and a gilded LOG chip
+            // makes the affordance unmistakable — the card is a way
+            // in, not a status plaque.
+            HStack(spacing: IhsanSpacing.sm) {
+                Text(inscription.uppercased())
+                    .font(IhsanFont.inscription)
+                    .tracking(1.4)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+                    .shadow(color: tokens.inkHaloDark, radius: 1)
+                    .shadow(color: tokens.inkHaloLight, radius: 3)
+                Text("LOG")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.8)
+                    .foregroundStyle(tokens.keyline)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 3)
+                    .background { Capsule().fill(tokens.leafGold) }
+                    .overlay {
+                        Capsule().strokeBorder(
+                            tokens.keyline.opacity(0.55), lineWidth: 0.8
+                        )
+                    }
+            }
+        case .active, .logged:
             Text(inscription.uppercased())
                 .font(IhsanFont.inscription)
                 .tracking(1.4)
@@ -533,7 +576,7 @@ struct FocusedPrayerCard: View {
         parts.append("\(prayer.displayNameEnglish) prayer")
         parts.append("logged")
         if isJamaah {
-            parts.append("in jamaʿah")
+            parts.append("in \(IhsanVocabulary.jamaah)")
         }
         if let status = currentStatus {
             parts.append(status.spokenLabel)
@@ -596,7 +639,7 @@ private struct JamaahToggleControl: View {
                 isOn.toggle()
             }
         } label: {
-            Text("JAMA·AH")
+            Text(IhsanVocabulary.jamaahInscription)
                 .font(IhsanFont.inscription)
                 .tracking(2.0)
                 .foregroundStyle(isOn ? tokens.panelFill : tokens.metal)
@@ -617,9 +660,9 @@ private struct JamaahToggleControl: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Jamaʿah toggle")
+        .accessibilityLabel("\(IhsanVocabulary.jamaahTitle) toggle")
         .accessibilityValue(isOn ? "on" : "off")
-        .accessibilityHint("Double-tap to toggle jamaʿah selection.")
+        .accessibilityHint("Double-tap to toggle \(IhsanVocabulary.jamaah) selection.")
     }
 }
 

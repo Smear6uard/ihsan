@@ -66,7 +66,7 @@ public struct PrayerRow: View {
         if let status {
             parts.append("status \(status.rawValue)")
         }
-        parts.append(isJamaah ? "in jama'ah" : "individual")
+        parts.append(isJamaah ? "in \(IhsanVocabulary.jamaah)" : "individual")
         return parts.joined(separator: ", ")
     }
 }

@@ -41,7 +41,7 @@ struct QuietSummaryRow: View {
     private var entries: [(label: String, count: Int)] {
         [
             ("ON TIME", aggregate.onTimeCount),
-            ("JAMAʿAH", aggregate.jamaahCount),
+            (IhsanVocabulary.jamaahInscription, aggregate.jamaahCount),
             ("LATE",    aggregate.lateCount),
             ("MISSED",  aggregate.missedCount),
             ("QADĀ",    aggregate.qadaCount)
@@ -50,7 +50,7 @@ struct QuietSummaryRow: View {
 
     private var accessibilityLabel: String {
         "On time: \(aggregate.onTimeCount). "
-        + "Jamaʿah: \(aggregate.jamaahCount). "
+        + "\(IhsanVocabulary.jamaahTitle): \(aggregate.jamaahCount). "
         + "Late: \(aggregate.lateCount). "
         + "Missed: \(aggregate.missedCount). "
         + "Qadā: \(aggregate.qadaCount)."

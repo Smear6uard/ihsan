@@ -17,10 +17,10 @@ public struct IhsanAppShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: ToggleJamaahIntent(),
             phrases: [
-                "Toggle jama'ah for \(\.$prayer) in \(.applicationName)",
-                "Mark \(\.$prayer) as jama'ah in \(.applicationName)"
+                "Toggle jamāʿah for \(\.$prayer) in \(.applicationName)",
+                "Mark \(\.$prayer) as jamāʿah in \(.applicationName)"
             ],
-            shortTitle: "Toggle Jama'ah",
+            shortTitle: "Toggle Jamāʿah",
             systemImageName: "person.3.fill"
         )
         AppShortcut(

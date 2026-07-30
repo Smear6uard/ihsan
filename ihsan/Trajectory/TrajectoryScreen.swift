@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import IhsanCore
 import IhsanDesignSystem
+import IhsanIntents
 
 /// The Trajectory tab.
 ///
@@ -41,9 +42,20 @@ struct TrajectoryScreen: View {
     @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
     @State private var showingRepairDetail = false
+    /// A grid cell awaiting the retroactive log sheet.
+    @State private var retroSelection: RetroLogSelection?
+
+    @Environment(\.nowProvider) private var nowProvider
 
     private var settings: UserSettings? {
         settingsRows.first
+    }
+
+    /// Change signature covering in-place edits — `logs.count` alone
+    /// misses a retro edit that rewrites an existing row.
+    private var logSignature: String {
+        logs.map { "\($0.id.uuidString):\($0.modifiedAt.timeIntervalSince1970)" }
+            .joined(separator: "|")
     }
 
     var body: some View {
@@ -79,13 +91,17 @@ struct TrajectoryScreen: View {
         }
         .ihsanManuscriptPage()
         .onAppear {
+            // The screen's clock is the injected provider — never the
+            // wall clock — so the period window agrees with every
+            // other surface about which day is "today".
+            viewModel.nowProvider = nowProvider
             viewModel.refresh(
                 logs: logs,
                 pauseIntervals: pauses,
                 travelIntervals: travels
             )
         }
-        .onChange(of: logs.count) {
+        .onChange(of: logSignature) {
             viewModel.refresh(
                 logs: logs,
                 pauseIntervals: pauses,
@@ -111,6 +127,9 @@ struct TrajectoryScreen: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+        }
+        .sheet(item: $retroSelection) { selection in
+            retroLogSheet(for: selection)
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
@@ -187,6 +206,14 @@ struct TrajectoryScreen: View {
                     days: snapshot.days,
                     onDayTap: { day in
                         selectedDay = day
+                    },
+                    onCellTap: { day, completion in
+                        retroSelection = RetroLogSelection(
+                            day: day.date,
+                            prayer: completion.prayer,
+                            currentStatus: completion.status,
+                            isJamaah: completion.withJamaah
+                        )
                     }
                 )
                 .padding(.horizontal, IhsanSpacing.md)
@@ -223,6 +250,59 @@ struct TrajectoryScreen: View {
         return Set(naflLogs.map { calendar.startOfDay(for: $0.naflDate) })
     }
 
+    // MARK: - Retroactive logging (the ledger's way in)
+
+    /// The log sheet for a tapped grid cell. Prior days open with all
+    /// four tiles active (the past-day rule); today's cells defer to
+    /// the availability rule. The sheet inscribes the day instead of
+    /// clock times — a past day has no window to describe.
+    @ViewBuilder
+    private func retroLogSheet(for selection: RetroLogSelection) -> some View {
+        let now = nowProvider.now()
+        let tokens = PaletteState.resolved(
+            for: SkyPhase.approximate(at: now, timeZone: .current)
+        )
+        PrayerLogSheet(
+            prayer: selection.prayer,
+            scheduledTime: selection.day,
+            windowEndTime: nil,
+            timeZone: .current,
+            tokens: tokens,
+            currentStatus: selection.currentStatus,
+            isJamaah: selection.isJamaah,
+            availableStatuses: TimingAvailability.allowedStatuses(
+                now: now,
+                dayBeingLogged: selection.day,
+                scheduledTime: nil,
+                windowEndTime: nil,
+                currentStatus: selection.currentStatus
+            ),
+            displayDate: selection.day,
+            onCommit: { status, jamaah in
+                commitRetro(selection: selection, status: status, jamaah: jamaah)
+            },
+            onCancel: {}
+        )
+    }
+
+    /// The same single funnel every surface uses — the intents —
+    /// with the cell's civil day attached. Dedup holds per
+    /// (prayer, day); an edit rewrites in place.
+    private func commitRetro(
+        selection: RetroLogSelection, status: PrayerStatus, jamaah: Bool
+    ) {
+        Task {
+            _ = try? await LogPrayerWithStatusIntent(
+                prayer: selection.prayer, status: status, date: selection.day
+            ).perform()
+            if jamaah != selection.isJamaah {
+                _ = try? await ToggleJamaahIntent(
+                    prayer: selection.prayer, date: selection.day
+                ).perform()
+            }
+        }
+    }
+
     /// The quiet in-Path switch for the overlay: a small outlined chip,
     /// filled while the sixth row shows. Visible only when the sunnah
     /// layer itself is on.
@@ -254,6 +334,15 @@ struct TrajectoryScreen: View {
         .accessibilityValue(isOn ? "on" : "off")
         .accessibilityHint("Adds a quieter sixth row to the pattern.")
     }
+}
+
+/// Identifies the grid cell whose log sheet is presented.
+private struct RetroLogSelection: Identifiable, Hashable {
+    let day: Date
+    let prayer: Prayer
+    let currentStatus: PrayerStatus?
+    let isJamaah: Bool
+    var id: String { "\(prayer.rawValue)-\(day.timeIntervalSinceReferenceDate)" }
 }
 
 #Preview {
