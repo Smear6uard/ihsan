@@ -1,3 +1,4 @@
+import IhsanCore
 import SwiftUI
 
 /// Small caps section label rendered in the manuscript register —
@@ -7,6 +8,8 @@ import SwiftUI
 public struct SectionHeader: View {
     public let title: String
 
+    @Environment(\.timeOfDayOverride) private var override
+
     public init(_ title: String) {
         self.title = title
     }
@@ -15,7 +18,7 @@ public struct SectionHeader: View {
         Text(title.uppercased())
             .font(IhsanFont.inscription)
             .tracking(1.8)
-            .foregroundStyle(IhsanColor.brassDark)
+            .foregroundStyle(IhsanPageChrome.tokens(at: override ?? NowProvider.active.now()).inkSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .accessibilityAddTraits(.isHeader)
     }

@@ -10,7 +10,7 @@ struct HeatmapDayPopover: View {
     let day: DayCompletion
 
     private var tokens: SkyPaletteTokens {
-        IhsanPageChrome.tokens(at: .now)
+        IhsanPageChrome.tokens(at: NowProvider.active.now())
     }
 
     var body: some View {

@@ -1,3 +1,4 @@
+import IhsanCore
 import SwiftUI
 
 /// Prose block for explanatory copy inside SettingsSectionCard.
@@ -11,7 +12,7 @@ public struct SettingsDescriptionText: View {
     public var body: some View {
         Text(text)
             .font(IhsanFont.bodyEnglish)
-            .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+            .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary)
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, IhsanSpacing.md)

@@ -35,9 +35,9 @@ public struct SettingsSectionCard<Content: View>: View {
     ScrollView {
         VStack(spacing: IhsanSpacing.lg) {
             SettingsSectionCard("Location & Times") {
-                SettingsRow(title: "Oakland, CA", subtitle: nil, icon: "location.fill", action: {})
-                SettingsRow(title: "Method", subtitle: "ISNA", icon: nil, action: {})
-                SettingsRow(title: "Madhhab (Asr)", subtitle: "Standard", icon: nil, action: {})
+                SettingsRow(title: "Oakland, CA", subtitle: nil, glyph: .location, action: {})
+                SettingsRow(title: "Method", subtitle: "ISNA", action: {})
+                SettingsRow(title: "Madhhab (Asr)", subtitle: "Standard", action: {})
             }
         }
         .padding()

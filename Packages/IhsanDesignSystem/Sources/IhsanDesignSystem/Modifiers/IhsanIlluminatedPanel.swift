@@ -1,3 +1,4 @@
+import IhsanCore
 import SwiftUI
 
 /// Intensity tier for content panels. Under palette v2 the tiers
@@ -63,7 +64,7 @@ internal struct IhsanIlluminatedPanelModifier: ViewModifier {
             TimelineView(.periodic(from: .distantPast, by: 60)) { context in
                 content.modifier(
                     TokenCelestialPanelModifier(
-                        tokens: IhsanPageChrome.tokens(at: context.date),
+                        tokens: IhsanPageChrome.tokens(at: NowProvider.active.resolve(context.date)),
                         cornerRadius: intensity.cornerRadius,
                         isActive: isActive
                     )
@@ -94,7 +95,7 @@ public struct IhsanManuscriptPageModifier: ViewModifier {
         } else {
             TimelineView(.periodic(from: .distantPast, by: 60)) { context in
                 content.background {
-                    ground(at: context.date).ignoresSafeArea()
+                    ground(at: NowProvider.active.resolve(context.date)).ignoresSafeArea()
                 }
             }
         }

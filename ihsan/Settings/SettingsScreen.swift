@@ -95,7 +95,7 @@ struct SettingsScreen: View {
                         AboutSection(openURL: openURL)
                     } else {
                         ProgressView()
-                            .tint(IhsanColor.brass)
+                            .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                             .frame(maxWidth: .infinity)
                             .padding(.top, IhsanSpacing.xxl)
                     }
@@ -190,13 +190,16 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Quiet preferences")
                 .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).ink)
                 .accessibilityAddTraits(.isHeader)
             Text("SETTINGS")
                 .font(IhsanFont.inscription)
                 .tracking(2.0)
-                .foregroundStyle(IhsanColor.brass)
-            OrnamentalDivider()
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary)
+            OrnamentalDivider(
+                tint: IhsanPageChrome.tokens(at: NowProvider.active.now()).metal,
+                opacity: 0.5
+            )
                 .padding(.top, IhsanSpacing.xs)
         }
     }
@@ -498,31 +501,31 @@ private struct LocationSection: View {
             SettingsRow(
                 title: currentCityTitle,
                 subtitle: currentCitySubtitle,
-                icon: "location.fill",
+                glyph: .location,
                 action: onCityTap
             ) { EmptyView() }
             #else
             SettingsRow(
                 title: currentCityTitle,
                 subtitle: currentCitySubtitle,
-                icon: "location.fill"
+                glyph: .location
             ) { EmptyView() }
             #endif
 
-            SettingsRow(title: "Automatic location updates", icon: "location.circle") {
+            SettingsRow(title: "Automatic location updates", glyph: .location) {
                 Toggle("", isOn: Binding(
                     get: { settings.automaticLocationUpdatesEnabled },
                     set: { onAutomaticLocationChanged($0, settings) }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Automatic location updates")
             }
 
             SettingsRow(
                 title: "Refresh location now",
                 subtitle: refreshMessage,
-                icon: "location.magnifyingglass",
+                glyph: .location,
                 action: onRefresh
             )
         }
@@ -546,7 +549,7 @@ private struct CalculationSection: View {
             SettingsRow(
                 title: "Current method",
                 subtitle: settings.calculationMethod.settingsDisplayName,
-                icon: "function",
+                glyph: .method,
                 action: {
                     Haptics.impact(.light)
                     path.append(.calculationMethod)
@@ -565,7 +568,7 @@ private struct MadhabSection: View {
             SettingsRow(
                 title: "Current choice",
                 subtitle: settings.madhab.settingsDisplayName,
-                icon: "book.closed.fill",
+                glyph: .asrShadow,
                 action: {
                     Haptics.impact(.light)
                     path.append(.madhab)
@@ -584,7 +587,7 @@ private struct HighLatitudeSection: View {
             SettingsRow(
                 title: "Current rule",
                 subtitle: settings.highLatitudeRule.settingsDisplayName,
-                icon: "sun.horizon",
+                glyph: .highLatitude,
                 action: {
                     Haptics.impact(.light)
                     path.append(.highLatitudeRule)
@@ -603,13 +606,13 @@ private struct NotificationsSection: View {
 
     var body: some View {
         SettingsSectionCard("Notifications") {
-            SettingsRow(title: "Adhan notifications", icon: "bell.fill") {
+            SettingsRow(title: "Adhan notifications", glyph: .adhan) {
                 Toggle("", isOn: Binding(
                     get: { settings.notificationsEnabled },
                     set: { onToggleNotifications($0, settings) }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Adhan notifications")
             }
 
@@ -617,7 +620,7 @@ private struct NotificationsSection: View {
                 SettingsRow(
                     title: "Sound",
                     subtitle: "Default",
-                    icon: "speaker.wave.2.fill",
+                    glyph: .adhan,
                     action: {
                         Haptics.impact(.light)
                         path.append(.adhanSound)
@@ -625,10 +628,10 @@ private struct NotificationsSection: View {
                 )
 
                 ForEach(Prayer.allCases, id: \.self) { prayer in
-                    SettingsRow(title: prayer.displayNameEnglish, icon: "clock.badge.checkmark") {
+                    SettingsRow(title: prayer.displayNameEnglish, glyph: .adhan) {
                         Toggle("", isOn: prayerNotificationBinding(for: prayer))
                             .labelsHidden()
-                            .tint(IhsanColor.brass)
+                            .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                             .accessibilityLabel("\(prayer.displayNameEnglish) notification")
                     }
                 }
@@ -665,14 +668,14 @@ private struct PauseModeSection: View {
             SettingsRow(
                 title: "Status",
                 subtitle: activePause.map { "Active since \($0.startDate.formatted(date: .abbreviated, time: .shortened))" } ?? "Inactive",
-                icon: "pause.circle.fill"
+                glyph: .pause
             ) {
                 Toggle("", isOn: Binding(
                     get: { activePause != nil },
                     set: onToggle
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Pause Mode")
             }
 
@@ -680,7 +683,7 @@ private struct PauseModeSection: View {
                 SettingsRow(
                     title: "Expected end",
                     subtitle: "Nothing ends without you",
-                    icon: "calendar"
+                    glyph: .calendar
                 ) {
                     Toggle("", isOn: Binding(
                         get: { activePause.expectedEndDate != nil },
@@ -692,12 +695,12 @@ private struct PauseModeSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Expected end date")
                 }
 
                 if let expectedEnd = activePause.expectedEndDate {
-                    SettingsRow(title: "Around", icon: "clock") {
+                    SettingsRow(title: "Around", glyph: .clock) {
                         DatePicker(
                             "",
                             selection: Binding(
@@ -732,14 +735,14 @@ private struct TravelModeSection: View {
             SettingsRow(
                 title: "Status",
                 subtitle: activeTravel.map { "Active since \($0.startDate.formatted(date: .abbreviated, time: .shortened))" } ?? "Inactive",
-                icon: "airplane"
+                glyph: .travel
             ) {
                 Toggle("", isOn: Binding(
                     get: { activeTravel != nil },
                     set: onToggle
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Travel Mode")
             }
 
@@ -747,14 +750,14 @@ private struct TravelModeSection: View {
                 SettingsRow(
                     title: "Jam policy",
                     subtitle: activeTravel.jamPolicy.settingsDisplayName,
-                    icon: "arrow.triangle.merge",
+                    glyph: .jam,
                     action: {
                         Haptics.impact(.light)
                         path.append(.jamPolicy)
                     }
                 )
 
-                SettingsRow(title: "Qasr enabled", icon: "arrow.down.forward.and.arrow.up.backward") {
+                SettingsRow(title: "Qasr enabled", glyph: .qasr) {
                     Toggle("", isOn: Binding(
                         get: { activeTravel.qasrEnabled },
                         set: {
@@ -763,7 +766,7 @@ private struct TravelModeSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Qasr enabled")
                 }
             }
@@ -783,7 +786,7 @@ private struct MakeupPrayersSection: View {
                 SettingsRow(
                     title: "Unlogged prayers flow here",
                     subtitle: "When a day passes without a record",
-                    icon: "arrow.uturn.backward"
+                    glyph: .makeupLedger
                 ) {
                     Toggle("", isOn: Binding(
                         get: { settings.qadaMissedFlowEnabled },
@@ -793,11 +796,11 @@ private struct MakeupPrayersSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Unlogged prayers flow into makeup count")
                 }
 
-                SettingsRow(title: "Track witr", icon: "moon.haze.fill") {
+                SettingsRow(title: "Track witr", glyph: .nightMoon) {
                     Toggle("", isOn: Binding(
                         get: { settings.qadaTracksWitr },
                         set: {
@@ -806,7 +809,7 @@ private struct MakeupPrayersSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Track witr makeups")
                 }
 
@@ -815,7 +818,7 @@ private struct MakeupPrayersSection: View {
                 SettingsRow(
                     title: "Makeup prayers",
                     subtitle: "At your pace",
-                    icon: "arrow.uturn.backward",
+                    glyph: .makeupLedger,
                     action: onBeginSetup
                 )
 
@@ -835,7 +838,7 @@ private struct SunnahSection: View {
 
     var body: some View {
         SettingsSectionCard("Sunnah & Night Prayer") {
-            SettingsRow(title: "Sunnah & night prayer", icon: "moon.stars") {
+            SettingsRow(title: "Sunnah & night prayer", glyph: .nightMoon) {
                 Toggle("", isOn: Binding(
                     get: { settings.sunnahLayerEnabled },
                     set: { enabled in
@@ -855,12 +858,12 @@ private struct SunnahSection: View {
                     }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Sunnah and night prayer")
             }
 
             if settings.sunnahLayerEnabled {
-                SettingsRow(title: "Rawatib", subtitle: "Around each fard", icon: "circle.grid.cross") {
+                SettingsRow(title: "Rawatib", subtitle: "Around each fard", glyph: .rawatib) {
                     Toggle("", isOn: Binding(
                         get: { settings.sunnahRawatibEnabled },
                         set: {
@@ -869,7 +872,7 @@ private struct SunnahSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Rawatib")
                 }
 
@@ -877,7 +880,7 @@ private struct SunnahSection: View {
                     SettingsRow(
                         title: "Rawatib counts",
                         subtitle: "Yours to set",
-                        icon: "plusminus",
+                        glyph: .counts,
                         action: {
                             Haptics.impact(.light)
                             path.append(.rawatibCounts)
@@ -885,7 +888,7 @@ private struct SunnahSection: View {
                     )
                 }
 
-                SettingsRow(title: "Duha", subtitle: "The forenoon prayer", icon: "sun.min") {
+                SettingsRow(title: "Duha", subtitle: "The forenoon prayer", glyph: .sun) {
                     Toggle("", isOn: Binding(
                         get: { settings.sunnahDuhaEnabled },
                         set: {
@@ -894,7 +897,7 @@ private struct SunnahSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Duha")
                 }
 
@@ -902,7 +905,7 @@ private struct SunnahSection: View {
                     SettingsRow(
                         title: "Duha window",
                         subtitle: duhaWindowSubtitle,
-                        icon: "clock",
+                        glyph: .clock,
                         action: {
                             Haptics.impact(.light)
                             path.append(.duhaWindow)
@@ -910,7 +913,7 @@ private struct SunnahSection: View {
                     )
                 }
 
-                SettingsRow(title: "Night prayer", subtitle: "Qiyam and witr", icon: "moon.zzz") {
+                SettingsRow(title: "Night prayer", subtitle: "Qiyam and witr", glyph: .nightMoon) {
                     Toggle("", isOn: Binding(
                         get: { settings.sunnahNightEnabled },
                         set: {
@@ -920,12 +923,12 @@ private struct SunnahSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Night prayer")
                 }
 
                 if settings.sunnahNightEnabled {
-                    SettingsRow(title: "Gentle wake", subtitle: "For the last third", icon: "alarm") {
+                    SettingsRow(title: "Gentle wake", subtitle: "For the last third", glyph: .clock) {
                         Toggle("", isOn: Binding(
                             get: { settings.nightWakeEnabled },
                             set: {
@@ -935,7 +938,7 @@ private struct SunnahSection: View {
                             }
                         ))
                         .labelsHidden()
-                        .tint(IhsanColor.brass)
+                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                         .accessibilityLabel("Gentle wake")
                     }
 
@@ -964,7 +967,7 @@ private struct SunnahSection: View {
                     }
                 }
 
-                SettingsRow(title: "Ask for rak'ah counts", subtitle: "Off: one tap records", icon: "number") {
+                SettingsRow(title: "Ask for rak'ah counts", subtitle: "Off: one tap records", glyph: .counts) {
                     Toggle("", isOn: Binding(
                         get: { settings.sunnahRakahCountsEnabled },
                         set: {
@@ -973,7 +976,7 @@ private struct SunnahSection: View {
                         }
                     ))
                     .labelsHidden()
-                    .tint(IhsanColor.brass)
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Ask for rak'ah counts")
                 }
 
@@ -1013,10 +1016,10 @@ private struct RawatibCountRow: View {
         let config = settings.rawatibConfig(for: prayer)
         VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
             Divider()
-                .overlay(IhsanColor.brass.opacity(0.18))
+                .overlay(IhsanPageChrome.tokens(at: NowProvider.active.now()).metal.opacity(0.18))
             Text(prayer.displayNameEnglish)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).ink)
             HStack(spacing: IhsanSpacing.lg) {
                 miniCountControl(
                     label: "Before",
@@ -1095,24 +1098,27 @@ private func miniCountControl(
         Text(label.uppercased())
             .font(IhsanFont.inscription)
             .tracking(1.2)
-            .foregroundStyle(IhsanPageChrome.tokens(at: .now).inkSecondary.opacity(0.7))
+            .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary.opacity(0.7))
         HStack(spacing: IhsanSpacing.sm) {
             Button {
                 Haptics.impact(.light)
                 onChange(max(range.lowerBound, value - step))
             } label: {
-                Image(systemName: "minus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IhsanColor.brass)
+                StepMark(isPlus: false)
+                    .stroke(
+                        IhsanPageChrome.tokens(at: NowProvider.active.now()).metal,
+                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                    )
+                    .frame(width: 10, height: 10)
                     .frame(width: 28, height: 28)
-                    .background(Circle().strokeBorder(IhsanColor.brass.opacity(0.45), lineWidth: 1))
+                    .background(Circle().strokeBorder(IhsanPageChrome.tokens(at: NowProvider.active.now()).metal.opacity(0.45), lineWidth: 1))
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
 
             Text("\(value)")
                 .font(.system(.body, design: .monospaced).monospacedDigit())
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).ink)
                 .frame(minWidth: 28)
                 .contentTransition(.numericText())
 
@@ -1120,11 +1126,14 @@ private func miniCountControl(
                 Haptics.impact(.light)
                 onChange(min(range.upperBound, value + step))
             } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IhsanColor.brass)
+                StepMark(isPlus: true)
+                    .stroke(
+                        IhsanPageChrome.tokens(at: NowProvider.active.now()).metal,
+                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                    )
+                    .frame(width: 10, height: 10)
                     .frame(width: 28, height: 28)
-                    .background(Circle().strokeBorder(IhsanColor.brass.opacity(0.45), lineWidth: 1))
+                    .background(Circle().strokeBorder(IhsanPageChrome.tokens(at: NowProvider.active.now()).metal.opacity(0.45), lineWidth: 1))
             }
             .buttonStyle(.plain)
             .accessibilityHidden(true)
@@ -1154,7 +1163,7 @@ private struct DisplaySection: View {
             SettingsRow(
                 title: "Theme",
                 subtitle: settings.theme.settingsDisplayName,
-                icon: "moon.stars.fill",
+                glyph: .nightMoon,
                 action: {
                     Haptics.impact(.light)
                     path.append(.theme)
@@ -1172,7 +1181,7 @@ private struct ReflectionSyncSection: View {
             SettingsRow(
                 title: "Sync voice memos via iCloud",
                 subtitle: "Off by default",
-                icon: "icloud.fill"
+                glyph: .sync
             ) {
                 Toggle("", isOn: Binding(
                     get: { settings.autoSyncAudioMemos },
@@ -1182,7 +1191,7 @@ private struct ReflectionSyncSection: View {
                     }
                 ))
                 .labelsHidden()
-                .tint(IhsanColor.brass)
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Sync voice memos via iCloud")
             }
 
@@ -1201,14 +1210,14 @@ private struct PrivacySection: View {
 
             SettingsRow(
                 title: "Export my data",
-                icon: "square.and.arrow.up",
+                glyph: .share,
                 action: onExport
             )
             .accessibilityHint("Creates a JSON export and opens the share sheet.")
 
             SettingsRow(
                 title: "Delete all data",
-                icon: "trash",
+                glyph: .remove,
                 action: onDelete
             )
             .accessibilityHint("Opens a confirmation before deleting local Ihsan data.")
@@ -1224,23 +1233,23 @@ private struct AboutSection: View {
             SettingsRow(
                 title: "Version",
                 subtitle: "\(Bundle.main.appVersion) (\(Bundle.main.buildNumber))",
-                icon: "info.circle.fill"
+                glyph: .info
             ) {
                 EmptyView()
             }
-            SettingsRow(title: "Photography credits", subtitle: "Sunrise and Maghrib wallpaper sources pending", icon: "camera.fill") { EmptyView() }
-            SettingsRow(title: "Audio credits", subtitle: "Adhan recording credits pending", icon: "waveform") { EmptyView() }
+            SettingsRow(title: "Photography credits", subtitle: "Sunrise and Maghrib wallpaper sources pending", glyph: .info) { EmptyView() }
+            SettingsRow(title: "Audio credits", subtitle: "Adhan recording credits pending", glyph: .voiceWaves) { EmptyView() }
             SettingsRow(
                 title: "Fiqh content credits",
                 subtitle: "ihsan-fiqh-config public repo",
-                icon: "book.pages.fill",
+                glyph: .book,
                 action: { openURL(URL(string: "https://github.com/sameerstudios/ihsan-fiqh-config")!) }
             )
-            SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", icon: "heart.fill") { EmptyView() }
+            SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", glyph: .heart) { EmptyView() }
             SettingsRow(
                 title: "Privacy policy",
                 subtitle: "Hosted policy URL pending before App Store submission",
-                icon: "lock.shield.fill",
+                glyph: .privacy,
                 action: { openURL(URL(string: "https://sameerstudios.github.io/ihsan/privacy")!) }
             )
         }
@@ -1259,7 +1268,7 @@ private struct CalculationMethodPicker: View {
                 SettingsRow(
                     title: "Auto-detect from location",
                     subtitle: autoDetectSubtitle,
-                    icon: "location.viewfinder",
+                    glyph: .location,
                     action: autoDetect
                 )
             }
@@ -1362,7 +1371,7 @@ private struct AdhanSoundPicker: View {
         PickerScaffold(title: "Adhan Sound") {
             SettingsSectionCard("Sound") {
                 ForEach(options, id: \.self) { option in
-                    SettingsRow(title: option, subtitle: "Sound switching lands with notification scheduling", icon: "speaker.wave.2.fill") {
+                    SettingsRow(title: option, subtitle: "Sound switching lands with notification scheduling", glyph: .adhan) {
                         EmptyView()
                     }
                     .accessibilityHint("This option is visible but not active yet.")
@@ -1461,11 +1470,11 @@ private func optionRow(
     isSelected: Bool,
     action: @escaping () -> Void
 ) -> some View {
-    SettingsRow(title: title, subtitle: subtitle, icon: isSelected ? "checkmark.circle.fill" : "circle", action: {
+    SettingsRow(title: title, subtitle: subtitle, action: {
         Haptics.impact(.light)
         action()
     }) {
-        EmptyView()
+        SettingsSelectionRing(isSelected: isSelected)
     }
     .accessibilityHint(isSelected ? "Selected" : "Double tap to select")
 }
@@ -1763,5 +1772,22 @@ private extension Bundle {
 
     var buildNumber: String {
         object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1"
+    }
+}
+
+
+/// The stepper's engraved marks: a drawn line and cross, never a
+/// symbol.
+private struct StepMark: Shape {
+    let isPlus: Bool
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.midY))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+        if isPlus {
+            p.move(to: CGPoint(x: rect.midX, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        }
+        return p
     }
 }
