@@ -11,6 +11,7 @@ import IhsanFiqhConfig
 /// affordance used on the Today screen (prompt + Begin button), while
 /// this hero is the writing surface.
 struct ReflectionHeroComposer: View {
+    let tokens: SkyPaletteTokens
     let prompt: ReflectionPrompt
     @Binding var draftText: String
     let isRecording: Bool
@@ -35,11 +36,12 @@ struct ReflectionHeroComposer: View {
             promptHeader
 
             Rectangle()
-                .fill(IhsanColor.brass.opacity(0.25))
+                .fill(tokens.metal.opacity(0.45))
                 .frame(height: IhsanSpacing.hairline)
                 .accessibilityHidden(true)
 
             ReflectionInputComposer(
+                tokens: tokens,
                 text: $draftText,
                 isRecording: isRecording,
                 recordingElapsed: recordingElapsed,
@@ -68,7 +70,7 @@ struct ReflectionHeroComposer: View {
             // Slim brass marginal mark — a Mushaf-style accent that makes
             // the prompt read as a passage from a book rather than a UI string.
             RoundedRectangle(cornerRadius: 1, style: .continuous)
-                .fill(IhsanColor.brass.opacity(0.75))
+                .fill(tokens.metal.opacity(0.85))
                 .frame(width: 2)
                 .frame(maxHeight: .infinity, alignment: .top)
                 .padding(.vertical, 4)
@@ -78,17 +80,17 @@ struct ReflectionHeroComposer: View {
                 Text("TODAY'S PROMPT")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
 
                 Text(prompt.promptEn)
                     .font(.system(size: 20, weight: .medium, design: .serif).italic())
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Text(prompt.citationEn)
                     .font(IhsanFont.citation)
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.95))
                     .fixedSize(horizontal: false, vertical: true)
             }
         }

@@ -63,6 +63,25 @@ struct PageChromeContrastTests {
         }
     }
 
+    // MARK: - The prompt text (Reflect's hero)
+
+    /// The reflection prompt is the page's most-read passage: italic
+    /// serif ink on the hero panel. Body targets 7:1 in every phase;
+    /// the citation line under it holds ≥4.5:1. This is the "prompt
+    /// text specifically" contrast report the repaint was gated on —
+    /// the old navy-on-brown pairing failed exactly here.
+    @Test
+    func promptTextReadsComfortablyInEveryPhase() {
+        for state in states {
+            let tokens = state.tokens
+            let panel = tokens.panelFillValue
+            let prompt = tokens.inkValue.contrastRatio(against: panel)
+            let citation = tokens.inkSecondaryValue.contrastRatio(against: panel)
+            #expect(prompt >= 7.0, "\(state) prompt \(String(format: "%.2f", prompt)):1")
+            #expect(citation >= 4.5, "\(state) citation \(String(format: "%.2f", citation)):1")
+        }
+    }
+
     // MARK: - The dot-state language
 
     @Test

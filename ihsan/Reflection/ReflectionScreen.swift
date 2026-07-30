@@ -35,9 +35,18 @@ struct ReflectionScreen: View {
 
     @FocusState private var isInputFocused: Bool
 
+    @Environment(\.nowProvider) private var nowProvider
+
     var body: some View {
-        content
-        .ihsanManuscriptPage()
+        // The page's one clock — tokens and ground resolve together,
+        // and the shared chrome modifiers ride the same instant.
+        TimelineView(.periodic(from: .distantPast, by: 60)) { context in
+            let now = nowProvider.resolve(context.date)
+            let tokens = IhsanPageChrome.tokens(at: now)
+            content(tokens: tokens)
+                .ihsanManuscriptPage()
+                .environment(\.timeOfDayOverride, now)
+        }
         .task {
             if viewModel == nil {
                 viewModel = ReflectionViewModel(modelContext: modelContext)
@@ -87,6 +96,7 @@ struct ReflectionScreen: View {
         .sheet(item: $presentedReflection) { reflection in
             if let viewModel {
                 ReflectionDetailSheet(
+                    tokens: IhsanPageChrome.tokens(at: nowProvider.now()),
                     reflection: reflection,
                     isPlaybackActive: viewModel.playback.activeMemoID == reflection.voiceMemoID,
                     isPlaybackPlaying: isPlaybackPlayingForCurrentSheet(viewModel: viewModel, reflection: reflection),
@@ -100,42 +110,43 @@ struct ReflectionScreen: View {
     // MARK: - Top-level content branching
 
     @ViewBuilder
-    private var content: some View {
+    private func content(tokens: SkyPaletteTokens) -> some View {
         if let viewModel {
             switch viewModel.state {
             case .loading:
-                loadingView
+                loadingView(tokens: tokens)
             case .ready(let snapshot):
-                readyView(snapshot: snapshot, viewModel: viewModel)
+                readyView(snapshot: snapshot, viewModel: viewModel, tokens: tokens)
             case .error(let message):
-                errorView(message: message)
+                errorView(message: message, tokens: tokens)
             }
         } else {
-            loadingView
+            loadingView(tokens: tokens)
         }
     }
 
-    private var loadingView: some View {
+    private func loadingView(tokens: SkyPaletteTokens) -> some View {
         VStack(spacing: IhsanSpacing.md) {
             ProgressView()
                 .progressViewStyle(.circular)
-                .tint(IhsanColor.brass)
+                .tint(tokens.inkSecondary)
             Text("LOADING REFLECTIONS…")
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).inkSecondary)
+                .foregroundStyle(tokens.inkSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func errorView(message: String) -> some View {
+    private func errorView(message: String, tokens: SkyPaletteTokens) -> some View {
         VStack(spacing: IhsanSpacing.md) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 32))
-                .foregroundStyle(IhsanColor.brassDark)
+            FourPointedStar()
+                .fill(tokens.metal.opacity(0.6))
+                .frame(width: 24, height: 24)
+                .accessibilityHidden(true)
             Text(message)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
+                .foregroundStyle(tokens.ink)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -147,14 +158,16 @@ struct ReflectionScreen: View {
     @ViewBuilder
     private func readyView(
         snapshot: ReflectionState.Snapshot,
-        viewModel: ReflectionViewModel
+        viewModel: ReflectionViewModel,
+        tokens: SkyPaletteTokens
     ) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-                header(promptDate: snapshot.promptDate)
+                header(promptDate: snapshot.promptDate, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
                 ReflectionHeroComposer(
+                    tokens: tokens,
                     prompt: snapshot.prompt,
                     draftText: bindingDraftText(viewModel),
                     isRecording: isRecordingActive,
@@ -184,7 +197,7 @@ struct ReflectionScreen: View {
                 )
                 .padding(.horizontal, IhsanSpacing.md)
 
-                feedSection(snapshot: snapshot, viewModel: viewModel)
+                feedSection(snapshot: snapshot, viewModel: viewModel, tokens: tokens)
 
                 Color.clear.frame(height: IhsanSpacing.xl)
             }
@@ -195,18 +208,18 @@ struct ReflectionScreen: View {
     // MARK: - Header
 
     @ViewBuilder
-    private func header(promptDate: Date) -> some View {
+    private func header(promptDate: Date, tokens: SkyPaletteTokens) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("The day's quiet account")
                 .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
+                .foregroundStyle(tokens.ink)
 
             Text("REFLECTION · \(HijriDateFormatter.string(from: promptDate).uppercased())")
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(IhsanColor.brass)
+                .foregroundStyle(tokens.inkSecondary)
 
-            OrnamentalDivider()
+            OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
                 .padding(.top, IhsanSpacing.xs)
         }
         .accessibilityElement(children: .combine)
@@ -217,12 +230,14 @@ struct ReflectionScreen: View {
     @ViewBuilder
     private func feedSection(
         snapshot: ReflectionState.Snapshot,
-        viewModel: ReflectionViewModel
+        viewModel: ReflectionViewModel,
+        tokens: SkyPaletteTokens
     ) -> some View {
         if snapshot.isEmpty {
             ReflectionEmptyState(
                 title: snapshot.framing.reflectionEmptyTitle,
-                subtitle: snapshot.framing.reflectionEmptySubtitle
+                subtitle: snapshot.framing.reflectionEmptySubtitle,
+                tokens: tokens
             )
             .padding(.top, IhsanSpacing.lg)
             .padding(.horizontal, IhsanSpacing.md)
@@ -231,7 +246,7 @@ struct ReflectionScreen: View {
                 Text("EARLIER ENTRIES")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brass)
+                    .foregroundStyle(tokens.inkSecondary)
                     .padding(.horizontal, IhsanSpacing.md)
 
                 ForEach(snapshot.sections) { section in
@@ -239,12 +254,13 @@ struct ReflectionScreen: View {
                         Text(section.title.uppercased())
                             .font(IhsanFont.inscription)
                             .tracking(1.6)
-                            .foregroundStyle(IhsanColor.brassDark)
+                            .foregroundStyle(tokens.inkSecondary.opacity(0.9))
                             .padding(.horizontal, IhsanSpacing.md)
 
                         VStack(spacing: IhsanSpacing.sm) {
                             ForEach(section.entries) { entry in
                                 ReflectionFeedCard(
+                                    tokens: tokens,
                                     reflection: entry,
                                     isPlaybackActive: viewModel.playback.activeMemoID == entry.voiceMemoID,
                                     isPlaybackPlaying: isPlaybackPlayingFor(

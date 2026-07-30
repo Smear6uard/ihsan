@@ -67,7 +67,7 @@ final class ReflectionViewModel {
         }
 
         didBootstrap = true
-        let now = Date.now
+        let now = NowProvider.active.now()
         let promptAnchor = Calendar.current.startOfDay(for: now)
         let bucket = ReflectionTimeOfDay.bucket(for: now)
 
@@ -103,7 +103,7 @@ final class ReflectionViewModel {
         guard case let .ready(snapshot) = state else { return }
         let sections = ReflectionDateGrouping.sections(
             from: cachedReflections,
-            now: .now
+            now: NowProvider.active.now()
         )
         state = .ready(.init(
             prompt: snapshot.prompt,

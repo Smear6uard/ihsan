@@ -5,6 +5,7 @@ import IhsanDesignSystem
 /// duration. Compact by design — the text content of a reflection is the
 /// primary content; the pill is an enhancement.
 struct ReflectionAudioPill: View {
+    let tokens: SkyPaletteTokens
     let isActive: Bool
     let isPlaying: Bool
     let currentTime: TimeInterval
@@ -17,16 +18,16 @@ struct ReflectionAudioPill: View {
                 Image(systemName: iconName)
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 22, height: 22)
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                     .contentTransition(.symbolEffect(.replace))
 
-                ProgressTrack(progress: progress)
+                ProgressTrack(progress: progress, tokens: tokens)
                     .frame(height: 2)
                     .frame(minWidth: 80)
 
                 Text(displayedTimeLabel)
                     .font(IhsanFont.tabular)
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
+                    .foregroundStyle(tokens.inkSecondary)
                     .frame(minWidth: 36, alignment: .trailing)
                     .accessibilityHidden(true)
             }
@@ -34,10 +35,10 @@ struct ReflectionAudioPill: View {
             .padding(.vertical, IhsanSpacing.sm)
             .background {
                 Capsule(style: .continuous)
-                    .fill(IhsanColor.inkDeep.opacity(0.06))
+                    .fill(tokens.ink.opacity(0.06))
                     .overlay {
                         Capsule(style: .continuous)
-                            .strokeBorder(IhsanColor.brass.opacity(0.35), lineWidth: 0.5)
+                            .strokeBorder(tokens.panelStroke.opacity(0.8), lineWidth: 0.5)
                     }
             }
         }
@@ -88,14 +89,15 @@ struct ReflectionAudioPill: View {
 
 private struct ProgressTrack: View {
     let progress: Double
+    let tokens: SkyPaletteTokens
 
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .leading) {
                 Capsule()
-                    .fill(IhsanColor.brass.opacity(0.25))
+                    .fill(tokens.metal.opacity(0.30))
                 Capsule()
-                    .fill(IhsanColor.brassDark)
+                    .fill(tokens.metal)
                     .frame(width: max(0, geo.size.width * progress))
                     .animation(.linear(duration: 0.12), value: progress)
             }
@@ -107,6 +109,7 @@ private struct ProgressTrack: View {
 #Preview("Audio pill") {
     VStack(spacing: IhsanSpacing.md) {
         ReflectionAudioPill(
+            tokens: PaletteState.afternoon.tokens,
             isActive: false,
             isPlaying: false,
             currentTime: 0,
@@ -114,6 +117,7 @@ private struct ProgressTrack: View {
             onToggle: {}
         )
         ReflectionAudioPill(
+            tokens: PaletteState.afternoon.tokens,
             isActive: true,
             isPlaying: true,
             currentTime: 18,

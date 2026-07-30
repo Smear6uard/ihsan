@@ -166,6 +166,35 @@ private struct RootGate: View {
             try? modelContext.delete(model: PrayerLog.self)
             try? modelContext.delete(model: NaflLog.self)
             try? modelContext.delete(model: PauseInterval.self)
+            try? modelContext.delete(model: Reflection.self)
+            try? modelContext.save()
+        }
+        // `-IhsanDebugSeedReflections N` inserts N typed reflections
+        // across recent days — the screenshot harness for the feed's
+        // populated state.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugSeedReflections"),
+           arguments.indices.contains(flagIndex + 1),
+           let count = Int(arguments[flagIndex + 1]) {
+            let now = NowProvider.active.now()
+            let samples = [
+                "Gratitude came easier today than it has in weeks.",
+                "The pause before Maghrib was the stillest moment of the day.",
+                "I noticed how much lighter the evening felt after Isha.",
+                "A slow morning, but Fajr held it together.",
+            ]
+            for index in 0..<count {
+                let day = Calendar.current.date(byAdding: .day, value: -index * 2, to: now) ?? now
+                modelContext.insert(Reflection(
+                    kind: .daily,
+                    forDate: Calendar.current.startOfDay(for: day),
+                    loggedTimeZoneIdentifier: TimeZone.current.identifier,
+                    promptText: "What moment today felt closest to stillness?",
+                    promptCitation: "Surah Ar-Ra'd 13:28",
+                    typedText: samples[index % samples.count],
+                    createdAt: day,
+                    modifiedAt: day
+                ))
+            }
             try? modelContext.save()
         }
         if arguments.contains("-IhsanDebugCompletedOnboarding") {

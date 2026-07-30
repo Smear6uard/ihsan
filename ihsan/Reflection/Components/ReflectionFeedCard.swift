@@ -15,6 +15,7 @@ import IhsanDesignSystem
 ///
 /// Each card is its own tappable panel that opens the detail sheet.
 struct ReflectionFeedCard: View {
+    let tokens: SkyPaletteTokens
     let reflection: Reflection
     let isPlaybackActive: Bool
     let isPlaybackPlaying: Bool
@@ -97,7 +98,7 @@ struct ReflectionFeedCard: View {
         case .textOnly(let text):
             Text(text)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.inkDeep)
+                .foregroundStyle(tokens.ink)
                 .lineSpacing(3)
                 .lineLimit(4)
                 .fixedSize(horizontal: false, vertical: true)
@@ -105,6 +106,7 @@ struct ReflectionFeedCard: View {
         case let .voiceOnly(audio, transcript):
             VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
                 ReflectionAudioPill(
+                    tokens: tokens,
                     isActive: isPlaybackActive,
                     isPlaying: isPlaybackPlaying,
                     currentTime: playbackCurrentTime,
@@ -114,7 +116,7 @@ struct ReflectionFeedCard: View {
                 if let snippet = transcript, !snippet.isEmpty {
                     Text(snippet)
                         .font(IhsanFont.bodyEnglish)
-                        .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+                        .foregroundStyle(tokens.inkSecondary)
                         .lineSpacing(3)
                         .lineLimit(3)
                         .fixedSize(horizontal: false, vertical: true)
@@ -125,11 +127,12 @@ struct ReflectionFeedCard: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 Text(text)
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                     .lineSpacing(3)
                     .lineLimit(4)
                     .fixedSize(horizontal: false, vertical: true)
                 ReflectionAudioPill(
+                    tokens: tokens,
                     isActive: isPlaybackActive,
                     isPlaying: isPlaybackPlaying,
                     currentTime: playbackCurrentTime,
@@ -143,7 +146,7 @@ struct ReflectionFeedCard: View {
                 if let transcript, !transcript.isEmpty {
                     Text(transcript)
                         .font(IhsanFont.bodyEnglish)
-                        .foregroundStyle(IhsanColor.inkDeep)
+                        .foregroundStyle(tokens.ink)
                         .lineSpacing(3)
                         .lineLimit(4)
                         .fixedSize(horizontal: false, vertical: true)
@@ -151,13 +154,13 @@ struct ReflectionFeedCard: View {
                 Text("VOICE MEMO UNAVAILABLE ON THIS DEVICE")
                     .font(IhsanFont.inscription)
                     .tracking(1.4)
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.75))
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.9))
             }
 
         case .unknown:
             Text("(empty reflection)")
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.inkDeep.opacity(0.55))
+                .foregroundStyle(tokens.inkSecondary.opacity(0.8))
         }
     }
 
@@ -166,13 +169,13 @@ struct ReflectionFeedCard: View {
     private var metadata: some View {
         HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
             Text(gregorianLabel)
-                .font(.system(size: 20, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanColor.inkDeep)
+                .font(.system(.title3, weight: .medium))
+                .foregroundStyle(tokens.ink)
             Spacer(minLength: IhsanSpacing.sm)
             Text(hijriLabel)
                 .font(IhsanFont.inscription)
                 .tracking(1.4)
-                .foregroundStyle(IhsanColor.brassDark)
+                .foregroundStyle(tokens.inkSecondary)
         }
         .accessibilityElement(children: .combine)
     }
@@ -211,7 +214,7 @@ struct ReflectionFeedCard: View {
     private func promptLine(_ text: String) -> some View {
         Text("— \(text)")
             .font(.system(size: 16, weight: .regular, design: .serif).italic())
-            .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+            .foregroundStyle(tokens.inkSecondary)
             .lineSpacing(2)
             .fixedSize(horizontal: false, vertical: true)
     }

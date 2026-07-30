@@ -12,6 +12,7 @@ import IhsanDesignSystem
 /// design system's defined never-red color for recording. Reduce-motion
 /// disables the pulse animation but keeps the static halo.
 struct ReflectionRecorderControl: View {
+    let tokens: SkyPaletteTokens
     let isRecording: Bool
     let elapsed: TimeInterval
     let onStart: () -> Void
@@ -26,7 +27,7 @@ struct ReflectionRecorderControl: View {
                 ZStack {
                     if isRecording {
                         Circle()
-                            .fill(IhsanColor.recordingPulse)
+                            .fill(tokens.metal.opacity(0.60))
                             .frame(width: 32, height: 32)
                             .scaleEffect(reduceMotion ? 1.0 : (pulse ? 1.18 : 0.92))
                             .opacity(reduceMotion ? 0.85 : (pulse ? 1.0 : 0.5))
@@ -40,7 +41,7 @@ struct ReflectionRecorderControl: View {
 
                     Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                         .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(IhsanColor.inkDeep)
+                        .foregroundStyle(tokens.ink)
                         .contentTransition(.symbolEffect(.replace))
                 }
                 .frame(width: 32, height: 32)
@@ -48,27 +49,27 @@ struct ReflectionRecorderControl: View {
                 if isRecording {
                     Text(elapsedLabel)
                         .font(IhsanFont.tabular)
-                        .foregroundStyle(IhsanColor.inkDeep)
+                        .foregroundStyle(tokens.ink)
                         .monospacedDigit()
                         .transition(.opacity)
                 } else {
                     Text("RECORD")
                         .font(IhsanFont.inscription)
                         .tracking(1.6)
-                        .foregroundStyle(IhsanColor.brassDark)
+                        .foregroundStyle(tokens.inkSecondary)
                 }
             }
             .padding(.horizontal, IhsanSpacing.md)
             .padding(.vertical, IhsanSpacing.sm)
             .background {
                 Capsule(style: .continuous)
-                    .fill(IhsanColor.inkDeep.opacity(0.06))
+                    .fill(tokens.ink.opacity(0.06))
                     .overlay {
                         Capsule(style: .continuous)
                             .strokeBorder(
                                 isRecording
-                                    ? IhsanColor.recordingPulse
-                                    : IhsanColor.brass.opacity(0.40),
+                                    ? tokens.metal.opacity(0.85)
+                                    : tokens.panelStroke.opacity(0.8),
                                 lineWidth: isRecording ? 1.0 : 0.5
                             )
                     }
@@ -110,12 +111,14 @@ struct ReflectionRecorderControl: View {
 #Preview("Recorder control") {
     VStack(spacing: IhsanSpacing.md) {
         ReflectionRecorderControl(
+            tokens: PaletteState.afternoon.tokens,
             isRecording: false,
             elapsed: 0,
             onStart: {},
             onStop: {}
         )
         ReflectionRecorderControl(
+            tokens: PaletteState.afternoon.tokens,
             isRecording: true,
             elapsed: 14,
             onStart: {},

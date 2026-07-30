@@ -13,6 +13,7 @@ import IhsanDesignSystem
 /// page-level typography and illuminated panels — the same hybrid
 /// hierarchy used by the prayer log sheet and the day popover.
 struct ReflectionDetailSheet: View {
+    let tokens: SkyPaletteTokens
     let reflection: Reflection
     let isPlaybackActive: Bool
     let isPlaybackPlaying: Bool
@@ -27,7 +28,7 @@ struct ReflectionDetailSheet: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
                 metadataHeader
 
-                OrnamentalDivider()
+                OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
                     .padding(.bottom, IhsanSpacing.xs)
 
                 promptBlock
@@ -37,13 +38,14 @@ struct ReflectionDetailSheet: View {
                    !title.isEmpty {
                     Text(title)
                         .font(.system(size: 22, weight: .medium, design: .serif).italic())
-                        .foregroundStyle(IhsanColor.inkDeep)
+                        .foregroundStyle(tokens.ink)
                         .fixedSize(horizontal: false, vertical: true)
                 }
 
                 if let memoID = reflection.voiceMemoID,
                    let url = ReflectionAudioPaths.existingFileURL(for: memoID) {
                     ReflectionAudioPill(
+                        tokens: tokens,
                         isActive: isPlaybackActive,
                         isPlaying: isPlaybackPlaying,
                         currentTime: playbackCurrentTime,
@@ -73,12 +75,12 @@ struct ReflectionDetailSheet: View {
         HStack(alignment: .firstTextBaseline) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(gregorianLabel)
-                    .font(.system(size: 26, weight: .medium, design: .serif))
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .font(.system(.title2, weight: .medium))
+                    .foregroundStyle(tokens.ink)
                 Text(hijriLabel)
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
             }
             Spacer()
             Button {
@@ -89,7 +91,7 @@ struct ReflectionDetailSheet: View {
                 Text("DONE")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
                     .padding(.horizontal, IhsanSpacing.sm)
                     .padding(.vertical, IhsanSpacing.xs)
             }
@@ -106,10 +108,10 @@ struct ReflectionDetailSheet: View {
                 Text("PROMPT")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
                 Text("— \(prompt)")
                     .font(.system(size: 17, weight: .regular, design: .serif).italic())
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.85))
+                    .foregroundStyle(tokens.ink.opacity(0.9))
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
                 if let citation = reflection.promptCitation?
@@ -117,7 +119,7 @@ struct ReflectionDetailSheet: View {
                    !citation.isEmpty {
                     Text(citation)
                         .font(IhsanFont.citation)
-                        .foregroundStyle(IhsanColor.brassDark.opacity(0.80))
+                        .foregroundStyle(tokens.inkSecondary.opacity(0.9))
                 }
             }
             .padding(IhsanSpacing.md)
@@ -136,7 +138,7 @@ struct ReflectionDetailSheet: View {
         if !typed.isEmpty {
             Text(typed)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.inkDeep)
+                .foregroundStyle(tokens.ink)
                 .lineSpacing(4)
                 .fixedSize(horizontal: false, vertical: true)
         }
@@ -145,10 +147,10 @@ struct ReflectionDetailSheet: View {
                 Text("TRANSCRIPT")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
                 Text(transcript)
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.78))
+                    .foregroundStyle(tokens.inkSecondary)
                     .lineSpacing(4)
                     .fixedSize(horizontal: false, vertical: true)
             }

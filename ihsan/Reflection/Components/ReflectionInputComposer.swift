@@ -10,6 +10,7 @@ import IhsanDesignSystem
 /// trash control appear above the editor; the editor then holds the
 /// editable transcript.
 struct ReflectionInputComposer: View {
+    let tokens: SkyPaletteTokens
     @Binding var text: String
     let isRecording: Bool
     let recordingElapsed: TimeInterval
@@ -40,7 +41,7 @@ struct ReflectionInputComposer: View {
                 Text(inlineErrorMessage)
                     .font(IhsanFont.inscription)
                     .tracking(1.2)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.attention)
                     .multilineTextAlignment(.leading)
                     .accessibilityLabel(inlineErrorMessage)
             }
@@ -66,7 +67,7 @@ struct ReflectionInputComposer: View {
             if text.isEmpty, !isRecording, attachedAudio == nil {
                 Text("Write what comes to mind…")
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.40))
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.75))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 8)
                     .accessibilityHidden(true)
@@ -74,7 +75,7 @@ struct ReflectionInputComposer: View {
             }
             TextEditor(text: $text)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.inkDeep)
+                .foregroundStyle(tokens.ink)
                 .scrollContentBackground(.hidden)
                 .background(Color.clear)
                 .frame(minHeight: 120)
@@ -87,13 +88,13 @@ struct ReflectionInputComposer: View {
                 cornerRadius: IhsanSpacing.smallCardRadius,
                 style: .continuous
             )
-            .fill(IhsanColor.inkDeep.opacity(0.05))
+            .fill(tokens.ink.opacity(0.05))
             .overlay {
                 RoundedRectangle(
                     cornerRadius: IhsanSpacing.smallCardRadius,
                     style: .continuous
                 )
-                .strokeBorder(IhsanColor.brass.opacity(0.20), lineWidth: 0.5)
+                .strokeBorder(tokens.panelStroke.opacity(0.7), lineWidth: 0.5)
             }
         }
     }
@@ -103,6 +104,7 @@ struct ReflectionInputComposer: View {
     private func attachedRow(for attached: ReflectionInputDraft.AttachedAudio) -> some View {
         HStack(spacing: IhsanSpacing.sm) {
             ReflectionAudioPill(
+                tokens: tokens,
                 isActive: true,
                 isPlaying: isPlayingAttached,
                 currentTime: attachedCurrentTime,
@@ -116,13 +118,13 @@ struct ReflectionInputComposer: View {
                 Image(systemName: "trash")
                     .font(.system(size: 14, weight: .semibold))
                     .frame(width: 32, height: 32)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
                     .background {
                         Circle()
-                            .fill(IhsanPageChrome.tokens(at: .now).panelFill.opacity(0.55))
+                            .fill(tokens.panelFill.opacity(0.55))
                             .overlay {
                                 Circle()
-                                    .strokeBorder(IhsanColor.brass.opacity(0.40), lineWidth: 0.5)
+                                    .strokeBorder(tokens.panelStroke.opacity(0.8), lineWidth: 0.5)
                             }
                     }
             }
@@ -137,6 +139,7 @@ struct ReflectionInputComposer: View {
     private var controlsRow: some View {
         HStack(alignment: .center, spacing: IhsanSpacing.sm) {
             ReflectionRecorderControl(
+                tokens: tokens,
                 isRecording: isRecording,
                 elapsed: recordingElapsed,
                 onStart: onStartRecording,
@@ -148,7 +151,7 @@ struct ReflectionInputComposer: View {
                     Text("CANCEL")
                         .font(IhsanFont.inscription)
                         .tracking(1.6)
-                        .foregroundStyle(IhsanColor.brassDark)
+                        .foregroundStyle(tokens.inkSecondary)
                         .padding(.horizontal, IhsanSpacing.md)
                         .padding(.vertical, IhsanSpacing.sm)
                 }
@@ -160,11 +163,11 @@ struct ReflectionInputComposer: View {
                 HStack(spacing: 6) {
                     ProgressView()
                         .scaleEffect(0.7)
-                        .tint(IhsanColor.brassDark)
+                        .tint(tokens.inkSecondary)
                     Text("TRANSCRIBING")
                         .font(IhsanFont.inscription)
                         .tracking(1.4)
-                        .foregroundStyle(IhsanColor.brassDark)
+                        .foregroundStyle(tokens.inkSecondary)
                 }
                 .accessibilityLabel("Transcribing audio")
             }
@@ -177,27 +180,27 @@ struct ReflectionInputComposer: View {
 
     private var saveButton: some View {
         Button(action: onSave) {
-            HStack(spacing: 6) {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .semibold))
-                Text("SAVE")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.8)
-            }
-            .foregroundStyle(IhsanColor.inkDeep)
-            .padding(.horizontal, IhsanSpacing.md + 2)
-            .padding(.vertical, IhsanSpacing.sm + 2)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(canSave
-                          ? AnyShapeStyle(IhsanIridescence.brassStroke(opacity: 0.95))
-                          : AnyShapeStyle(IhsanColor.brass.opacity(0.30)))
-                    .overlay {
-                        Capsule(style: .continuous)
-                            .strokeBorder(IhsanColor.brassDark.opacity(canSave ? 0.55 : 0.30), lineWidth: 0.5)
-                    }
-            }
-            .opacity(canSave ? 1.0 : 0.45)
+            Text("SAVE")
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(canSave ? tokens.keyline : tokens.inkSecondary)
+                .padding(.horizontal, IhsanSpacing.md + 2)
+                .padding(.vertical, IhsanSpacing.sm + 2)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(canSave
+                              ? AnyShapeStyle(tokens.leafGold)
+                              : AnyShapeStyle(tokens.panelFill.opacity(0.6)))
+                        .overlay {
+                            Capsule(style: .continuous)
+                                .strokeBorder(
+                                    canSave
+                                        ? tokens.keyline.opacity(0.55)
+                                        : tokens.panelStroke.opacity(0.8),
+                                    lineWidth: canSave ? 0.8 : 0.5
+                                )
+                        }
+                }
         }
         .buttonStyle(.plain)
         .disabled(!canSave)
