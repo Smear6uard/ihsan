@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import IhsanCore
+import IhsanDesignSystem
 import IhsanIntents
 import IhsanLocation
 import IhsanNotifications
@@ -72,16 +73,20 @@ struct IhsanApp: App {
     }
 }
 
-/// Decides which top-level scene to present based on whether the user
-/// has completed the first-launch flow. The OnboardingFlow is shown
-/// as a full-screen cover over the RootTabView so:
-///   - the gate flips automatically when SwiftData publishes the
-///     `hasCompletedOnboarding = true` write at the end of step 5,
-///   - the user cannot dismiss the cover by gesture (onboarding is
-///     non-skippable as a whole; only individual permission rationale
-///     screens within it are skippable),
-///   - cold-launching mid-flow lands on the welcome step every time
-///     because the OnboardingFlow owns its own view model.
+/// Decides which top-level scene to present based on whether the person
+/// has completed the first launch.
+///
+/// The two are exclusive, not stacked. Onboarding used to be a cover
+/// over a live `RootTabView`, which meant Today was running underneath
+/// it — and Today asks for location the moment it appears. The system
+/// permission dialog therefore arrived on its own at launch, in front
+/// of the screen that exists to ask for location in place. A first
+/// screen whose question has already been asked by something else is
+/// not asking anything.
+///
+/// The gate still flips by itself when SwiftData publishes
+/// `hasCompletedOnboarding = true`, and cold-launching mid-flow still
+/// starts over, because the flow owns its own view model.
 private struct RootGate: View {
     @Environment(\.modelContext) private var modelContext
     @Query private var allSettings: [UserSettings]
@@ -95,13 +100,20 @@ private struct RootGate: View {
 
     var body: some View {
         ZStack {
-            RootTabView()
-                .opacity(didResolveInitialSettings ? 1 : 0)
+            if !didResolveInitialSettings {
+                // Neither, yet. Building RootTabView here — even at
+                // zero opacity — starts Today, and Today asks for
+                // location the moment it appears; the system dialog
+                // then arrives before the screen that exists to ask.
+                Color.clear.ihsanManuscriptPage().ignoresSafeArea()
+            } else if hasCompletedOnboarding {
+                RootTabView()
+            } else {
+                OnboardingFlow()
+                    .transition(.opacity)
+            }
         }
-        .fullScreenCover(isPresented: shouldPresentOnboarding) {
-            OnboardingFlow()
-                .interactiveDismissDisabled(true)
-        }
+        .animation(.easeInOut(duration: 0.35), value: hasCompletedOnboarding)
         .task {
             ensureSingletonExists()
             applyDebugLaunchArguments()
@@ -119,18 +131,6 @@ private struct RootGate: View {
             await endLiveActivitiesForNewLogs()
         }
         #endif
-    }
-
-    /// Driven by the persisted flag. Setter is a no-op because the
-    /// flag flips only via OnboardingViewModel.commit(...). Without
-    /// the no-op the system would try to dismiss the cover when the
-    /// user swipes down, which we don't want for a non-skippable
-    /// flow.
-    private var shouldPresentOnboarding: Binding<Bool> {
-        Binding(
-            get: { didResolveInitialSettings && !hasCompletedOnboarding },
-            set: { _ in }
-        )
     }
 
     private var hasCompletedOnboarding: Bool {
