@@ -278,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV5.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV6.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -383,6 +383,62 @@ private func assertV4StoreMigratesToV5() throws {
         #expect(reread.calculationTuning.offsets.fajr == -2)
         #expect(reread.calculationTuning.offsets.isha == 3)
         #expect(reread.calculationTuning.overridesAngles)
+    }
+}
+
+/// Seeds a store shaped like the build that shipped calculation depth —
+/// the version a device could already be sitting at when the sound work
+/// arrives.
+private func seedV5Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV5.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let log = IhsanSchemaV5.PrayerLog()
+    log.id = seededLogID
+    log.dedupKey = "fajr-2023-03-09"
+    log.prayerRaw = Prayer.fajr.rawValue
+    log.prayerDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
+    log.loggedTimeZoneIdentifier = "America/Toronto"
+    log.statusRaw = PrayerStatus.onTime.rawValue
+    log.note = "quiet fajr"
+    context.insert(log)
+
+    let settings = IhsanSchemaV5.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.customFajrAngle = 17.5
+    settings.customIshaIntervalMinutes = 90
+    settings.prayerOffsetAsrMinutes = 3
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
+@Test
+func migratingSeededV5StoreToV6KeepsCalculationDepthAndLandsSilentModeOff() async {
+    await #expect(processExitsWith: .success) {
+        try assertV5StoreMigratesToV6()
+    }
+}
+
+private func assertV5StoreMigratesToV6() throws {
+    try withMigratedStore(seed: seedV5Store) { context in
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.first?.id == seededLogID)
+        #expect(logs.first?.note == "quiet fajr")
+
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        // Calculation depth set at V5 survives untouched: adding a sound
+        // preference may not quietly move anybody's prayer times.
+        #expect(settings.calculationTuning.fajrAngle == 17.5)
+        #expect(settings.calculationTuning.ishaRule == .intervalMinutes(90))
+        #expect(settings.calculationTuning.offsets.asr == 3)
+
+        // And the new field lands quiet: the silent switch is honoured
+        // until someone says otherwise.
+        #expect(settings.adhanPlaysInSilentMode == false)
     }
 }
 

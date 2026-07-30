@@ -11,13 +11,11 @@ import AlarmKit
 import ActivityKit
 #endif
 
-/// The single swap-point for the wake tone. The bundled
-/// `night-wake-chime.caf` is a placeholder — a soft bell that repeats and
-/// rises gently over twelve seconds, never a jarring default. When the
-/// final asset lands, replace the file and, if its name differs, this
-/// constant; nothing else references the tone.
+/// The wake tone is the app's chime — one tone, one constant, named in
+/// `AdhanAsset`. The wake and the prayer notification cannot drift
+/// apart, and replacing the placeholder replaces both.
 enum NightWakeSound {
-    static let assetName = "night-wake-chime.caf"
+    static var assetName: String { AdhanAsset.nightWake }
 }
 
 /// Orchestrates the gentle wake: computes each night's plan from that

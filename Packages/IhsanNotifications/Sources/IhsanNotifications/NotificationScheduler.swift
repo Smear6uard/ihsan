@@ -8,28 +8,28 @@ import SwiftData
 
 public struct PrayerNotificationPreference: Equatable, Sendable {
     public let prayer: Prayer
+    /// Whether a notification fires at all for this prayer.
     public let isEnabled: Bool
-    public let soundChoice: AdhanSoundCatalog?
+    /// What it sounds like. `.silent` is a real answer — banner only —
+    /// and is the single way this app says "no sound"; there is no
+    /// second mute flag that could disagree with it.
+    public let soundChoice: AdhanSoundCatalog
     public let leadTimeSeconds: Int
-    /// When `false`, the scheduled notification uses the system default
-    /// tone instead of the configured adhan recording. This is the
-    /// "mute adhan for this prayer" toggle exposed in the row UI, and
-    /// is independent of `isEnabled` (which decides whether a
-    /// notification fires at all).
-    public let adhanEnabled: Bool
+    /// Whether this prayer may break through Focus.
+    public let isTimeSensitive: Bool
 
     public init(
         prayer: Prayer,
         isEnabled: Bool = true,
-        soundChoice: AdhanSoundCatalog? = nil,
+        soundChoice: AdhanSoundCatalog = .chime,
         leadTimeSeconds: Int = 0,
-        adhanEnabled: Bool = true
+        isTimeSensitive: Bool = false
     ) {
         self.prayer = prayer
         self.isEnabled = isEnabled
         self.soundChoice = soundChoice
         self.leadTimeSeconds = leadTimeSeconds
-        self.adhanEnabled = adhanEnabled
+        self.isTimeSensitive = isTimeSensitive
     }
 }
 
@@ -42,7 +42,6 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     /// same instants the plate draws — a custom angle that moved Fajr
     /// must move the Fajr notification too.
     public let calculationTuning: CalculationTuning
-    public let adhanSoundChoice: AdhanSoundCatalog
     public let prayerPreferences: [PrayerNotificationPreference]
 
     public init(
@@ -51,7 +50,6 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
         calculationTuning: CalculationTuning = .standard,
-        adhanSoundChoice: AdhanSoundCatalog = .systemDefault,
         prayerPreferences: [PrayerNotificationPreference] = Prayer.allCases.map { PrayerNotificationPreference(prayer: $0) }
     ) {
         self.notificationsEnabled = notificationsEnabled
@@ -59,7 +57,6 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         self.madhab = madhab
         self.highLatitudeRule = highLatitudeRule
         self.calculationTuning = calculationTuning
-        self.adhanSoundChoice = adhanSoundChoice
         self.prayerPreferences = prayerPreferences
     }
 
@@ -85,13 +82,18 @@ extension NotificationScheduleSettings {
             highLatitudeRule: userSettings.highLatitudeRule,
             calculationTuning: userSettings.calculationTuning,
             prayerPreferences: decodedConfigs.map {
-                let soundChoice = AdhanSoundCatalog(userChoice: $0.athanSoundName)
+                // The legacy per-prayer mute column still wins when it
+                // is off, so a person who silenced a prayer in an
+                // earlier build stays silenced through the change of
+                // vocabulary.
+                let stored = AdhanSoundCatalog(userChoice: $0.athanSoundName)
+                let muted = !userSettings.adhanEnabled(for: $0.prayer)
                 return PrayerNotificationPreference(
                     prayer: $0.prayer,
                     isEnabled: $0.isEnabled,
-                    soundChoice: soundChoice == .systemDefault ? nil : soundChoice,
+                    soundChoice: muted ? .silent : stored,
                     leadTimeSeconds: $0.leadTimeSeconds,
-                    adhanEnabled: userSettings.adhanEnabled(for: $0.prayer)
+                    isTimeSensitive: $0.isTimeSensitive
                 )
             }
         )
@@ -270,17 +272,12 @@ public actor NotificationScheduler {
                     continue
                 }
 
-                // When the user has muted the adhan for this prayer, fall
-                // back to the system default tone — they still receive the
-                // notification, just without the recorded call to prayer.
-                let resolvedSoundChoice: AdhanSoundCatalog = preference.adhanEnabled
-                    ? (preference.soundChoice ?? settings.adhanSoundChoice)
-                    : .systemDefault
                 let request = makeNotificationRequest(
                     prayerTime: prayerTime,
                     notificationDate: notificationDate,
                     timeZone: place.timeZone,
-                    soundChoice: resolvedSoundChoice
+                    soundChoice: preference.soundChoice,
+                    isTimeSensitive: preference.isTimeSensitive
                 )
                 try await notificationCenter.add(request)
             }
@@ -326,13 +323,15 @@ public actor NotificationScheduler {
         prayerTime: PrayerTime,
         notificationDate: Date,
         timeZone: TimeZone,
-        soundChoice: AdhanSoundCatalog
+        soundChoice: AdhanSoundCatalog,
+        isTimeSensitive: Bool
     ) -> UNNotificationRequest {
         let content = NotificationContent.makeAdhanContent(
             prayer: prayerTime.prayer,
             scheduledDate: prayerTime.scheduledTime,
             timeZone: timeZone,
             soundChoice: soundChoice,
+            isTimeSensitive: isTimeSensitive,
             soundFileResolver: soundFileResolver
         )
 

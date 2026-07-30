@@ -29,24 +29,187 @@ func rebuildScheduleCancelsExistingIhsanRequestsThenSchedulesRollingWindow() asy
 }
 
 @Test
-func fajrAwareSoundUsesFajrFileOnlyForFajr() {
-    #expect(AdhanSoundCatalog.fajrAwareLong.fileName(for: .fajr) == "adhan-fajr-long.caf")
-    #expect(AdhanSoundCatalog.fajrAwareLong.fileName(for: .dhuhr) == "adhan-standard-long.caf")
-    #expect(AdhanSoundCatalog.fajrAwareShort.fileName(for: .fajr) == "adhan-fajr-short.caf")
-    #expect(AdhanSoundCatalog.fajrAwareShort.fileName(for: .isha) == "adhan-standard-short.caf")
+func theDawnVariantIsOfferedForFajrAndNowhereElse() {
+    #expect(AdhanSoundCatalog.options(for: .fajr).contains(.chimeDawn))
+    for prayer in Prayer.allCases where prayer != .fajr {
+        #expect(!AdhanSoundCatalog.options(for: prayer).contains(.chimeDawn))
+    }
+    // Every prayer can always be chimed or silenced.
+    for prayer in Prayer.allCases {
+        #expect(AdhanSoundCatalog.options(for: prayer).contains(.chime))
+        #expect(AdhanSoundCatalog.options(for: prayer).contains(.silent))
+    }
 }
 
 @Test
-func contentFallsBackToDefaultSoundButKeepsDiagnosticFileNameWhenAssetIsMissing() {
+func silenceIsHonouredRatherThanReplacedBySystemDefault() {
+    let content = NotificationContent.makeAdhanContent(
+        prayer: .dhuhr,
+        scheduledDate: fixedDate(),
+        timeZone: TimeZone(secondsFromGMT: 0)!,
+        soundChoice: .silent,
+        isTimeSensitive: false,
+        soundFileResolver: .allPresent
+    )
+
+    #expect(content.sound == nil, "Silent must mean silent, not the system tri-tone.")
+    #expect(content.userInfo[ScheduledNotificationUserInfoKey.soundFileName] == nil)
+    #expect(content.userInfo[ScheduledNotificationUserInfoKey.soundChoice] as? String == "silent")
+}
+
+@Test
+func aChoiceWhoseRecordingIsMissingFallsBackToTheChime() {
+    // Only the chime is in the bundle — the state this build ships in.
+    let onlyChime = AdhanSoundFileResolver { $0 == AdhanAsset.chime }
+
+    #expect(AdhanSoundCatalog.takbirat.resolvedFileName(using: onlyChime) == AdhanAsset.chime)
+    #expect(AdhanSoundCatalog.takbirat.awaitsRecording(using: onlyChime))
+    #expect(!AdhanSoundCatalog.chime.awaitsRecording(using: onlyChime))
+    #expect(AdhanSoundCatalog.silent.resolvedFileName(using: onlyChime) == nil)
+    #expect(!AdhanSoundCatalog.silent.awaitsRecording(using: onlyChime))
+
     let content = NotificationContent.makeAdhanContent(
         prayer: .fajr,
         scheduledDate: fixedDate(),
         timeZone: TimeZone(secondsFromGMT: 0)!,
-        soundChoice: .fajrAwareLong,
-        soundFileResolver: AdhanSoundFileResolver { _ in false }
+        soundChoice: .takbirat,
+        isTimeSensitive: false,
+        soundFileResolver: onlyChime
+    )
+    #expect(content.userInfo[ScheduledNotificationUserInfoKey.soundFileName] as? String == AdhanAsset.chime)
+    #expect(content.sound != nil)
+}
+
+@Test
+func nothingBreaksThroughFocusUnlessAsked() {
+    let quiet = NotificationContent.makeAdhanContent(
+        prayer: .asr,
+        scheduledDate: fixedDate(),
+        timeZone: TimeZone(secondsFromGMT: 0)!,
+        soundChoice: .chime,
+        isTimeSensitive: false,
+        soundFileResolver: .allPresent
+    )
+    #expect(quiet.interruptionLevel == .active)
+
+    let asked = NotificationContent.makeAdhanContent(
+        prayer: .fajr,
+        scheduledDate: fixedDate(),
+        timeZone: TimeZone(secondsFromGMT: 0)!,
+        soundChoice: .chimeDawn,
+        isTimeSensitive: true,
+        soundFileResolver: .allPresent
+    )
+    #expect(asked.interruptionLevel == .timeSensitive)
+}
+
+@Test
+func everyPrayerNotificationCarriesThePlayAdhanCategory() {
+    let content = NotificationContent.makeAdhanContent(
+        prayer: .maghrib,
+        scheduledDate: fixedDate(),
+        timeZone: TimeZone(secondsFromGMT: 0)!,
+        soundChoice: .chime,
+        isTimeSensitive: false,
+        soundFileResolver: .allPresent
+    )
+    #expect(content.categoryIdentifier == NotificationCategory.prayer)
+}
+
+@Test
+func anExcusedPauseSchedulesNothingAndLeavesEveryPreferenceIntact() async throws {
+    let center = MockNotificationCenter(existingRequests: [
+        makeExistingRequest(identifier: "ihsan.prayer.fajr.1")
+    ])
+    let settings = UserSettings()
+    settings.setSound(.takbirat, for: .fajr)
+    settings.setTimeSensitive(true, for: .fajr)
+
+    let paused = NotificationScheduleSettings(userSettings: settings, isPaused: true)
+    #expect(!paused.notificationsEnabled)
+
+    let scheduler = makeScheduler(now: fixedDate(), center: center, settings: paused)
+    try await scheduler.rebuildSchedule()
+
+    let added = center.events.filter(\.isAdd)
+    #expect(added.isEmpty, "A pause must schedule nothing at all.")
+    let scheduled = await scheduler.scheduledNotifications()
+    #expect(scheduled.isEmpty)
+
+    // And the preferences it suppressed are untouched, so they come
+    // back exactly as they were when the pause ends.
+    #expect(settings.sound(for: .fajr) == .takbirat)
+    #expect(settings.isTimeSensitive(.fajr))
+    let resumed = NotificationScheduleSettings(userSettings: settings, isPaused: false)
+    #expect(resumed.notificationsEnabled)
+    #expect(resumed.preference(for: .fajr).soundChoice == .takbirat)
+    #expect(resumed.preference(for: .fajr).isTimeSensitive)
+}
+
+@Test
+func perPrayerSoundsSurviveTheRoundTripThroughSettings() {
+    let settings = UserSettings()
+    settings.setSound(.chimeDawn, for: .fajr)
+    settings.setSound(.silent, for: .dhuhr)
+    settings.setSound(.takbirat, for: .maghrib)
+
+    #expect(settings.sound(for: .fajr) == .chimeDawn)
+    #expect(settings.sound(for: .dhuhr) == .silent)
+    #expect(settings.sound(for: .maghrib) == .takbirat)
+    #expect(settings.sound(for: .asr) == .chime, "An untouched prayer keeps the chime.")
+
+    // Silencing writes the legacy mute column too, so the two stores
+    // can never disagree about whether a prayer makes a sound.
+    #expect(!settings.adhanEnabled(for: .dhuhr))
+    #expect(settings.adhanEnabled(for: .fajr))
+
+    let schedule = NotificationScheduleSettings(userSettings: settings)
+    #expect(schedule.preference(for: .fajr).soundChoice == .chimeDawn)
+    #expect(schedule.preference(for: .dhuhr).soundChoice == .silent)
+    #expect(schedule.preference(for: .maghrib).soundChoice == .takbirat)
+}
+
+@Test
+func aPrayerMutedByAnEarlierBuildStaysSilent() {
+    let settings = UserSettings()
+    // The old vocabulary: a sound name plus a separate mute column.
+    settings.setNotificationConfig(
+        PrayerNotificationConfig(prayer: .isha, athanSoundName: "standard-long")
+    )
+    settings.setAdhanEnabled(false, for: .isha)
+
+    #expect(settings.sound(for: .isha) == .silent)
+    #expect(NotificationScheduleSettings(userSettings: settings)
+        .preference(for: .isha).soundChoice == .silent)
+}
+
+@Test
+func storedNamesFromEarlierBuildsReadAsSomethingAudible() {
+    #expect(AdhanSoundCatalog(userChoice: "default") == .chime)
+    #expect(AdhanSoundCatalog(userChoice: "standard-long") == .chime)
+    #expect(AdhanSoundCatalog(userChoice: "adhan-standard-long.caf") == .chime)
+    #expect(AdhanSoundCatalog(userChoice: "fajr-aware-long") == .chimeDawn)
+    #expect(AdhanSoundCatalog(userChoice: "standard-short") == .takbirat)
+    #expect(AdhanSoundCatalog(userChoice: "silent") == .silent)
+    #expect(AdhanSoundCatalog(userChoice: "who knows") == .chime)
+}
+
+@Test
+func aPreferencePayloadFromAnEarlierBuildStillDecodes() throws {
+    // No `isTimeSensitive` key — exactly what a shipped build wrote.
+    let legacy = #"[{"prayer":"fajr","isEnabled":true,"athanSoundName":"standard-long","leadTimeSeconds":300}]"#
+    let decoded = try JSONDecoder().decode(
+        [PrayerNotificationConfig].self, from: Data(legacy.utf8)
     )
 
-    #expect(content.userInfo[ScheduledNotificationUserInfoKey.soundFileName] as? String == "adhan-fajr-long.caf")
+    #expect(decoded.count == 1)
+    #expect(decoded[0].leadTimeSeconds == 300)
+    #expect(decoded[0].isTimeSensitive == false)
+}
+
+@Test
+func theGentleWakeAndTheNotificationShareOneTone() {
+    #expect(AdhanAsset.nightWake == AdhanAsset.chime)
 }
 
 @Test
@@ -55,7 +218,7 @@ func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     let activityScheduler = MockPrayerActivityScheduler()
     let disabledAsrSettings = NotificationScheduleSettings(
         prayerPreferences: Prayer.allCases.map {
-            PrayerNotificationPreference(prayer: $0, isEnabled: $0 != .asr, soundChoice: .standardShort)
+            PrayerNotificationPreference(prayer: $0, isEnabled: $0 != .asr, soundChoice: .chime)
         }
     )
     let scheduler = makeScheduler(
@@ -87,9 +250,7 @@ func rebuildScheduleIsNoOpWhenNotificationPermissionIsDenied() async throws {
 private func makeScheduler(
     now: Date,
     center: MockNotificationCenter,
-    settings: NotificationScheduleSettings = NotificationScheduleSettings(
-        adhanSoundChoice: .fajrAwareLong
-    ),
+    settings: NotificationScheduleSettings = NotificationScheduleSettings(),
     activityScheduler: MockPrayerActivityScheduler = MockPrayerActivityScheduler()
 ) -> NotificationScheduler {
     NotificationScheduler(

@@ -40,6 +40,12 @@ struct IhsanApp: App {
         // sheet never reach the container the UI's @Querys observe.
         IhsanSharedModelContainer.shared.register(modelContainer)
 
+        // Before any notification can be delivered, so a cold launch
+        // from a tapped banner behaves exactly like a warm one.
+        Task { @MainActor in
+            PrayerNotificationResponder.shared.install()
+        }
+
         #if canImport(ActivityKit) && os(iOS)
         Task {
             await NotificationScheduler.shared.setPrayerActivityScheduler(PrayerActivityScheduler.shared)
@@ -184,6 +190,18 @@ private struct RootGate: View {
             // stock defaults, and the flags below re-apply on top.
             try? modelContext.delete(model: UserSettings.self)
             try? modelContext.save()
+        }
+        // `-IhsanDebugSoundProbe chime,chime-dawn,takbirat,silent`
+        // schedules one prayer notification per named sound a few
+        // seconds out, through the same content builder the real
+        // schedule uses. The timed device test watches them arrive and
+        // reads the sound each one carries — the only way to prove the
+        // whole path, since a bundled tone iOS rejects still delivers a
+        // notification, just a silent one.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugSoundProbe"),
+           arguments.indices.contains(flagIndex + 1) {
+            let names = arguments[flagIndex + 1].split(separator: ",").map(String.init)
+            Task { await AdhanSoundProbe.fire(names: names) }
         }
         // `-IhsanDebugSeedReflections N` inserts N typed reflections
         // across recent days — the screenshot harness for the feed's

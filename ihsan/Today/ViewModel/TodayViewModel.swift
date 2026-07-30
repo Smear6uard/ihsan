@@ -210,14 +210,16 @@ final class TodayViewModel {
         }
     }
 
-    /// Toggles whether the configured adhan recording plays for this
-    /// prayer. The notification still fires; it just uses the system
-    /// default tone instead. Rebuilds the pending notification window
-    /// immediately so the change takes effect for the next prayer.
+    /// Silences this prayer, or gives it its sound back. The
+    /// notification still fires either way — only the room changes.
+    /// Rebuilds the pending window immediately so the change takes
+    /// effect for the next prayer rather than the next day.
     func toggleAdhanEnabled(for prayer: Prayer) async {
         guard let settings else { return }
-        let current = settings.adhanEnabled(for: prayer)
-        settings.setAdhanEnabled(!current, for: prayer)
+        settings.setSound(
+            settings.sound(for: prayer) == .silent ? .chime : .silent,
+            for: prayer
+        )
         settings.modifiedAt = nowProvider.now()
         Haptics.impact(.light)
         do {

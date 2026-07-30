@@ -77,6 +77,11 @@ final class GalleryCaptureUITests: XCTestCase {
                 "-IhsanDebugTab", "settings",
                 "-IhsanDebugSettingsRoute", "calculationMethod"
             ], settle: 3.0),
+            Frame(name: "09b-adhan", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "settings",
+                "-IhsanDebugSettingsRoute", "adhanSound"
+            ], settle: 3.0),
             Frame(name: "10-reflect", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
                 "-IhsanDebugTab", "reflection",

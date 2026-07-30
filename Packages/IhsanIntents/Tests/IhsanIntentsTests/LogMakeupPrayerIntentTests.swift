@@ -62,7 +62,7 @@ final class LogMakeupPrayerIntentTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: directory) }
         let storeURL = directory.appendingPathComponent("Ihsan.sqlite")
 
-        let schema = Schema(IhsanSchemaV5.models)
+        let schema = Schema(IhsanSchemaV6.models)
         func openContainer() throws -> ModelContainer {
             try ModelContainer(
                 for: schema,

@@ -234,7 +234,7 @@ struct SettingsScreen: View {
         case .highLatitudeRule:
             HighLatitudeRulePicker(settings: settings)
         case .adhanSound:
-            AdhanSoundPicker()
+            AdhanSoundPicker(settings: settings)
         case .jamPolicy:
             if let activeTravel {
                 JamPolicyPicker(travel: activeTravel)
@@ -678,8 +678,8 @@ private struct NotificationsSection: View {
 
             if settings.notificationsEnabled {
                 SettingsRow(
-                    title: "Sound",
-                    subtitle: "Default",
+                    title: "Adhan",
+                    subtitle: soundSummary,
                     glyph: .adhan,
                     action: {
                         Haptics.impact(.light)
@@ -699,19 +699,19 @@ private struct NotificationsSection: View {
         }
     }
 
+    /// "Chime" when every prayer agrees, "Mixed" when they do not — so
+    /// the row never claims a single answer that isn't true.
+    private var soundSummary: String {
+        let sounds = Set(Prayer.allCases.map { settings.sound(for: $0) })
+        guard sounds.count == 1, let only = sounds.first else { return "Mixed" }
+        return only.displayName
+    }
+
     private func prayerNotificationBinding(for prayer: Prayer) -> Binding<Bool> {
         Binding(
-            get: {
-                settings.prayerNotificationConfigs.first(where: { $0.prayer == prayer })?.isEnabled ?? true
-            },
+            get: { settings.notificationEnabled(for: prayer) },
             set: { isEnabled in
-                var configs = settings.prayerNotificationConfigs
-                if let index = configs.firstIndex(where: { $0.prayer == prayer }) {
-                    configs[index].isEnabled = isEnabled
-                } else {
-                    configs.append(PrayerNotificationConfig(prayer: prayer, isEnabled: isEnabled))
-                }
-                settings.prayerNotificationConfigs = configs
+                settings.setNotificationEnabled(isEnabled, for: prayer)
                 settings.modifiedAt = .now
             }
         )
@@ -1967,24 +1967,159 @@ private struct HighLatitudeRulePicker: View {
     }
 }
 
+/// Set → Adhan.
+///
+/// Each prayer chooses its own sound, because the prayer that has to
+/// wake someone is not the prayer that arrives mid-afternoon. Below the
+/// prayers: the full recording, which only the app can play, and the
+/// two decisions that belong to the room rather than to a prayer —
+/// whether the adhan may sound on silent, and whether it may break
+/// through Focus.
 private struct AdhanSoundPicker: View {
-    private let options = [
-        "Default",
-        "Adhan Standard",
-        "Adhan Fajr-aware",
-        "Tone Only"
-    ]
+    let settings: UserSettings
+
+    @State private var expandedPrayer: Prayer?
+    @State private var player = AdhanPlayer.shared
+
+    private let resolver = AdhanSoundFileResolver.mainBundle
 
     var body: some View {
-        PickerScaffold(title: "Adhan Sound") {
-            SettingsSectionCard("Sound") {
-                ForEach(options, id: \.self) { option in
-                    SettingsRow(title: option, subtitle: "Sound switching lands with notification scheduling", glyph: .adhan) {
-                        EmptyView()
+        PickerScaffold(title: "Adhan") {
+            SettingsSectionCard("Each prayer") {
+                SettingsDescriptionText("Choose what each prayer sounds like. Silent still shows the notification — it just doesn't make a sound.")
+
+                ForEach(Prayer.allCases, id: \.self) { prayer in
+                    prayerRow(prayer)
+
+                    if expandedPrayer == prayer {
+                        ForEach(AdhanSoundCatalog.options(for: prayer), id: \.self) { option in
+                            optionRow(
+                                title: option.displayName,
+                                subtitle: subtitle(for: option),
+                                isSelected: settings.sound(for: prayer) == option
+                            ) {
+                                settings.setSound(option, for: prayer)
+                                settings.modifiedAt = .now
+                                rebuildSchedule()
+                            }
+                        }
                     }
-                    .accessibilityHint("This option is visible but not active yet.")
                 }
             }
+
+            SettingsSectionCard("The full call") {
+                SettingsDescriptionText(fullAdhanDescription)
+
+                SettingsRow(
+                    title: player.isPlaying ? "Stop" : "Play",
+                    glyph: .adhan,
+                    action: {
+                        Haptics.impact(.light)
+                        if player.isPlaying {
+                            player.stop()
+                        } else {
+                            player.play(overridesSilentSwitch: settings.adhanPlaysInSilentMode)
+                        }
+                    }
+                )
+
+                if let failure = player.lastFailure {
+                    SettingsDescriptionText(failure)
+                }
+
+                SettingsRow(title: "Play adhan even in silent mode", glyph: .adhan) {
+                    Toggle("", isOn: Binding(
+                        get: { settings.adhanPlaysInSilentMode },
+                        set: {
+                            settings.adhanPlaysInSilentMode = $0
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                    .accessibilityLabel("Play adhan even in silent mode")
+                }
+
+                SettingsDescriptionText("Off by default. When the ringer switch is off, the adhan stays quiet like everything else.")
+            }
+
+            SettingsSectionCard("Focus") {
+                SettingsDescriptionText("A time-sensitive notification arrives even while Focus is on. Off unless you ask for it, one prayer at a time.")
+
+                ForEach(Prayer.allCases, id: \.self) { prayer in
+                    SettingsRow(title: prayer.displayNameEnglish) {
+                        Toggle("", isOn: Binding(
+                            get: { settings.isTimeSensitive(prayer) },
+                            set: {
+                                settings.setTimeSensitive($0, for: prayer)
+                                settings.modifiedAt = .now
+                                rebuildSchedule()
+                            }
+                        ))
+                        .labelsHidden()
+                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                        .accessibilityLabel("\(prayer.displayNameEnglish) breaks through Focus")
+                    }
+                }
+            }
+        }
+        .onDisappear { player.stop() }
+    }
+
+    private func prayerRow(_ prayer: Prayer) -> some View {
+        SettingsRow(
+            title: prayer.displayNameEnglish,
+            subtitle: settings.sound(for: prayer).displayName,
+            glyph: .adhan,
+            action: {
+                Haptics.impact(.light)
+                withAnimation(.snappy(duration: 0.22)) {
+                    expandedPrayer = expandedPrayer == prayer ? nil : prayer
+                }
+            }
+        )
+        .accessibilityHint(expandedPrayer == prayer ? "Collapses the choices" : "Shows the choices")
+    }
+
+    /// Says plainly when an option is standing in for a recording that
+    /// has not landed, rather than letting two rows sound identical
+    /// with no explanation.
+    private func subtitle(for option: AdhanSoundCatalog) -> String {
+        if option.awaitsRecording(using: resolver) {
+            return "Recording not in this build yet — plays the chime"
+        }
+        return option.settingsDescription
+    }
+
+    private var fullAdhanDescription: String {
+        let base = "A notification tone can only be thirty seconds long, so the whole adhan plays here in the app — and from the notification, if you tap Play the adhan."
+        guard AdhanPlayer.isAvailable else {
+            return base + " The recording is not in this build yet."
+        }
+        return base
+    }
+
+    private func rebuildSchedule() {
+        Task { try? await NotificationScheduler.shared.rebuildSchedule() }
+    }
+}
+
+private extension AdhanSoundCatalog {
+    var displayName: String {
+        switch self {
+        case .silent: "Silent"
+        case .chime: "Chime"
+        case .chimeDawn: "Chime, rising"
+        case .takbirat: "Takbīrāt"
+        }
+    }
+
+    var settingsDescription: String {
+        switch self {
+        case .silent: "The notification arrives without a sound."
+        case .chime: "One soft struck bowl, warm and low."
+        case .chimeDawn: "The same bowl, struck four times, growing. For waking."
+        case .takbirat: "The muezzin's opening lines."
         }
     }
 }
@@ -2224,25 +2359,6 @@ private struct ExportReflection: Codable {
 }
 
 // MARK: - Display helpers
-
-private extension UserSettings {
-    var prayerNotificationConfigs: [PrayerNotificationConfig] {
-        get {
-            guard let data = prayerNotificationsConfigJSON.data(using: .utf8),
-                  let configs = try? JSONDecoder().decode([PrayerNotificationConfig].self, from: data)
-            else {
-                return Prayer.allCases.map { PrayerNotificationConfig(prayer: $0) }
-            }
-            return configs
-        }
-        set {
-            guard let data = try? JSONEncoder().encode(newValue),
-                  let json = String(data: data, encoding: .utf8)
-            else { return }
-            prayerNotificationsConfigJSON = json
-        }
-    }
-}
 
 private extension MadhabChoice {
     var settingsDisplayName: String {

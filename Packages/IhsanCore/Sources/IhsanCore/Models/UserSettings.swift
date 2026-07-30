@@ -1,22 +1,40 @@
 import Foundation
 import SwiftData
 
-public struct PrayerNotificationConfig: Codable, Sendable {
+public struct PrayerNotificationConfig: Codable, Sendable, Equatable {
     public var prayer: Prayer
     public var isEnabled: Bool
     public var athanSoundName: String
     public var leadTimeSeconds: Int
+    /// Whether this prayer's notification may break through Focus.
+    /// Off unless asked for: the app does not decide on its own that it
+    /// is allowed to interrupt.
+    public var isTimeSensitive: Bool
 
     public init(
         prayer: Prayer,
         isEnabled: Bool = true,
         athanSoundName: String = "default",
-        leadTimeSeconds: Int = 0
+        leadTimeSeconds: Int = 0,
+        isTimeSensitive: Bool = false
     ) {
         self.prayer = prayer
         self.isEnabled = isEnabled
         self.athanSoundName = athanSoundName
         self.leadTimeSeconds = leadTimeSeconds
+        self.isTimeSensitive = isTimeSensitive
+    }
+
+    /// Decoded leniently so a payload written by an earlier build — one
+    /// with no `isTimeSensitive` key — still reads, rather than
+    /// throwing away every per-prayer preference a person had set.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        prayer = try container.decode(Prayer.self, forKey: .prayer)
+        isEnabled = try container.decodeIfPresent(Bool.self, forKey: .isEnabled) ?? true
+        athanSoundName = try container.decodeIfPresent(String.self, forKey: .athanSoundName) ?? "default"
+        leadTimeSeconds = try container.decodeIfPresent(Int.self, forKey: .leadTimeSeconds) ?? 0
+        isTimeSensitive = try container.decodeIfPresent(Bool.self, forKey: .isTimeSensitive) ?? false
     }
 }
 
@@ -72,6 +90,11 @@ public final class UserSettings {
     public var adhanEnabledAsr: Bool = true
     public var adhanEnabledMaghrib: Bool = true
     public var adhanEnabledIsha: Bool = true
+    /// Whether the in-app adhan plays when the ringer switch is off.
+    /// Off by default: the silent switch means silent, and an app that
+    /// overrides it without being asked has broken a promise the phone
+    /// made to its owner.
+    public var adhanPlaysInSilentMode: Bool = false
     public var themeRaw: String = ThemePreference.dark.rawValue
     public var hijriCalendarOffsetDays: Int = 0
     public var arabicNumeralsEnabled: Bool = false
@@ -138,6 +161,7 @@ public final class UserSettings {
         adhanEnabledAsr: Bool = true,
         adhanEnabledMaghrib: Bool = true,
         adhanEnabledIsha: Bool = true,
+        adhanPlaysInSilentMode: Bool = false,
         theme: ThemePreference = .dark,
         hijriCalendarOffsetDays: Int = 0,
         arabicNumeralsEnabled: Bool = false,
@@ -194,6 +218,7 @@ public final class UserSettings {
         self.adhanEnabledAsr = adhanEnabledAsr
         self.adhanEnabledMaghrib = adhanEnabledMaghrib
         self.adhanEnabledIsha = adhanEnabledIsha
+        self.adhanPlaysInSilentMode = adhanPlaysInSilentMode
         self.themeRaw = theme.rawValue
         self.hijriCalendarOffsetDays = hijriCalendarOffsetDays
         self.arabicNumeralsEnabled = arabicNumeralsEnabled
