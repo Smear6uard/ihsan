@@ -520,7 +520,7 @@ struct FocusedPrayerCard: View {
         caption: String
     ) -> some View {
         Button {
-            Haptics.impact(.soft)
+            Haptics.settle()
             onToggleNafl?(kind)
         } label: {
             HStack(spacing: 5) {
@@ -645,7 +645,7 @@ struct FocusedPrayerCard: View {
     // MARK: - State transitions
 
     private func commit(_ status: PrayerStatus) {
-        Haptics.success()
+        Haptics.settle()
         let jamaah = jamaahPending
         onCommit(status, jamaah)
         mode = .collapsed

@@ -305,7 +305,7 @@ struct ReflectionScreen: View {
         Haptics.impact(.medium)
         let saved = viewModel.save()
         if saved {
-            ReflectionHaptics.saveSuccess()
+            ReflectionHaptics.saved()
             isInputFocused = false
         }
     }

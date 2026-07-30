@@ -864,10 +864,10 @@ private struct TodayReadyView: View {
             .frame(maxWidth: .infinity)
     }
 
-    /// One funnel, instant feedback: the haptic fires before the
+    /// One funnel, instant feedback: the settle fires before the
     /// intent persists, and the @Query re-render carries the truth.
     private func recordFast(kind: FastKind, state: FastState) {
-        Haptics.impact(.light)
+        Haptics.settle()
         let day = todayDay(at: nowProvider.now())
         Task {
             _ = try? await LogFastIntent(kind: kind, state: state, fastDate: day).perform()
@@ -1093,6 +1093,10 @@ private struct TodayReadyView: View {
     /// notification schedule rebuilds either way, so suppression tracks the
     /// pause without touching any stored preference.
     private func togglePause() {
+        // One deliberate action, one medium impact. It used to fire a
+        // success notification as well, so a single tap produced a
+        // thud and then a rising double-tap — and a pause is neither
+        // an achievement nor an operation that might have failed.
         Haptics.impact(.medium)
         let now = nowProvider.now()
         if let activePause {
@@ -1106,7 +1110,6 @@ private struct TodayReadyView: View {
                 modifiedAt: now
             ))
         }
-        Haptics.notification(.success)
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
             await NightWakeService.shared.refresh(using: modelContext)

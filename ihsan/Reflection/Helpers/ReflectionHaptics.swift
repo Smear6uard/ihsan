@@ -3,10 +3,12 @@ import Foundation
 #if os(iOS)
 import UIKit
 
-/// Reflection-specific haptics. Distinct file from the Today helper so
-/// the two surfaces can evolve independently — the Today screen's tap
-/// for prayer logging is a different feel from the recorder's start /
-/// stop and the save success.
+/// The recorder's own two haptics, plus the commit.
+///
+/// Start and stop are transport controls and feel like controls. The
+/// save is not: a reflection written or spoken is a worship record,
+/// the same kind of thing as a logged prayer, and it wears the same
+/// settle. It used to fire a success notification.
 @MainActor
 enum ReflectionHaptics {
     static func prepareAll() {
@@ -23,9 +25,9 @@ enum ReflectionHaptics {
         Haptics.impact(.light)
     }
 
-    /// Success notification — fires after a reflection saves.
-    static func saveSuccess() {
-        Haptics.notification(.success)
+    /// The settle — a reflection has been recorded.
+    static func saved() {
+        Haptics.settle()
     }
 }
 #else
@@ -34,6 +36,6 @@ enum ReflectionHaptics {
     static func prepareAll() {}
     static func recordStart() {}
     static func recordStop() {}
-    static func saveSuccess() {}
+    static func saved() {}
 }
 #endif

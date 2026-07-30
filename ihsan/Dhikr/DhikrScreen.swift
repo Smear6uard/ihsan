@@ -91,10 +91,14 @@ struct DhikrScreen: View {
         totalCount += 1
         let position = filledMarks
         if position == Self.cycleLength {
-            // The cycle completes: one distinct haptic.
-            Haptics.notification(.success)
+            // The boundary is a worship commit, and wears the same
+            // settle every other commit wears.
+            Haptics.settle()
         } else {
-            Haptics.impact(.soft)
+            // Each bead in between is lighter than the boundary, so
+            // the boundary is felt as an arrival rather than as one
+            // more of the same.
+            Haptics.impact(.light)
         }
         // Spoken waypoints only — the per-tap haptic carries the
         // rhythm (see the type comment).

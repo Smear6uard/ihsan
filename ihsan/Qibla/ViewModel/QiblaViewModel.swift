@@ -161,8 +161,9 @@ final class QiblaViewModel {
 
         switch next.alignmentEvent {
         case .entered:
-            // The one haptic of arrival — never rate-limited away.
-            Haptics.impact(.soft)
+            // Arrival is the qibla's commit: the same settle a logged
+            // prayer makes. Never rate-limited away.
+            Haptics.settle()
             if logsHeading { print("QIBLA-HAPTIC aligned-entry") }
             bloomCount += 1
             settleTask?.cancel()

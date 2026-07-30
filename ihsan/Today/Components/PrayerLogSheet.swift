@@ -404,10 +404,10 @@ struct PrayerLogSheet: View {
     private var commitBar: some View {
         Button {
             guard let timing = selectedTiming else { return }
-            // Haptic first — commit feel lands with the tap, the
-            // optimistic model update follows within the same beat,
-            // and the plate's materialize animation plays off it.
-            Haptics.notification(.success)
+            // The settle lands with the tap; the optimistic model
+            // update follows within the same beat, and the plate's
+            // materialize animation plays off it.
+            Haptics.settle()
             onCommit(timing, jamaahOn)
             dismiss()
         } label: {

@@ -182,7 +182,7 @@ final class TodayViewModel {
         do {
             let intent = LogPrayerWithStatusIntent(prayer: prayer, status: status)
             _ = try await intent.perform()
-            Haptics.success()
+            Haptics.settle()
         } catch {
             print("setStatus failed: \(error)")
         }

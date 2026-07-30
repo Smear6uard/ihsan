@@ -104,7 +104,7 @@ struct CelestialPlateScene: View {
     /// foreground after a long absence); each layer animates toward
     /// it on its own staggered clock — the arc draws in, ornaments
     /// bloom in prayer order, the celestial glow arrives last,
-    /// ~800 ms in total. Under Reduce Motion every stagger collapses
+    /// 0.9 s in total. Under Reduce Motion every stagger collapses
     /// to one 300 ms crossfade.
     var entrance: Double = 1.0
 
@@ -112,24 +112,23 @@ struct CelestialPlateScene: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     // MARK: - Entrance choreography
+    //
+    // The numbers live in `EntranceChoreography` so the order — arc,
+    // then ornaments in prayer order, then light — is stated once and
+    // can be tested, rather than spread across three literals here.
 
-    /// One crossfade under Reduce Motion — the defined equivalent for
-    /// every entrance animation below.
-    private var crossfade: Animation { .easeIn(duration: 0.3) }
+    private var crossfade: Animation { EntranceChoreography.crossfade }
 
     private var arcEntranceAnimation: Animation {
-        reduceMotion ? crossfade : .easeOut(duration: 0.35)
+        EntranceChoreography.arc(reduceMotion: reduceMotion)
     }
 
     private func markerEntranceAnimation(index: Int) -> Animation {
-        reduceMotion
-            ? crossfade
-            : .spring(response: 0.35, dampingFraction: 0.85)
-                .delay(0.18 + 0.09 * Double(index))
+        EntranceChoreography.marker(index: index, reduceMotion: reduceMotion)
     }
 
     private var glowEntranceAnimation: Animation {
-        reduceMotion ? crossfade : .easeOut(duration: 0.25).delay(0.55)
+        EntranceChoreography.glow(reduceMotion: reduceMotion)
     }
 
     // MARK: - Composition constants
