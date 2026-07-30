@@ -72,7 +72,8 @@ final class TodayViewModel {
             timeZone: place.timeZone,
             calculationMethod: settings.calculationMethod,
             madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
+            highLatitudeRule: settings.highLatitudeRule,
+            tuning: settings.calculationTuning
         )
         let logs = try fetchTodaysLogs(now: now, timeZone: place.timeZone)
         let statuses = Self.statusMap(from: logs)

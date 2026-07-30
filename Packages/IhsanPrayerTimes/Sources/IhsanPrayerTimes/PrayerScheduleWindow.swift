@@ -302,7 +302,8 @@ public extension PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning = .standard
     ) throws -> PrayerScheduleWindow {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
@@ -319,7 +320,8 @@ public extension PrayerTimesProviding {
                 timeZone: timeZone,
                 calculationMethod: calculationMethod,
                 madhab: madhab,
-                highLatitudeRule: highLatitudeRule
+                highLatitudeRule: highLatitudeRule,
+                tuning: tuning
             )
         }
 

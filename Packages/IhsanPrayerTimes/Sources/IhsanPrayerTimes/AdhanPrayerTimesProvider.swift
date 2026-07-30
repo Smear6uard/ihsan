@@ -11,7 +11,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: IhsanCore.HighLatitudeRule
+        highLatitudeRule: IhsanCore.HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> DayPrayerTimes {
         try validate(coordinates: coordinates)
         try validate(timeZone: timeZone)
@@ -31,6 +32,7 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         var parameters = try calculationMethod.toAdhanCalculationParameters()
         parameters.madhab = madhab.toAdhanMadhab()
         parameters.highLatitudeRule = highLatitudeRule.toAdhanHighLatitudeRule()
+        parameters.apply(tuning)
 
         let adhanCoordinates = Adhan.Coordinates(
             latitude: coordinates.latitude,
@@ -77,7 +79,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: IhsanCore.HighLatitudeRule
+        highLatitudeRule: IhsanCore.HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> PrayerTime {
         let window = try scheduleWindow(
             for: referenceDate,
@@ -85,7 +88,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         )
         return PrayerStateResolver.resolve(
             prayerTimes: window.resolverSchedule,
@@ -99,7 +103,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: IhsanCore.HighLatitudeRule
+        highLatitudeRule: IhsanCore.HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> PrayerTime? {
         // Window-aware: pre-dawn hours belong to yesterday's Isha, the
         // forenoon gap [sunrise, dhuhr) belongs to no one, and every
@@ -110,7 +115,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         )
         return PrayerStateResolver.resolve(
             prayerTimes: window.resolverSchedule,
@@ -125,7 +131,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: IhsanCore.HighLatitudeRule
+        highLatitudeRule: IhsanCore.HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> [DayPrayerTimes] {
         guard startDate <= endDate else {
             throw PrayerTimesError.invalidDate("startDate must be before or equal to endDate.")
@@ -158,7 +165,8 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
                     timeZone: timeZone,
                     calculationMethod: calculationMethod,
                     madhab: madhab,
-                    highLatitudeRule: highLatitudeRule
+                    highLatitudeRule: highLatitudeRule,
+                    tuning: tuning
                 )
             )
 

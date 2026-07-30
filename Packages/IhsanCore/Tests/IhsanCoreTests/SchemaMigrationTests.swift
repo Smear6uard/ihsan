@@ -196,6 +196,76 @@ private func seedV3Store(at url: URL) throws {
     try context.save()
 }
 
+/// Seeds a store shaped exactly like a real V4 install — the worship
+/// layer's own records included — using the frozen V4 snapshot types,
+/// then closes it.
+private func seedV4Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV4.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let log = IhsanSchemaV4.PrayerLog()
+    log.id = seededLogID
+    log.dedupKey = "fajr-2023-03-09"
+    log.prayerRaw = Prayer.fajr.rawValue
+    log.prayerDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
+    log.loggedTimeZoneIdentifier = "America/Toronto"
+    log.scheduledTime = Date(timeIntervalSinceReferenceDate: 700_000_100)
+    log.prayedAt = Date(timeIntervalSinceReferenceDate: 700_000_200)
+    log.statusRaw = PrayerStatus.onTime.rawValue
+    log.withJamaah = true
+    log.note = "quiet fajr"
+    context.insert(log)
+
+    let pause = IhsanSchemaV4.PauseInterval()
+    pause.id = seededPauseID
+    pause.startDate = Date(timeIntervalSinceReferenceDate: 699_900_000)
+    pause.expectedEndDate = Date(timeIntervalSinceReferenceDate: 701_000_000)
+    pause.loggedTimeZoneIdentifier = "America/Toronto"
+    pause.note = "resting"
+    context.insert(pause)
+
+    let ledger = IhsanSchemaV4.QadaLedger()
+    ledger.categoryRaw = QadaCategory.isha.rawValue
+    ledger.remainingCount = 40
+    ledger.madeUpCount = 3
+    context.insert(ledger)
+
+    let entry = IhsanSchemaV4.QadaEntry()
+    entry.id = seededQadaEntryID
+    entry.categoryRaw = QadaCategory.isha.rawValue
+    entry.kindRaw = QadaEntryKind.estimated.rawValue
+    entry.amount = 40
+    entry.reason = "first estimate"
+    context.insert(entry)
+
+    let fast = IhsanSchemaV4.FastLog()
+    fast.dedupKey = "fast-2023-03-10"
+    fast.kindRaw = FastKind.whiteDay.rawValue
+    fast.stateRaw = FastState.kept.rawValue
+    fast.fastDate = Date(timeIntervalSinceReferenceDate: 700_090_000)
+    context.insert(fast)
+
+    let session = IhsanSchemaV4.DhikrSession()
+    session.sessionDate = Date(timeIntervalSinceReferenceDate: 700_090_000)
+    session.count = 33
+    session.phraseRaw = DhikrPhrase.subhanallah.rawValue
+    context.insert(session)
+
+    let settings = IhsanSchemaV4.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.calculationMethodRaw = CalculationMethodChoice.karachi.rawValue
+    settings.qadaTrackingEnabled = true
+    settings.sunnahLayerEnabled = true
+    settings.fastingMonThuOfferEnabled = true
+    settings.hijriCalendarOffsetDays = 1
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
 private func withMigratedStore(
     seed: (URL) throws -> Void,
     assertions: (ModelContext) throws -> Void
@@ -208,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV4.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV5.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -248,6 +318,71 @@ func migratedStoreAcceptsNewNaflAndQadaRecords() async {
 func migratingSeededV3StoreToV4PreservesTheLedgerAndAddsTheWorshipTables() async {
     await #expect(processExitsWith: .success) {
         try assertV3StoreMigratesToV4()
+    }
+}
+
+@Test
+func migratingSeededV4StoreToV5PreservesWorshipRecordsAndLandsUntunedCalculation() async {
+    await #expect(processExitsWith: .success) {
+        try assertV4StoreMigratesToV5()
+    }
+}
+
+private func assertV4StoreMigratesToV5() throws {
+    try withMigratedStore(seed: seedV4Store) { context in
+        // Nothing the worship layer wrote may be disturbed by adding
+        // calculation depth.
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.id == seededLogID)
+        #expect(logs.first?.note == "quiet fajr")
+
+        let ledgers = try context.fetch(FetchDescriptor<QadaLedger>())
+        #expect(ledgers.first?.remainingCount == 40)
+        #expect(ledgers.first?.madeUpCount == 3)
+
+        let entries = try context.fetch(FetchDescriptor<QadaEntry>())
+        #expect(entries.first?.id == seededQadaEntryID)
+
+        let fasts = try context.fetch(FetchDescriptor<FastLog>())
+        #expect(fasts.first?.kind == .whiteDay)
+        let sessions = try context.fetch(FetchDescriptor<DhikrSession>())
+        #expect(sessions.first?.count == 33)
+
+        let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
+        #expect(pauses.first?.note == "resting")
+
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.calculationMethod == .karachi)
+        #expect(settings.sunnahLayerEnabled == true)
+        #expect(settings.fastingMonThuOfferEnabled == true)
+        #expect(settings.hijriCalendarOffsetDays == 1)
+
+        // An existing install arrives on the untouched preset: no
+        // custom angle, no interval, no offsets. A migration must never
+        // silently move someone's prayer times.
+        #expect(settings.customFajrAngle == nil)
+        #expect(settings.customIshaAngle == nil)
+        #expect(settings.customIshaIntervalMinutes == nil)
+        #expect(settings.calculationTuning == .standard)
+        #expect(settings.calculationTuning.overridesAngles == false)
+
+        // And the new columns are writable, round-tripping through the
+        // derived tuning.
+        settings.calculationTuning = CalculationTuning(
+            fajrAngle: 17.5,
+            ishaRule: .intervalMinutes(90),
+            offsets: PrayerOffsets(fajr: -2, isha: 3)
+        )
+        try context.save()
+
+        let reread = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(reread.calculationTuning.fajrAngle == 17.5)
+        #expect(reread.calculationTuning.ishaRule == .intervalMinutes(90))
+        #expect(reread.calculationTuning.offsets.fajr == -2)
+        #expect(reread.calculationTuning.offsets.isha == 3)
+        #expect(reread.calculationTuning.overridesAngles)
     }
 }
 

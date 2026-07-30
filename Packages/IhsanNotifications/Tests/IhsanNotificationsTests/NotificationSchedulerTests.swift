@@ -122,7 +122,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> DayPrayerTimes {
         let dayStart = Calendar.gregorianUTC.startOfDay(for: date)
         return DayPrayerTimes(
@@ -149,7 +150,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> PrayerTime {
         try dayTimes(
             for: referenceDate,
@@ -157,7 +159,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         ).fajr
     }
 
@@ -167,7 +170,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> PrayerTime? {
         nil
     }
@@ -179,7 +183,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning
     ) throws -> [DayPrayerTimes] {
         var days: [DayPrayerTimes] = []
         var cursor = Calendar.gregorianUTC.startOfDay(for: startDate)
@@ -192,7 +197,8 @@ private struct MockPrayerTimesProvider: PrayerTimesProviding {
                 timeZone: timeZone,
                 calculationMethod: calculationMethod,
                 madhab: madhab,
-                highLatitudeRule: highLatitudeRule
+                highLatitudeRule: highLatitudeRule,
+                tuning: tuning
             ))
             cursor = Calendar.gregorianUTC.date(byAdding: .day, value: 1, to: cursor)!
         }

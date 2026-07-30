@@ -1,5 +1,6 @@
 import SwiftUI
 import IhsanCore
+import IhsanPrayerTimes
 import IhsanDesignSystem
 
 /// Read-only summary card displayed on the calculation-method step.
@@ -20,11 +21,11 @@ struct OnboardingMethodCard: View {
                 .tracking(1.2)
                 .foregroundStyle(IhsanColor.textMuted)
 
-            Text(method.displayName)
+            Text(method.shortName)
                 .font(IhsanFont.subtitle)
                 .foregroundStyle(IhsanColor.textPrimary)
 
-            Text(method.regionHint)
+            Text(method.provenance)
                 .font(IhsanFont.bodyEnglish)
                 .foregroundStyle(IhsanColor.textSecondary)
                 .fixedSize(horizontal: false, vertical: true)

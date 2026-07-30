@@ -13,7 +13,8 @@ public extension PrayerTimesProviding {
         timeZone: TimeZone,
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
-        highLatitudeRule: HighLatitudeRule
+        highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning = .standard
     ) throws -> NightIntervals {
         let today = try dayTimes(
             for: date,
@@ -21,7 +22,8 @@ public extension PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         )
 
         var calendar = Calendar(identifier: .gregorian)
@@ -36,7 +38,8 @@ public extension PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         )
 
         return try NightIntervals(
@@ -54,6 +57,7 @@ public extension PrayerTimesProviding {
         calculationMethod: CalculationMethodChoice,
         madhab: MadhabChoice,
         highLatitudeRule: HighLatitudeRule,
+        tuning: CalculationTuning = .standard,
         sunriseOffset: TimeInterval = 20 * 60,
         dhuhrMargin: TimeInterval = 15 * 60
     ) throws -> DuhaWindow? {
@@ -63,7 +67,8 @@ public extension PrayerTimesProviding {
             timeZone: timeZone,
             calculationMethod: calculationMethod,
             madhab: madhab,
-            highLatitudeRule: highLatitudeRule
+            highLatitudeRule: highLatitudeRule,
+            tuning: tuning
         )
 
         return DuhaWindow(

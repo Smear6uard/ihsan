@@ -42,7 +42,8 @@ internal struct PrayerLogService: Sendable {
         let calculationConfiguration = (
             settings.calculationMethod,
             settings.madhab,
-            settings.highLatitudeRule
+            settings.highLatitudeRule,
+            settings.calculationTuning
         )
 
         let timeZone = TimeZone.current
@@ -64,7 +65,8 @@ internal struct PrayerLogService: Sendable {
                     timeZone: timeZone,
                     calculationMethod: calculationConfiguration.0,
                     madhab: calculationConfiguration.1,
-                    highLatitudeRule: calculationConfiguration.2
+                    highLatitudeRule: calculationConfiguration.2,
+                    tuning: calculationConfiguration.3
                 )
                 scheduledTime = try dayTimes.scheduledTime(for: prayer)
             } catch {

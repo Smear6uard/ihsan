@@ -173,6 +173,16 @@ private struct RootGate: View {
             try? modelContext.delete(model: NaflLog.self)
             try? modelContext.delete(model: PauseInterval.self)
             try? modelContext.delete(model: Reflection.self)
+            try? modelContext.delete(model: FastLog.self)
+            try? modelContext.delete(model: DhikrSession.self)
+            try? modelContext.delete(model: QadaEntry.self)
+            try? modelContext.delete(model: QadaLedger.self)
+            // Preferences leak between runs too — a custom angle set by
+            // one test is still there for the next one, and a test that
+            // silently inherits state is not a test. The settings row
+            // goes with the records; `fetchOrCreate` rebuilds it with
+            // stock defaults, and the flags below re-apply on top.
+            try? modelContext.delete(model: UserSettings.self)
             try? modelContext.save()
         }
         // `-IhsanDebugSeedReflections N` inserts N typed reflections

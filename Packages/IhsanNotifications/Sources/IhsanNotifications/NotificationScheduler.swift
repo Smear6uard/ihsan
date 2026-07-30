@@ -38,6 +38,10 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     public let calculationMethod: CalculationMethodChoice
     public let madhab: MadhabChoice
     public let highLatitudeRule: HighLatitudeRule
+    /// The user's calculation depth. Notifications fire against the
+    /// same instants the plate draws — a custom angle that moved Fajr
+    /// must move the Fajr notification too.
+    public let calculationTuning: CalculationTuning
     public let adhanSoundChoice: AdhanSoundCatalog
     public let prayerPreferences: [PrayerNotificationPreference]
 
@@ -46,6 +50,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         calculationMethod: CalculationMethodChoice = .isna,
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
+        calculationTuning: CalculationTuning = .standard,
         adhanSoundChoice: AdhanSoundCatalog = .systemDefault,
         prayerPreferences: [PrayerNotificationPreference] = Prayer.allCases.map { PrayerNotificationPreference(prayer: $0) }
     ) {
@@ -53,6 +58,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         self.calculationMethod = calculationMethod
         self.madhab = madhab
         self.highLatitudeRule = highLatitudeRule
+        self.calculationTuning = calculationTuning
         self.adhanSoundChoice = adhanSoundChoice
         self.prayerPreferences = prayerPreferences
     }
@@ -77,6 +83,7 @@ extension NotificationScheduleSettings {
             calculationMethod: userSettings.calculationMethod,
             madhab: userSettings.madhab,
             highLatitudeRule: userSettings.highLatitudeRule,
+            calculationTuning: userSettings.calculationTuning,
             prayerPreferences: decodedConfigs.map {
                 let soundChoice = AdhanSoundCatalog(userChoice: $0.athanSoundName)
                 return PrayerNotificationPreference(
@@ -226,7 +233,8 @@ public actor NotificationScheduler {
             timeZone: place.timeZone,
             calculationMethod: settings.calculationMethod,
             madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
+            highLatitudeRule: settings.highLatitudeRule,
+            tuning: settings.calculationTuning
         )
 
         await cancelAllScheduledNotifications()

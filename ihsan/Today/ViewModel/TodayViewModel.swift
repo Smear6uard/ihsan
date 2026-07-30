@@ -91,7 +91,8 @@ final class TodayViewModel {
             timeZone: place.timeZone,
             calculationMethod: settings.calculationMethod,
             madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
+            highLatitudeRule: settings.highLatitudeRule,
+            tuning: settings.calculationTuning
         )
 
         state = .ready(.init(
@@ -162,7 +163,8 @@ final class TodayViewModel {
                 timeZone: place.timeZone,
                 calculationMethod: settings.calculationMethod,
                 madhab: settings.madhab,
-                highLatitudeRule: settings.highLatitudeRule
+                highLatitudeRule: settings.highLatitudeRule,
+                tuning: settings.calculationTuning
             )
         }
 

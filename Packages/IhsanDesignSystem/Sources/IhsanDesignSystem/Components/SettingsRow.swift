@@ -77,6 +77,11 @@ public struct SettingsRow<Accessory: View>: View {
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm + 2)
         .frame(minHeight: 44)
+        // The row's title and value sit either side of a Spacer, and a
+        // Spacer carries no hit area of its own — without this the gap
+        // between them is dead to touch and the row only responds where
+        // there happens to be ink.
+        .contentShape(Rectangle())
     }
 
     private var accessibilityLabel: String {

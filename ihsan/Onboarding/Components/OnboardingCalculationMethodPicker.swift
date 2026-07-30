@@ -1,5 +1,6 @@
 import SwiftUI
 import IhsanCore
+import IhsanPrayerTimes
 import IhsanDesignSystem
 
 /// Modal picker for overriding the auto-detected calculation method.
@@ -52,10 +53,10 @@ struct OnboardingCalculationMethodPicker: View {
         } label: {
             HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.md) {
                 VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
-                    Text(method.displayName)
+                    Text(method.shortName)
                         .font(IhsanFont.bodyEnglishBold)
                         .foregroundStyle(IhsanColor.textPrimary)
-                    Text(method.regionHint)
+                    Text(method.provenance)
                         .font(IhsanFont.bodyEnglish)
                         .foregroundStyle(IhsanColor.textSecondary)
                         .fixedSize(horizontal: false, vertical: true)
@@ -92,8 +93,8 @@ struct OnboardingCalculationMethodPicker: View {
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(method.displayName)
-        .accessibilityHint(method.regionHint)
+        .accessibilityLabel(method.shortName)
+        .accessibilityHint(method.provenance)
         .accessibilityValue(selection == method ? "Selected" : "")
     }
 }

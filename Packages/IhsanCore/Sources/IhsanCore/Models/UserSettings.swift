@@ -44,6 +44,18 @@ public final class UserSettings {
     public var calculationMethodRaw: String = CalculationMethodChoice.isna.rawValue
     public var madhabRaw: String = MadhabChoice.standard.rawValue
     public var highLatitudeRuleRaw: String = HighLatitudeRule.middleOfNight.rawValue
+    /// Calculation depth — all nil / zero means "the chosen method,
+    /// untouched". `customFajrAngle` and the Isha pair override the
+    /// method's own twilight angles; the offsets are whole-minute
+    /// corrections applied after the solar math.
+    public var customFajrAngle: Double?
+    public var customIshaAngle: Double?
+    public var customIshaIntervalMinutes: Int?
+    public var prayerOffsetFajrMinutes: Int = 0
+    public var prayerOffsetDhuhrMinutes: Int = 0
+    public var prayerOffsetAsrMinutes: Int = 0
+    public var prayerOffsetMaghribMinutes: Int = 0
+    public var prayerOffsetIshaMinutes: Int = 0
     public var automaticLocationUpdatesEnabled: Bool = true
     @Attribute(.allowsCloudEncryption)
     public var lastResolvedCityName: String?
@@ -114,6 +126,7 @@ public final class UserSettings {
         calculationMethod: CalculationMethodChoice = .isna,
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
+        calculationTuning: CalculationTuning = .standard,
         automaticLocationUpdatesEnabled: Bool = true,
         lastResolvedCityName: String? = nil,
         lastResolvedCountryCode: String? = nil,
@@ -162,6 +175,14 @@ public final class UserSettings {
         self.calculationMethodRaw = calculationMethod.rawValue
         self.madhabRaw = madhab.rawValue
         self.highLatitudeRuleRaw = highLatitudeRule.rawValue
+        self.customFajrAngle = calculationTuning.fajrAngle
+        self.customIshaAngle = calculationTuning.ishaRule.storedAngle
+        self.customIshaIntervalMinutes = calculationTuning.ishaRule.storedIntervalMinutes
+        self.prayerOffsetFajrMinutes = calculationTuning.offsets.fajr
+        self.prayerOffsetDhuhrMinutes = calculationTuning.offsets.dhuhr
+        self.prayerOffsetAsrMinutes = calculationTuning.offsets.asr
+        self.prayerOffsetMaghribMinutes = calculationTuning.offsets.maghrib
+        self.prayerOffsetIshaMinutes = calculationTuning.offsets.isha
         self.automaticLocationUpdatesEnabled = automaticLocationUpdatesEnabled
         self.lastResolvedCityName = lastResolvedCityName
         self.lastResolvedCountryCode = lastResolvedCountryCode
@@ -273,6 +294,38 @@ public extension UserSettings {
 
     var highLatitudeRule: HighLatitudeRule {
         HighLatitudeRule(rawValue: highLatitudeRuleRaw) ?? .middleOfNight
+    }
+
+    /// The calculation depth, assembled from the stored columns. Every
+    /// surface that computes prayer times reads this and hands it to the
+    /// provider alongside the method — there is no second path.
+    var calculationTuning: CalculationTuning {
+        get {
+            CalculationTuning(
+                fajrAngle: customFajrAngle,
+                ishaRule: IshaRule(
+                    storedAngle: customIshaAngle,
+                    storedIntervalMinutes: customIshaIntervalMinutes
+                ),
+                offsets: PrayerOffsets(
+                    fajr: prayerOffsetFajrMinutes,
+                    dhuhr: prayerOffsetDhuhrMinutes,
+                    asr: prayerOffsetAsrMinutes,
+                    maghrib: prayerOffsetMaghribMinutes,
+                    isha: prayerOffsetIshaMinutes
+                )
+            )
+        }
+        set {
+            customFajrAngle = newValue.fajrAngle
+            customIshaAngle = newValue.ishaRule.storedAngle
+            customIshaIntervalMinutes = newValue.ishaRule.storedIntervalMinutes
+            prayerOffsetFajrMinutes = newValue.offsets.fajr
+            prayerOffsetDhuhrMinutes = newValue.offsets.dhuhr
+            prayerOffsetAsrMinutes = newValue.offsets.asr
+            prayerOffsetMaghribMinutes = newValue.offsets.maghrib
+            prayerOffsetIshaMinutes = newValue.offsets.isha
+        }
     }
 
     var theme: ThemePreference {

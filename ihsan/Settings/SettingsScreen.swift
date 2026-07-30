@@ -119,6 +119,9 @@ struct SettingsScreen: View {
             latestPlace = locationCoordinator.mostRecentResolvedPlace()
             nightWakeUsesFallback = NightWakeService.shared.usesNotificationFallback
             await loadFiqhFraming()
+            #if DEBUG
+            openDebugRoute()
+            #endif
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
@@ -178,6 +181,22 @@ struct SettingsScreen: View {
     private var settings: UserSettings? {
         settingsRows.first
     }
+
+    #if DEBUG
+    /// `-IhsanDebugSettingsRoute calculationMethod` — the screenshot
+    /// harness opens a settings subscreen directly, so a gallery frame
+    /// does not depend on a chain of taps. DEBUG only; release builds
+    /// never compile this.
+    private func openDebugRoute() {
+        let arguments = ProcessInfo.processInfo.arguments
+        guard
+            let index = arguments.firstIndex(of: "-IhsanDebugSettingsRoute"),
+            arguments.indices.contains(index + 1),
+            let route = SettingsRoute(debugName: arguments[index + 1])
+        else { return }
+        path = [route]
+    }
+    #endif
 
     private var activePause: PauseInterval? {
         pauses.first(where: \.isActive)
@@ -479,6 +498,22 @@ private enum SettingsRoute: Hashable {
     case theme
     case rawatibCounts
     case duhaWindow
+
+    #if DEBUG
+    init?(debugName: String) {
+        switch debugName {
+        case "calculationMethod": self = .calculationMethod
+        case "madhab": self = .madhab
+        case "highLatitudeRule": self = .highLatitudeRule
+        case "adhanSound": self = .adhanSound
+        case "jamPolicy": self = .jamPolicy
+        case "theme": self = .theme
+        case "rawatibCounts": self = .rawatibCounts
+        case "duhaWindow": self = .duhaWindow
+        default: return nil
+        }
+    }
+    #endif
 }
 
 // MARK: - Sections
@@ -546,17 +581,41 @@ private struct CalculationSection: View {
     @Binding var path: [SettingsRoute]
 
     var body: some View {
+        let description = CalculationDescription.resolve(
+            method: settings.calculationMethod,
+            tuning: settings.calculationTuning
+        )
+
         SettingsSectionCard("Calculation Method") {
             SettingsRow(
                 title: "Current method",
-                subtitle: settings.calculationMethod.settingsDisplayName,
+                subtitle: description.title,
                 glyph: .method,
                 action: {
                     Haptics.impact(.light)
                     path.append(.calculationMethod)
                 }
             )
+            .accessibilityValue(description.spokenTitle)
+
+            if !settings.calculationTuning.offsets.isEmpty {
+                SettingsDescriptionText(offsetSummary)
+            }
         }
+    }
+
+    /// Offsets are quiet but never hidden: a person who set one months
+    /// ago should be able to see it from the settings root, because a
+    /// forgotten offset looks exactly like a wrong app.
+    private var offsetSummary: String {
+        let offsets = settings.calculationTuning.offsets
+        let parts = Prayer.allCases.compactMap { prayer -> String? in
+            let minutes = offsets[prayer]
+            guard minutes != 0 else { return nil }
+            let sign = minutes > 0 ? "+" : "−"
+            return "\(prayer.displayNameEnglish) \(sign)\(abs(minutes))"
+        }
+        return "Manual offsets: " + parts.joined(separator: ", ") + " min."
     }
 }
 
@@ -1045,6 +1104,7 @@ private struct RawatibCountRow: View {
                 Spacer()
             }
         }
+        .settingsControlInset()
         .padding(.vertical, IhsanSpacing.xs)
     }
 }
@@ -1077,11 +1137,23 @@ private struct DuhaWindowPicker: View {
                         settings.modifiedAt = .now
                     }
                 }
+                .settingsControlInset()
                 .padding(.vertical, IhsanSpacing.xs)
 
                 SettingsDescriptionText("Schools differ on the window's edges; both offsets are yours to set.")
             }
         }
+    }
+}
+
+private extension View {
+    /// The inset every direct child of a `SettingsSectionCard` owes the
+    /// card. `SettingsRow` and `SettingsDescriptionText` apply it
+    /// themselves; hand-built controls have to say so, or they hang off
+    /// the panel's left edge and sit centred instead of aligned.
+    func settingsControlInset() -> some View {
+        frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, IhsanSpacing.md)
     }
 }
 
@@ -1093,9 +1165,17 @@ private func miniCountControl(
     step: Int = 1,
     range: ClosedRange<Int> = 0...12,
     accessibilityLabel: String,
+    /// Spoken form when the bare number would mislead — a signed
+    /// offset reads as "minus three minutes", not "-3".
+    valueDescription: String? = nil,
     onChange: @escaping (Int) -> Void
 ) -> some View {
-    VStack(alignment: .leading, spacing: 4) {
+    // A range that reaches below zero is a correction, not a count, and
+    // its sign has to be visible at a glance.
+    let signed = range.lowerBound < 0
+    let displayed = signed && value > 0 ? "+\(value)" : (signed && value < 0 ? "−\(abs(value))" : "\(value)")
+
+    return VStack(alignment: .leading, spacing: 4) {
         Text(label.uppercased())
             .font(IhsanFont.inscription)
             .tracking(1.2)
@@ -1117,10 +1197,10 @@ private func miniCountControl(
             .buttonStyle(.plain)
             .accessibilityHidden(true)
 
-            Text("\(value)")
+            Text(displayed)
                 .font(.system(.body, design: .monospaced).monospacedDigit())
                 .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).ink)
-                .frame(minWidth: 28)
+                .frame(minWidth: 36)
                 .contentTransition(.numericText())
 
             Button {
@@ -1142,7 +1222,7 @@ private func miniCountControl(
     }
     .accessibilityElement(children: .ignore)
     .accessibilityLabel(accessibilityLabel)
-    .accessibilityValue("\(value)")
+    .accessibilityValue(valueDescription ?? "\(value)")
     .accessibilityAdjustableAction { direction in
         switch direction {
         case .increment:
@@ -1375,54 +1455,465 @@ private struct AboutSection: View {
 
 // MARK: - Pickers
 
+/// Calculation method, and everything underneath it.
+///
+/// Each preset carries its own angles on the row, so a person can check
+/// the app against the timetable on their masjid wall instead of taking
+/// an acronym on faith. Advanced replaces those angles; the moment it
+/// does, the method stops calling itself by a standard name anywhere in
+/// the app.
 private struct CalculationMethodPicker: View {
     let settings: UserSettings
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         PickerScaffold(title: "Calculation Method") {
             SettingsSectionCard("Automatic") {
-                SettingsRow(
-                    title: "Auto-detect from location",
-                    subtitle: autoDetectSubtitle,
-                    glyph: .location,
-                    action: autoDetect
-                )
+                SettingsDescriptionText(autoDetectDescription)
+
+                if let common = commonMethod {
+                    SettingsRow(
+                        title: "Match my region",
+                        subtitle: common.shortName,
+                        glyph: .location,
+                        action: autoDetect
+                    )
+                }
             }
 
             SettingsSectionCard("Methods") {
-                ForEach(CalculationMethodChoice.allCases, id: \.self) { method in
-                    optionRow(
-                        title: method.settingsDisplayName,
-                        subtitle: method.settingsDescription,
+                SettingsDescriptionText("Every method sets how far below the horizon the sun must be for Fajr and Isha. Those two angles are on each row.")
+
+                ForEach(CalculationMethodChoice.selectable, id: \.self) { method in
+                    MethodRow(
+                        method: method,
                         isSelected: settings.calculationMethod == method
-                    ) {
-                        settings.calculationMethodRaw = method.rawValue
-                        settings.modifiedAt = .now
-                        dismiss()
-                    }
+                            && !settings.calculationTuning.overridesAngles,
+                        action: { select(method) }
+                    )
                 }
             }
+
+            CalculationAdvancedSection(settings: settings)
+            CalculationOffsetsSection(settings: settings)
         }
     }
 
-    private var recommendedMethod: CalculationMethodChoice? {
-        settings.lastResolvedCountryCode.map(CalculationMethodChoice.recommendedMethod)
+    private var commonMethod: CalculationMethodChoice? {
+        settings.lastResolvedCountryCode.map { CalculationMethodChoice.commonMethod(forCountryCode: $0) }
     }
 
-    private var autoDetectSubtitle: String {
-        guard let countryCode = settings.lastResolvedCountryCode else {
-            return "Refresh location first"
+    private var autoDetectDescription: String {
+        guard let countryCode = settings.lastResolvedCountryCode,
+              let method = commonMethod
+        else {
+            return "Refresh your location to see the method timetables use where you are."
         }
-        return "\(countryCode.uppercased()) recommends \((recommendedMethod ?? .muslimWorldLeague).settingsDisplayName)"
+        return "Timetables in \(countryCode.uppercased()) commonly use \(method.titleWithAngles)."
     }
 
     private func autoDetect() {
         guard let countryCode = settings.lastResolvedCountryCode else { return }
         Haptics.impact(.light)
-        settings.calculationMethodRaw = CalculationMethodChoice.recommendedMethod(for: countryCode).rawValue
+        select(CalculationMethodChoice.commonMethod(forCountryCode: countryCode))
+    }
+
+    /// Choosing a published method clears any custom angles — otherwise
+    /// the row would show as selected while the app quietly computed
+    /// something else. Manual offsets survive: they correct a local
+    /// timetable, and that correction outlives the method choice.
+    private func select(_ method: CalculationMethodChoice) {
+        settings.calculationMethodRaw = method.rawValue
+        settings.calculationTuning = settings.calculationTuning.resettingAngles()
         settings.modifiedAt = .now
-        dismiss()
+    }
+}
+
+/// One method, in two lines: the name a person says and the angles
+/// they can check, on the first; who publishes it, quietly, on the
+/// second. The angles never shrink and never truncate — a figure that
+/// cannot be read in full is worse than no figure at all.
+private struct MethodRow: View {
+    let method: CalculationMethodChoice
+    let isSelected: Bool
+    let action: () -> Void
+
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        let tokens = IhsanPageChrome.tokens(at: NowProvider.active.now())
+        let angles = method.angles
+
+        VStack(spacing: 0) {
+            Divider()
+                .frame(height: 0.5)
+                .overlay(tokens.panelStroke.opacity(0.55))
+
+            Button {
+                Haptics.impact(.light)
+                action()
+            } label: {
+                // Past the large accessibility sizes the name and the
+                // angles cannot share a line without one of them
+                // shrinking, so they stack instead.
+                let stacked = typeSize >= .accessibility2
+
+                HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.md) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        if stacked {
+                            nameText(tokens)
+                            if let angles { angleText(angles, tokens) }
+                        } else {
+                            HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+                                nameText(tokens)
+                                Spacer(minLength: IhsanSpacing.xs)
+                                if let angles { angleText(angles, tokens) }
+                            }
+                        }
+
+                        Text(method.provenance)
+                            .font(.footnote)
+                            .foregroundStyle(tokens.inkSecondary.opacity(0.85))
+                            .fixedSize(horizontal: false, vertical: true)
+                            .multilineTextAlignment(.leading)
+
+                        if let caveat = method.caveat {
+                            Text(caveat)
+                                .font(.caption)
+                                .foregroundStyle(tokens.inkSecondary.opacity(0.7))
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+
+                    SettingsSelectionRing(isSelected: isSelected)
+                }
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.vertical, IhsanSpacing.sm + 2)
+                .frame(minHeight: 44)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityLabel("\(method.shortName), \(method.provenance)")
+        .accessibilityValue(
+            [method.angles?.spokenDescription, isSelected ? "Selected" : nil]
+                .compactMap { $0 }
+                .joined(separator: ". ")
+        )
+        .accessibilityHint(isSelected ? "" : "Double tap to select")
+    }
+
+    private func nameText(_ tokens: SkyPaletteTokens) -> some View {
+        Text(method.shortName)
+            .font(.system(size: 17, weight: .regular, design: .serif))
+            .foregroundStyle(tokens.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// Tabular, gilded, and never allowed to shrink or clip.
+    private func angleText(_ angles: CalculationMethodAngles, _ tokens: SkyPaletteTokens) -> some View {
+        Text(angles.inlineDescription)
+            .font(.system(.subheadline, design: .rounded).monospacedDigit())
+            .foregroundStyle(tokens.leafGold)
+            .fixedSize(horizontal: true, vertical: false)
+            .layoutPriority(1)
+    }
+}
+
+/// Custom angles. Present but not prominent: someone who needs it knows
+/// what an angle is, and someone who does not should never have to
+/// decide about one.
+private struct CalculationAdvancedSection: View {
+    let settings: UserSettings
+
+    var body: some View {
+        let tuning = settings.calculationTuning
+        let base = settings.calculationMethod
+        let baseAngles = base.angles
+
+        SettingsSectionCard("Advanced") {
+            SettingsDescriptionText("Set your own angles when a local timetable uses figures no listed method matches. Everything else — madhab, high-latitude rule, offsets — stays as you set it.")
+
+            if tuning.overridesAngles {
+                CustomBanner(
+                    description: CalculationDescription.resolve(method: base, tuning: tuning)
+                )
+            }
+
+            angleControl(
+                label: "Fajr angle",
+                value: tuning.fajrAngle ?? baseAngles?.fajrAngle ?? 15,
+                isOverridden: tuning.fajrAngle != nil,
+                accessibilityLabel: "Custom Fajr angle, degrees"
+            ) { newValue in
+                var updated = settings.calculationTuning
+                updated.fajrAngle = newValue
+                commit(updated)
+            }
+
+            HairlineDivider()
+
+            Text("ISHA")
+                .font(IhsanFont.inscription)
+                .tracking(1.2)
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary.opacity(0.7))
+                .settingsControlInset()
+                .padding(.top, IhsanSpacing.xs)
+
+            IshaModeRow(
+                title: "By angle",
+                isSelected: isIshaAngleMode,
+                action: {
+                    var updated = settings.calculationTuning
+                    updated.ishaRule = .angle(currentIshaAngle)
+                    commit(updated)
+                }
+            )
+
+            if isIshaAngleMode {
+                angleControl(
+                    label: "Isha angle",
+                    value: currentIshaAngle,
+                    isOverridden: tuning.ishaRule.storedAngle != nil,
+                    accessibilityLabel: "Custom Isha angle, degrees"
+                ) { newValue in
+                    var updated = settings.calculationTuning
+                    updated.ishaRule = .angle(newValue)
+                    commit(updated)
+                }
+            }
+
+            IshaModeRow(
+                title: "Fixed minutes after Maghrib",
+                isSelected: isIshaIntervalMode,
+                action: {
+                    var updated = settings.calculationTuning
+                    updated.ishaRule = .intervalMinutes(currentIshaInterval)
+                    commit(updated)
+                }
+            )
+
+            if isIshaIntervalMode {
+                miniCountControl(
+                    label: "Minutes after Maghrib",
+                    value: currentIshaInterval,
+                    step: CalculationTuning.intervalStep,
+                    range: CalculationTuning.intervalRange,
+                    accessibilityLabel: "Minutes after Maghrib for Isha"
+                ) { newValue in
+                    var updated = settings.calculationTuning
+                    updated.ishaRule = .intervalMinutes(newValue)
+                    commit(updated)
+                }
+                .settingsControlInset()
+                .padding(.vertical, IhsanSpacing.xs)
+            }
+
+            if tuning.overridesAngles {
+                HairlineDivider()
+                SettingsRow(
+                    title: "Reset to \(base.shortName)",
+                    subtitle: baseAngles.map { "Back to \($0.inlineDescription)" },
+                    action: {
+                        Haptics.impact(.medium)
+                        commit(settings.calculationTuning.resettingAngles())
+                    }
+                )
+            }
+        }
+    }
+
+    private var isIshaAngleMode: Bool {
+        settings.calculationTuning.ishaRule.storedAngle != nil
+    }
+
+    private var isIshaIntervalMode: Bool {
+        settings.calculationTuning.ishaRule.storedIntervalMinutes != nil
+    }
+
+    /// What the angle control shows before anyone touches it: the value
+    /// the app is computing with right now, whatever its source.
+    private var currentIshaAngle: Double {
+        if let custom = settings.calculationTuning.ishaRule.storedAngle { return custom }
+        return settings.calculationMethod.angles?.ishaAngle ?? 15
+    }
+
+    private var currentIshaInterval: Int {
+        if let custom = settings.calculationTuning.ishaRule.storedIntervalMinutes { return custom }
+        return settings.calculationMethod.angles?.ishaIntervalMinutes ?? 90
+    }
+
+    private func commit(_ tuning: CalculationTuning) {
+        settings.calculationTuning = tuning
+        settings.modifiedAt = .now
+    }
+
+    private func angleControl(
+        label: String,
+        value: Double,
+        isOverridden: Bool,
+        accessibilityLabel: String,
+        onChange: @escaping (Double) -> Void
+    ) -> some View {
+        let tokens = IhsanPageChrome.tokens(at: NowProvider.active.now())
+        let step = CalculationTuning.angleStep
+        let range = CalculationTuning.angleRange
+
+        return VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: IhsanSpacing.xs) {
+                Text(label.uppercased())
+                    .font(IhsanFont.inscription)
+                    .tracking(1.2)
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.7))
+                if isOverridden {
+                    Text("SET BY YOU")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.2)
+                        .foregroundStyle(tokens.leafGold)
+                }
+            }
+
+            HStack(spacing: IhsanSpacing.sm) {
+                stepButton(isPlus: false) {
+                    onChange(max(range.lowerBound, value - step))
+                }
+
+                // Fixed, not minimum: "15°" and "15.5°" must not shift
+                // the marks either side of them as the value steps.
+                Text(formatted(value))
+                    .font(.system(.body, design: .monospaced).monospacedDigit())
+                    .foregroundStyle(tokens.ink)
+                    .frame(width: 64)
+                    .contentTransition(.numericText())
+
+                stepButton(isPlus: true) {
+                    onChange(min(range.upperBound, value + step))
+                }
+                Spacer()
+            }
+        }
+        .settingsControlInset()
+        .padding(.vertical, IhsanSpacing.xs)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityValue(formatted(value))
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment: onChange(min(range.upperBound, value + step))
+            case .decrement: onChange(max(range.lowerBound, value - step))
+            @unknown default: break
+            }
+        }
+    }
+
+    private func formatted(_ value: Double) -> String {
+        value == value.rounded()
+            ? "\(Int(value))°"
+            : String(format: "%.1f°", value)
+    }
+
+    private func stepButton(isPlus: Bool, action: @escaping () -> Void) -> some View {
+        let tokens = IhsanPageChrome.tokens(at: NowProvider.active.now())
+        return Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
+            StepMark(isPlus: isPlus)
+                .stroke(tokens.metal, style: StrokeStyle(lineWidth: 1.4, lineCap: .round))
+                .frame(width: 10, height: 10)
+                .frame(width: 28, height: 28)
+                .background(Circle().strokeBorder(tokens.metal.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Says plainly that the app is no longer computing a standard method,
+/// so nobody believes they are on one.
+private struct CustomBanner: View {
+    let description: CalculationDescription
+
+    var body: some View {
+        let tokens = IhsanPageChrome.tokens(at: NowProvider.active.now())
+        VStack(alignment: .leading, spacing: 2) {
+            Text(description.title)
+                .font(IhsanFont.bodyEnglishBold)
+                .foregroundStyle(tokens.ink)
+            Text("These are your angles, not a published method's.")
+                .font(.footnote)
+                .foregroundStyle(tokens.inkSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .settingsControlInset()
+        .padding(.vertical, IhsanSpacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(description.spokenTitle)
+    }
+}
+
+private struct IshaModeRow: View {
+    let title: String
+    let isSelected: Bool
+    let action: () -> Void
+
+    var body: some View {
+        SettingsRow(title: title, action: {
+            Haptics.impact(.light)
+            action()
+        }) {
+            SettingsSelectionRing(isSelected: isSelected)
+        }
+        .accessibilityHint(isSelected ? "Selected" : "Double tap to select")
+    }
+}
+
+/// Whole-minute corrections, for matching a printed timetable exactly.
+private struct CalculationOffsetsSection: View {
+    let settings: UserSettings
+
+    var body: some View {
+        SettingsSectionCard("Manual Offsets") {
+            SettingsDescriptionText("Shift any prayer by up to ten minutes to match the timetable you pray by. Offsets stay with you when you change method.")
+
+            ForEach(Prayer.allCases, id: \.self) { prayer in
+                miniCountControl(
+                    label: prayer.displayNameEnglish,
+                    value: settings.calculationTuning.offsets[prayer],
+                    step: 1,
+                    range: PrayerOffsets.allowedRange,
+                    accessibilityLabel: "\(prayer.displayNameEnglish) offset in minutes",
+                    valueDescription: Self.signed(settings.calculationTuning.offsets[prayer])
+                ) { newValue in
+                    var updated = settings.calculationTuning
+                    updated.offsets[prayer] = newValue
+                    settings.calculationTuning = updated
+                    settings.modifiedAt = .now
+                }
+                .settingsControlInset()
+                .padding(.vertical, IhsanSpacing.xxs)
+            }
+
+            if !settings.calculationTuning.offsets.isEmpty {
+                HairlineDivider()
+                SettingsRow(
+                    title: "Clear all offsets",
+                    action: {
+                        Haptics.impact(.medium)
+                        var updated = settings.calculationTuning
+                        updated.offsets = .none
+                        settings.calculationTuning = updated
+                        settings.modifiedAt = .now
+                    }
+                )
+            }
+        }
+    }
+
+    static func signed(_ minutes: Int) -> String {
+        if minutes == 0 { return "0 minutes" }
+        return minutes > 0 ? "plus \(minutes) minutes" : "minus \(abs(minutes)) minutes"
     }
 }
 
@@ -1749,71 +2240,6 @@ private extension UserSettings {
                   let json = String(data: data, encoding: .utf8)
             else { return }
             prayerNotificationsConfigJSON = json
-        }
-    }
-}
-
-private extension CalculationMethodChoice {
-    var settingsDisplayName: String {
-        switch self {
-        case .muslimWorldLeague: "MWL"
-        case .isna: "ISNA"
-        case .egyptian: "Egyptian"
-        case .ummAlQura: "Umm al-Qura"
-        case .karachi: "Karachi"
-        case .dubai: "Dubai"
-        case .qatar: "Qatar"
-        case .kuwait: "Kuwait"
-        case .singapore: "Singapore"
-        case .tehran: "Tehran"
-        case .jafari: "Jafari"
-        case .moonsightingCommittee: "Moonsighting Committee"
-        case .northAmerica: "North America"
-        case .turkey: "Turkey"
-        case .other: "Other"
-        }
-    }
-
-    var settingsDescription: String {
-        switch self {
-        case .muslimWorldLeague: "Worldwide default"
-        case .isna: "North America"
-        case .egyptian: "Egypt and parts of Africa"
-        case .ummAlQura: "Saudi Arabia and Gulf"
-        case .karachi: "South Asia"
-        case .dubai: "United Arab Emirates"
-        case .qatar: "Qatar"
-        case .kuwait: "Kuwait"
-        case .singapore: "Singapore and nearby regions"
-        case .tehran: "Iran"
-        case .jafari: "Shia Ithna Ashari communities"
-        case .moonsightingCommittee: "Moonsighting Committee settings"
-        case .northAmerica: "North America calculation profile"
-        case .turkey: "Turkey"
-        case .other: "Custom or unsupported method"
-        }
-    }
-
-    nonisolated static func recommendedMethod(for countryCode: String) -> CalculationMethodChoice {
-        switch countryCode.uppercased() {
-        case "US", "CA":
-            return .isna
-        case "SA", "AE", "QA", "KW", "BH", "OM":
-            return .ummAlQura
-        case "GB", "IE":
-            return .muslimWorldLeague
-        case "PK", "IN", "BD", "LK":
-            return .karachi
-        case "EG":
-            return .egyptian
-        case "SG", "MY", "ID", "BN":
-            return .singapore
-        case "TR":
-            return .turkey
-        case "IR":
-            return .tehran
-        default:
-            return .muslimWorldLeague
         }
     }
 }
