@@ -175,6 +175,9 @@ private struct TodayReadyView: View {
     @Query private var recentNaflLogs: [NaflLog]
     /// Today's fast, if one is recorded (intended or kept).
     @Query private var todaysFasts: [FastLog]
+    /// Yesterday's prayer logs — the only day the account line ever
+    /// speaks about.
+    @Query private var yesterdaysLogs: [PrayerLog]
 
     private var activePause: PauseInterval? {
         pauses.first(where: \.isActive)
@@ -200,6 +203,12 @@ private struct TodayReadyView: View {
     /// significant-day line — presentation state, not worship data.
     @AppStorage("IhsanSignificantDayDismissedDay")
     private var significantDayDismissedDay: String = ""
+    /// Civil day the person last dismissed the yesterday line on.
+    /// Presentation state, like the line above it — never worship data.
+    @AppStorage("IhsanYesterdayOfferDismissedDay")
+    private var yesterdayOfferDismissedDay: String = ""
+    @State private var isYesterdaySheetPresented = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugPresentYesterday")
     /// Entrance choreography target — 0 until the first frame has a
     /// chance to render at rest-zero, then 1; the scene's layers
     /// animate toward it on their staggered clocks. Replays after a
@@ -244,6 +253,11 @@ private struct TodayReadyView: View {
             log.fastDate >= startOfDay && log.fastDate < endOfDay
         }
         self._todaysFasts = Query(filter: fastPredicate, sort: \FastLog.fastDate)
+
+        let yesterdayPredicate = #Predicate<PrayerLog> { log in
+            log.prayerDate >= startOfYesterday && log.prayerDate < startOfDay
+        }
+        self._yesterdaysLogs = Query(filter: yesterdayPredicate, sort: \PrayerLog.prayerDate)
     }
 
     var body: some View {
@@ -333,7 +347,15 @@ private struct TodayReadyView: View {
                         onHijriTap: { isHijriSheetPresented = true },
                         significantDayInscription: headerLineText(at: now),
                         significantDayHint: headerLineHint(at: now),
-                        onSignificantDayTap: { handleHeaderLineTap(at: now) }
+                        onSignificantDayTap: { handleHeaderLineTap(at: now) },
+                        yesterdayInscription: yesterdayOffer(at: now)?.inscription,
+                        yesterdaySpokenLabel: yesterdayOffer(at: now)?.spokenLabel,
+                        onYesterdayTap: { isYesterdaySheetPresented = true },
+                        onYesterdayDismiss: {
+                            yesterdayOfferDismissedDay = YesterdayAccount.civilDayKey(
+                                now, calendar: placeCalendar
+                            )
+                        }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                     .padding(.top, IhsanSpacing.md)
@@ -388,6 +410,9 @@ private struct TodayReadyView: View {
             }
             .sheet(isPresented: $isHijriSheetPresented) {
                 hijriMonthSheet
+            }
+            .sheet(isPresented: $isYesterdaySheetPresented) {
+                yesterdaySheet(at: now)
             }
             .confirmationDialog(
                 "How many rak'ah?",
@@ -668,6 +693,79 @@ private struct TodayReadyView: View {
             hasFastToday: todaysFast != nil,
             dismissedForToday: significantDayDismissedDay == civilDayKey(at: now)
         )
+    }
+
+    /// The place's calendar — yesterday is a civil day where the
+    /// prayers were, not where the device happens to be now.
+    private var placeCalendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = snapshot.place.timeZone
+        return calendar
+    }
+
+    /// Whether the app should mention yesterday at all. Every
+    /// suppression rule lives in `YesterdayAccount`; this only asks.
+    private func yesterdayOffer(at now: Date) -> YesterdayAccount.Offer? {
+        YesterdayAccount.offer(
+            now: now,
+            logs: yesterdaysLogs,
+            pauses: pauses,
+            dismissedDayKey: yesterdayOfferDismissedDay,
+            calendar: placeCalendar
+        )
+    }
+
+    @ViewBuilder
+    private func yesterdaySheet(at now: Date) -> some View {
+        let calendar = placeCalendar
+        let day = calendar.date(
+            byAdding: .day, value: -1, to: calendar.startOfDay(for: now)
+        ) ?? now
+        let rows = YesterdayAccount.rows(
+            for: day, logs: yesterdaysLogs, calendar: calendar
+        )
+        let tokens = PaletteState.resolved(
+            for: SkyPhase.resolve(at: now, events: solarEvents)
+        )
+
+        YesterdaySheet(
+            day: day,
+            rows: rows,
+            tokens: tokens,
+            onCommit: { prayer, status, jamaah in
+                commitYesterday(prayer, status: status, isJamaah: jamaah, on: day)
+            },
+            onCommitAllOnTime: {
+                for prayer in Prayer.allCases {
+                    commitYesterday(prayer, status: .onTime, isJamaah: false, on: day)
+                }
+            },
+            onDone: {}
+        )
+        .presentationDetents([.large])
+    }
+
+    /// One retroactive commit, through the same intent funnel every
+    /// other surface uses — so dedup, idempotency, and the makeup
+    /// ledger all behave exactly as they do for today.
+    private func commitYesterday(
+        _ prayer: Prayer,
+        status: PrayerStatus,
+        isJamaah: Bool,
+        on day: Date
+    ) {
+        Task {
+            do {
+                _ = try await LogPrayerWithStatusIntent(
+                    prayer: prayer, status: status, date: day
+                ).perform()
+                if isJamaah, status != .missed {
+                    _ = try await ToggleJamaahIntent(prayer: prayer, date: day).perform()
+                }
+            } catch {
+                Haptics.warning()
+            }
+        }
     }
 
     private func headerLineText(at now: Date) -> String? {

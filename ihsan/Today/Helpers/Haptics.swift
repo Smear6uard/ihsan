@@ -64,7 +64,28 @@ enum Haptics {
         softImpact.prepare()
     }
 
-    /// Success notification — fires after an Intent's perform() completes.
+    /// **The settle.** One soft impact, and the only haptic a worship
+    /// commit ever makes.
+    ///
+    /// Every act the app records — a prayer logged from any surface, a
+    /// fast, a dhikr boundary, the qibla coming into alignment — is the
+    /// same physical event under the thumb: a small weight coming to
+    /// rest. Not a click, which reads as a machine acknowledging input,
+    /// and not a success notification's rising double-tap, which reads
+    /// as praise. Worship is recorded, not applauded.
+    ///
+    /// Soft rather than light because the commit is the heaviest thing
+    /// a person does here, and it should feel like it landed.
+    static func settle() {
+        softImpact.impactOccurred(intensity: 0.85)
+        softImpact.prepare()
+    }
+
+    /// Success notification — fires after an Intent's perform()
+    /// completes. **Not for worship commits** — those use `settle()`.
+    /// Reserved for operations that either succeed or fail and where
+    /// the person needs to know which (an export finishing, a
+    /// destructive action completing).
     static func success() {
         notification(.success)
     }
@@ -92,6 +113,7 @@ enum Haptics {
     static func notification(_ notificationType: Notification) {}
     static func tap() {}
     static func soft() {}
+    static func settle() {}
     static func success() {}
     static func warning() {}
 }

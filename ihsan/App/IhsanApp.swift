@@ -190,6 +190,32 @@ private struct RootGate: View {
             // stock defaults, and the flags below re-apply on top.
             try? modelContext.delete(model: UserSettings.self)
             try? modelContext.save()
+
+            // Presentation state lives in UserDefaults, not the store,
+            // and leaks between runs just as readily: a line dismissed
+            // by one test is still dismissed for the next.
+            for key in [
+                "IhsanSignificantDayDismissedDay",
+                "IhsanYesterdayOfferDismissedDay",
+                "IhsanSunnahCardDismissed"
+            ] {
+                UserDefaults.standard.removeObject(forKey: key)
+            }
+        }
+        // `-IhsanDebugPauseSince N` opens an excused pause N days ago
+        // and leaves it running — the state every "must stay silent"
+        // suppression test needs.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugPauseSince"),
+           arguments.indices.contains(flagIndex + 1),
+           let days = Int(arguments[flagIndex + 1]) {
+            let start = Calendar.current.date(
+                byAdding: .day, value: -days, to: NowProvider.active.now()
+            ) ?? NowProvider.active.now()
+            modelContext.insert(PauseInterval(
+                startDate: start,
+                loggedTimeZoneIdentifier: TimeZone.current.identifier
+            ))
+            try? modelContext.save()
         }
         // `-IhsanDebugSoundProbe chime,chime-dawn,takbirat,silent`
         // schedules one prayer notification per named sound a few

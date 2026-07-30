@@ -58,6 +58,16 @@ struct TodayHeader: View {
     /// Tapping the line dismisses it for the day, or records the
     /// offered intention.
     var onSignificantDayTap: (() -> Void)? = nil
+    /// "YESTERDAY · 3 UNLOGGED" — the quiet front door to the day that
+    /// was prayed and never logged. `nil` renders nothing, which is the
+    /// usual case.
+    var yesterdayInscription: String? = nil
+    var yesterdaySpokenLabel: String? = nil
+    /// Tapping the line opens yesterday's sheet.
+    var onYesterdayTap: (() -> Void)? = nil
+    /// The line carries its own dismiss mark, separate from its body,
+    /// so putting it away is deliberate rather than a mis-tap.
+    var onYesterdayDismiss: (() -> Void)? = nil
 
     var body: some View {
         let foreground = tokens.ink
@@ -117,6 +127,14 @@ struct TodayHeader: View {
                     .accessibilityLabel(significantDayInscription)
                     .accessibilityHint(significantDayHint ?? "Dismisses this note for today.")
                 }
+
+                if let yesterdayInscription {
+                    yesterdayLine(
+                        inscription: yesterdayInscription,
+                        foreground: foregroundSecondary,
+                        shadowColor: shadowColor
+                    )
+                }
             }
 
             Spacer(minLength: IhsanSpacing.sm)
@@ -127,6 +145,59 @@ struct TodayHeader: View {
             )
         }
         .accessibilityElement(children: .contain)
+    }
+
+    /// The same inscription register as the significant-day line, with
+    /// one difference: a dismiss mark of its own. The line's body opens
+    /// yesterday; the mark puts it away. Two targets, because an offer
+    /// you can only accept is not an offer.
+    @ViewBuilder
+    private func yesterdayLine(
+        inscription: String,
+        foreground: Color,
+        shadowColor: Color
+    ) -> some View {
+        HStack(spacing: 6) {
+            Button {
+                Haptics.impact(.light)
+                onYesterdayTap?()
+            } label: {
+                HStack(spacing: 6) {
+                    Rectangle()
+                        .fill(tokens.metal.opacity(0.75))
+                        .frame(width: 10, height: 1.2)
+                    Text(inscription)
+                        .font(.system(size: 10, weight: .semibold).smallCaps())
+                        .tracking(1.4)
+                        .foregroundStyle(foreground)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(yesterdaySpokenLabel ?? inscription)
+            .accessibilityHint("Opens yesterday to fill in.")
+
+            Button {
+                Haptics.impact(.light)
+                onYesterdayDismiss?()
+            } label: {
+                DismissCross()
+                    .stroke(
+                        tokens.metal.opacity(0.7),
+                        style: StrokeStyle(lineWidth: 1.1, lineCap: .round)
+                    )
+                    .frame(width: 7, height: 7)
+                    // The mark is small; its target is not.
+                    .frame(width: 32, height: 28)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss yesterday's note")
+            .accessibilityHint("Hides it until tomorrow.")
+        }
     }
 
     @ViewBuilder
@@ -218,5 +289,17 @@ private struct MoonPhaseGlyph: View {
             .font(.system(size: 22, weight: .regular))
             .foregroundStyle(IhsanColor.brass.opacity(0.85))
             .accessibilityLabel(bucket.spokenLabel)
+    }
+}
+
+/// The dismiss mark — a drawn cross, like every other mark in the app.
+private struct DismissCross: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        return path
     }
 }
