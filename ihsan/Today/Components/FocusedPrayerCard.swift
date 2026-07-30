@@ -171,16 +171,21 @@ struct FocusedPrayerCard: View {
                     Haptics.impact(.light)
                     onMoreOptions()
                 }
-        } else if mode == .expanded {
+        } else if mode == .expanded, FocusedCardModel.allowsLogging(phase) {
             expandedContent
                 .transition(.opacity)
-        } else {
+        } else if FocusedCardModel.allowsLogging(phase) {
             defaultContent
                 .transition(.opacity)
                 .onTapGesture {
                     Haptics.impact(.light)
                     mode = .expanded
                 }
+        } else {
+            // Pre-window: the upcoming state replaces commit controls
+            // entirely — no expansion, no sheet, nothing to press.
+            defaultContent
+                .transition(.opacity)
         }
     }
 

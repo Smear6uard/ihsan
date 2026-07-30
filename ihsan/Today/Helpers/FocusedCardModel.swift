@@ -22,6 +22,14 @@ enum FocusedCardModel {
         case logged
     }
 
+    /// Whether the phase admits logging controls. Before a window
+    /// opens there is nothing to commit — the card shows its upcoming
+    /// state and offers no buttons, no sheet.
+    static func allowsLogging(_ phase: Phase) -> Bool {
+        if case .upcoming = phase { return false }
+        return true
+    }
+
     static func resolve(
         scheduledTime: Date,
         windowEndTime: Date?,

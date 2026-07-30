@@ -637,21 +637,10 @@ private struct TodayReadyView: View {
         snapshot.dayTimes.time(for: prayer)
     }
 
-    /// End of `prayer`'s window. Fajr ends at sunrise, Dhuhr–Maghrib
-    /// at the next prayer, Isha at tomorrow's true Fajr.
+    /// End of `prayer`'s window — the one rule, shared with the sheet
+    /// and pinned against `moment(at:)` by `PrayerWindowSemanticsTests`.
     private func windowEndTime(for prayer: Prayer) -> Date? {
-        switch prayer {
-        case .fajr:
-            return snapshot.dayTimes.sunrise
-        case .dhuhr:
-            return snapshot.dayTimes.asr.scheduledTime
-        case .asr:
-            return snapshot.dayTimes.maghrib.scheduledTime
-        case .maghrib:
-            return snapshot.dayTimes.isha.scheduledTime
-        case .isha:
-            return snapshot.scheduleWindow.tomorrowFajr.scheduledTime
-        }
+        PrayerWindowRule.windowEnd(for: prayer, in: snapshot.scheduleWindow)
     }
 
     private func log(for prayer: Prayer) -> PrayerLog? {
