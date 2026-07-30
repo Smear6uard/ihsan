@@ -453,3 +453,34 @@ device:
   bloom's single breath were tuned in the simulator; confirm the
   standing glow neither vanishes nor hums on OLED, and the bloom
   reads as one calm breath, not a flash.
+
+## Corrective G — night integrity, painted horizon, sheet finish (2026-07-29)
+
+Source-level work is tested (contrast math, property tests, geometry
+tests); these need eyes on hardware:
+
+- **Timing tiles at 50% brightness.** All four tile ornaments (On
+  Time / Late / Qadā / Missed) pass ≥3:1 silhouette contrast against
+  their tile mathematically in all four palettes
+  (`PrayerLogSheetContrastTests`). Confirm on OLED at ~50% brightness,
+  day and night grounds, that the qadā lapis+gold roundel and the
+  deepened late outline read at arm's length.
+- **Ground filaments on OLED.** The engraved ground echoes were
+  lifted to 0.46/0.30/0.18 metal on the jewel grounds — confirm
+  visible-at-arm's-length at sunset and night without reading as
+  ruled lines.
+- **Night-bowl gilding.** The traversed night filament
+  (metalHighlight 0.60, taper dissolving at the cursor) was tuned in
+  the simulator; confirm the gilded passage reads as one line burning
+  to "now" on OLED, and that the day arc's heavier gild ribbon (2.6pt
+  over 1.6pt base) reads as weight, not blur.
+- **Moon earthshine.** Earthshine dropped to 0.30 over the dark limb
+  with a 0.75pt limb rim; confirm the dark limb neither vanishes on
+  OLED black nor reads as a full disc at 50% brightness.
+- **Sun bloom locality.** The horizon filament brightening dies
+  within 35% of screen width of the sun — confirm at sunset that the
+  falloff reads as painted light, with the far side of the chord
+  staying quiet gold + lapis.
+- **Sheet detent fit.** The log sheet's content-sized detent was
+  verified at standard type; walk the accessibility type sizes and
+  confirm the clamp + scroll handoff has no jump.
