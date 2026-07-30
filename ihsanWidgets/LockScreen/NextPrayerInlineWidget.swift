@@ -14,7 +14,7 @@ struct NextPrayerInlineWidgetView: View {
             Label("Open Ihsan to set location", systemImage: "moon.stars")
         } else {
             Label {
-                Text("\(entry.nextPrayer.displayNameEnglish) · \(WidgetCountdown.clockTime(entry.nextPrayerScheduledTime))")
+                Text("\(entry.nextPrayer.displayNameEnglish) · \(entry.clockTime(entry.nextPrayerScheduledTime))")
                     .font(.system(.body, design: .rounded).monospacedDigit())
             } icon: {
                 Image(systemName: lockSymbol(for: entry.nextPrayer))

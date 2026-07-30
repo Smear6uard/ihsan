@@ -5,16 +5,17 @@ import IhsanDesignSystem
 /// Watch-tuned hero countdown. Reuses the iOS layout vocabulary —
 /// prayer name above, monospaced tabular figures, lowercase smallcaps
 /// caption — but at watchOS-appropriate sizes (~32pt countdown vs
-/// 64pt on iOS). Minute-granularity ticks: a 1Hz timeline drains the
-/// watch battery, and the user reads `Asr 1h 23m`, not seconds.
+/// 64pt on iOS). The parent owns the shared tick so this view never
+/// reads a second clock; the rendered value remains minute-granular.
 struct HeroCountdown: View {
     let targetPrayer: Prayer
     let targetTime: Date
+    /// The same injected instant used to resolve `targetPrayer`.
+    let now: Date
 
     var body: some View {
-        TimelineView(.everyMinute) { context in
-            let remaining = max(0, targetTime.timeIntervalSince(context.date))
-            VStack(spacing: 2) {
+        let remaining = max(0, targetTime.timeIntervalSince(now))
+        VStack(spacing: 2) {
                 HStack(spacing: 4) {
                     Text(targetPrayer.displayNameEnglish)
                         .font(.system(size: 14, weight: .semibold))
@@ -30,12 +31,11 @@ struct HeroCountdown: View {
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-            }
-            .padding(.vertical, 6)
-            .frame(maxWidth: .infinity)
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(Self.accessibilityLabel(prayer: targetPrayer, seconds: remaining))
         }
+        .padding(.vertical, 6)
+        .frame(maxWidth: .infinity)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(Self.accessibilityLabel(prayer: targetPrayer, seconds: remaining))
     }
 
     static func formatted(seconds: TimeInterval) -> String {

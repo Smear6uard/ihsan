@@ -8,8 +8,8 @@ import Foundation
 /// `read()` to avoid spinning up CoreLocation on a tight extension
 /// budget.
 ///
-/// This persists *derived* data only — the five `Date`s that prayer
-/// fall at today, plus the city name. Coordinates are NOT cached;
+/// This persists *derived* data only — the exact resolver boundaries,
+/// place timezone/city, and qibla bearing. Coordinates are NOT cached;
 /// the privacy contract on `LocatedPlace` forbids persisting raw
 /// location to UserDefaults or any storage.
 public struct PrayerTimesCache: Codable, Sendable, Equatable {
@@ -28,7 +28,13 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
     public let date: Date
     public let timeZoneIdentifier: String
     public let cityName: String?
+    public let qiblaBearingDegrees: Double?
     public let entries: [Entry]
+    /// Adjacent and solar boundaries required by the shared prayer
+    /// state resolver. Optional so an older on-device v1 payload
+    /// decodes safely and is treated as stale by new readers.
+    public let previousDayIsha: Date?
+    public let sunrise: Date?
     public let nextDayFajr: Date?
     public let writtenAt: Date
 
@@ -36,14 +42,20 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
         date: Date,
         timeZoneIdentifier: String,
         cityName: String?,
+        qiblaBearingDegrees: Double? = nil,
         entries: [Entry],
+        previousDayIsha: Date? = nil,
+        sunrise: Date? = nil,
         nextDayFajr: Date?,
         writtenAt: Date = .now
     ) {
         self.date = date
         self.timeZoneIdentifier = timeZoneIdentifier
         self.cityName = cityName
+        self.qiblaBearingDegrees = qiblaBearingDegrees
         self.entries = entries
+        self.previousDayIsha = previousDayIsha
+        self.sunrise = sunrise
         self.nextDayFajr = nextDayFajr
         self.writtenAt = writtenAt
     }

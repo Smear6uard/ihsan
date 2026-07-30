@@ -50,7 +50,7 @@ struct PrayerStatusMediumWidgetView: View {
                 Text(entry.nextPrayer.displayNameEnglish)
                     .font(IhsanFont.bodyEnglishBold)
                     .foregroundStyle(IhsanColor.textSecondary)
-                Text(WidgetCountdown.clockTime(entry.nextPrayerScheduledTime))
+                Text(entry.clockTime(entry.nextPrayerScheduledTime))
                     .font(IhsanFont.tabular)
                     .foregroundStyle(IhsanColor.textMuted)
             }

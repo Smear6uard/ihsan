@@ -6,11 +6,15 @@ import Testing
 
 /// Part-A item 4: the header's "NEXT:" inscription and the plate's
 /// marker labels must agree to the minute — same data source (the
-/// resolved `PrayerMoment`), same formatter (`PlateTimeFormat`).
+/// resolved `PrayerResolution`), same formatter (`PlateTimeFormat`).
 @Suite("Today moment derivation")
 struct TodayMomentDerivationTests {
 
     private let chicago = TimeZone(identifier: "America/Chicago")!
+
+    private func resolve(_ window: PrayerScheduleWindow, at date: Date) -> PrayerResolution {
+        PrayerStateResolver.resolve(prayerTimes: window.resolverSchedule, now: date)
+    }
 
     private func window(at date: Date) throws -> PrayerScheduleWindow {
         try AdhanPrayerTimesProvider().scheduleWindow(
@@ -46,16 +50,18 @@ struct TodayMomentDerivationTests {
         var now = w.day.fajr.scheduledTime
         let end = w.tomorrowFajr.scheduledTime
         while now < end {
-            let moment = w.moment(at: now)
+            let resolution = resolve(w, at: now)
             let display = TodayDisplaySchedule.displayTime(
-                for: moment.next.prayer, window: w, now: now
+                for: resolution.nextPrayer.prayer,
+                window: w,
+                resolution: resolution
             )
             // One source: the display schedule and the moment agree
             // about which instant "next" means…
-            #expect(display == moment.next.scheduledTime)
+            #expect(display == resolution.nextPrayer.scheduledTime)
 
             // …so the four surfaces' rendered strings are identical.
-            let header = PlateTimeFormat.time(moment.next.scheduledTime, in: chicago)
+            let header = PlateTimeFormat.time(resolution.nextPrayer.scheduledTime, in: chicago)
             let plateLabel = PlateTimeFormat.time(display, in: chicago)
             let card = PlateTimeFormat.time(display, in: chicago)
             let sheet = PlateTimeFormat.time(display, in: chicago)
@@ -76,23 +82,35 @@ struct TodayMomentDerivationTests {
         let w = try window(at: noon)
         let beforeIsha = w.day.isha.scheduledTime.addingTimeInterval(-60)
         let afterIsha = w.day.isha.scheduledTime.addingTimeInterval(60)
+        let beforeResolution = resolve(w, at: beforeIsha)
+        let afterResolution = resolve(w, at: afterIsha)
 
         #expect(
-            TodayDisplaySchedule.displayTime(for: .fajr, window: w, now: beforeIsha)
+            TodayDisplaySchedule.displayTime(
+                for: .fajr, window: w, resolution: beforeResolution
+            )
                 == w.day.fajr.scheduledTime
         )
-        #expect(!TodayDisplaySchedule.isRolledToTomorrow(.fajr, window: w, now: beforeIsha))
+        #expect(!TodayDisplaySchedule.isRolledToTomorrow(
+            .fajr, window: w, resolution: beforeResolution
+        ))
 
         #expect(
-            TodayDisplaySchedule.displayTime(for: .fajr, window: w, now: afterIsha)
+            TodayDisplaySchedule.displayTime(
+                for: .fajr, window: w, resolution: afterResolution
+            )
                 == w.tomorrowFajr.scheduledTime
         )
-        #expect(TodayDisplaySchedule.isRolledToTomorrow(.fajr, window: w, now: afterIsha))
+        #expect(TodayDisplaySchedule.isRolledToTomorrow(
+            .fajr, window: w, resolution: afterResolution
+        ))
 
         // The other four prayers never roll.
         for prayer in [Prayer.dhuhr, .asr, .maghrib, .isha] {
             #expect(
-                TodayDisplaySchedule.displayTime(for: prayer, window: w, now: afterIsha)
+                TodayDisplaySchedule.displayTime(
+                    for: prayer, window: w, resolution: afterResolution
+                )
                     == w.day.time(for: prayer)
             )
         }
@@ -119,8 +137,8 @@ struct TodayMomentDerivationTests {
 
         for step in stride(from: -3.0, through: 3.0, by: 0.5) {
             let now = boundary.addingTimeInterval(step)
-            let moment = w.moment(at: now)
-            let target = moment.countdownTarget
+            let resolution = resolve(w, at: now)
+            let target = resolution.countdownTarget
             #expect(target > now)
             #expect(FocusedCardModel.countdown(until: target, now: now) != "0:00:00")
         }
@@ -128,17 +146,17 @@ struct TodayMomentDerivationTests {
 
     /// Marker-state projection: at a window boundary the current
     /// marker flips on the same tick the card's state flips — both
-    /// read the same `PrayerMoment`.
+    /// read the same `PrayerResolution`.
     @Test
     func markerCurrentFollowsTheMomentAtBoundaries() throws {
         let w = try window(at: noon)
 
-        let justBeforeAsr = w.moment(at: w.day.asr.scheduledTime.addingTimeInterval(-1))
-        #expect(justBeforeAsr.current?.prayer == .dhuhr)
-        #expect(justBeforeAsr.next.prayer == .asr)
+        let justBeforeAsr = resolve(w, at: w.day.asr.scheduledTime.addingTimeInterval(-1))
+        #expect(justBeforeAsr.currentPrayer?.prayer == .dhuhr)
+        #expect(justBeforeAsr.nextPrayer.prayer == .asr)
 
-        let atAsr = w.moment(at: w.day.asr.scheduledTime)
-        #expect(atAsr.current?.prayer == .asr)
-        #expect(atAsr.next.prayer == .maghrib)
+        let atAsr = resolve(w, at: w.day.asr.scheduledTime)
+        #expect(atAsr.currentPrayer?.prayer == .asr)
+        #expect(atAsr.nextPrayer.prayer == .maghrib)
     }
 }

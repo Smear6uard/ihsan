@@ -15,6 +15,10 @@ struct PrayerWindowSemanticsTests {
 
     private let newYork = TimeZone(identifier: "America/New_York")!
 
+    private func resolve(_ window: PrayerScheduleWindow, at date: Date) -> PrayerResolution {
+        PrayerStateResolver.resolve(prayerTimes: window.resolverSchedule, now: date)
+    }
+
     private func window(at date: Date) throws -> PrayerScheduleWindow {
         try AdhanPrayerTimesProvider().scheduleWindow(
             for: date,
@@ -45,11 +49,10 @@ struct PrayerWindowSemanticsTests {
         let dayEnd = w.tomorrowFajr.scheduledTime
         var openSamples = 0
         while tick < dayEnd {
-            let moment = w.moment(at: tick)
-            if let current = moment.current {
+            let resolution = resolve(w, at: tick)
+            if let current = resolution.currentPrayer {
                 #expect(
-                    PrayerWindowRule.windowEnd(for: current.prayer, in: w)
-                        == moment.currentWindowEnd,
+                    resolution.windowEnd(for: current) == resolution.currentWindowEnd,
                     "disagreement at \(tick) for \(current.prayer)"
                 )
                 openSamples += 1
@@ -65,15 +68,13 @@ struct PrayerWindowSemanticsTests {
     @Test
     func dhuhrEndsExactlyAtAsr() throws {
         let w = try window(at: noon)
-        #expect(
-            PrayerWindowRule.windowEnd(for: .dhuhr, in: w)
-                == w.day.asr.scheduledTime
-        )
+        let atDhuhr = resolve(w, at: w.day.dhuhr.scheduledTime)
+        #expect(atDhuhr.windowEnd(for: w.day.dhuhr) == w.day.asr.scheduledTime)
         let justBeforeAsr = w.day.asr.scheduledTime.addingTimeInterval(-1)
-        let moment = w.moment(at: justBeforeAsr)
-        #expect(moment.current?.prayer == .dhuhr)
-        #expect(moment.currentWindowEnd == w.day.asr.scheduledTime)
-        #expect(moment.next.prayer == .asr)
+        let resolution = resolve(w, at: justBeforeAsr)
+        #expect(resolution.currentPrayer?.prayer == .dhuhr)
+        #expect(resolution.currentWindowEnd == w.day.asr.scheduledTime)
+        #expect(resolution.nextPrayer.prayer == .asr)
     }
 
     /// The dawn property, pinned after the device review caught the
@@ -88,19 +89,19 @@ struct PrayerWindowSemanticsTests {
         var tick = w.day.fajr.scheduledTime
         var samples = 0
         while tick < w.day.sunrise {
-            let moment = w.moment(at: tick)
-            #expect(moment.current?.prayer == .fajr, "Fajr not current at \(tick)")
-            #expect(moment.currentWindowEnd == w.day.sunrise)
-            #expect(moment.next.prayer == .dhuhr)
+            let resolution = resolve(w, at: tick)
+            #expect(resolution.currentPrayer?.prayer == .fajr, "Fajr not current at \(tick)")
+            #expect(resolution.currentWindowEnd == w.day.sunrise)
+            #expect(resolution.nextPrayer.prayer == .dhuhr)
             tick = tick.addingTimeInterval(30)
             samples += 1
         }
         #expect(samples > 50)
 
         // The boundary instant itself belongs to the closed state.
-        let atSunrise = w.moment(at: w.day.sunrise)
-        #expect(atSunrise.current == nil)
-        #expect(atSunrise.next.prayer == .dhuhr)
+        let atSunrise = resolve(w, at: w.day.sunrise)
+        #expect(atSunrise.currentPrayer == nil)
+        #expect(atSunrise.nextPrayer.prayer == .dhuhr)
     }
 
     /// The forenoon gap is the only span with no open window: after
@@ -112,10 +113,10 @@ struct PrayerWindowSemanticsTests {
         let midGap = w.day.sunrise.addingTimeInterval(
             w.day.dhuhr.scheduledTime.timeIntervalSince(w.day.sunrise) / 2
         )
-        let moment = w.moment(at: midGap)
-        #expect(moment.current == nil)
-        #expect(moment.currentWindowEnd == nil)
-        #expect(moment.next.prayer == .dhuhr)
+        let resolution = resolve(w, at: midGap)
+        #expect(resolution.currentPrayer == nil)
+        #expect(resolution.currentWindowEnd == nil)
+        #expect(resolution.nextPrayer.prayer == .dhuhr)
     }
 
     // MARK: - Pre-window gating
@@ -127,11 +128,8 @@ struct PrayerWindowSemanticsTests {
         let now = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let opens = now.addingTimeInterval(3600)
         let phase = FocusedCardModel.resolve(
-            scheduledTime: opens,
-            windowEndTime: opens.addingTimeInterval(7200),
-            isInWindow: false,
-            isLogged: false,
-            now: now
+            windowState: .upcoming(opensAt: opens),
+            isLogged: false
         )
         #expect(phase == .upcoming(opensAt: opens))
         #expect(FocusedCardModel.allowsLogging(phase) == false)

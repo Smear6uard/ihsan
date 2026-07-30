@@ -11,7 +11,6 @@ enum TodayState {
 
     struct Snapshot {
         let place: LocatedPlace
-        let dayTimes: DayPrayerTimes
         /// Three days of schedule bracketing the refresh moment. The
         /// views derive the current/next prayer, window ends, and
         /// countdown targets from this on every clock tick — the

@@ -42,10 +42,9 @@ struct PrayerLogSheet: View {
     /// ledger): the header inscribes the date instead of the window's
     /// clock times.
     var displayDate: Date? = nil
-    /// The resolved moment at presentation — the header's tense
-    /// derives from comparing it to the window boundary, same rule as
-    /// the card. `nil` (retroactive days) shows the date, no clock.
-    var now: Date? = nil
+    /// The exact state produced by `PrayerStateResolver`. `nil`
+    /// (retroactive days) shows the date, no live temporal claim.
+    var windowState: PrayerWindowState? = nil
 
     /// One commit: the chosen timing plus the jamāʿah flag, together.
     let onCommit: (PrayerStatus, Bool) -> Void
@@ -74,7 +73,7 @@ struct PrayerLogSheet: View {
         isPaused: Bool = false,
         availableStatuses: Set<PrayerStatus>,
         displayDate: Date? = nil,
-        now: Date? = nil,
+        windowState: PrayerWindowState? = nil,
         onCommit: @escaping (PrayerStatus, Bool) -> Void,
         onTogglePause: @escaping () -> Void = {},
         onCancel: @escaping () -> Void
@@ -89,7 +88,7 @@ struct PrayerLogSheet: View {
         self.isPaused = isPaused
         self.availableStatuses = availableStatuses
         self.displayDate = displayDate
-        self.now = now
+        self.windowState = windowState
         self.onCommit = onCommit
         self.onTogglePause = onTogglePause
         self.onCancel = onCancel
@@ -163,7 +162,7 @@ struct PrayerLogSheet: View {
             scheduledTime: scheduledTime,
             windowEndTime: windowEndTime,
             displayDate: displayDate,
-            now: now,
+            windowState: windowState,
             timeZone: timeZone
         )
     }
@@ -175,7 +174,7 @@ struct PrayerLogSheet: View {
         scheduledTime: Date,
         windowEndTime: Date?,
         displayDate: Date?,
-        now: Date?,
+        windowState: PrayerWindowState?,
         timeZone: TimeZone
     ) -> String {
         if let displayDate {
@@ -183,7 +182,12 @@ struct PrayerLogSheet: View {
         }
         let start = PlateTimeFormat.time(scheduledTime, in: timeZone).uppercased()
         guard let end = windowEndTime else { return start }
-        let verb = if let now { now >= end ? "ENDED" : "ENDS" } else { "ENDS" }
+        let verb: String
+        if case .closed = windowState {
+            verb = "ENDED"
+        } else {
+            verb = "ENDS"
+        }
         return "\(start) · \(verb) \(PlateTimeFormat.time(end, in: timeZone).uppercased())"
     }
 

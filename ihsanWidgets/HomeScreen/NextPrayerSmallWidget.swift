@@ -36,7 +36,7 @@ struct NextPrayerSmallWidgetView: View {
                     .font(IhsanFont.bodyEnglishBold)
                     .foregroundStyle(IhsanColor.textPrimary)
 
-                Text("at \(WidgetCountdown.clockTime(entry.nextPrayerScheduledTime))")
+                Text("at \(entry.clockTime(entry.nextPrayerScheduledTime))")
                     .font(IhsanFont.smallCaps)
                     .tracking(0.6)
                     .foregroundStyle(IhsanColor.textMuted)

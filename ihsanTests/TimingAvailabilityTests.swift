@@ -1,5 +1,6 @@
 import Foundation
 import IhsanCore
+import IhsanPrayerTimes
 import Testing
 @testable import ihsan
 
@@ -24,11 +25,22 @@ struct TimingAvailabilityTests {
         windowEndTime: Date?,
         currentStatus: PrayerStatus? = nil
     ) -> Set<PrayerStatus> {
-        TimingAvailability.allowedStatuses(
+        let state: PrayerWindowState?
+        if let scheduledTime, let windowEndTime {
+            if now < scheduledTime {
+                state = .upcoming(opensAt: scheduledTime)
+            } else if now < windowEndTime {
+                state = .current(startedAt: scheduledTime, endsAt: windowEndTime)
+            } else {
+                state = .closed(startedAt: scheduledTime, endedAt: windowEndTime)
+            }
+        } else {
+            state = nil
+        }
+        return TimingAvailability.allowedStatuses(
             now: now,
             dayBeingLogged: day ?? now,
-            scheduledTime: scheduledTime,
-            windowEndTime: windowEndTime,
+            windowState: state,
             currentStatus: currentStatus,
             calendar: calendar
         )
@@ -174,13 +186,17 @@ struct PrayerLogSheetCopyTests {
 
         let open = PrayerLogSheet.timeRangeInscription(
             scheduledTime: start, windowEndTime: end,
-            displayDate: nil, now: end.addingTimeInterval(-60), timeZone: timeZone
+            displayDate: nil,
+            windowState: .current(startedAt: start, endsAt: end),
+            timeZone: timeZone
         )
         #expect(open.contains("ENDS") && !open.contains("ENDED"))
 
         let closed = PrayerLogSheet.timeRangeInscription(
             scheduledTime: start, windowEndTime: end,
-            displayDate: nil, now: end, timeZone: timeZone
+            displayDate: nil,
+            windowState: .closed(startedAt: start, endedAt: end),
+            timeZone: timeZone
         )
         #expect(closed.contains("ENDED"))
     }

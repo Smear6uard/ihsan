@@ -42,7 +42,7 @@ struct NextPrayerRectangularWidgetView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
 
-                Text(WidgetCountdown.clockTime(entry.nextPrayerScheduledTime))
+                Text(entry.clockTime(entry.nextPrayerScheduledTime))
                     .font(.system(size: 12, weight: .regular, design: .rounded).monospacedDigit())
                     .foregroundStyle(.secondary)
                     .lineLimit(1)

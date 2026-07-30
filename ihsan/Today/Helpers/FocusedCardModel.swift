@@ -1,5 +1,6 @@
 import Foundation
 import IhsanCore
+import IhsanPrayerTimes
 
 /// The focused card's state machine, as pure functions of the moment.
 ///
@@ -31,31 +32,21 @@ enum FocusedCardModel {
     }
 
     static func resolve(
-        scheduledTime: Date,
-        windowEndTime: Date?,
-        isInWindow: Bool,
-        isLogged: Bool,
-        now: Date
+        windowState: PrayerWindowState,
+        isLogged: Bool
     ) -> Phase {
         if isLogged { return .logged }
-        // The never-early rule, checked before anything else: for any
-        // now earlier than the prayer's start, the prayer is never
-        // active — whatever an upstream `isInWindow` flag claims.
-        // `FocusedCardModelTests` pins this as a property over random
-        // inputs; no combination of the other arguments can reach
-        // `.active` from here.
-        if now < scheduledTime {
-            return .upcoming(opensAt: scheduledTime)
+        // No boundary arithmetic lives here. The UI consumes the exact
+        // state produced by `PrayerStateResolver`, so a card cannot
+        // disagree with the header, plate, sheet, or widgets.
+        switch windowState {
+        case .upcoming(let opensAt):
+            return .upcoming(opensAt: opensAt)
+        case .current(_, let endsAt):
+            return .active(until: endsAt)
+        case .closed(_, let endedAt):
+            return .windowClosed(at: endedAt)
         }
-        if isInWindow, let end = windowEndTime, now < end {
-            return .active(until: end)
-        }
-        if let end = windowEndTime, now >= end {
-            return .windowClosed(at: end)
-        }
-        // Past the start without a known end (defensive; the schedule
-        // window always supplies one).
-        return .active(until: windowEndTime ?? scheduledTime)
     }
 
     // MARK: - Copy

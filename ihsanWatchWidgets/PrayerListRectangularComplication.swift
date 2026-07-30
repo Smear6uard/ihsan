@@ -24,11 +24,12 @@ struct PrayerListRectangularWidget: Widget {
 struct PrayerListRectangularView: View {
     let entry: ComplicationEntry
 
-    private static let timeFormatter: DateFormatter = {
+    private var timeFormatter: DateFormatter {
         let f = DateFormatter()
         f.dateFormat = "h:mm"
+        f.timeZone = TimeZone(identifier: entry.timeZoneIdentifier)
         return f
-    }()
+    }
 
     var body: some View {
         if entry.isStale || entry.dayPrayerTimes.isEmpty {
@@ -81,7 +82,7 @@ struct PrayerListRectangularView: View {
                 }
             }
             if let scheduled {
-                let timeText = Text(Self.timeFormatter.string(from: scheduled))
+                let timeText = Text(timeFormatter.string(from: scheduled))
                     .font(.system(size: 11, weight: isNext ? .semibold : .regular,
                                   design: .rounded).monospacedDigit())
                     .foregroundStyle(
@@ -121,4 +122,3 @@ struct PrayerListRectangularView: View {
         }
     }
 }
-

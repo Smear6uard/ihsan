@@ -1,5 +1,6 @@
 import Foundation
 import IhsanCore
+import IhsanPrayerTimes
 
 /// The sheet's temporal truth rule: which timing choices can be TRUE
 /// at `now` for the prayer and civil day being logged.
@@ -29,16 +30,14 @@ enum TimingAvailability {
     static func allowedStatuses(
         now: Date,
         dayBeingLogged: Date,
-        scheduledTime: Date?,
-        windowEndTime: Date?,
+        windowState: PrayerWindowState?,
         currentStatus: PrayerStatus?,
         calendar: Calendar = .current
     ) -> Set<PrayerStatus> {
         var allowed = baseStatuses(
             now: now,
             dayBeingLogged: dayBeingLogged,
-            scheduledTime: scheduledTime,
-            windowEndTime: windowEndTime,
+            windowState: windowState,
             calendar: calendar
         )
         if let currentStatus {
@@ -50,8 +49,7 @@ enum TimingAvailability {
     private static func baseStatuses(
         now: Date,
         dayBeingLogged: Date,
-        scheduledTime: Date?,
-        windowEndTime: Date?,
+        windowState: PrayerWindowState?,
         calendar: Calendar
     ) -> Set<PrayerStatus> {
         let today = calendar.startOfDay(for: now)
@@ -68,15 +66,16 @@ enum TimingAvailability {
         // ledger surfaces (Path cells) open without a schedule and
         // fall through to the full set — repair is deliberate there,
         // and the Today surfaces remain the schedule's authority.
-        guard let scheduledTime, let windowEndTime else {
+        guard let windowState else {
             return [.onTime, .late, .qada, .missed]
         }
-        if now < scheduledTime {
+        switch windowState {
+        case .upcoming:
             return []
-        }
-        if now < windowEndTime {
+        case .current:
             return [.onTime]
+        case .closed:
+            return [.onTime, .late, .qada, .missed]
         }
-        return [.onTime, .late, .qada, .missed]
     }
 }

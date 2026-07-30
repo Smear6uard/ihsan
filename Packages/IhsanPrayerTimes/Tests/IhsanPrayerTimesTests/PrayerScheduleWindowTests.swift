@@ -3,7 +3,7 @@ import IhsanCore
 import Testing
 @testable import IhsanPrayerTimes
 
-/// Correctness contract for `PrayerScheduleWindow.moment(at:)`:
+/// Correctness contract for `PrayerStateResolver.resolve(...)`:
 ///
 /// - `next` is always the strictly-future nearest fardh, rolling into
 ///   tomorrow's Fajr after Isha.
@@ -12,13 +12,16 @@ import Testing
 ///   Maghrib [maghrib, isha), Isha [isha, next Fajr) — which before
 ///   dawn is *yesterday's* Isha. The only current-less span is the
 ///   forenoon gap [sunrise, dhuhr).
-/// - The countdown target (window end while current, next start
-///   otherwise) is strictly in the future at every instant, so a
-///   rendered countdown can never rest at zero.
+/// - `countdownTarget` is always the strictly-future next prayer start;
+///   current-window end is exposed separately for the active card.
 @Suite("PrayerScheduleWindow")
 struct PrayerScheduleWindowTests {
 
     private let provider = AdhanPrayerTimesProvider()
+
+    private func resolve(_ window: PrayerScheduleWindow, at date: Date) -> PrayerResolution {
+        PrayerStateResolver.resolve(prayerTimes: window.resolverSchedule, now: date)
+    }
 
     private func window(
         at date: Date,
@@ -50,47 +53,47 @@ struct PrayerScheduleWindowTests {
     @Test
     func atFajrExactlyFajrIsCurrent() throws {
         let w = try window(at: referenceNoon)
-        let m = w.moment(at: w.day.fajr.scheduledTime)
-        #expect(m.current?.prayer == .fajr)
+        let m = resolve(w, at: w.day.fajr.scheduledTime)
+        #expect(m.currentPrayer?.prayer == .fajr)
         #expect(m.currentWindowEnd == w.day.sunrise)
-        #expect(m.next.prayer == .dhuhr)
+        #expect(m.nextPrayer.prayer == .dhuhr)
     }
 
     @Test
     func atSunriseExactlyTheWindowHasAlreadyClosed() throws {
         let w = try window(at: referenceNoon)
-        let m = w.moment(at: w.day.sunrise)
-        #expect(m.current == nil)
+        let m = resolve(w, at: w.day.sunrise)
+        #expect(m.currentPrayer == nil)
         #expect(m.currentWindowEnd == nil)
-        #expect(m.next.prayer == .dhuhr)
+        #expect(m.nextPrayer.prayer == .dhuhr)
     }
 
     @Test
     func oneSecondBeforeSunriseFajrIsStillCurrent() throws {
         let w = try window(at: referenceNoon)
-        let m = w.moment(at: w.day.sunrise.addingTimeInterval(-1))
-        #expect(m.current?.prayer == .fajr)
+        let m = resolve(w, at: w.day.sunrise.addingTimeInterval(-1))
+        #expect(m.currentPrayer?.prayer == .fajr)
     }
 
     @Test
     func atIshaExactlyIshaIsCurrentAndNextRollsToTomorrowFajr() throws {
         let w = try window(at: referenceNoon)
-        let m = w.moment(at: w.day.isha.scheduledTime)
-        #expect(m.current?.prayer == .isha)
+        let m = resolve(w, at: w.day.isha.scheduledTime)
+        #expect(m.currentPrayer?.prayer == .isha)
         #expect(m.currentWindowEnd == w.tomorrowFajr.scheduledTime)
-        #expect(m.next.prayer == .fajr)
-        #expect(m.next.scheduledTime > w.day.isha.scheduledTime)
+        #expect(m.nextPrayer.prayer == .fajr)
+        #expect(m.nextPrayer.scheduledTime > w.day.isha.scheduledTime)
     }
 
     @Test
     func preDawnCurrentIsYesterdaysIsha() throws {
         let w = try window(at: referenceNoon)
         let preDawn = w.day.fajr.scheduledTime.addingTimeInterval(-3600)
-        let m = w.moment(at: preDawn)
-        #expect(m.current?.prayer == .isha)
-        #expect(m.current?.scheduledTime == w.yesterdayIsha.scheduledTime)
+        let m = resolve(w, at: preDawn)
+        #expect(m.currentPrayer?.prayer == .isha)
+        #expect(m.currentPrayer?.scheduledTime == w.yesterdayIsha.scheduledTime)
         #expect(m.currentWindowEnd == w.day.fajr.scheduledTime)
-        #expect(m.next.prayer == .fajr)
+        #expect(m.nextPrayer.prayer == .fajr)
     }
 
     @Test
@@ -99,10 +102,10 @@ struct PrayerScheduleWindowTests {
         let midAsr = w.day.asr.scheduledTime.addingTimeInterval(
             w.day.maghrib.scheduledTime.timeIntervalSince(w.day.asr.scheduledTime) / 2
         )
-        let m = w.moment(at: midAsr)
-        #expect(m.current?.prayer == .asr)
+        let m = resolve(w, at: midAsr)
+        #expect(m.currentPrayer?.prayer == .asr)
         #expect(m.currentWindowEnd == w.day.maghrib.scheduledTime)
-        #expect(m.next.prayer == .maghrib)
+        #expect(m.nextPrayer.prayer == .maghrib)
     }
 
     /// Item 3's core guarantee: at every instant — including exact
@@ -122,8 +125,8 @@ struct PrayerScheduleWindowTests {
             probes.append(time.addingTimeInterval(1))
         }
         for t in probes {
-            let m = w.moment(at: t)
-            let target = m.currentWindowEnd ?? m.next.scheduledTime
+            let m = resolve(w, at: t)
+            let target = m.currentWindowEnd ?? m.nextPrayer.scheduledTime
             #expect(target > t, "countdown target must be strictly future at \(t)")
         }
     }
@@ -131,7 +134,7 @@ struct PrayerScheduleWindowTests {
     // MARK: - Property test: 50 random times and locations
 
     @Test
-    func momentInvariantsHoldAcrossRandomTimesAndLocations() throws {
+    func resolutionInvariantsHoldAcrossRandomTimesAndLocations() throws {
         var rng = SplitMix64(state: 0x1FA9_2026)
         let timeZonePool = [
             "UTC", "America/New_York", "America/Los_Angeles", "Europe/London",
@@ -151,21 +154,21 @@ struct PrayerScheduleWindowTests {
             let w = try window(
                 at: t, latitude: latitude, longitude: longitude, timeZone: timeZone
             )
-            let m = w.moment(at: t)
+            let m = resolve(w, at: t)
             let context = "iteration \(iteration): lat \(latitude), lon \(longitude), \(timeZone.identifier), t \(t)"
 
             // next is strictly future and minimal among candidates.
-            #expect(m.next.scheduledTime > t, Comment(rawValue: context))
+            #expect(m.nextPrayer.scheduledTime > t, Comment(rawValue: context))
             let candidates = w.day.allFardh + [w.tomorrowFajr]
             let strictlyFuture = candidates
                 .filter { $0.scheduledTime > t }
                 .map(\.scheduledTime)
             if let earliest = strictlyFuture.min() {
-                #expect(m.next.scheduledTime == earliest, Comment(rawValue: context))
+                #expect(m.nextPrayer.scheduledTime == earliest, Comment(rawValue: context))
             }
 
             // current's window contains t; the gap is exactly [sunrise, dhuhr).
-            if let current = m.current {
+            if let current = m.currentPrayer {
                 let end = try #require(m.currentWindowEnd, Comment(rawValue: context))
                 #expect(current.scheduledTime <= t, Comment(rawValue: context))
                 #expect(t < end, Comment(rawValue: context))

@@ -79,7 +79,7 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
         madhab: MadhabChoice,
         highLatitudeRule: IhsanCore.HighLatitudeRule
     ) throws -> PrayerTime {
-        let today = try dayTimes(
+        let window = try scheduleWindow(
             for: referenceDate,
             coordinates: coordinates,
             timeZone: timeZone,
@@ -87,26 +87,10 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
             madhab: madhab,
             highLatitudeRule: highLatitudeRule
         )
-
-        for prayerTime in today.allFardh where referenceDate < prayerTime.scheduledTime {
-            return prayerTime
-        }
-
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: referenceDate) else {
-            throw PrayerTimesError.invalidDate("Could not advance to next day in \(timeZone.identifier).")
-        }
-
-        let tomorrowTimes = try dayTimes(
-            for: tomorrow,
-            coordinates: coordinates,
-            timeZone: timeZone,
-            calculationMethod: calculationMethod,
-            madhab: madhab,
-            highLatitudeRule: highLatitudeRule
-        )
-        return tomorrowTimes.fajr
+        return PrayerStateResolver.resolve(
+            prayerTimes: window.resolverSchedule,
+            now: referenceDate
+        ).nextPrayer
     }
 
     public func currentPrayer(
@@ -128,7 +112,10 @@ public struct AdhanPrayerTimesProvider: PrayerTimesProviding {
             madhab: madhab,
             highLatitudeRule: highLatitudeRule
         )
-        return window.moment(at: referenceDate).current
+        return PrayerStateResolver.resolve(
+            prayerTimes: window.resolverSchedule,
+            now: referenceDate
+        ).currentPrayer
     }
 
     public func dayTimesRange(

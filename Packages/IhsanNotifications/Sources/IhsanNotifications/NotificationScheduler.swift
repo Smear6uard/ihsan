@@ -137,6 +137,10 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
 }
 
 public actor NotificationScheduler {
+    /// Scheduling-only Live Activity window. This package has no
+    /// dependency on, and cannot affect, the prayer state resolver.
+    private static let liveActivityPreAdhanSchedulingLeadTime: TimeInterval = 60 * 60
+    private static let liveActivityPostAdhanSchedulingLifetime: TimeInterval = 30 * 60
     public static let shared = NotificationScheduler(
         prayerTimesProvider: AdhanPrayerTimesProvider(),
         locationProvider: CoreLocationCoordinator.shared,
@@ -235,14 +239,18 @@ public actor NotificationScheduler {
                 }
 
                 let notificationDate = prayerTime.scheduledTime.addingTimeInterval(TimeInterval(-preference.leadTimeSeconds))
-                let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(-3_600)
+                let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(
+                    -Self.liveActivityPreAdhanSchedulingLeadTime
+                )
                 if activityStartDate > referenceDate {
                     try await prayerActivityScheduler.schedulePrayerActivityStart(
                         for: prayerTime,
                         in: day,
                         startDate: activityStartDate
                     )
-                } else if prayerTime.scheduledTime.addingTimeInterval(30 * 60) > referenceDate {
+                } else if prayerTime.scheduledTime.addingTimeInterval(
+                    Self.liveActivityPostAdhanSchedulingLifetime
+                ) > referenceDate {
                     try await prayerActivityScheduler.schedulePrayerActivityStart(
                         for: prayerTime,
                         in: day,

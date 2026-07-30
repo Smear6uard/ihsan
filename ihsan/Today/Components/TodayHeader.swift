@@ -17,7 +17,7 @@ import SwiftUI
 ///
 ///   Small caps in brass with letter-spacing, separated by a brass
 ///   middle dot. The "NEXT" prayer comes from the same resolved
-///   `PrayerMoment` the plate markers and the focused card use, and
+///   `PrayerResolution` the plate markers and focused card use, and
 ///   its time goes through the same `PlateTimeFormat` as the marker
 ///   labels — one data source, one formatter, no disagreement.
 /// - **Moon-phase glyph** in the top-right corner. Shows the current
@@ -35,7 +35,7 @@ struct TodayHeader: View {
     /// The resolved prayer state at `now` — source of the "NEXT: …"
     /// inscription. Optional so non-ready states can render the
     /// header without prayer data.
-    let moment: PrayerMoment?
+    let resolution: PrayerResolution?
     /// Timezone of the place the times belong to.
     let timeZone: TimeZone
     /// Resolved v2 palette tokens for this moment — the same set the
@@ -155,9 +155,9 @@ struct TodayHeader: View {
     /// "NEXT: DHUHR 12:50 PM" — the moment's next prayer, formatted by
     /// the same `PlateTimeFormat` the plate's marker labels use.
     private var nextPrayerInscription: String? {
-        guard let moment else { return nil }
-        let time = PlateTimeFormat.time(moment.next.scheduledTime, in: timeZone).uppercased()
-        let name = moment.next.prayer.displayNameEnglish.uppercased()
+        guard let resolution else { return nil }
+        let time = PlateTimeFormat.time(resolution.nextPrayer.scheduledTime, in: timeZone).uppercased()
+        let name = resolution.nextPrayer.prayer.displayNameEnglish.uppercased()
         return "NEXT: \(name) \(time)"
     }
 
@@ -170,10 +170,10 @@ struct TodayHeader: View {
     private func accessibilityLabel(nextInscription: String?) -> String {
         let hijri = HijriDateFormatter.string(from: now)
         var parts = ["Location: \(cityName)", "Hijri date: \(hijri)"]
-        if let moment {
-            let time = PlateTimeFormat.time(moment.next.scheduledTime, in: timeZone)
+        if let resolution {
+            let time = PlateTimeFormat.time(resolution.nextPrayer.scheduledTime, in: timeZone)
             parts.append(
-                "Next prayer: \(moment.next.prayer.displayNameEnglish) at \(time)"
+                "Next prayer: \(resolution.nextPrayer.prayer.displayNameEnglish) at \(time)"
             )
         }
         _ = nextInscription

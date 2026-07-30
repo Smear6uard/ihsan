@@ -1,5 +1,6 @@
 import IhsanCore
 import IhsanDesignSystem
+import IhsanPrayerTimes
 import SwiftUI
 
 /// The focused-prayer card on the celestial Today screen — an
@@ -68,7 +69,9 @@ struct FocusedPrayerCard: View {
     /// inscription instead of ever reading a clock.
     let loggedAt: Date?
     let isJamaah: Bool
-    let isInWindow: Bool
+    /// The exact temporal state from the shared resolver. The card
+    /// performs no independent boundary comparisons.
+    let windowState: PrayerWindowState
 
     /// Sunnah-layer surfaces; all default off so the five-prayer card
     /// is untouched until the user opts in.
@@ -112,13 +115,12 @@ struct FocusedPrayerCard: View {
 
     private var phase: FocusedCardModel.Phase {
         FocusedCardModel.resolve(
-            scheduledTime: scheduledTime,
-            windowEndTime: windowEndTime,
-            isInWindow: isInWindow,
-            isLogged: isLogged,
-            now: now
+            windowState: windowState,
+            isLogged: isLogged
         )
     }
+
+    private var isInWindow: Bool { windowState.isCurrent }
 
     private var inscription: String {
         FocusedCardModel.inscription(

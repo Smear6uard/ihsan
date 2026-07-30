@@ -1,5 +1,6 @@
 import Foundation
 import IhsanCore
+import IhsanPrayerTimes
 import Testing
 @testable import ihsan
 
@@ -15,18 +16,16 @@ struct FocusedCardModelTests {
     @Test
     func upcomingUntilTheExactOpeningInstant() {
         let before = FocusedCardModel.resolve(
-            scheduledTime: scheduled, windowEndTime: windowEnd,
-            isInWindow: false, isLogged: false,
-            now: scheduled.addingTimeInterval(-1)
+            windowState: .upcoming(opensAt: scheduled),
+            isLogged: false
         )
         #expect(before == .upcoming(opensAt: scheduled))
 
         // At the opening instant the resolver upstream flips
         // isInWindow; the model then reports active — atomically.
         let at = FocusedCardModel.resolve(
-            scheduledTime: scheduled, windowEndTime: windowEnd,
-            isInWindow: true, isLogged: false,
-            now: scheduled
+            windowState: .current(startedAt: scheduled, endsAt: windowEnd),
+            isLogged: false
         )
         #expect(at == .active(until: windowEnd))
     }
@@ -34,18 +33,15 @@ struct FocusedCardModelTests {
     @Test
     func windowClosesAtTheExactEndInstant() {
         let justBefore = FocusedCardModel.resolve(
-            scheduledTime: scheduled, windowEndTime: windowEnd,
-            isInWindow: true, isLogged: false,
-            now: windowEnd.addingTimeInterval(-1)
+            windowState: .current(startedAt: scheduled, endsAt: windowEnd),
+            isLogged: false
         )
         #expect(justBefore == .active(until: windowEnd))
 
-        // Even if the caller's isInWindow is stale by one frame, the
-        // model refuses to stay active at or past the end.
+        // At the exact end, the shared resolver supplies `.closed`.
         let atEnd = FocusedCardModel.resolve(
-            scheduledTime: scheduled, windowEndTime: windowEnd,
-            isInWindow: true, isLogged: false,
-            now: windowEnd
+            windowState: .closed(startedAt: scheduled, endedAt: windowEnd),
+            isLogged: false
         )
         #expect(atEnd == .windowClosed(at: windowEnd))
     }
@@ -74,15 +70,10 @@ struct FocusedCardModelTests {
             )
             // now strictly before the start: from one second to a week.
             let now = start.addingTimeInterval(-1 - nextUnit() * 604_800)
-            let end: Date? = nextUnit() < 0.2
-                ? nil
-                : start.addingTimeInterval(-3600 + nextUnit() * 4 * 86_400)
+            _ = now
             let phase = FocusedCardModel.resolve(
-                scheduledTime: start,
-                windowEndTime: end,
-                isInWindow: nextUnit() < 0.5,
-                isLogged: false,
-                now: now
+                windowState: .upcoming(opensAt: start),
+                isLogged: false
             )
             #expect(phase == .upcoming(opensAt: start))
         }
@@ -116,12 +107,12 @@ struct FocusedCardModelTests {
             // before the end.
             let span = end.timeIntervalSince(start.addingTimeInterval(-604_800)) - 1
             let now = start.addingTimeInterval(-604_800 + nextUnit() * span)
+            let state: PrayerWindowState = now < start
+                ? .upcoming(opensAt: start)
+                : .current(startedAt: start, endsAt: end)
             let phase = FocusedCardModel.resolve(
-                scheduledTime: start,
-                windowEndTime: end,
-                isInWindow: nextUnit() < 0.5,
-                isLogged: false,
-                now: now
+                windowState: state,
+                isLogged: false
             )
             if case .windowClosed = phase {
                 Issue.record("windowClosed resolved at \(end.timeIntervalSince(now))s before the boundary")
@@ -139,9 +130,8 @@ struct FocusedCardModelTests {
     @Test
     func loggedWinsOverEverything() {
         let phase = FocusedCardModel.resolve(
-            scheduledTime: scheduled, windowEndTime: windowEnd,
-            isInWindow: true, isLogged: true,
-            now: scheduled.addingTimeInterval(60)
+            windowState: .current(startedAt: scheduled, endsAt: windowEnd),
+            isLogged: true
         )
         #expect(phase == .logged)
     }
@@ -259,8 +249,8 @@ struct FocusedCardModelTests {
         let fajr = sunrise.addingTimeInterval(-95 * 60)
         let now = sunrise.addingTimeInterval(10 * 60)
         let phase = FocusedCardModel.resolve(
-            scheduledTime: fajr, windowEndTime: sunrise,
-            isInWindow: false, isLogged: false, now: now
+            windowState: .closed(startedAt: fajr, endedAt: sunrise),
+            isLogged: false
         )
         #expect(phase == .windowClosed(at: sunrise))
         let text = FocusedCardModel.inscription(

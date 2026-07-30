@@ -18,6 +18,15 @@ import IhsanPrayerTimes
 /// of them."
 struct TodayView: View {
     let onPresentQibla: () -> Void
+    let nowProvider: NowProvider
+
+    init(
+        onPresentQibla: @escaping () -> Void,
+        nowProvider: NowProvider = .active
+    ) {
+        self.onPresentQibla = onPresentQibla
+        self.nowProvider = nowProvider
+    }
 
     @Environment(\.modelContext) private var modelContext
     @State private var viewModel: TodayViewModel?
@@ -33,7 +42,10 @@ struct TodayView: View {
         .containerBackground(IhsanColor.ground.gradient, for: .navigation)
         .task {
             if viewModel == nil {
-                viewModel = TodayViewModel(modelContext: modelContext)
+                viewModel = TodayViewModel(
+                    nowProvider: nowProvider,
+                    modelContext: modelContext
+                )
             }
             await viewModel?.bootstrap()
         }
@@ -108,13 +120,46 @@ struct TodayView: View {
     }
 
     private func readyView(_ snapshot: TodayState.Snapshot) -> some View {
+        TimelineView(.periodic(from: .distantPast, by: 1)) { context in
+            let now = nowProvider.resolve(context.date)
+            let schedule = snapshot.scheduleWindow.resolverSchedule
+            let resolution = PrayerStateResolver.resolve(
+                prayerTimes: schedule,
+                now: now
+            )
+            readyContent(snapshot, resolution: resolution, now: now)
+                .onAppear {
+                    PrayerResolverDiagnostics.emit(
+                        prayerTimes: schedule,
+                        now: now,
+                        resolution: resolution,
+                        surface: "watch.today"
+                    )
+                }
+                .onChange(of: resolution) { _, newResolution in
+                    PrayerResolverDiagnostics.emit(
+                        prayerTimes: schedule,
+                        now: now,
+                        resolution: newResolution,
+                        surface: "watch.today"
+                    )
+                }
+        }
+    }
+
+    private func readyContent(
+        _ snapshot: TodayState.Snapshot,
+        resolution: PrayerResolution,
+        now: Date
+    ) -> some View {
         ScrollView {
             VStack(spacing: 10) {
                 topBar(cityName: snapshot.place.cityName)
 
                 HeroCountdown(
-                    targetPrayer: snapshot.nextPrayer.prayer,
-                    targetTime: snapshot.nextPrayer.scheduledTime
+                    targetPrayer: resolution.nextPrayer.prayer,
+                    targetTime: resolution.countdownTarget,
+                    now: now
                 )
                 .ihsanGlassHero()
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
@@ -194,7 +239,7 @@ struct TodayView: View {
             f.dateFormat = "h:mm a"
             return f
         }()
-        let scheduled = snapshot.dayTimes.time(for: selectedPrayer)
+        let scheduled = snapshot.scheduleWindow.day.time(for: selectedPrayer)
         let status = snapshot.status(for: selectedPrayer)
 
         return VStack(spacing: 1) {
@@ -269,7 +314,7 @@ struct TodayView: View {
         let formatter = DateFormatter()
         formatter.dateStyle = .none
         formatter.timeStyle = .short
-        let scheduled = snapshot.dayTimes.time(for: selectedPrayer)
+        let scheduled = snapshot.scheduleWindow.day.time(for: selectedPrayer)
         let timeStr = formatter.string(from: scheduled)
         let prayerName = selectedPrayer.displayNameEnglish
         if let status = snapshot.status(for: selectedPrayer) {

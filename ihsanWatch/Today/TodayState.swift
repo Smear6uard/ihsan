@@ -11,8 +11,7 @@ enum TodayState {
 
     struct Snapshot {
         let place: LocatedPlace
-        let dayTimes: DayPrayerTimes
-        let nextPrayer: PrayerTime
+        let scheduleWindow: PrayerScheduleWindow
         /// Map from prayer to logged status, if a log exists for today.
         /// `nil` value means the prayer has not yet been logged.
         let statuses: [Prayer: PrayerStatus?]

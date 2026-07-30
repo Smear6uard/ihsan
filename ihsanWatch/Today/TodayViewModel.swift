@@ -13,6 +13,7 @@ final class TodayViewModel {
 
     private let locationProvider: LocationProviding
     private let prayerTimesProvider: PrayerTimesProviding
+    private let nowProvider: NowProvider
     private let modelContext: ModelContext
     private var settings: UserSettings?
 
@@ -22,10 +23,12 @@ final class TodayViewModel {
     init(
         locationProvider: LocationProviding = CoreLocationCoordinator.shared,
         prayerTimesProvider: PrayerTimesProviding = AdhanPrayerTimesProvider(),
+        nowProvider: NowProvider = .active,
         modelContext: ModelContext
     ) {
         self.locationProvider = locationProvider
         self.prayerTimesProvider = prayerTimesProvider
+        self.nowProvider = nowProvider
         self.modelContext = modelContext
     }
 
@@ -58,12 +61,12 @@ final class TodayViewModel {
         }
 
         let place = try await locationProvider.currentPlace()
-        let now = Date.now
+        let now = nowProvider.now()
         settings.lastResolvedCityName = place.cityName
         settings.lastResolvedCountryCode = place.countryCode
         settings.modifiedAt = now
 
-        let dayTimes = try prayerTimesProvider.dayTimes(
+        let scheduleWindow = try prayerTimesProvider.scheduleWindow(
             for: now,
             coordinates: place.coordinates,
             timeZone: place.timeZone,
@@ -71,23 +74,13 @@ final class TodayViewModel {
             madhab: settings.madhab,
             highLatitudeRule: settings.highLatitudeRule
         )
-        let nextPrayer = try prayerTimesProvider.nextPrayer(
-            from: now,
-            coordinates: place.coordinates,
-            timeZone: place.timeZone,
-            calculationMethod: settings.calculationMethod,
-            madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
-        )
-
-        let logs = try fetchTodaysLogs()
+        let logs = try fetchTodaysLogs(now: now, timeZone: place.timeZone)
         let statuses = Self.statusMap(from: logs)
         let jamaah = Self.jamaahMap(from: logs)
 
         state = .ready(.init(
             place: place,
-            dayTimes: dayTimes,
-            nextPrayer: nextPrayer,
+            scheduleWindow: scheduleWindow,
             statuses: statuses,
             jamaah: jamaah
         ))
@@ -95,26 +88,26 @@ final class TodayViewModel {
         // Refresh the App-Group prayer-times cache every time we
         // recompute. Complications read from this rather than spinning
         // up CoreLocation on a tight 30s timeline-provider budget.
-        let nextDayFajr = try? prayerTimesProvider.dayTimes(
-            for: Calendar.current.date(byAdding: .day, value: 1, to: now) ?? now,
-            coordinates: place.coordinates,
-            timeZone: place.timeZone,
-            calculationMethod: settings.calculationMethod,
-            madhab: settings.madhab,
-            highLatitudeRule: settings.highLatitudeRule
-        ).fajr.scheduledTime
-
+        var placeCalendar = Calendar(identifier: .gregorian)
+        placeCalendar.timeZone = place.timeZone
         let cache = PrayerTimesCache(
-            date: Calendar.current.startOfDay(for: now),
+            date: placeCalendar.startOfDay(for: now),
             timeZoneIdentifier: place.timeZone.identifier,
             cityName: place.cityName,
-            entries: dayTimes.allFardh.map {
+            qiblaBearingDegrees: QiblaEngine(
+                latitude: place.coordinates.latitude,
+                longitude: place.coordinates.longitude
+            ).qiblaBearing,
+            entries: scheduleWindow.day.allFardh.map {
                 PrayerTimesCache.Entry(
                     prayerRaw: $0.prayer.rawValue,
                     scheduledTime: $0.scheduledTime
                 )
             },
-            nextDayFajr: nextDayFajr
+            previousDayIsha: scheduleWindow.yesterdayIsha.scheduledTime,
+            sunrise: scheduleWindow.day.sunrise,
+            nextDayFajr: scheduleWindow.tomorrowFajr.scheduledTime,
+            writtenAt: now
         )
         PrayerTimesCacheStore.write(cache)
 
@@ -147,10 +140,15 @@ final class TodayViewModel {
         }
     }
 
-    private func fetchTodaysLogs() throws -> [PrayerLog] {
-        let startOfDay = Calendar.current.startOfDay(for: .now)
+    private func fetchTodaysLogs(now: Date, timeZone: TimeZone) throws -> [PrayerLog] {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let startOfDay = calendar.startOfDay(for: now)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
         let descriptor = FetchDescriptor<PrayerLog>(
-            predicate: #Predicate { $0.prayerDate == startOfDay }
+            predicate: #Predicate {
+                $0.prayerDate >= startOfDay && $0.prayerDate < endOfDay
+            }
         )
         return try modelContext.fetch(descriptor)
     }

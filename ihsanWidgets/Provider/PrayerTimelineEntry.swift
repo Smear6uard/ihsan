@@ -19,6 +19,9 @@ struct PrayerTimelineEntry: TimelineEntry, Codable, Sendable, Equatable {
     /// when `date` falls after today's Isha.
     let nextPrayer: Prayer
     let nextPrayerScheduledTime: Date
+    /// Current prayer from `PrayerStateResolver`, never reconstructed
+    /// from the widget entry's date.
+    let currentPrayer: Prayer?
 
     /// Today's five prayer scheduled times in chronological order. Used
     /// by the medium/large widgets to render the day's strip even for
@@ -31,6 +34,7 @@ struct PrayerTimelineEntry: TimelineEntry, Codable, Sendable, Equatable {
     let loggedStatusByPrayerRaw: [String: String]
 
     let cityName: String
+    let timeZoneIdentifier: String
     let qiblaBearingDegrees: Double?
 
     /// `true` when location is unavailable (App Group cache empty). The
@@ -54,14 +58,18 @@ struct PrayerTimelineEntry: TimelineEntry, Codable, Sendable, Equatable {
     /// Convenience: which prayer (if any) is currently "active" (we are
     /// past its scheduled time but before the next one).
     var activePrayer: Prayer? {
-        todayPrayerTimes
-            .filter { $0.scheduledTime <= date }
-            .last?
-            .prayer
+        currentPrayer
     }
 
     var secondsUntilNextPrayer: TimeInterval {
         max(0, nextPrayerScheduledTime.timeIntervalSince(date))
+    }
+
+    func clockTime(_ date: Date) -> String {
+        WidgetCountdown.clockTime(
+            date,
+            timeZone: TimeZone(identifier: timeZoneIdentifier)
+        )
     }
 
     /// Number of prayers logged today with a non-missed status.
@@ -96,22 +104,39 @@ extension PrayerTimelineEntry {
                 scheduledTime: startOfDay.addingTimeInterval(TimeInterval(offset))
             )
         }
-        let next: PrayerSlot = slots.first(where: { $0.scheduledTime > date })
-            ?? PrayerSlot(
-                prayer: .fajr,
-                scheduledTime: calendar.date(byAdding: .day, value: 1, to: slots[0].scheduledTime) ?? slots[0].scheduledTime
-            )
+        let tomorrowFajr = PrayerTime(
+            prayer: .fajr,
+            scheduledTime: calendar.date(byAdding: .day, value: 1, to: slots[0].scheduledTime)
+                ?? slots[0].scheduledTime.addingTimeInterval(86_400)
+        )
+        let schedule = PrayerStateSchedule(
+            yesterdayIsha: PrayerTime(
+                prayer: .isha,
+                scheduledTime: slots[4].scheduledTime.addingTimeInterval(-86_400)
+            ),
+            fajr: PrayerTime(prayer: .fajr, scheduledTime: slots[0].scheduledTime),
+            sunrise: startOfDay.addingTimeInterval(6 * 3600 + 45 * 60),
+            dhuhr: PrayerTime(prayer: .dhuhr, scheduledTime: slots[1].scheduledTime),
+            asr: PrayerTime(prayer: .asr, scheduledTime: slots[2].scheduledTime),
+            maghrib: PrayerTime(prayer: .maghrib, scheduledTime: slots[3].scheduledTime),
+            isha: PrayerTime(prayer: .isha, scheduledTime: slots[4].scheduledTime),
+            tomorrowFajr: tomorrowFajr,
+            timeZoneIdentifier: TimeZone.current.identifier
+        )
+        let resolution = PrayerStateResolver.resolve(prayerTimes: schedule, now: date)
 
         return PrayerTimelineEntry(
             date: date,
-            nextPrayer: next.prayer,
-            nextPrayerScheduledTime: next.scheduledTime,
+            nextPrayer: resolution.nextPrayer.prayer,
+            nextPrayerScheduledTime: resolution.countdownTarget,
+            currentPrayer: resolution.currentPrayer?.prayer,
             todayPrayerTimes: slots,
             loggedStatusByPrayerRaw: [
                 Prayer.fajr.rawValue: PrayerStatus.onTime.rawValue,
                 Prayer.dhuhr.rawValue: PrayerStatus.onTime.rawValue
             ],
             cityName: "Your City",
+            timeZoneIdentifier: TimeZone.current.identifier,
             qiblaBearingDegrees: 58,
             isLocationMissing: false
         )

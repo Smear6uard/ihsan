@@ -1,4 +1,5 @@
 import Foundation
+import IhsanCore
 import WidgetKit
 
 /// Drives all six widget families.
@@ -45,10 +46,17 @@ struct PrayerTimelineProvider: TimelineProvider {
         Task { @MainActor in
             let loader = WidgetSnapshotLoader()
             let entries = loader.entries(starting: .now)
-            // `.atEnd` reloads when the system surfaces the final entry;
-            // that entry's date is tomorrow's Fajr, so the new timeline
-            // build picks up tomorrow's prayer times automatically.
-            let policy: TimelineReloadPolicy = .atEnd
+            // The cached table expires at tomorrow Fajr. The final
+            // rendered entry is Isha; request a fresh host-published
+            // table at the exact next-day boundary instead of deriving
+            // tomorrow with a second calculation path.
+            let policy: TimelineReloadPolicy
+            if let reload = PrayerTimesCacheStore.read()?.nextDayFajr,
+               reload > Date.now {
+                policy = .after(reload)
+            } else {
+                policy = .after(Date.now.addingTimeInterval(3_600))
+            }
             completion(Timeline(entries: entries, policy: policy))
         }
     }

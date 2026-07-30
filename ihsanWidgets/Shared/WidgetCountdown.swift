@@ -38,12 +38,13 @@ enum WidgetCountdown {
         return "in \(compact(secondsUntil: secondsUntil))"
     }
 
-    /// Wall-clock "4:32 PM" formatter. Caller passes the prayer time;
-    /// we format in the device's current locale and time zone.
-    static func clockTime(_ date: Date) -> String {
+    /// Wall-clock "4:32 PM" formatter. Caller passes the prayer time
+    /// and, for real entries, the timezone of the calculated place.
+    static func clockTime(_ date: Date, timeZone: TimeZone? = nil) -> String {
         let formatter = DateFormatter()
         formatter.timeStyle = .short
         formatter.dateStyle = .none
+        formatter.timeZone = timeZone
         return formatter.string(from: date)
     }
 }

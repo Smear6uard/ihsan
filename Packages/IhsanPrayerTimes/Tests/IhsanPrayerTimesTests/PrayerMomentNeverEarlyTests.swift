@@ -6,13 +6,13 @@ import Testing
 /// Corrective G, phase 1: the never-early property.
 ///
 /// For any instant t earlier than a prayer's start, that prayer is
-/// never `current` — equivalently, whenever `moment(at:)` reports a
+/// never `current` — equivalently, whenever the resolver reports a
 /// current prayer, the instant lies inside `[start, end)` of that
 /// prayer's window, and `next` is strictly future. Checked across 50
 /// deterministic pseudo-random locations and dates, sweeping each
 /// schedule window's full valid span — including the post-Maghrib
 /// pre-Isha stretch and the post-Isha rollover into tomorrow's Fajr.
-@Suite("PrayerMoment never enters a prayer early")
+@Suite("Prayer resolution never enters a prayer early")
 struct PrayerMomentNeverEarlyTests {
 
     /// SplitMix64 — deterministic cases; a failure reproduces exactly.
@@ -110,9 +110,12 @@ struct PrayerMomentNeverEarlyTests {
             }
 
             for probe in probes where probe < spanEnd {
-                let moment = window.moment(at: probe)
+                let resolution = PrayerStateResolver.resolve(
+                    prayerTimes: window.resolverSchedule,
+                    now: probe
+                )
 
-                if let current = moment.current {
+                if let current = resolution.currentPrayer {
                     // Never early: a current prayer's start is never
                     // in the future.
                     #expect(
@@ -120,7 +123,7 @@ struct PrayerMomentNeverEarlyTests {
                         "\(current.prayer) reported current \(current.scheduledTime.timeIntervalSince(probe))s before its start at \(probe) (\(testCase.coordinates))"
                     )
                     // And its window still contains the instant.
-                    if let end = moment.currentWindowEnd {
+                    if let end = resolution.currentWindowEnd {
                         #expect(probe < end)
                     } else {
                         Issue.record("current without a window end at \(probe)")
@@ -128,7 +131,7 @@ struct PrayerMomentNeverEarlyTests {
                 }
 
                 // The next prayer is strictly future.
-                #expect(moment.next.scheduledTime > probe)
+                #expect(resolution.nextPrayer.scheduledTime > probe)
             }
         }
     }

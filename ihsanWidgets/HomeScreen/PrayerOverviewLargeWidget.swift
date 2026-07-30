@@ -109,7 +109,7 @@ struct PrayerOverviewLargeWidgetView: View {
                         .foregroundStyle(IhsanColor.textMuted)
                 }
 
-                Text(WidgetCountdown.clockTime(slot.scheduledTime))
+                Text(entry.clockTime(slot.scheduledTime))
                     .font(IhsanFont.tabular)
                     .foregroundStyle(isActive ? IhsanColor.textSecondary : IhsanColor.textMuted)
                     .frame(minWidth: 60, alignment: .trailing)
@@ -118,7 +118,7 @@ struct PrayerOverviewLargeWidgetView: View {
             .padding(.vertical, IhsanSpacing.xxs)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Log \(slot.prayer.displayNameEnglish) on time, scheduled \(WidgetCountdown.clockTime(slot.scheduledTime))")
+        .accessibilityLabel("Log \(slot.prayer.displayNameEnglish) on time, scheduled \(entry.clockTime(slot.scheduledTime))")
     }
 
     private func statusChip(_ status: PrayerStatus) -> some View {

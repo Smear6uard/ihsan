@@ -306,8 +306,7 @@ struct TrajectoryScreen: View {
             availableStatuses: TimingAvailability.allowedStatuses(
                 now: now,
                 dayBeingLogged: selection.day,
-                scheduledTime: nil,
-                windowEndTime: nil,
+                windowState: nil,
                 currentStatus: selection.currentStatus
             ),
             displayDate: selection.day,

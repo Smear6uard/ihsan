@@ -2,6 +2,7 @@ import Foundation
 import SwiftData
 import WidgetKit
 import IhsanCore
+import IhsanPrayerTimes
 
 /// Single shared timeline provider that all three complications
 /// consume. Each entry carries enough context to render any of the
@@ -24,9 +25,11 @@ struct ComplicationEntry: TimelineEntry {
     let date: Date
     let nextPrayer: Prayer?
     let nextPrayerTime: Date?
+    let currentPrayer: Prayer?
     let dayPrayerTimes: [Prayer: Date]
     let loggedStatuses: [Prayer: PrayerStatus]
     let cityName: String?
+    let timeZoneIdentifier: String
     let isStale: Bool
 }
 
@@ -35,6 +38,7 @@ extension ComplicationEntry {
         date: .now,
         nextPrayer: .dhuhr,
         nextPrayerTime: .now.addingTimeInterval(3_600),
+        currentPrayer: nil,
         dayPrayerTimes: [
             .fajr: .now.addingTimeInterval(-21_600),
             .dhuhr: .now.addingTimeInterval(3_600),
@@ -44,6 +48,7 @@ extension ComplicationEntry {
         ],
         loggedStatuses: [.fajr: .onTime],
         cityName: nil,
+        timeZoneIdentifier: TimeZone.current.identifier,
         isStale: false
     )
 
@@ -51,9 +56,11 @@ extension ComplicationEntry {
         date: .now,
         nextPrayer: nil,
         nextPrayerTime: nil,
+        currentPrayer: nil,
         dayPrayerTimes: [:],
         loggedStatuses: [:],
         cityName: nil,
+        timeZoneIdentifier: TimeZone.current.identifier,
         isStale: true
     )
 }
@@ -71,7 +78,10 @@ struct ComplicationProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<Entry>) -> Void) {
         let now = Date.now
-        guard let cache = PrayerTimesCacheStore.read() else {
+        guard
+            let cache = PrayerTimesCacheStore.read(),
+            let schedule = cache.resolverSchedule
+        else {
             // No cache: one placeholder entry, ask system to retry in
             // an hour. The host app will populate the cache when next
             // opened, at which point we'll be reloaded explicitly.
@@ -80,15 +90,15 @@ struct ComplicationProvider: TimelineProvider {
             return
         }
 
-        let logs = (try? readTodaysLogs()) ?? [:]
+        let logs = (try? readTodaysLogs(at: now, timeZoneIdentifier: cache.timeZoneIdentifier)) ?? [:]
 
         var transitions: [Date] = [now]
-        for entry in cache.entries where entry.scheduledTime > now {
-            transitions.append(entry.scheduledTime)
-        }
-        if let nextDayFajr = cache.nextDayFajr, nextDayFajr > now {
-            transitions.append(nextDayFajr)
-        }
+        let boundaries = [
+            schedule.fajr.scheduledTime, schedule.sunrise,
+            schedule.dhuhr.scheduledTime, schedule.asr.scheduledTime,
+            schedule.maghrib.scheduledTime, schedule.isha.scheduledTime
+        ]
+        transitions.append(contentsOf: boundaries.filter { $0 > now })
         // Dedup + sort defensively.
         let sortedTransitions = Array(Set(transitions)).sorted()
 
@@ -96,6 +106,7 @@ struct ComplicationProvider: TimelineProvider {
             buildEntry(
                 at: transition,
                 cache: cache,
+                schedule: schedule,
                 logs: logs
             )
         }
@@ -103,7 +114,9 @@ struct ComplicationProvider: TimelineProvider {
         // Refresh policy: re-ask for a timeline an hour after the
         // last entry. If the user opens the watch app in the meantime,
         // an explicit reload pre-empts this.
-        let nextRefresh = sortedTransitions.last?.addingTimeInterval(3_600) ?? now.addingTimeInterval(3_600)
+        let nextRefresh = schedule.tomorrowFajr.scheduledTime > now
+            ? schedule.tomorrowFajr.scheduledTime
+            : now.addingTimeInterval(3_600)
         completion(Timeline(entries: entries, policy: .after(nextRefresh)))
     }
 
@@ -111,13 +124,15 @@ struct ComplicationProvider: TimelineProvider {
 
     private func buildEntry(at date: Date) -> ComplicationEntry? {
         guard let cache = PrayerTimesCacheStore.read() else { return nil }
-        let logs = (try? readTodaysLogs()) ?? [:]
-        return buildEntry(at: date, cache: cache, logs: logs)
+        guard let schedule = cache.resolverSchedule else { return nil }
+        let logs = (try? readTodaysLogs(at: date, timeZoneIdentifier: cache.timeZoneIdentifier)) ?? [:]
+        return buildEntry(at: date, cache: cache, schedule: schedule, logs: logs)
     }
 
     private func buildEntry(
         at date: Date,
         cache: PrayerTimesCache,
+        schedule: PrayerStateSchedule,
         logs: [Prayer: PrayerStatus]
     ) -> ComplicationEntry {
         var times: [Prayer: Date] = [:]
@@ -127,49 +142,58 @@ struct ComplicationProvider: TimelineProvider {
             }
         }
 
-        // Find the next prayer relative to `date`. Prefer today's
-        // remaining schedule; if all are past, fall back to tomorrow's
-        // Fajr from the cache.
-        let upcoming = cache.entries
-            .compactMap { entry -> (Prayer, Date)? in
-                guard let p = Prayer(rawValue: entry.prayerRaw) else { return nil }
-                return (p, entry.scheduledTime)
-            }
-            .first(where: { $0.1 > date })
-
-        let nextPair: (Prayer, Date)? = upcoming
-            ?? cache.nextDayFajr.map { (Prayer.fajr, $0) }
+        let resolution = PrayerStateResolver.resolve(
+            prayerTimes: schedule,
+            now: date
+        )
+        PrayerResolverDiagnostics.emit(
+            prayerTimes: schedule,
+            now: date,
+            resolution: resolution,
+            surface: "watch.complication"
+        )
 
         // Cache validity: if the cache's `date` (start-of-day) is
         // more than one day before today, mark stale so views can
         // hint the user to reopen the app.
-        let cacheDay = Calendar.current.startOfDay(for: cache.date)
-        let today = Calendar.current.startOfDay(for: date)
-        let isStale = cacheDay.distance(to: today) > 86_400
+        let isStale = resolution.isScheduleExhausted
+        let displayedCurrent = resolution.currentPrayer.flatMap {
+            schedule.dayPrayerTimes.contains($0) ? $0.prayer : nil
+        }
 
         return ComplicationEntry(
             date: date,
-            nextPrayer: nextPair?.0,
-            nextPrayerTime: nextPair?.1,
+            nextPrayer: resolution.nextPrayer.prayer,
+            nextPrayerTime: resolution.countdownTarget,
+            currentPrayer: displayedCurrent,
             dayPrayerTimes: times,
             loggedStatuses: logs,
             cityName: cache.cityName,
+            timeZoneIdentifier: cache.timeZoneIdentifier,
             isStale: isStale
         )
     }
 
     // MARK: - SwiftData
 
-    private func readTodaysLogs() throws -> [Prayer: PrayerStatus] {
+    private func readTodaysLogs(
+        at date: Date,
+        timeZoneIdentifier: String
+    ) throws -> [Prayer: PrayerStatus] {
         // Spin up the same App-Group + CloudKit container the host
         // app uses. Widget extensions can open SwiftData containers;
         // the cost is real but bounded, and prayer log volume is
         // tiny (single-digit rows per day).
         let container = try IhsanModelContainerFactory.makeContainer(inMemory: false)
         let context = ModelContext(container)
-        let startOfDay = Calendar.current.startOfDay(for: .now)
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? .current
+        let startOfDay = calendar.startOfDay(for: date)
+        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
         let descriptor = FetchDescriptor<PrayerLog>(
-            predicate: #Predicate { $0.prayerDate == startOfDay }
+            predicate: #Predicate {
+                $0.prayerDate >= startOfDay && $0.prayerDate < endOfDay
+            }
         )
         let logs = try context.fetch(descriptor)
         var map: [Prayer: PrayerStatus] = [:]

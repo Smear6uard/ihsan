@@ -96,7 +96,6 @@ final class TodayViewModel {
 
         state = .ready(.init(
             place: place,
-            dayTimes: scheduleWindow.day,
             scheduleWindow: scheduleWindow,
             ramadanContext: RamadanContext(
                 at: now,
@@ -104,6 +103,31 @@ final class TodayViewModel {
                 offsetDays: settings.hijriCalendarOffsetDays
             ),
             night: relevantNight(now: now, place: place, settings: settings)
+        ))
+
+        // Publish the exact resolver table for widgets/watch
+        // complications. Extensions never recalculate with a second
+        // timezone or settings path, and coordinates remain transient.
+        var placeCalendar = Calendar(identifier: .gregorian)
+        placeCalendar.timeZone = place.timeZone
+        PrayerTimesCacheStore.write(PrayerTimesCache(
+            date: placeCalendar.startOfDay(for: now),
+            timeZoneIdentifier: place.timeZone.identifier,
+            cityName: place.cityName,
+            qiblaBearingDegrees: QiblaEngine(
+                latitude: place.coordinates.latitude,
+                longitude: place.coordinates.longitude
+            ).qiblaBearing,
+            entries: scheduleWindow.day.allFardh.map {
+                PrayerTimesCache.Entry(
+                    prayerRaw: $0.prayer.rawValue,
+                    scheduledTime: $0.scheduledTime
+                )
+            },
+            previousDayIsha: scheduleWindow.yesterdayIsha.scheduledTime,
+            sunrise: scheduleWindow.day.sunrise,
+            nextDayFajr: scheduleWindow.tomorrowFajr.scheduledTime,
+            writtenAt: now
         ))
 
         // Secondary pages ride the same solar transition as the plate:
