@@ -73,12 +73,18 @@ internal struct PrayerLogService: Sendable {
                 throw IntentError.prayerTimesCalculationFailed(underlying: String(describing: error))
             }
         } else {
-            // MARK: TODO
-            // v1 placeholder: the application-layer coordinator that owns
-            // CoreLocation should pass coordinates so this can save real
-            // scheduled prayer times before shipping. Retroactive
-            // entries stamp the day itself — coordinates for a past
-            // day are gone by design (transient, never stored).
+            // No coordinates, so no schedule: the entry stamps the
+            // civil day itself.
+            //
+            // This is the privacy invariant showing through rather than
+            // a gap to close. `LocatedPlace.coordinates` exists only in
+            // memory and is never written down, so where someone was
+            // last Tuesday is not recoverable — by this app or by
+            // anyone who takes the device. A retroactive log therefore
+            // records the day it belongs to and nothing finer, and
+            // `lateBySeconds` below stays nil for it, because a
+            // lateness measured against a start time we do not know
+            // would be a fabricated number.
             scheduledTime = explicitPrayerDate.map { Calendar.current.startOfDay(for: $0) } ?? now
         }
 

@@ -47,15 +47,13 @@ struct RootTabView: View {
 
     /// The tasbīḥ instrument rides over whichever tab is up — entered
     /// from the logged card's quiet link or the Siri/Shortcut intent.
-    @State private var isDhikrPresented = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugPresentDhikr")
+    @State private var isDhikrPresented = DebugLaunch.flag("-IhsanDebugPresentDhikr")
 
     #if DEBUG
     /// `-IhsanDebugWidgetGallery` — the widget faces at their real
     /// sizes, so the phase gate has a picture of a surface no test
     /// harness can place on a home screen.
-    @State private var isWidgetGalleryPresented = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugWidgetGallery")
+    @State private var isWidgetGalleryPresented = DebugLaunch.flag("-IhsanDebugWidgetGallery")
     #endif
 
     var body: some View {
@@ -68,7 +66,7 @@ struct RootTabView: View {
                 Label { Text("Today") } icon: { Image(uiImage: TabGlyphs.today) }
             }
             SwiftUI.Tab(value: AppTab.trajectory) {
-                TrajectoryScreen()
+                TrajectoryScreen(onOpenSunnahSettings: { selectedTab = .settings })
             } label: {
                 Label { Text("Path") } icon: { Image(uiImage: TabGlyphs.path) }
             }

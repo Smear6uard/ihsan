@@ -2185,6 +2185,12 @@ private struct ThemePicker: View {
 }
 
 private struct PickerScaffold<Content: View>: View {
+    /// The floating tab bar's height plus the home indicator, with
+    /// room to breathe. A subscreen inside a tab has to clear it
+    /// itself: the bar floats over the scroll view rather than
+    /// insetting it.
+    static var tabBarClearance: CGFloat { 96 }
+
     let title: String
     let content: Content
 
@@ -2200,11 +2206,17 @@ private struct PickerScaffold<Content: View>: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
                     content
-                    Color.clear.frame(height: IhsanSpacing.xl)
+                    // Clearance for the floating tab bar. Without it a
+                    // method row sits half-behind the bar at the foot
+                    // of the list, which reads as a rendering fault
+                    // rather than as a list continuing. The soft edge
+                    // effect handles the top.
+                    Color.clear.frame(height: Self.tabBarClearance)
                 }
                 .padding(.horizontal, IhsanSpacing.md)
                 .padding(.top, IhsanSpacing.md)
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
         }
         .navigationTitle(title)
         .navigationBarTitleDisplayMode(.inline)

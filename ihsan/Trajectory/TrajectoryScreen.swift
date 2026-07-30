@@ -35,6 +35,22 @@ struct TrajectoryScreen: View {
 
     @Query private var settingsRows: [UserSettings]
 
+    /// Whether the sunnah invitation has been answered. Presentation
+    /// state, like the other one-time cards — never worship data.
+    @AppStorage("IhsanSunnahCardDismissed")
+    private var sunnahInviteDismissed: Bool = false
+
+    /// How many distinct civil days carry a log. The invitation is for
+    /// someone with a habit here, not for someone on their third day.
+    private var distinctLoggedDayCount: Int {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = .current
+        return Set(logs.map { calendar.startOfDay(for: $0.prayerDate) }).count
+    }
+
+    /// Hands the person to Set when they say yes.
+    var onOpenSunnahSettings: (() -> Void)?
+
     @Query(sort: \NaflLog.naflDate, order: .reverse)
     private var naflLogs: [NaflLog]
     @Query(sort: \DhikrSession.sessionDate)
@@ -43,8 +59,7 @@ struct TrajectoryScreen: View {
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
-    @State private var showingRepairDetail = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugPresentRepair")
+    @State private var showingRepairDetail = DebugLaunch.flag("-IhsanDebugPresentRepair")
     /// A grid cell awaiting the retroactive log sheet.
     @State private var retroSelection: RetroLogSelection?
 
@@ -91,6 +106,27 @@ struct TrajectoryScreen: View {
                             settings.qadaPathCardDismissed = true
                             settings.modifiedAt = .now
                         }
+                    )
+                    .padding(.horizontal, IhsanSpacing.md)
+                }
+
+                // The sunnah layer is invisible until turned on, which
+                // is right and also means nobody finds it. This is the
+                // one time the app mentions it — after a fortnight, and
+                // never again after either answer.
+                if let settings, SunnahInvite.shouldOffer(
+                    distinctLoggedDays: DebugLaunch.flag("-IhsanDebugSunnahInvite")
+                        ? SunnahInvite.requiredDays
+                        : distinctLoggedDayCount,
+                    sunnahLayerEnabled: settings.sunnahLayerEnabled,
+                    hasBeenDismissed: sunnahInviteDismissed
+                ) {
+                    SunnahInviteCard(
+                        onShow: {
+                            sunnahInviteDismissed = true
+                            onOpenSunnahSettings?()
+                        },
+                        onDismiss: { sunnahInviteDismissed = true }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                 }

@@ -58,6 +58,7 @@ struct YesterdaySheet: View {
                 }
                 .padding(IhsanSpacing.md)
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .ihsanManuscriptPage()
             .navigationBarTitleDisplayMode(.inline)

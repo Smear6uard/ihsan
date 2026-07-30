@@ -598,3 +598,34 @@ UI cycle); these need eyes and hands on hardware:
   published real solar events (IhsanPageChrome.publish) with the
   clock anchors only as the cold-launch fallback; the earlier
   tens-of-minutes disagreement near maghrib no longer exists.
+
+## Ship pass — device verification
+
+Items the simulator cannot settle. Each was left as found and needs a
+device to judge.
+
+- **Scroll edge under the floating tab bar.** Secondary pages now carry
+  `.scrollEdgeEffectStyle(.soft, for: .all)` and 96 pt of bottom
+  clearance, which is the system treatment. In the simulator a row at
+  the foot of a long list still reads through the bar's material more
+  than it should; the simulator renders `.glassEffect` materials
+  differently from hardware, so this needs a device before deciding
+  whether anything further is warranted.
+- **The settle haptic's physical character.** `Haptics.settle()` is one
+  soft impact at 0.85 intensity, chosen for a weight coming to rest
+  rather than a click. The simulator has no Taptic Engine; the feel
+  across all seven commit sites (prayer, fast, nafl, dhikr boundary,
+  qibla alignment, reflection save, yesterday's sheet) needs a hand.
+- **StandBy on hardware.** The nightstand face is measured against a
+  red-only worst case in `ShipPassContrastTests` and holds AA, but
+  Night Mode's actual tint and the display's low-brightness behaviour
+  are not reproducible in a simulator.
+- **Entrance choreography at 60 fps.** The draw loop is inside its 4 ms
+  CPU budget per `RenderPerformanceTests`, and the choreography's order
+  and timings are pinned by `EntranceChoreographyTests`. Whether the
+  0.9 s sequence *feels* right, and holds 60 fps on the oldest
+  supported device, is a device judgement.
+- **VoiceOver pronunciation.** The walk asserts every interactive
+  element has a label and that markers voice prayer, time, and state.
+  How the speech synthesiser says "Qadā", "jamāʿah", and "takbīrāt" —
+  and the Arabic prayer names — needs listening to.

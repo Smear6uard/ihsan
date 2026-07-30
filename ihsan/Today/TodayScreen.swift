@@ -185,20 +185,24 @@ private struct TodayReadyView: View {
 
     @State private var focusedPrayer: Prayer?
     @State private var sheetSelection: LogSheetSelection? = {
-        // `-IhsanDebugPresentLogSheet <prayer>` — simulator screenshot
-        // harness; mirrors -IhsanDebugPresentQibla.
+        // `-IhsanDebugPresentLogSheet <prayer>` — the screenshot
+        // harness. Every debug affordance compiles out of release; a
+        // shipped binary must not read launch arguments an attacker
+        // or a curious user could set.
+        #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-IhsanDebugPresentLogSheet"),
               index + 1 < arguments.count,
               let prayer = Prayer(rawValue: arguments[index + 1])
         else { return nil }
         return LogSheetSelection(prayer: prayer)
+        #else
+        return nil
+        #endif
     }()
     @State private var revertFocusTask: Task<Void, Never>?
-    @State private var isCelestialReferencePresented = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugPresentQibla")
-    @State private var isHijriSheetPresented = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugPresentHijriSheet")
+    @State private var isCelestialReferencePresented = DebugLaunch.flag("-IhsanDebugPresentQibla")
+    @State private var isHijriSheetPresented = DebugLaunch.flag("-IhsanDebugPresentHijriSheet")
     /// Civil-day key ("2026-07-30") of the day the user dismissed the
     /// significant-day line — presentation state, not worship data.
     @AppStorage("IhsanSignificantDayDismissedDay")
@@ -207,8 +211,7 @@ private struct TodayReadyView: View {
     /// Presentation state, like the line above it — never worship data.
     @AppStorage("IhsanYesterdayOfferDismissedDay")
     private var yesterdayOfferDismissedDay: String = ""
-    @State private var isYesterdaySheetPresented = ProcessInfo.processInfo
-        .arguments.contains("-IhsanDebugPresentYesterday")
+    @State private var isYesterdaySheetPresented = DebugLaunch.flag("-IhsanDebugPresentYesterday")
     /// Entrance choreography target — 0 until the first frame has a
     /// chance to render at rest-zero, then 1; the scene's layers
     /// animate toward it on their staggered clocks. Replays after a

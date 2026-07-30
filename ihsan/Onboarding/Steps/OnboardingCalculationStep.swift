@@ -66,6 +66,7 @@ struct OnboardingCalculationStep: View {
                 .padding(.horizontal, IhsanSpacing.md)
                 .padding(.top, IhsanSpacing.md)
             }
+            .scrollEdgeEffectStyle(.soft, for: .all)
 
             VStack(spacing: IhsanSpacing.md) {
                 OnboardingPrimaryButton("Continue") {
