@@ -1,8 +1,9 @@
 import SwiftUI
 import WidgetKit
 
-/// Entry point for the widget extension. Registers all six families:
-/// three home screen sizes and three lock screen accessory families.
+/// Entry point for the widget extension: three home-screen sizes, the
+/// nightstand face for StandBy, three lock-screen accessory families,
+/// the Repair complication, and the Control Center button.
 @main
 struct IhsanWidgetsBundle: WidgetBundle {
     var body: some Widget {
@@ -10,6 +11,8 @@ struct IhsanWidgetsBundle: WidgetBundle {
         NextPrayerSmallWidget()
         PrayerStatusMediumWidget()
         PrayerOverviewLargeWidget()
+        // StandBy
+        StandByPlateWidget()
         // Lock screen
         NextPrayerRectangularWidget()
         PrayerProgressCircularWidget()

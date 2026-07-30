@@ -274,3 +274,49 @@ public struct PrayerMarkerOrnament: View {
         }
     }
 }
+
+/// A prayer's ornament as monochrome linework.
+///
+/// For surfaces the system renders in an accented or vibrant mode — the
+/// Lock Screen, the Dynamic Island, a tinted complication — where
+/// colour is discarded and only shape and coverage survive. The gilded
+/// marker would arrive there as a flat silhouette; this keeps the
+/// drawing.
+///
+/// The fill is even-odd, which is not optional: the night star is a
+/// ring with a star inside it, and the Shamsa has a heart. Filled with
+/// the default winding rule they both become discs.
+public struct OrnamentLinework: View {
+    public let prayer: Prayer
+    public let size: CGFloat
+    /// Filled reads as "happening or done"; outlined as "ahead of you".
+    /// The distinction has to survive with no colour at all.
+    public let isEmphasised: Bool
+
+    public init(prayer: Prayer, size: CGFloat, isEmphasised: Bool = false) {
+        self.prayer = prayer
+        self.size = size
+        self.isEmphasised = isEmphasised
+    }
+
+    public var body: some View {
+        Group {
+            if isEmphasised {
+                PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                    .fill(.primary, style: FillStyle(eoFill: true))
+            } else {
+                PrayerOrnamentShape(prayer: prayer, mode: .outline)
+                    .stroke(
+                        .secondary,
+                        style: StrokeStyle(
+                            lineWidth: max(0.9, size / 16),
+                            lineCap: .round,
+                            lineJoin: .round
+                        )
+                    )
+            }
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}

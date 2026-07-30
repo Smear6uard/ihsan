@@ -1,6 +1,7 @@
 #if canImport(ActivityKit) && os(iOS)
 import Foundation
 import IhsanCore
+import IhsanNotifications
 import IhsanPrayerTimes
 import Testing
 @testable import ihsan
@@ -11,7 +12,7 @@ func startActivityCreatesPreAdhanLiveActivity() async throws {
     let client = MockPrayerActivityClient()
     let scheduler = PrayerActivityScheduler(
         client: client,
-        now: { scheduledTime.addingTimeInterval(-3_600) },
+        now: { scheduledTime.addingTimeInterval(-LiveActivityWindow.preAdhanLead + 60) },
         sleep: { _ in throw CancellationError() },
         calendar: Calendar(identifier: .gregorian)
     )
@@ -26,6 +27,39 @@ func startActivityCreatesPreAdhanLiveActivity() async throws {
     #expect(client.requests.first?.attributes.prayer == .asr)
     #expect(client.requests.first?.state.countdownPhase == .preAdhan)
     #expect(client.requests.first?.state.hasBeenLoggedThisActivity == false)
+}
+
+/// The Live Activity is the only surface in the app allowed a lead
+/// time, and it is thirty minutes. Pinned here because the value has
+/// drifted before: two private copies of the constant lived in two
+/// modules, both at an hour.
+@Test
+func theLiveActivityAppearsExactlyThirtyMinutesAheadAndNotSooner() async throws {
+    #expect(LiveActivityWindow.preAdhanLead == 30 * 60)
+
+    let scheduledTime = Date(timeIntervalSince1970: 1_800_000)
+    let prayerTime = PrayerTime(prayer: .asr, scheduledTime: scheduledTime)
+    let day = makeDayPrayerTimes(scheduledTime: scheduledTime)
+
+    func startedActivity(secondsBefore: TimeInterval) async throws -> String? {
+        let client = MockPrayerActivityClient()
+        let scheduler = PrayerActivityScheduler(
+            client: client,
+            now: { scheduledTime.addingTimeInterval(-secondsBefore) },
+            sleep: { _ in throw CancellationError() },
+            calendar: Calendar(identifier: .gregorian)
+        )
+        return try await scheduler.startActivity(for: prayerTime, in: day)
+    }
+
+    // A second inside the window opens it.
+    #expect(try await startedActivity(secondsBefore: 30 * 60 - 1) != nil)
+    // Exactly at the boundary opens it.
+    #expect(try await startedActivity(secondsBefore: 30 * 60) != nil)
+    // A minute earlier does not: an hour out, nothing on the lock
+    // screen should be counting down to Asr yet.
+    #expect(try await startedActivity(secondsBefore: 31 * 60) == nil)
+    #expect(try await startedActivity(secondsBefore: 60 * 60) == nil)
 }
 
 @Test

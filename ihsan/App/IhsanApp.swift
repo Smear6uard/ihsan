@@ -271,7 +271,7 @@ private struct RootGate: View {
                 settings.qadaTrackingEnabled = true
                 settings.qadaSetupCompletedAt = NowProvider.active.now()
             }
-            try? QadaLedgerWriter().recordEstimate(
+            _ = try? QadaLedgerWriter().recordEstimate(
                 [.fasting: count, .isha: 24],
                 sourceSurface: .app,
                 in: modelContext

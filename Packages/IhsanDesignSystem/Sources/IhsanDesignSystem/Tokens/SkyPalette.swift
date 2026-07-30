@@ -538,3 +538,20 @@ extension SkyPaletteTokens {
         inkHalo: SRGBValue(hex: 0x43182A)
     )
 }
+
+public extension SkyPaletteTokens {
+    /// Ink for a face seen on a nightstand.
+    ///
+    /// StandBy at three in the morning gets Night Mode's red shift,
+    /// which discards the blue and green channels. A bright white
+    /// becomes a glare with no colour left in it; warm parchment held
+    /// at 84% keeps its character through the tint and never becomes a
+    /// light source in a dark room.
+    var standByInk: Color {
+        SRGBValue(red: 0.92, green: 0.87, blue: 0.78).color.opacity(0.84)
+    }
+
+    var standByInkSecondary: Color {
+        SRGBValue(red: 0.92, green: 0.87, blue: 0.78).color.opacity(0.55)
+    }
+}

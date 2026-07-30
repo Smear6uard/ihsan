@@ -65,6 +65,7 @@ struct WidgetSnapshotLoader {
                         scheduledTime: $0.scheduledTime
                     )
                 },
+                sunrise: schedule.sunrise,
                 loggedStatusByPrayerRaw: logs,
                 cityName: cache.cityName ?? "Current Location",
                 timeZoneIdentifier: cache.timeZoneIdentifier,
@@ -132,6 +133,7 @@ struct WidgetSnapshotLoader {
             nextPrayerScheduledTime: placeholder.nextPrayerScheduledTime,
             currentPrayer: nil,
             todayPrayerTimes: placeholder.todayPrayerTimes,
+            sunrise: placeholder.sunrise,
             loggedStatusByPrayerRaw: [:],
             cityName: "Open Ihsan",
             timeZoneIdentifier: TimeZone.current.identifier,

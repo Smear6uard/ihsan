@@ -3,23 +3,37 @@ import IhsanDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// Small (2×2) home widget. Asymmetric layout:
-/// - top-left: prayer symbol
-/// - center-left: hero countdown (auto-updating, tabular)
-/// - bottom-left: prayer name + scheduled time
-/// - top-right: city label, small caps
+/// Small (2×2). One ornament and one number.
+///
+/// At this size the arc would be five ornaments crowded into an inch,
+/// so it is cut entirely: what a person wants from a 2×2 is which
+/// prayer is next and how long. The ornament carries the identity — a
+/// six-petal rosette or a ten-point star is unmistakably this app from
+/// across a home screen, in a way a countdown never is.
 struct NextPrayerSmallWidgetView: View {
     let entry: PrayerTimelineEntry
 
+    @Environment(\.showsWidgetContainerBackground) private var showsContainer
+
     var body: some View {
+        let tokens = WidgetPalette.tokens(for: entry)
+        let isStandBy = !showsContainer
+        let ink = isStandBy ? tokens.standByInk : tokens.ink
+        let inkSecondary = isStandBy ? tokens.standByInkSecondary : tokens.inkSecondary
+
         VStack(alignment: .leading, spacing: 0) {
             HStack(alignment: .top) {
-                PrayerSymbol(entry.nextPrayer, size: 18)
-                Spacer()
+                PrayerMarkerOrnament(
+                    prayer: entry.nextPrayer,
+                    size: 22,
+                    state: entry.currentPrayer == entry.nextPrayer ? .current : .upcoming,
+                    tokens: tokens
+                )
+                Spacer(minLength: IhsanSpacing.xs)
                 Text(entry.cityName.uppercased())
-                    .font(IhsanFont.smallCaps)
+                    .font(IhsanFont.inscription)
                     .tracking(0.8)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .foregroundStyle(inkSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
             }
@@ -27,35 +41,44 @@ struct NextPrayerSmallWidgetView: View {
             Spacer(minLength: IhsanSpacing.xxs)
 
             if entry.isLocationMissing {
-                placeholderBody
+                placeholderBody(ink: ink, inkSecondary: inkSecondary)
             } else {
                 CountdownLabel.Tabular(until: entry.nextPrayerScheduledTime, scale: 1.05)
+                    .foregroundStyle(ink)
                     .padding(.bottom, IhsanSpacing.xxs)
 
                 Text(entry.nextPrayer.displayNameEnglish)
-                    .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .font(.system(size: 17, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
 
-                Text("at \(entry.clockTime(entry.nextPrayerScheduledTime))")
-                    .font(IhsanFont.smallCaps)
-                    .tracking(0.6)
-                    .foregroundStyle(IhsanColor.textMuted)
+                Text(entry.clockTime(entry.nextPrayerScheduledTime))
+                    .font(.system(.footnote, design: .rounded).monospacedDigit())
+                    .foregroundStyle(inkSecondary)
+                    .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(WidgetDeeplink.today)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            entry.isLocationMissing
+                ? "Open Ihsan to set your location"
+                : "\(entry.nextPrayer.displayNameEnglish) at \(entry.clockTime(entry.nextPrayerScheduledTime))"
+        )
     }
 
     @ViewBuilder
-    private var placeholderBody: some View {
+    private func placeholderBody(ink: Color, inkSecondary: Color) -> some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
             Text("Open Ihsan")
-                .font(IhsanFont.bodyEnglishBold)
-                .foregroundStyle(IhsanColor.textPrimary)
+                .font(.system(size: 17, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
             Text("to set your location")
-                .font(IhsanFont.smallCaps)
+                .font(IhsanFont.inscription)
                 .tracking(0.6)
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(inkSecondary)
         }
     }
 }
@@ -67,14 +90,27 @@ struct NextPrayerSmallWidget: Widget {
         StaticConfiguration(kind: Self.kind, provider: PrayerTimelineProvider()) { entry in
             NextPrayerSmallWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    ZStack {
-                        IhsanColor.ground
-                        Color.clear.ihsanGlass(intensity: .hero)
-                    }
+                    WidgetGround(entry: entry)
                 }
         }
         .configurationDisplayName("Next Prayer")
         .description("Countdown to your next prayer.")
         .supportedFamilies([.systemSmall])
+    }
+}
+
+/// The ground under a home widget, and the nightstand ground in
+/// StandBy. One place, so every family drifts through the day together.
+struct WidgetGround: View {
+    let entry: PrayerTimelineEntry
+
+    @Environment(\.showsWidgetContainerBackground) private var showsContainer
+
+    var body: some View {
+        if showsContainer {
+            WidgetPalette.homeGround(for: entry)
+        } else {
+            WidgetPalette.standByGround(for: entry)
+        }
     }
 }

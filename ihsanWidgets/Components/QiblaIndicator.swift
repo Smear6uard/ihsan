@@ -11,23 +11,25 @@ import SwiftUI
 struct QiblaIndicator: View {
     let bearingDegrees: Double
     let size: CGFloat
+    let tokens: SkyPaletteTokens
 
-    init(bearingDegrees: Double, size: CGFloat = 38) {
+    init(bearingDegrees: Double, size: CGFloat = 38, tokens: SkyPaletteTokens) {
         self.bearingDegrees = bearingDegrees
         self.size = size
+        self.tokens = tokens
     }
 
     var body: some View {
         VStack(spacing: IhsanSpacing.xxs) {
             ZStack {
-                // Atmospheric ring
+                // The dial's keyline, in metal like every drawn edge.
                 Circle()
-                    .strokeBorder(IhsanColor.atmospheric, lineWidth: 0.75)
+                    .strokeBorder(tokens.metal.opacity(0.45), lineWidth: 0.75)
 
                 // 45° ticks
                 ForEach(0..<8, id: \.self) { i in
                     Rectangle()
-                        .fill(IhsanColor.atmospheric)
+                        .fill(tokens.metal.opacity(0.45))
                         .frame(width: 0.75, height: i % 2 == 0 ? 4 : 2)
                         .offset(y: -size / 2 + 2)
                         .rotationEffect(.degrees(Double(i) * 45))
@@ -36,11 +38,11 @@ struct QiblaIndicator: View {
                 // Brass arrow pointing to qibla
                 ZStack {
                     Triangle()
-                        .fill(IhsanColor.statusQada)
+                        .fill(tokens.leafGold)
                         .frame(width: 5, height: size * 0.42)
                         .offset(y: -size * 0.18)
                     Circle()
-                        .fill(IhsanColor.statusQada)
+                        .fill(tokens.leafGold)
                         .frame(width: 3, height: 3)
                 }
                 .rotationEffect(.degrees(bearingDegrees))
@@ -50,7 +52,7 @@ struct QiblaIndicator: View {
             Text("QIBLA")
                 .font(.system(size: 8, weight: .semibold, design: .default).smallCaps())
                 .tracking(1.2)
-                .foregroundStyle(IhsanColor.textMuted)
+                .foregroundStyle(tokens.inkSecondary)
         }
         .accessibilityLabel("Qibla direction \(Int(bearingDegrees.rounded())) degrees")
     }

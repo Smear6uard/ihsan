@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 import IhsanCore
 import IhsanDesignSystem
 import IhsanIntents
@@ -48,6 +49,14 @@ struct RootTabView: View {
     /// from the logged card's quiet link or the Siri/Shortcut intent.
     @State private var isDhikrPresented = ProcessInfo.processInfo
         .arguments.contains("-IhsanDebugPresentDhikr")
+
+    #if DEBUG
+    /// `-IhsanDebugWidgetGallery` — the widget faces at their real
+    /// sizes, so the phase gate has a picture of a surface no test
+    /// harness can place on a home screen.
+    @State private var isWidgetGalleryPresented = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugWidgetGallery")
+    #endif
 
     var body: some View {
         // The glyphs are the app's own linework set (`TabGlyphs`),
@@ -129,6 +138,11 @@ struct RootTabView: View {
                 clearDeeplink(forKey: StartTasbihIntent.deeplinkUserDefaultsKey)
             })
         }
+        #if DEBUG
+        .fullScreenCover(isPresented: $isWidgetGalleryPresented) {
+            WidgetFaceGallery()
+        }
+        #endif
     }
 
     /// Foreground reconciliation for the makeup ledger: first heal any
@@ -137,8 +151,11 @@ struct RootTabView: View {
     /// the user chose that at setup. Both are idempotent and pause-aware,
     /// so calling on every foreground is safe.
     private func runMissedFlowSweep() {
-        try? QadaLedgerWriter().reconcile(in: modelContext)
-        try? QadaMissedFlowSweep().sweep(in: modelContext)
+        // Both are best-effort and idempotent: a failure here is
+        // retried on the next foreground, and neither has a result the
+        // caller can act on.
+        _ = try? QadaLedgerWriter().reconcile(in: modelContext)
+        _ = try? QadaMissedFlowSweep().sweep(in: modelContext)
     }
 
     /// Reads the App Group UserDefaults flag without clearing it. The

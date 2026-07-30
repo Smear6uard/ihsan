@@ -46,10 +46,6 @@ nonisolated enum PrayerActivityDismissal: Equatable, Sendable {
 public actor PrayerActivityScheduler: PrayerActivityScheduling {
     public static let shared = PrayerActivityScheduler()
 
-    /// Scheduling-only. Never pass this value to `PrayerStateResolver`.
-    private static let liveActivityPreAdhanSchedulingLeadTime: TimeInterval = 60 * 60
-    /// Scheduling-only lifetime after the exact adhan instant.
-    private static let liveActivityPostAdhanLifetime: TimeInterval = 30 * 60
     private static let loggedConfirmationDuration: TimeInterval = 5
 
     private let client: any PrayerActivityClient
@@ -84,12 +80,12 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
     ) async throws -> String? {
         let currentDate = now()
         let scheduledTime = prayerTime.scheduledTime
-        guard currentDate < scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime) else {
+        guard currentDate < scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime) else {
             logger.info("Skipping \(prayerTime.prayer.rawValue) activity because its post-adhan window has passed.")
             return nil
         }
 
-        guard currentDate >= scheduledTime.addingTimeInterval(-Self.liveActivityPreAdhanSchedulingLeadTime) else {
+        guard currentDate >= scheduledTime.addingTimeInterval(-LiveActivityWindow.preAdhanLead) else {
             logger.info("Skipping \(prayerTime.prayer.rawValue) activity because its pre-adhan window has not started.")
             return nil
         }
@@ -112,7 +108,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
             countdownPhase: phase(for: scheduledTime, at: currentDate),
             hasBeenLoggedThisActivity: false
         )
-        let staleDate = scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime)
+        let staleDate = scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
         let activityId = try await client.request(attributes: attributes, state: state, staleDate: staleDate)
         scheduleLocalTransitions(activityId: activityId, scheduledTime: scheduledTime)
         logger.info("Started \(prayerTime.prayer.rawValue) Live Activity \(activityId, privacy: .public).")
@@ -162,7 +158,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         await client.update(
             activityId: activityId,
             state: state,
-            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime)
+            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
         )
     }
 
@@ -215,7 +211,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         await client.update(
             activityId: snapshot.id,
             state: state,
-            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime)
+            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
         )
     }
 
@@ -273,7 +269,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
                 await self.updateToAdhanWindow(activityId: activityId)
             }
 
-            let timeoutDate = scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime)
+            let timeoutDate = scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
             let afterAdhanDate = now()
             guard timeoutDate > afterAdhanDate else {
                 await self.endActivity(activityId: activityId, reason: .timedOut)
@@ -293,7 +289,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         if date < scheduledTime {
             return .preAdhan
         }
-        if date < scheduledTime.addingTimeInterval(Self.liveActivityPostAdhanLifetime) {
+        if date < scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime) {
             return .adhanWindow
         }
         return .postAdhan

@@ -2,33 +2,22 @@ import IhsanCore
 import SwiftUI
 import WidgetKit
 
-/// Lock screen inline widget — single line above the clock.
-/// "☼ Asr · 4:32 PM" in the inline accessory family. The system
-/// constrains this to a single line of text and an optional leading
-/// SF Symbol. Tabular figures keep the digits from jittering.
+/// Lock screen inline — a single line above the clock.
+///
+/// The system allows one line of text and an optional leading image,
+/// and renders both at text scale in the accented mode. At that size an
+/// ornament is indistinguishable from a smudge, so this line is words
+/// and figures only: "Asr · 4:32 PM". Nothing is lost — the shapes do
+/// their work everywhere there is room for them.
 struct NextPrayerInlineWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
         if entry.isLocationMissing {
-            Label("Open Ihsan to set location", systemImage: "moon.stars")
+            Text("Open Ihsan to set location")
         } else {
-            Label {
-                Text("\(entry.nextPrayer.displayNameEnglish) · \(entry.clockTime(entry.nextPrayerScheduledTime))")
-                    .font(.system(.body, design: .rounded).monospacedDigit())
-            } icon: {
-                Image(systemName: lockSymbol(for: entry.nextPrayer))
-            }
-        }
-    }
-
-    private func lockSymbol(for prayer: Prayer) -> String {
-        switch prayer {
-        case .fajr: return "sunrise"
-        case .dhuhr: return "sun.max"
-        case .asr: return "sun.haze"
-        case .maghrib: return "sunset"
-        case .isha: return "moon.stars"
+            Text("\(entry.nextPrayer.displayNameEnglish) · \(entry.clockTime(entry.nextPrayerScheduledTime))")
+                .font(.system(.body, design: .rounded).monospacedDigit())
         }
     }
 }

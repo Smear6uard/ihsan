@@ -5,119 +5,114 @@ import IhsanIntents
 import SwiftUI
 import WidgetKit
 
-/// Medium (4×2) home widget. Two columns:
-/// - left: prayer symbol + countdown + prayer name + scheduled clock time
-/// - right: today's five-prayer status row, each dot is a tappable
-///   `Button(intent: LogPrayerIntent(prayer:))` that logs that prayer
-///   as on-time when pressed
+/// Medium (4×2). The day's arc.
+///
+/// This is the app's signature at widget scale: the five ornaments set
+/// along a shallow arc at their true proportion of the day, gilded
+/// behind you and outlined ahead. The letter row that used to sit under
+/// a row of dots — F D A M I — is gone; a shape that means Maghrib
+/// needs no letter to say so, and the arc carries the day's shape in a
+/// way five evenly spaced dots never could.
+///
+/// Every ornament is a tap target: pressing one logs that prayer
+/// through the same intent every other surface uses.
 struct PrayerStatusMediumWidgetView: View {
     let entry: PrayerTimelineEntry
 
+    @Environment(\.showsWidgetContainerBackground) private var showsContainer
+
     var body: some View {
-        HStack(alignment: .center, spacing: IhsanSpacing.lg) {
-            countdownColumn
+        let tokens = WidgetPalette.tokens(for: entry)
+        let isStandBy = !showsContainer
+        let ink = isStandBy ? tokens.standByInk : tokens.ink
+        let inkSecondary = isStandBy ? tokens.standByInkSecondary : tokens.inkSecondary
 
-            divider
+        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+            header(ink: ink, inkSecondary: inkSecondary)
 
-            statusColumn
+            if entry.isLocationMissing {
+                Spacer(minLength: 0)
+                Text("Open Ihsan to set your location")
+                    .font(.system(size: 15, weight: .regular, design: .serif))
+                    .foregroundStyle(inkSecondary)
+                Spacer(minLength: 0)
+            } else {
+                ZStack {
+                    WidgetPlate(entry: entry, tokens: tokens, ornamentSize: 22)
+                    tapTargets
+                }
+                .frame(maxHeight: .infinity)
+            }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(WidgetDeeplink.today)
     }
 
-    @ViewBuilder
-    private var countdownColumn: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-            HStack(spacing: IhsanSpacing.sm) {
-                PrayerSymbol(entry.nextPrayer, size: 18)
-                Text(entry.cityName.uppercased())
-                    .font(IhsanFont.smallCaps)
-                    .tracking(0.8)
-                    .foregroundStyle(IhsanColor.textMuted)
-                    .lineLimit(1)
-            }
+    private func header(ink: Color, inkSecondary: Color) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+            Text(entry.cityName.uppercased())
+                .font(IhsanFont.inscription)
+                .tracking(1.0)
+                .foregroundStyle(inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
 
-            if entry.isLocationMissing {
-                Text("Open Ihsan")
-                    .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textPrimary)
-                Text("to set your location")
-                    .font(IhsanFont.smallCaps)
-                    .tracking(0.6)
-                    .foregroundStyle(IhsanColor.textMuted)
-            } else {
-                CountdownLabel.Tabular(until: entry.nextPrayerScheduledTime, scale: 1.0)
+            Spacer(minLength: IhsanSpacing.xs)
+
+            if !entry.isLocationMissing {
                 Text(entry.nextPrayer.displayNameEnglish)
-                    .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textSecondary)
-                Text(entry.clockTime(entry.nextPrayerScheduledTime))
-                    .font(IhsanFont.tabular)
-                    .foregroundStyle(IhsanColor.textMuted)
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
+                    .foregroundStyle(ink)
+                Text("in")
+                    .font(IhsanFont.inscription)
+                    .tracking(0.8)
+                    .foregroundStyle(inkSecondary)
+                CountdownLabel.Compact(until: entry.nextPrayerScheduledTime)
+                    .foregroundStyle(ink)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .lineLimit(1)
+        .accessibilityElement(children: .combine)
     }
 
-    private var divider: some View {
-        Rectangle()
-            .fill(IhsanColor.atmospheric)
-            .frame(width: IhsanSpacing.hairline)
-    }
-
-    @ViewBuilder
-    private var statusColumn: some View {
-        VStack(alignment: .center, spacing: IhsanSpacing.sm) {
-            Text("TODAY")
-                .font(IhsanFont.smallCaps)
-                .tracking(1.2)
-                .foregroundStyle(IhsanColor.textMuted)
-
-            HStack(spacing: IhsanSpacing.sm) {
-                ForEach(entry.todayPrayerTimes) { slot in
-                    statusDotButton(for: slot)
-                }
-            }
-
-            HStack(spacing: IhsanSpacing.sm) {
-                ForEach(entry.todayPrayerTimes) { slot in
-                    Text(initial(for: slot.prayer))
-                        .font(IhsanFont.smallCaps)
-                        .tracking(0.6)
-                        .foregroundStyle(
-                            slot.prayer == entry.activePrayer
-                                ? IhsanColor.textSecondary
-                                : IhsanColor.textMuted
-                        )
-                        .frame(width: 22, alignment: .center)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    private func statusDotButton(for slot: PrayerTimelineEntry.PrayerSlot) -> some View {
-        Button(intent: LogPrayerIntent(prayer: slot.prayer)) {
-            PrayerStatusDot(
-                prayer: slot.prayer,
-                status: entry.loggedStatus(for: slot.prayer),
-                isActive: slot.prayer == entry.activePrayer,
-                size: 14
+    /// Invisible buttons over each ornament. Drawing and touch are kept
+    /// apart on purpose: an ornament that had to also be a button would
+    /// have to grow a hit area, and the arc's spacing is information.
+    private var tapTargets: some View {
+        GeometryReader { proxy in
+            let inset: CGFloat = 13
+            let width = max(proxy.size.width - inset * 2, 1)
+            let span = zip(
+                entry.todayPrayerTimes.first?.scheduledTime,
+                entry.todayPrayerTimes.last?.scheduledTime
             )
-            .frame(width: 22, height: 22)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Log \(slot.prayer.displayNameEnglish) on time")
-    }
 
-    private func initial(for prayer: Prayer) -> String {
-        switch prayer {
-        case .fajr: return "F"
-        case .dhuhr: return "D"
-        case .asr: return "A"
-        case .maghrib: return "M"
-        case .isha: return "I"
+            ForEach(entry.todayPrayerTimes) { slot in
+                if let span, span.1 > span.0 {
+                    let t = CGFloat(
+                        slot.scheduledTime.timeIntervalSince(span.0)
+                            / span.1.timeIntervalSince(span.0)
+                    )
+                    Button(intent: LogPrayerIntent(prayer: slot.prayer)) {
+                        Color.clear
+                            .frame(width: 40, height: proxy.size.height)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .position(
+                        x: inset + width * min(max(t, 0), 1),
+                        y: proxy.size.height / 2
+                    )
+                    .accessibilityLabel("Log \(slot.prayer.displayNameEnglish) on time")
+                }
+            }
         }
     }
+}
+
+private func zip(_ a: Date?, _ b: Date?) -> (Date, Date)? {
+    guard let a, let b else { return nil }
+    return (a, b)
 }
 
 struct PrayerStatusMediumWidget: Widget {
@@ -127,14 +122,11 @@ struct PrayerStatusMediumWidget: Widget {
         StaticConfiguration(kind: Self.kind, provider: PrayerTimelineProvider()) { entry in
             PrayerStatusMediumWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
-                    ZStack {
-                        IhsanColor.ground
-                        Color.clear.ihsanGlass(intensity: .regular)
-                    }
+                    WidgetGround(entry: entry)
                 }
         }
         .configurationDisplayName("Today's Prayers")
-        .description("Next prayer countdown and today's five-prayer status.")
+        .description("The day's arc, with every prayer one tap from logged.")
         .supportedFamilies([.systemMedium])
     }
 }

@@ -1,15 +1,18 @@
 import IhsanCore
+import IhsanDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// Lock screen circular widget — five-segment progress ring around an
-/// outline prayer symbol. Each segment corresponds to one of today's
-/// prayers and fills (`.primary`) when that prayer is logged with any
-/// non-missed status. Missed/unlogged segments stay at the
-/// `.tertiary` opacity so the ring is fully drawn.
+/// Lock screen circular — five segments around one ornament.
 ///
-/// Uses `Gauge(value:in:label:)` is too coarse for five distinct
-/// segments, so we compose the ring manually from five arc paths.
+/// Each segment is one prayer, filled once that prayer is logged. The
+/// centre carries the current or next prayer's own ornament, so the
+/// glance answers "which prayer, and where am I in the day" without a
+/// figure. It used to read "3/5"; a count out of five is a score, and
+/// this app does not keep score of anyone's worship.
+///
+/// `Gauge` is too coarse for five distinct segments, so the ring is
+/// composed from five arcs.
 struct PrayerProgressCircularWidgetView: View {
     let entry: PrayerTimelineEntry
 
@@ -25,16 +28,16 @@ struct PrayerProgressCircularWidgetView: View {
                     .foregroundStyle(isFilled ? .primary : .tertiary)
             }
 
-            VStack(spacing: 0) {
-                Image(systemName: lockSymbol(for: entry.nextPrayer))
-                    .font(.system(size: 13, weight: .regular))
-                Text("\(entry.loggedCountToday)/5")
-                    .font(.system(size: 9, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
+            LockOrnament(
+                prayer: centrePrayer,
+                size: 17,
+                isEmphasised: entry.currentPrayer != nil
+            )
         }
         .padding(2)
         .widgetAccentable()
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func degrees(for index: Int) -> (start: Double, end: Double) {
@@ -47,14 +50,17 @@ struct PrayerProgressCircularWidgetView: View {
         return (start, end)
     }
 
-    private func lockSymbol(for prayer: Prayer) -> String {
-        switch prayer {
-        case .fajr: return "sunrise"
-        case .dhuhr: return "sun.max"
-        case .asr: return "sun.haze"
-        case .maghrib: return "sunset"
-        case .isha: return "moon.stars"
+    /// The prayer the glance is about: the open one if a window is
+    /// open, otherwise the one being waited for.
+    private var centrePrayer: Prayer {
+        entry.currentPrayer ?? entry.nextPrayer
+    }
+
+    private var accessibilityLabel: String {
+        if let current = entry.currentPrayer {
+            return "\(current.displayNameEnglish) now"
         }
+        return "\(entry.nextPrayer.displayNameEnglish) at \(entry.clockTime(entry.nextPrayerScheduledTime))"
     }
 }
 
@@ -88,7 +94,7 @@ struct PrayerProgressCircularWidget: Widget {
                 }
         }
         .configurationDisplayName("Today's Progress")
-        .description("Five-segment ring showing today's logged prayers.")
+        .description("Which prayers are logged, and which one you are in.")
         .supportedFamilies([.accessoryCircular])
     }
 }

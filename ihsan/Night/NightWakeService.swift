@@ -15,7 +15,7 @@ import ActivityKit
 /// `AdhanAsset`. The wake and the prayer notification cannot drift
 /// apart, and replacing the placeholder replaces both.
 enum NightWakeSound {
-    static var assetName: String { AdhanAsset.nightWake }
+    nonisolated static var assetName: String { AdhanAsset.nightWake }
 }
 
 /// Orchestrates the gentle wake: computes each night's plan from that

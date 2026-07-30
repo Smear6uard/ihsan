@@ -24,7 +24,23 @@ enum CountdownLabel {
                 .font(.system(size: 40 * scale, weight: .thin, design: .rounded).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
-                .foregroundStyle(IhsanColor.textPrimary)
+        }
+    }
+
+    /// Inline "1h 23m" at body scale — sits on a header line beside
+    /// the prayer's name rather than standing alone.
+    struct Compact: View {
+        let untilDate: Date
+
+        init(until: Date) {
+            self.untilDate = until
+        }
+
+        var body: some View {
+            Text(timerInterval: .now...untilDate, countsDown: true)
+                .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.6)
         }
     }
 
@@ -43,7 +59,6 @@ enum CountdownLabel {
                 .font(.system(size: 28 * scale, weight: .regular, design: .rounded).monospacedDigit())
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-                .foregroundStyle(IhsanColor.textPrimary)
         }
     }
 }

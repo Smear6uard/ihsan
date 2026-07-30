@@ -28,6 +28,11 @@ struct PrayerTimelineEntry: TimelineEntry, Codable, Sendable, Equatable {
     /// prayers that have already passed.
     let todayPrayerTimes: [PrayerSlot]
 
+    /// Today's sunrise — Fajr's exit boundary, and the anchor the
+    /// widget's ground needs to ride the same solar palette as the
+    /// plate rather than a clock approximation.
+    let sunrise: Date
+
     /// Logged status per prayer for the civil day containing `date`.
     /// Absence means "no log written yet" (rendered as the inactive dot).
     /// String-keyed so the entry stays cleanly Codable.
@@ -131,6 +136,7 @@ extension PrayerTimelineEntry {
             nextPrayerScheduledTime: resolution.countdownTarget,
             currentPrayer: resolution.currentPrayer?.prayer,
             todayPrayerTimes: slots,
+            sunrise: schedule.sunrise,
             loggedStatusByPrayerRaw: [
                 Prayer.fajr.rawValue: PrayerStatus.onTime.rawValue,
                 Prayer.dhuhr.rawValue: PrayerStatus.onTime.rawValue

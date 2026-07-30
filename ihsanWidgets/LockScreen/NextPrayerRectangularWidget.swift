@@ -1,22 +1,24 @@
 import IhsanCore
+import IhsanDesignSystem
 import SwiftUI
 import WidgetKit
 
 /// Lock screen rectangular widget — "Asr in 1h 23m" with the
 /// scheduled clock time below in tabular figures.
 ///
-/// Lock screen widgets render with system-provided materials so the
-/// content stays legible on both light and dark wallpapers. We use
-/// outline SF Symbols and `.foregroundStyle(.primary/.secondary)`
-/// rather than the bone-white opacity tiers used on home widgets.
+/// Lock Screen widgets render in an accented mode that keeps shape and
+/// throws away colour, so the prayer's own ornament is drawn as
+/// linework and `.primary` / `.secondary` carry the emphasis. No SF
+/// Symbol stands in for a prayer here any more than it does on the
+/// plate.
 struct NextPrayerRectangularWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
         if entry.isLocationMissing {
             VStack(alignment: .leading, spacing: 2) {
-                Label("Open Ihsan", systemImage: "moon.stars")
-                    .font(.system(size: 15, weight: .semibold, design: .default))
+                Text("Open Ihsan")
+                    .font(.system(size: 15, weight: .semibold, design: .serif))
                     .lineLimit(1)
                 Text("Set your location")
                     .font(.system(size: 11, weight: .regular, design: .default))
@@ -28,10 +30,9 @@ struct NextPrayerRectangularWidgetView: View {
         } else {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 5) {
-                    Image(systemName: lockSymbol(for: entry.nextPrayer))
-                        .font(.system(size: 13, weight: .regular))
+                    LockOrnament(prayer: entry.nextPrayer, size: 13, isEmphasised: true)
                     Text(entry.nextPrayer.displayNameEnglish)
-                        .font(.system(size: 14, weight: .semibold, design: .default))
+                        .font(.system(size: 14, weight: .semibold, design: .serif))
                     Text("in")
                         .font(.system(size: 12, weight: .regular, design: .default))
                         .foregroundStyle(.secondary)
@@ -51,17 +52,6 @@ struct NextPrayerRectangularWidgetView: View {
         }
     }
 
-    /// Outline SF Symbols variants — Apple's lock screen guidance prefers
-    /// these over the filled glyphs used on the home widgets.
-    private func lockSymbol(for prayer: Prayer) -> String {
-        switch prayer {
-        case .fajr: return "sunrise"
-        case .dhuhr: return "sun.max"
-        case .asr: return "sun.haze"
-        case .maghrib: return "sunset"
-        case .isha: return "moon.stars"
-        }
-    }
 }
 
 struct NextPrayerRectangularWidget: Widget {

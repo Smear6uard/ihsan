@@ -27,9 +27,12 @@ final class AudioRecordingService: NSObject, AVAudioRecorderDelegate {
 
     private var recorder: AVAudioRecorder?
     private var sessionConfigured = false
-    /// Stored once in `init`, removed once in `deinit`. The
-    /// `nonisolated(unsafe)` annotation lets the nonisolated `deinit` read
-    /// it; the property is otherwise only touched on the main actor.
+    /// Stored once in `init`, removed once in `deinit`. Excluded from
+    /// observation — nothing renders it — so the stored form survives
+    /// the macro and `nonisolated(unsafe)` can say what it means: the
+    /// nonisolated `deinit` reads it, and nothing else touches it off
+    /// the main actor.
+    @ObservationIgnored
     nonisolated(unsafe) private var interruptionObserver: NSObjectProtocol?
 
     override init() {

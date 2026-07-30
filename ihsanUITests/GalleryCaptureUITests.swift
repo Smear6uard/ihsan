@@ -19,6 +19,9 @@ final class GalleryCaptureUITests: XCTestCase {
         let name: String
         let arguments: [String]
         var settle: TimeInterval = 2.5
+        /// Some surfaces are taller than the screen; this scrolls to
+        /// the end before the shutter so the frame shows the rest.
+        var scrollsToBottom: Bool = false
     }
 
     private static let chicagoNight = "2026-07-30T21:40:00"
@@ -87,6 +90,18 @@ final class GalleryCaptureUITests: XCTestCase {
                 "-IhsanDebugTab", "reflection",
                 "-IhsanDebugSeedReflections"
             ]),
+            Frame(name: "12-widget-faces-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugWidgetGallery"
+            ], settle: 3.0),
+            Frame(name: "13-widget-faces-night-lower", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugWidgetGallery"
+            ], settle: 3.0, scrollsToBottom: true),
+            Frame(name: "14-widget-faces-dawn", arguments: [
+                "-IhsanNowOverride", Self.chicagoDawn,
+                "-IhsanDebugWidgetGallery"
+            ], settle: 3.0),
             Frame(name: "11-dhikr", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
                 "-IhsanDebugPresentDhikr"
@@ -136,7 +151,8 @@ final class GalleryCaptureUITests: XCTestCase {
                 frame = Frame(
                     name: surface.name,
                     arguments: surface.arguments + ["-UIPreferredContentSizeCategoryName", size],
-                    settle: surface.settle
+                    settle: surface.settle,
+                    scrollsToBottom: surface.scrollsToBottom
                 )
                 capture(frame)
             }
@@ -156,6 +172,14 @@ final class GalleryCaptureUITests: XCTestCase {
         // The tab bar is the app's "ready" signal on every tab.
         _ = app.tabBars.firstMatch.waitForExistence(timeout: 20)
         Thread.sleep(forTimeInterval: frame.settle)
+
+        if frame.scrollsToBottom {
+            for _ in 0..<4 {
+                app.swipeUp(velocity: .fast)
+                Thread.sleep(forTimeInterval: 0.4)
+            }
+            Thread.sleep(forTimeInterval: 1.0)
+        }
 
         write(XCUIScreen.main.screenshot(), named: frame.name)
         app.terminate()
