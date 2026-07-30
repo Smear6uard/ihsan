@@ -43,6 +43,12 @@ struct PrayerLogSheet: View {
 
     @State private var selectedTiming: PrayerStatus?
     @State private var jamaahOn: Bool
+    /// Measured natural height of the sheet's content — the medium
+    /// detent is sized to exactly this, so there is no dead zone
+    /// between the tiles and the commit button and nothing below the
+    /// footer. At accessibility type sizes the measurement exceeds
+    /// the screen, the detent clamps, and the scroll view takes over.
+    @State private var contentHeight: CGFloat = 0
 
     init(
         prayer: Prayer,
@@ -74,39 +80,49 @@ struct PrayerLogSheet: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Scrolls only when it must (accessibility type sizes);
-            // at standard sizes the sheet is one still composition.
-            ScrollView {
-                VStack(spacing: 0) {
-                    header
-                        .padding(.top, IhsanSpacing.xl)
+        // One still composition, top to bottom, with no dead zone:
+        // the commit bar rides directly below the tiles, the footer
+        // directly below it. Scrolls only when it must (accessibility
+        // type sizes make the content taller than the screen).
+        ScrollView {
+            VStack(spacing: 0) {
+                header
+                    .padding(.top, IhsanSpacing.lg)
 
-                    jamaahRow
-                        .padding(.horizontal, IhsanSpacing.md)
-                        .padding(.top, IhsanSpacing.lg)
+                jamaahRow
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.lg)
 
-                    timingGrid
-                        .padding(.horizontal, IhsanSpacing.md)
-                        .padding(.top, IhsanSpacing.md)
-                }
+                timingGrid
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.md)
+
+                commitBar
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.top, IhsanSpacing.md)
+
+                footer
+                    .padding(.horizontal, IhsanSpacing.lg)
+                    .padding(.top, IhsanSpacing.xs)
+                    .padding(.bottom, IhsanSpacing.sm)
             }
-            .scrollBounceBehavior(.basedOnSize)
-
-            Spacer(minLength: IhsanSpacing.md)
-
-            commitBar
-                .padding(.horizontal, IhsanSpacing.md)
-            footer
-                .padding(.horizontal, IhsanSpacing.lg)
-                .padding(.top, IhsanSpacing.sm)
-                .padding(.bottom, IhsanSpacing.lg)
+            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
+                contentHeight = height
+            }
         }
+        .scrollBounceBehavior(.basedOnSize)
         .background {
-            // The warm backing under the platform glass — never a
-            // gray scrim over the scene's warmth.
-            tokens.chromeTint.ignoresSafeArea()
+            // The SkyPhase backing under the platform glass — indigo
+            // at night, plum at sunset, warm near-white on the days.
+            // Never a gray scrim, never a flat charcoal slab.
+            tokens.sheetBacking.ignoresSafeArea()
         }
+        // A medium detent sized to the content itself. No .large:
+        // the sheet holds exactly header + toggle + tiles + commit +
+        // footer, and nothing here justifies a taller pull.
+        .presentationDetents([.height(contentHeight > 0 ? contentHeight + 12 : 560)])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(.thinMaterial)
         .accessibilityElement(children: .contain)
     }
 
@@ -213,6 +229,7 @@ struct PrayerLogSheet: View {
                     .frame(width: 30, height: 30)
                 Text(title)
                     .font(IhsanFont.rowPrayerName)
+                    .fontWeight(selected ? .semibold : .regular)
                     .foregroundStyle(tokens.ink)
                 Text(caption)
                     .font(IhsanFont.inscription)
@@ -230,13 +247,58 @@ struct PrayerLogSheet: View {
         .buttonStyle(.plain)
         .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: selected)
         .overlay {
+            // Selection is form + weight, never hue alone: the chosen
+            // tile takes the illuminated double rule — a heavier gold
+            // border with an inset hairline echo — and its title turns
+            // semibold above.
             if selected {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(tokens.leafGold.opacity(0.85), lineWidth: 1.2)
+                    .strokeBorder(tokens.leafGold.opacity(0.90), lineWidth: 1.6)
+                RoundedRectangle(cornerRadius: 12.5, style: .continuous)
+                    .strokeBorder(tokens.metal.opacity(0.55), lineWidth: 0.75)
+                    .padding(3.5)
             }
         }
         .accessibilityLabel("\(title), \(caption.lowercased())")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    // MARK: - Tile ornament treatments
+    //
+    // One recipe per timing state, exposed as static functions so
+    // `PrayerLogSheetContrastTests` audits exactly the values the
+    // tiles render — every state's primary boundary holds ≥3:1
+    // against the tile in all four palettes. Quiet must never mean
+    // invisible.
+
+    /// The qadā body: lapis pigment, lifted a step on the jewel
+    /// grounds so the roundel never sinks into a dark tile.
+    static func qadaBodyValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.groundBottomValue.relativeLuminance < 0.5
+            ? tokens.lapisValue.scalingLightness(by: 1.4)
+            : tokens.lapisValue
+    }
+
+    /// The qadā edge: the metal keyline that pairs gold with the
+    /// pigment — the classical lapis-and-gold voice, and the boundary
+    /// that carries the ornament on dark tiles.
+    static func qadaEdgeValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.metalValue
+    }
+
+    /// The late outline: warm metal on jewel grounds; on the
+    /// near-white days plain metal falls under 3:1, so it deepens
+    /// toward the keyline — still bronze, never gray.
+    static func lateOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.groundBottomValue.relativeLuminance < 0.5
+            ? tokens.metalValue
+            : SRGBValue.mix(tokens.metalValue, tokens.keylineValue, amount: 0.30)
+    }
+
+    /// The missed outline: quiet secondary ink, already ≥7:1 on every
+    /// panel.
+    static func missedOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.inkSecondaryValue
     }
 
     /// The ornament in the state the choice would produce — the
@@ -248,22 +310,21 @@ struct PrayerLogSheet: View {
             // Gilded: solid leaf bounded by the keyline.
             GildedOrnamentGlyph(prayer: prayer, size: 30, tokens: tokens)
         case .late:
-            // The warm metal outline.
             PrayerOrnamentShape(prayer: prayer, mode: .outline)
-                .stroke(tokens.metal.opacity(0.85), lineWidth: 1.3)
+                .stroke(Self.lateOutlineValue(for: tokens).color.opacity(0.95), lineWidth: 1.3)
         case .qada:
-            // The pigment without the leaf: lapis body, keyline edge —
-            // made up later, warm, never alarming.
+            // The pigment paired with the metal: made up later — warm,
+            // legible, never alarming.
             ZStack {
                 PrayerOrnamentShape(prayer: prayer, mode: .filled)
-                    .fill(tokens.lapis, style: FillStyle(eoFill: true))
+                    .fill(Self.qadaBodyValue(for: tokens).color, style: FillStyle(eoFill: true))
                 PrayerOrnamentShape(prayer: prayer, mode: .filled)
-                    .stroke(tokens.keyline, lineWidth: 0.75)
+                    .stroke(Self.qadaEdgeValue(for: tokens).color.opacity(0.95), lineWidth: 1.0)
             }
         case .missed:
             // The quiet passed state.
             PrayerOrnamentShape(prayer: prayer, mode: .outline)
-                .stroke(tokens.inkSecondary.opacity(0.75), lineWidth: 1.0)
+                .stroke(Self.missedOutlineValue(for: tokens).color.opacity(0.85), lineWidth: 1.0)
         }
     }
 

@@ -294,6 +294,31 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     public var subterranean: Color { groundPlaneValue.color }
     public var subterraneanValue: SRGBValue { groundPlaneValue }
 
+    /// Backing tint for the log sheet's glass — SkyPhase-aware on
+    /// EVERY ground (corrective G, phase 3). `chromeTint` returns
+    /// clear on jewel grounds because a bar of bare glass over the
+    /// dark page needs no help; a full-height sheet is not a bar —
+    /// bare material over the night plate read as a flat charcoal
+    /// slab. The sheet's backing therefore carries the ground family
+    /// in all four phases: warm near-white on the days, deep
+    /// indigo/plum on the jewel grounds — glass that refracts the sky
+    /// it stands in. A backing layer under the platform material,
+    /// never a tint of the glass itself.
+    public var sheetBackingValue: SRGBValue {
+        groundPlaneValue.relativeLuminance > 0.5
+            ? SRGBValue.mix(panelFillValue, horizonWashValue, amount: 0.45)
+            : SRGBValue.mix(panelFillValue, groundPlaneValue, amount: 0.35)
+    }
+
+    /// Opacity of the sheet backing over the platform glass.
+    public var sheetBackingOpacity: Double {
+        groundPlaneValue.relativeLuminance > 0.5 ? 0.72 : 0.62
+    }
+
+    public var sheetBacking: Color {
+        sheetBackingValue.color.opacity(sheetBackingOpacity)
+    }
+
 }
 
 // MARK: - Canonical states

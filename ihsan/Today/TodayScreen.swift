@@ -313,11 +313,11 @@ private struct TodayReadyView: View {
                 }
                 .padding(.bottom, IhsanSpacing.md)
             }
+            // The log sheet owns its presentation: a content-sized
+            // medium detent, drag indicator, and SkyPhase-backed glass
+            // are applied inside `PrayerLogSheet`.
             .sheet(item: $sheetSelection) { selection in
                 logSheet(for: selection.prayer)
-                    .presentationDetents([.large])
-                    .presentationDragIndicator(.visible)
-                    .presentationBackground(.thinMaterial)
             }
             .sheet(isPresented: $isCelestialReferencePresented) {
                 QiblaScreen(
