@@ -150,3 +150,62 @@ struct RepairAdjustSheet: View {
         )
     }
 }
+
+/// The fasting thread's estimator: a manual count, entered by the
+/// user — days owed are counted, never estimated by the app. One
+/// count, one calm confirm; the same dignity rules as the prayer
+/// ledger.
+struct RepairFastingEstimatorSheet: View {
+    let viewModel: RepairViewModel
+    let tokens: SkyPaletteTokens
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var count: Int = 0
+
+    var body: some View {
+        ZStack {
+            tokens.groundGradient
+                .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                Text("FASTS TO MAKE UP")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(tokens.metal)
+                    .shadow(color: tokens.inkHalo, radius: 2)
+
+                Text("Enter the number of days as you know it. The count is yours to adjust at any time.")
+                    .font(IhsanFont.bodyEnglish)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .shadow(color: tokens.inkHalo, radius: 2)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                VStack(spacing: 0) {
+                    RepairCategoryCountRow(
+                        category: .fasting,
+                        count: $count,
+                        tokens: tokens
+                    )
+                }
+                .background {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(tokens.panelFill)
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(tokens.panelStroke, lineWidth: 1)
+                }
+
+                RepairPrimaryButton(title: "Begin the thread", tokens: tokens) {
+                    viewModel.beginFastingLedger(count: count)
+                    Haptics.success()
+                    dismiss()
+                }
+                .disabled(count == 0)
+                .opacity(count == 0 ? 0.5 : 1)
+            }
+            .padding(IhsanSpacing.lg)
+        }
+        .environment(\.colorScheme, tokens.prefersDarkChrome ? .dark : .light)
+    }
+}

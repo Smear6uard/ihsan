@@ -91,6 +91,14 @@ public final class UserSettings {
     public var duhaDhuhrMarginMinutes: Int = 15
     /// Optional nafl overlay on the Path dot rows — visible if sought.
     public var pathNaflOverlayEnabled: Bool = false
+    /// Voluntary fasting rhythms — gentle intentions, OFF by default.
+    /// When enabled, the significant-day line doubles as a quiet
+    /// offer; never a notification by default.
+    public var fastingMonThuOfferEnabled: Bool = false
+    public var fastingWhiteDaysOfferEnabled: Bool = false
+    /// Optional dhikr presence on the Path — off by default, factual
+    /// counts only, exactly like the nafl overlay.
+    public var pathDhikrOverlayEnabled: Bool = false
     /// The gentle wake for the last third of the night. Strictly opt-in.
     public var nightWakeEnabled: Bool = false
     /// Minutes before the last third's start to wake; 0 wakes at its start.
@@ -139,6 +147,9 @@ public final class UserSettings {
         duhaSunriseOffsetMinutes: Int = 20,
         duhaDhuhrMarginMinutes: Int = 15,
         pathNaflOverlayEnabled: Bool = false,
+        fastingMonThuOfferEnabled: Bool = false,
+        fastingWhiteDaysOfferEnabled: Bool = false,
+        pathDhikrOverlayEnabled: Bool = false,
         nightWakeEnabled: Bool = false,
         nightWakeOffsetMinutes: Int = 0,
         lastDataExportAt: Date? = nil,
@@ -184,6 +195,9 @@ public final class UserSettings {
         self.duhaSunriseOffsetMinutes = duhaSunriseOffsetMinutes
         self.duhaDhuhrMarginMinutes = duhaDhuhrMarginMinutes
         self.pathNaflOverlayEnabled = pathNaflOverlayEnabled
+        self.fastingMonThuOfferEnabled = fastingMonThuOfferEnabled
+        self.fastingWhiteDaysOfferEnabled = fastingWhiteDaysOfferEnabled
+        self.pathDhikrOverlayEnabled = pathDhikrOverlayEnabled
         self.nightWakeEnabled = nightWakeEnabled
         self.nightWakeOffsetMinutes = nightWakeOffsetMinutes
         self.lastDataExportAt = lastDataExportAt

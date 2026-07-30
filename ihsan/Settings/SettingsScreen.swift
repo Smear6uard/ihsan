@@ -83,6 +83,7 @@ struct SettingsScreen: View {
                             wakeFallbackNote: nightWakeFallbackNote,
                             onWakeSettingsChanged: { refreshNightWake(for: settings) }
                         )
+                        FastingSection(settings: settings)
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
                         PrivacySection(
@@ -1150,6 +1151,53 @@ private func miniCountControl(
             onChange(max(range.lowerBound, value - step))
         @unknown default:
             break
+        }
+    }
+}
+
+/// Voluntary fasting rhythms — gentle intentions, off by default.
+/// Enabling one only lets the Today header's significant-day line
+/// double as a quiet offer; nothing notifies, nothing counts.
+private struct FastingSection: View {
+    let settings: UserSettings
+
+    var body: some View {
+        SettingsSectionCard("Fasting") {
+            SettingsRow(
+                title: "Monday and Thursday",
+                subtitle: "Off by default",
+                glyph: .book
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { settings.fastingMonThuOfferEnabled },
+                    set: {
+                        settings.fastingMonThuOfferEnabled = $0
+                        settings.modifiedAt = .now
+                    }
+                ))
+                .labelsHidden()
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                .accessibilityLabel("Monday and Thursday fasting offer")
+            }
+
+            SettingsRow(
+                title: "White days (13–15)",
+                subtitle: "Off by default",
+                glyph: .nightMoon
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { settings.fastingWhiteDaysOfferEnabled },
+                    set: {
+                        settings.fastingWhiteDaysOfferEnabled = $0
+                        settings.modifiedAt = .now
+                    }
+                ))
+                .labelsHidden()
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                .accessibilityLabel("White days fasting offer")
+            }
+
+            SettingsDescriptionText("When a rhythm is on, the day's quiet line on Today doubles as the offer — one tap records an intention. An intention that passes simply expires. Never a notification.")
         }
     }
 }

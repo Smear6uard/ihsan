@@ -11,6 +11,7 @@ public enum NaflKind: Hashable, Sendable, Codable {
     case duha
     case qiyam
     case witr
+    case tarawih
 
     /// The stable string written to storage, e.g. `"rawatibBefore.fajr"`,
     /// `"duha"`, `"witr"`.
@@ -26,6 +27,8 @@ public enum NaflKind: Hashable, Sendable, Codable {
             "qiyam"
         case .witr:
             "witr"
+        case .tarawih:
+            "tarawih"
         }
     }
 
@@ -39,6 +42,8 @@ public enum NaflKind: Hashable, Sendable, Codable {
             self = .qiyam
         case "witr":
             self = .witr
+        case "tarawih":
+            self = .tarawih
         default:
             let parts = storageKey.split(separator: ".", maxSplits: 1)
             guard parts.count == 2, let prayer = Prayer(rawValue: String(parts[1])) else {
@@ -55,11 +60,12 @@ public enum NaflKind: Hashable, Sendable, Codable {
         }
     }
 
-    /// Every kind this build knows: ten rawatib slots plus duha, qiyam, witr.
+    /// Every kind this build knows: ten rawatib slots plus duha,
+    /// qiyam, witr, tarawih.
     public static var allKnownKinds: [NaflKind] {
         Prayer.allCases.map(NaflKind.rawatibBefore)
             + Prayer.allCases.map(NaflKind.rawatibAfter)
-            + [.duha, .qiyam, .witr]
+            + [.duha, .qiyam, .witr, .tarawih]
     }
 
     /// The fard prayer a rawatib kind surrounds; nil for the free-standing kinds.
@@ -67,7 +73,7 @@ public enum NaflKind: Hashable, Sendable, Codable {
         switch self {
         case .rawatibBefore(let prayer), .rawatibAfter(let prayer):
             prayer
-        case .duha, .qiyam, .witr:
+        case .duha, .qiyam, .witr, .tarawih:
             nil
         }
     }
@@ -84,6 +90,8 @@ public enum NaflKind: Hashable, Sendable, Codable {
             "Qiyam"
         case .witr:
             "Witr"
+        case .tarawih:
+            "Tarāwīḥ"
         }
     }
 
@@ -99,6 +107,8 @@ public enum NaflKind: Hashable, Sendable, Codable {
             "القيام"
         case .witr:
             "الوتر"
+        case .tarawih:
+            "التراويح"
         }
     }
 }

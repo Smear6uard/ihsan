@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import IhsanCore
 import IhsanDesignSystem
+import IhsanIntents
 import IhsanLocation
 import IhsanNotifications
 import IhsanPrayerTimes
@@ -172,6 +173,8 @@ private struct TodayReadyView: View {
     /// Yesterday's and today's voluntary records — yesterday's because a
     /// night act logged after midnight belongs to the night-of day.
     @Query private var recentNaflLogs: [NaflLog]
+    /// Today's fast, if one is recorded (intended or kept).
+    @Query private var todaysFasts: [FastLog]
 
     private var activePause: PauseInterval? {
         pauses.first(where: \.isActive)
@@ -236,6 +239,11 @@ private struct TodayReadyView: View {
             log.naflDate >= startOfYesterday && log.naflDate < endOfDay
         }
         self._recentNaflLogs = Query(filter: naflPredicate, sort: \NaflLog.naflDate)
+
+        let fastPredicate = #Predicate<FastLog> { log in
+            log.fastDate >= startOfDay && log.fastDate < endOfDay
+        }
+        self._todaysFasts = Query(filter: fastPredicate, sort: \FastLog.fastDate)
     }
 
     var body: some View {
@@ -303,8 +311,9 @@ private struct TodayReadyView: View {
                         tokens: tokens,
                         onMoonPhaseTap: { isCelestialReferencePresented = true },
                         onHijriTap: { isHijriSheetPresented = true },
-                        significantDayInscription: significantDayInscription(at: now),
-                        onSignificantDayTap: { dismissSignificantDay(at: now) }
+                        significantDayInscription: headerLineText(at: now),
+                        significantDayHint: headerLineHint(at: now),
+                        onSignificantDayTap: { handleHeaderLineTap(at: now) }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                     .padding(.top, IhsanSpacing.md)
@@ -320,6 +329,10 @@ private struct TodayReadyView: View {
                             onEndPause: { togglePause() }
                         )
                     } else {
+                        if let inscription = fastingInscription(at: now) {
+                            fastingInscriptionRow(inscription, tokens: tokens, now: now)
+                        }
+
                         focusedCard(now: now, moment: moment, tokens: tokens)
 
                         if let duhaWindow = activeDuhaWindow(at: now) {
@@ -516,7 +529,11 @@ private struct TodayReadyView: View {
                 forNightOf: nightDay,
                 witrLogs: witrLogs,
                 tracksWitrQada: settings.qadaTrackingEnabled && settings.qadaTracksWitr
-            )
+            ),
+            // Tarāwīḥ joins the night set for the month of Ramadan.
+            tarawihLogged: snapshot.isCurrentlyRamadan
+                ? naflLogged(.tarawih, on: nightDay)
+                : nil
         )
     }
 
@@ -537,7 +554,7 @@ private struct TodayReadyView: View {
 
     private func naflDay(for kind: NaflKind, at now: Date) -> Date {
         switch kind {
-        case .qiyam, .witr:
+        case .qiyam, .witr, .tarawih:
             return nightOfDay(at: now)
         case .duha, .rawatibBefore, .rawatibAfter:
             return todayDay(at: now)
@@ -578,30 +595,145 @@ private struct TodayReadyView: View {
             return [2, 4, 8, 12]
         case .witr:
             return [1, 3, 5, 7, 9, 11]
+        case .tarawih:
+            return [8, 20]
         }
     }
 
-    // MARK: - Hijri awareness
+    // MARK: - Hijri awareness + the fasting layer
 
     private var hijriOffsetDays: Int {
         sunnahSettings?.hijriCalendarOffsetDays ?? 0
     }
 
-    /// The quiet significant-day line for the header — present on a
-    /// curated day, dismissed by a tap until tomorrow.
-    private func significantDayInscription(at now: Date) -> String? {
-        guard significantDayDismissedDay != civilDayKey(at: now) else { return nil }
-        let components = HijriConverter.components(
-            for: now, offsetDays: hijriOffsetDays, timeZone: snapshot.place.timeZone
-        )
-        guard let significance = HijriConverter.significance(of: components).first else {
-            return nil
-        }
-        return significance.inscription(for: components).uppercased()
+    private var todaysFast: FastLog? {
+        todaysFasts.first
     }
 
-    private func dismissSignificantDay(at now: Date) {
-        significantDayDismissedDay = civilDayKey(at: now)
+    /// The header's quiet line for today: a curated calendar fact
+    /// (dismissible), or — when a rhythm is enabled — the same line
+    /// doubling as a gentle fasting offer.
+    private func headerLine(at now: Date) -> FastingDayModel.HeaderLine? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = snapshot.place.timeZone
+        return FastingDayModel.headerLine(
+            components: HijriConverter.components(
+                for: now, offsetDays: hijriOffsetDays, timeZone: snapshot.place.timeZone
+            ),
+            weekday: calendar.component(.weekday, from: now),
+            isRamadan: snapshot.isCurrentlyRamadan,
+            monThuOfferEnabled: sunnahSettings?.fastingMonThuOfferEnabled ?? false,
+            whiteDaysOfferEnabled: sunnahSettings?.fastingWhiteDaysOfferEnabled ?? false,
+            isPaused: activePause != nil,
+            hasFastToday: todaysFast != nil,
+            dismissedForToday: significantDayDismissedDay == civilDayKey(at: now)
+        )
+    }
+
+    private func headerLineText(at now: Date) -> String? {
+        switch headerLine(at: now) {
+        case .info(let text): return text
+        case .offer(let text, _): return text
+        case nil: return nil
+        }
+    }
+
+    private func headerLineHint(at now: Date) -> String? {
+        switch headerLine(at: now) {
+        case .info: return "Dismisses this note for today."
+        case .offer: return "Records a fasting intention for today."
+        case nil: return nil
+        }
+    }
+
+    private func handleHeaderLineTap(at now: Date) {
+        switch headerLine(at: now) {
+        case .info:
+            significantDayDismissedDay = civilDayKey(at: now)
+        case .offer(_, let kind):
+            recordFast(kind: kind, state: .intended)
+        case nil:
+            break
+        }
+    }
+
+    /// The quiet fasting inscription joining the focused-card region.
+    private func fastingInscription(at now: Date) -> FastingDayModel.Inscription? {
+        FastingDayModel.inscription(
+            state: todaysFast?.state,
+            isRamadan: snapshot.isCurrentlyRamadan,
+            isPaused: activePause != nil,
+            now: now,
+            fajr: snapshot.dayTimes.fajr.scheduledTime,
+            maghrib: snapshot.dayTimes.maghrib.scheduledTime,
+            timeZone: snapshot.place.timeZone
+        )
+    }
+
+    /// Inscription register, no countdown urgency: one small-caps
+    /// line. Facts sit still; the two offers are quiet buttons.
+    @ViewBuilder
+    private func fastingInscriptionRow(
+        _ inscription: FastingDayModel.Inscription,
+        tokens: SkyPaletteTokens,
+        now: Date
+    ) -> some View {
+        switch inscription {
+        case .fact(let text):
+            fastingLineLabel(text, tokens: tokens, outlined: false)
+                .accessibilityLabel(text.capitalized)
+        case .ramadanOffer(let text):
+            Button {
+                recordFast(kind: .ramadan, state: .kept)
+            } label: {
+                fastingLineLabel(text, tokens: tokens, outlined: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Fasting today?")
+            .accessibilityHint("Records today's Ramadan fast.")
+        case .keptCompletion(let text):
+            Button {
+                recordFast(kind: todaysFast?.kind ?? .other, state: .kept)
+            } label: {
+                fastingLineLabel(text, tokens: tokens, outlined: true)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Fast kept?")
+            .accessibilityHint("Records the intended fast as kept.")
+        }
+    }
+
+    private func fastingLineLabel(
+        _ text: String, tokens: SkyPaletteTokens, outlined: Bool
+    ) -> some View {
+        Text(text)
+            .font(IhsanFont.inscription)
+            .tracking(1.4)
+            .foregroundStyle(tokens.inkSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .shadow(color: tokens.inkHaloDark, radius: 1)
+            .shadow(color: tokens.inkHaloLight, radius: 3)
+            .padding(.horizontal, outlined ? 12 : 0)
+            .padding(.vertical, outlined ? 4 : 0)
+            .overlay {
+                if outlined {
+                    Capsule().strokeBorder(
+                        tokens.metal.opacity(0.45), lineWidth: 0.8
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity)
+    }
+
+    /// One funnel, instant feedback: the haptic fires before the
+    /// intent persists, and the @Query re-render carries the truth.
+    private func recordFast(kind: FastKind, state: FastState) {
+        Haptics.impact(.light)
+        let day = todayDay(at: nowProvider.now())
+        Task {
+            _ = try? await LogFastIntent(kind: kind, state: state, fastDate: day).perform()
+        }
     }
 
     private func civilDayKey(at now: Date) -> String {

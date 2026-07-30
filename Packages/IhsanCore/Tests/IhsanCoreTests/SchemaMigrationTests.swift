@@ -141,6 +141,61 @@ private func seedV2Store(at url: URL) throws {
     try context.save()
 }
 
+/// Seeds a store shaped exactly like a real V3 install — prayer logs,
+/// the qada ledger, a pause, nafl records, and a sunnah-enabled
+/// settings row — using the frozen V3 snapshot types, then closes it.
+private func seedV3Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV3.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    context.insert(IhsanSchemaV3.PrayerLog(
+        id: seededLogID,
+        prayer: .fajr,
+        prayerDate: Date(timeIntervalSinceReferenceDate: 700_000_000),
+        loggedTimeZoneIdentifier: "America/Toronto",
+        scheduledTime: Date(timeIntervalSinceReferenceDate: 700_000_100),
+        prayedAt: Date(timeIntervalSinceReferenceDate: 700_000_200),
+        status: .onTime,
+        withJamaah: true,
+        note: "quiet fajr"
+    ))
+    context.insert(IhsanSchemaV3.PauseInterval(
+        id: seededPauseID,
+        startDate: Date(timeIntervalSinceReferenceDate: 699_900_000),
+        expectedEndDate: Date(timeIntervalSinceReferenceDate: 701_000_000),
+        loggedTimeZoneIdentifier: "America/Toronto",
+        note: "resting"
+    ))
+
+    let ledger = IhsanSchemaV3.QadaLedger(category: .isha, remainingCount: 40)
+    ledger.madeUpCount = 3
+    context.insert(ledger)
+    context.insert(IhsanSchemaV3.QadaEntry(
+        id: seededQadaEntryID,
+        category: .isha,
+        kind: .estimated,
+        amount: 40,
+        reason: "first estimate"
+    ))
+    context.insert(IhsanSchemaV3.NaflLog(
+        kind: .witr,
+        naflDate: Date(timeIntervalSinceReferenceDate: 700_050_000),
+        rakahCount: 3
+    ))
+
+    let settings = IhsanSchemaV3.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.qadaTrackingEnabled = true
+    settings.sunnahLayerEnabled = true
+    settings.hijriCalendarOffsetDays = 1
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
 private func withMigratedStore(
     seed: (URL) throws -> Void,
     assertions: (ModelContext) throws -> Void
@@ -153,7 +208,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV3.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV4.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -186,6 +241,81 @@ func migratingSeededV2StoreToV3PreservesPrayerLogsQadaEntriesAndPauses() async {
 func migratedStoreAcceptsNewNaflAndQadaRecords() async {
     await #expect(processExitsWith: .success) {
         try assertMigratedStoreIsWritable()
+    }
+}
+
+@Test
+func migratingSeededV3StoreToV4PreservesTheLedgerAndAddsTheWorshipTables() async {
+    await #expect(processExitsWith: .success) {
+        try assertV3StoreMigratesToV4()
+    }
+}
+
+private func assertV3StoreMigratesToV4() throws {
+    try withMigratedStore(seed: seedV3Store) { context in
+        // The prayer ledger comes through intact — the fasting
+        // extension may not disturb a single existing record.
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.id == seededLogID)
+        #expect(logs.first?.note == "quiet fajr")
+        #expect(logs.first?.withJamaah == true)
+
+        let ledgers = try context.fetch(FetchDescriptor<QadaLedger>())
+        #expect(ledgers.count == 1)
+        #expect(ledgers.first?.category == .isha)
+        #expect(ledgers.first?.remainingCount == 40)
+        #expect(ledgers.first?.madeUpCount == 3)
+
+        let entries = try context.fetch(FetchDescriptor<QadaEntry>())
+        #expect(entries.count == 1)
+        #expect(entries.first?.id == seededQadaEntryID)
+        #expect(entries.first?.reason == "first estimate")
+
+        let nafl = try context.fetch(FetchDescriptor<NaflLog>())
+        #expect(nafl.count == 1)
+        #expect(nafl.first?.kind == .witr)
+        #expect(nafl.first?.rakahCount == 3)
+
+        let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
+        #expect(pauses.first?.note == "resting")
+
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.qadaTrackingEnabled == true)
+        #expect(settings.sunnahLayerEnabled == true)
+        #expect(settings.hijriCalendarOffsetDays == 1)
+        // Every V4 field lands with its quiet default: rhythms and
+        // overlays are off.
+        #expect(settings.fastingMonThuOfferEnabled == false)
+        #expect(settings.fastingWhiteDaysOfferEnabled == false)
+        #expect(settings.pathDhikrOverlayEnabled == false)
+
+        // The new tables exist, empty and writable.
+        #expect(try context.fetch(FetchDescriptor<FastLog>()).isEmpty)
+        #expect(try context.fetch(FetchDescriptor<DhikrSession>()).isEmpty)
+
+        context.insert(FastLog(
+            kind: .whiteDay,
+            state: .intended,
+            fastDate: Date(timeIntervalSinceReferenceDate: 700_100_000)
+        ))
+        context.insert(DhikrSession(
+            sessionDate: Date(timeIntervalSinceReferenceDate: 700_100_000),
+            count: 33,
+            phrase: .subhanallah
+        ))
+        context.insert(QadaEntry.estimated(category: .fasting, count: 12))
+        try context.save()
+
+        let fasts = try context.fetch(FetchDescriptor<FastLog>())
+        #expect(fasts.first?.kind == .whiteDay)
+        #expect(fasts.first?.state == .intended)
+        let sessions = try context.fetch(FetchDescriptor<DhikrSession>())
+        #expect(sessions.first?.count == 33)
+        let fastingEntries = try context.fetch(FetchDescriptor<QadaEntry>())
+            .filter { $0.category == .fasting }
+        #expect(fastingEntries.count == 1)
     }
 }
 

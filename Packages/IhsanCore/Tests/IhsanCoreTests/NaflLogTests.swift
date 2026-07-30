@@ -7,7 +7,7 @@ private let nightOf = Date(timeIntervalSinceReferenceDate: 700_000_000)
 
 @MainActor
 private func makeContext() throws -> ModelContext {
-    let schema = Schema(IhsanSchemaV3.models)
+    let schema = Schema(IhsanSchemaV4.models)
     // Unique store name per test — unnamed in-memory configurations share
     // one backing store within a process, which corrupts parallel runs.
     let configuration = ModelConfiguration(
@@ -31,16 +31,18 @@ func naflKindStorageKeysRoundTrip() throws {
 
     #expect(NaflKind(storageKey: "rawatibBefore.fajr") == .rawatibBefore(.fajr))
     #expect(NaflKind(storageKey: "witr") == .witr)
+    #expect(NaflKind(storageKey: "tarawih") == .tarawih)
     // Unknown keys stay nil instead of trapping — the kind design is
     // extensible and old builds must tolerate newer data.
-    #expect(NaflKind(storageKey: "tarawih") == nil)
+    #expect(NaflKind(storageKey: "sunriseWalk") == nil)
     #expect(NaflKind(storageKey: "rawatibBefore.tea") == nil)
 }
 
 @Test
 func naflKindEnumeratesAllKnownKinds() {
     let all = NaflKind.allKnownKinds
-    #expect(all.count == 13)
+    #expect(all.count == 14)
+    #expect(all.contains(.tarawih))
     #expect(all.contains(.duha))
     #expect(all.contains(.rawatibBefore(.dhuhr)))
     #expect(Set(all.map(\.storageKey)).count == all.count)

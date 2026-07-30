@@ -41,7 +41,8 @@ struct TrajectoryScreen: View {
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
-    @State private var showingRepairDetail = false
+    @State private var showingRepairDetail = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugPresentRepair")
     /// A grid cell awaiting the retroactive log sheet.
     @State private var retroSelection: RetroLogSelection?
 

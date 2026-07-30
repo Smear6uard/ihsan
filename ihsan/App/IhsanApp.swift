@@ -210,6 +210,46 @@ private struct RootGate: View {
                 try? modelContext.save()
             }
         }
+        // `-IhsanDebugEnableFastingRhythms` turns both voluntary
+        // rhythm offers on — the screenshot harness for the offer
+        // line.
+        if arguments.contains("-IhsanDebugEnableFastingRhythms") {
+            if let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                settings.fastingMonThuOfferEnabled = true
+                settings.fastingWhiteDaysOfferEnabled = true
+                try? modelContext.save()
+            }
+        }
+        // `-IhsanDebugLogFast ramadan:kept` seeds today's fast through
+        // the standard funnel; composes with -IhsanNowOverride.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugLogFast"),
+           arguments.indices.contains(flagIndex + 1) {
+            let parts = arguments[flagIndex + 1].split(separator: ":")
+            if parts.count == 2,
+               let kind = FastKind(rawValue: String(parts[0])),
+               let state = FastState(rawValue: String(parts[1])) {
+                let day = Calendar.current.startOfDay(for: NowProvider.active.now())
+                Task {
+                    _ = try? await LogFastIntent(kind: kind, state: state, fastDate: day).perform()
+                }
+            }
+        }
+        // `-IhsanDebugSeedFastingLedger N` opens the fasting thread
+        // with a manual count, as the estimator sheet would.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugSeedFastingLedger"),
+           arguments.indices.contains(flagIndex + 1),
+           let count = Int(arguments[flagIndex + 1]), count > 0 {
+            if let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                settings.qadaTrackingEnabled = true
+                settings.qadaSetupCompletedAt = NowProvider.active.now()
+            }
+            try? QadaLedgerWriter().recordEstimate(
+                [.fasting: count, .isha: 24],
+                sourceSurface: .app,
+                in: modelContext
+            )
+            try? modelContext.save()
+        }
         // `-IhsanDebugLogPrayer dhuhr:late` seeds today; an optional
         // third component is a day offset — `dhuhr:late:-1` seeds
         // yesterday (relative to the NowProvider clock, so it

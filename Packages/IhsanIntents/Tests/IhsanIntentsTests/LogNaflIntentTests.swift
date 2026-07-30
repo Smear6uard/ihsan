@@ -76,7 +76,7 @@ final class LogNaflIntentTests: XCTestCase {
     func testUnknownKindKeyThrows() async throws {
         _ = try await makeContext()
         var intent = LogNaflIntent()
-        intent.kindKey = "tarawih"
+        intent.kindKey = "sunriseWalk"
 
         do {
             _ = try await intent.perform()

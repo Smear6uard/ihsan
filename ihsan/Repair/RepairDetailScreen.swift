@@ -18,6 +18,7 @@ struct RepairDetailScreen: View {
     @State private var viewModel: RepairViewModel?
     @State private var showingMultiAdd = false
     @State private var showingAdjust = false
+    @State private var showingFastingEstimator = false
 
     private var tokens: SkyPaletteTokens {
         RepairPalette.tokens()
@@ -35,12 +36,19 @@ struct RepairDetailScreen: View {
         orderedLedgers.filter { $0.remainingCount > 0 }
     }
 
-    /// Ledger rows in day order (fajr → isha, witr last).
+    /// Ledger rows in day order (fajr → isha, witr, then the fasting
+    /// thread last).
     private var orderedLedgers: [QadaLedger] {
-        let order = QadaCategory.fardCategories + [.witr]
+        let order = QadaCategory.fardCategories + [.witr, .fasting]
         return order.compactMap { category in
             ledgers.first { $0.categoryRaw == category.rawValue }
         }
+    }
+
+    /// Whether the fasting thread has been opened at all — its
+    /// estimator entry is offered only until it exists.
+    private var hasFastingLedger: Bool {
+        ledgers.contains { $0.categoryRaw == QadaCategory.fasting.rawValue }
     }
 
     private var totalRemaining: Int {
@@ -123,6 +131,13 @@ struct RepairDetailScreen: View {
                 )
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+            }
+        }
+        .sheet(isPresented: $showingFastingEstimator) {
+            if let viewModel {
+                RepairFastingEstimatorSheet(viewModel: viewModel, tokens: tokens)
+                    .presentationDetents([.medium])
+                    .presentationDragIndicator(.visible)
             }
         }
         .fullScreenCover(item: Binding(
@@ -270,7 +285,11 @@ struct RepairDetailScreen: View {
                                 }
                         }
                         .buttonStyle(.plain)
-                        .accessibilityLabel("Log one \(category.displayNameEnglish) made up")
+                        .accessibilityLabel(
+                            category == .fasting
+                                ? "Log one makeup fast"
+                                : "Log one \(category.displayNameEnglish) made up"
+                        )
                     }
                     .padding(.horizontal, IhsanSpacing.md)
                     .padding(.vertical, IhsanSpacing.sm)
@@ -301,6 +320,21 @@ struct RepairDetailScreen: View {
                         .frame(minHeight: 40)
                 }
                 .buttonStyle(.plain)
+            }
+
+            if !hasFastingLedger {
+                Button {
+                    Haptics.impact(.light)
+                    showingFastingEstimator = true
+                } label: {
+                    Text("Add fasts")
+                        .font(IhsanFont.bodyEnglish)
+                        .foregroundStyle(tokens.inkSecondary)
+                        .shadow(color: tokens.inkHalo, radius: 2)
+                        .frame(minHeight: 40)
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("Opens the fasting thread with a count you enter.")
             }
 
             Spacer()

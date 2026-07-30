@@ -48,9 +48,15 @@ struct TodayHeader: View {
     /// Tap callback for the Hijri date — opens the Hijri month sheet.
     var onHijriTap: (() -> Void)? = nil
     /// A curated significant-day inscription for today ("WHITE DAY ·
-    /// SAFAR 14"), quiet and dismissible. `nil` renders nothing.
+    /// SAFAR 14"), quiet and dismissible — or, when a fasting rhythm
+    /// is enabled, the same line doubling as a gentle offer ("WHITE
+    /// DAY · FAST?"). `nil` renders nothing.
     var significantDayInscription: String? = nil
-    /// Tapping the line dismisses it for the day.
+    /// VoiceOver hint describing what the tap does (dismiss vs.
+    /// record an intention).
+    var significantDayHint: String? = nil
+    /// Tapping the line dismisses it for the day, or records the
+    /// offered intention.
     var onSignificantDayTap: (() -> Void)? = nil
 
     var body: some View {
@@ -109,7 +115,7 @@ struct TodayHeader: View {
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel(significantDayInscription)
-                    .accessibilityHint("Dismisses this note for today.")
+                    .accessibilityHint(significantDayHint ?? "Dismisses this note for today.")
                 }
             }
 

@@ -9,11 +9,19 @@ public enum QadaCategory: String, Codable, CaseIterable, Sendable {
     case maghrib
     case isha
     case witr
+    case fasting
 
-    /// The five daily prayers, in day order. Witr is a separate optional
-    /// category and is never included here.
+    /// The five daily prayers, in day order. Witr and fasting are
+    /// separate optional categories and are never included here.
     public static var fardCategories: [QadaCategory] {
         [.fajr, .dhuhr, .asr, .maghrib, .isha]
+    }
+
+    /// Whether the setup estimator may derive a starting count for
+    /// this category. Fasting is manual-entry only — days owed are
+    /// counted by the user, never estimated by the app.
+    public var supportsAutoEstimation: Bool {
+        self != .fasting
     }
 
     public init(prayer: Prayer) {
@@ -35,6 +43,8 @@ public enum QadaCategory: String, Codable, CaseIterable, Sendable {
         switch self {
         case .witr:
             "Witr"
+        case .fasting:
+            "Fasts"
         case .fajr, .dhuhr, .asr, .maghrib, .isha:
             prayer?.displayNameEnglish ?? rawValue.capitalized
         }
@@ -44,6 +54,8 @@ public enum QadaCategory: String, Codable, CaseIterable, Sendable {
         switch self {
         case .witr:
             "الوتر"
+        case .fasting:
+            "الصيام"
         case .fajr, .dhuhr, .asr, .maghrib, .isha:
             prayer?.displayNameArabic ?? rawValue
         }

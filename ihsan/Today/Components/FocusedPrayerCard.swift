@@ -50,6 +50,8 @@ struct FocusedPrayerCard: View {
         let witrLogged: Bool
         /// Informational only — the ledger is never mutated from here.
         let witrBridge: WitrNightState
+        /// Present only during Ramadan: tarāwīḥ joins the night set.
+        var tarawihLogged: Bool? = nil
     }
 
     let prayer: Prayer
@@ -483,6 +485,14 @@ struct FocusedPrayerCard: View {
                 logged: nightSet.witrLogged,
                 caption: "WITR"
             )
+            if let tarawihLogged = nightSet.tarawihLogged {
+                naflChip(
+                    kind: .tarawih,
+                    ornament: .isha,
+                    logged: tarawihLogged,
+                    caption: "TARĀWĪḤ"
+                )
+            }
             if nightSet.witrBridge == .current {
                 Text("TONIGHT'S WITR · CURRENT")
                     .font(IhsanFont.inscription)

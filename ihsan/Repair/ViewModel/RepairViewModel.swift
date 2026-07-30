@@ -87,6 +87,22 @@ final class RepairViewModel {
         }
     }
 
+    /// Opens the fasting thread with the user's own count. Manual
+    /// entry only — days owed are counted by the user, never
+    /// estimated by the app (`QadaCategory.supportsAutoEstimation`).
+    func beginFastingLedger(count: Int) {
+        guard count > 0 else { return }
+        do {
+            try writer.recordEstimate(
+                [.fasting: count],
+                sourceSurface: .app,
+                in: modelContext
+            )
+        } catch {
+            Haptics.notification(.warning)
+        }
+    }
+
     func setDailyIntention(_ enabled: Bool, settings: UserSettings) {
         settings.qadaDailyIntentionEnabled = enabled
         settings.modifiedAt = .now
