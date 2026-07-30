@@ -94,8 +94,8 @@ struct FocusedPrayerCard: View {
     var onTasbih: (() -> Void)? = nil
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var mode: Mode = ProcessInfo.processInfo.arguments
-        .contains("-IhsanDebugExpandCard") ? .expanded : .collapsed
+    @State private var mode: Mode = DebugLaunch.flag("-IhsanDebugExpandCard")
+        ? .expanded : .collapsed
     @State private var jamaahPending: Bool = false
     @State private var autoCollapseTask: Task<Void, Never>?
     @State private var rawatibRevealed: Bool = false

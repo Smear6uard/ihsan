@@ -62,8 +62,7 @@ final class QiblaViewModel {
 
     init(locationProvider: LocationProviding = CoreLocationCoordinator.shared) {
         self.locationProvider = locationProvider
-        self.logsHeading = ProcessInfo.processInfo.arguments
-            .contains("-IhsanQiblaHeadingLog")
+        self.logsHeading = DebugLaunch.flag("-IhsanQiblaHeadingLog")
     }
 
     /// Resolves the availability ladder and, when the instrument is
@@ -239,9 +238,7 @@ final class QiblaViewModel {
     ///
     /// Debug builds only; the real ladder never runs in this mode.
     private func startSimulatedHeadingIfRequested() -> Bool {
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let flagIndex = arguments.firstIndex(of: "-IhsanQiblaSimulateHeading"),
-              let mode = arguments.dropFirst(flagIndex + 1).first
+        guard let mode = DebugLaunch.value(after: "-IhsanQiblaSimulateHeading")
         else { return false }
 
         if mode == "denied" {

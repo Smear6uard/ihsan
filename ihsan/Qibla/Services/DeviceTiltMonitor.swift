@@ -15,9 +15,9 @@ final class DeviceTiltMonitor {
     private(set) var needsFlattening = false
 
     private let manager = CMMotionManager()
-    /// `-IhsanQiblaSimulateTilt` — simulator has no motion hardware.
-    private let simulateTilt = ProcessInfo.processInfo.arguments
-        .contains("-IhsanQiblaSimulateTilt")
+    /// `-IhsanQiblaSimulateTilt` — the simulator has no motion
+    /// hardware. Gated like every other debug affordance.
+    private let simulateTilt = DebugLaunch.flag("-IhsanQiblaSimulateTilt")
 
     func start() {
         #if DEBUG
