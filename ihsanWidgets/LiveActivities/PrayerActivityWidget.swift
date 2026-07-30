@@ -228,7 +228,7 @@ private struct PrayerActivityLogButton: View {
             Text("LOGGED")
                 .font(IhsanFont.inscription)
                 .tracking(1.4)
-                .foregroundStyle(tokens.leafGold)
+                .foregroundStyle(tokens.ink)
                 .frame(minWidth: compact ? 70 : 104, minHeight: compact ? 32 : 44)
                 .accessibilityLabel("\(context.attributes.englishName) logged")
         } else {
@@ -242,7 +242,7 @@ private struct PrayerActivityLogButton: View {
             // At the adhan itself the button is gold leaf on lapis —
             // the same gilding the current ornament wears. Before it,
             // the same shape, quiet.
-            .foregroundStyle(isPrimaryMoment ? tokens.lapis : tokens.ink)
+            .foregroundStyle(isPrimaryMoment ? tokens.keyline : tokens.ink)
             .background {
                 Capsule().fill(isPrimaryMoment ? tokens.leafGold : tokens.panelFill)
             }

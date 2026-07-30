@@ -142,7 +142,7 @@ struct PrayerOverviewLargeWidgetView: View {
                     Text("NEXT")
                         .font(IhsanFont.inscription)
                         .tracking(1.2)
-                        .foregroundStyle(tokens.leafGold)
+                        .foregroundStyle(tokens.ink)
                 }
 
                 Text(entry.clockTime(slot.scheduledTime))
@@ -176,7 +176,7 @@ struct PrayerOverviewLargeWidgetView: View {
         return Text(label)
             .font(IhsanFont.inscription)
             .tracking(1.0)
-            .foregroundStyle(status == .missed ? tokens.inkSecondary : tokens.leafGold)
+            .foregroundStyle(status == .missed ? tokens.inkSecondary : tokens.ink)
             .lineLimit(1)
     }
 }

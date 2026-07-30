@@ -547,11 +547,21 @@ public extension SkyPaletteTokens {
     /// becomes a glare with no colour left in it; warm parchment held
     /// at 84% keeps its character through the tint and never becomes a
     /// light source in a dark room.
+    ///
+    /// Held at 0.94 red rather than 0.92: Night Mode's tint leaves the
+    /// red channel doing nearly all the separating, and the darker
+    /// value measured 4.47:1 against the nightstand ground once the
+    /// other two were discarded — just under AA, on the one surface
+    /// read in the dark.
+    var standByInkValue: SRGBValue {
+        SRGBValue(red: 0.94, green: 0.89, blue: 0.80)
+    }
+
     var standByInk: Color {
-        SRGBValue(red: 0.92, green: 0.87, blue: 0.78).color.opacity(0.84)
+        standByInkValue.color.opacity(0.84)
     }
 
     var standByInkSecondary: Color {
-        SRGBValue(red: 0.92, green: 0.87, blue: 0.78).color.opacity(0.55)
+        standByInkValue.color.opacity(0.55)
     }
 }

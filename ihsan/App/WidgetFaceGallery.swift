@@ -254,8 +254,8 @@ struct WidgetFaceGallery: View {
         return AnyView(
             LinearGradient(
                 colors: [
-                    tokens.groundTopValue.scaled(0.65).color,
-                    tokens.groundBottomValue.scaled(0.55).color
+                    tokens.groundTopValue.scaled(0.55).color,
+                    tokens.groundBottomValue.scaled(0.45).color
                 ],
                 startPoint: .top, endPoint: .bottom
             )

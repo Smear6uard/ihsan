@@ -165,8 +165,11 @@ struct YesterdaySheet: View {
                     Text(stateInscription(for: row))
                         .font(IhsanFont.inscription)
                         .tracking(1.2)
+                        // Ink for an answered row, secondary ink for
+                        // one still waiting. Gold on the morning panel
+                        // measures 2.5:1 and this is text.
                         .foregroundStyle(
-                            row.log == nil ? tokens.inkSecondary : tokens.leafGold
+                            row.log == nil ? tokens.inkSecondary : tokens.ink
                         )
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
@@ -251,7 +254,10 @@ struct YesterdaySheet: View {
         } label: {
             Text(title)
                 .font(.system(size: 15, weight: selected ? .semibold : .regular, design: .serif))
-                .foregroundStyle(selected ? tokens.lapis : tokens.ink)
+                // The keyline, not lapis: the same deep ultramarine
+                // that bounds a gilded ornament, and the pairing that
+                // already holds AA on leaf gold in every phase.
+                .foregroundStyle(selected ? tokens.keyline : tokens.ink)
                 .padding(.horizontal, IhsanSpacing.sm + 2)
                 .padding(.vertical, 8)
                 .background(Capsule().fill(selected ? tokens.leafGold : tokens.panelFill))

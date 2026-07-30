@@ -55,7 +55,7 @@ final class GalleryCaptureUITests: XCTestCase {
             ]),
             Frame(name: "04-log-sheet", arguments: [
                 "-IhsanNowOverride", Self.chicagoAfternoon,
-                "-IhsanDebugPresentLogSheet"
+                "-IhsanDebugPresentLogSheet", "dhuhr"
             ], settle: 3.0),
             Frame(name: "05-path", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
@@ -122,7 +122,7 @@ final class GalleryCaptureUITests: XCTestCase {
             Frame(name: "a5-today", arguments: ["-IhsanNowOverride", Self.chicagoNight]),
             Frame(name: "a5-log-sheet", arguments: [
                 "-IhsanNowOverride", Self.chicagoAfternoon,
-                "-IhsanDebugPresentLogSheet"
+                "-IhsanDebugPresentLogSheet", "dhuhr"
             ], settle: 3.0),
             Frame(name: "a5-set", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
@@ -142,7 +142,16 @@ final class GalleryCaptureUITests: XCTestCase {
                 "-IhsanNowOverride", Self.chicagoNight,
                 "-IhsanDebugTab", "trajectory",
                 "-IhsanDebugLogPrayer", "fajr:onTime"
-            ])
+            ]),
+            Frame(name: "a5-yesterday", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugPresentYesterday"
+            ], settle: 3.0),
+            Frame(name: "a5-adhan", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "settings",
+                "-IhsanDebugSettingsRoute", "adhanSound"
+            ], settle: 3.0)
         ]
 
         for size in sizes {
@@ -169,8 +178,19 @@ final class GalleryCaptureUITests: XCTestCase {
 
         grantLocationIfAsked()
 
-        // The tab bar is the app's "ready" signal on every tab.
+        // The tab bar means the app is up; it does not mean the day
+        // has resolved. Waiting for the loading inscription to go is
+        // the difference between a frame of the app and a frame of a
+        // spinner — two accessibility captures were spinners before
+        // this existed.
         _ = app.tabBars.firstMatch.waitForExistence(timeout: 20)
+        let loading = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Loading prayer times'"))
+            .firstMatch
+        let deadline = Date().addingTimeInterval(25)
+        while loading.exists && Date() < deadline {
+            Thread.sleep(forTimeInterval: 0.5)
+        }
         Thread.sleep(forTimeInterval: frame.settle)
 
         if frame.scrollsToBottom {

@@ -76,8 +76,8 @@ enum WidgetPalette {
         let tokens = PaletteState.night.tokens
         return LinearGradient(
             colors: [
-                tokens.groundTopValue.darkened(by: 0.35).color,
-                tokens.groundBottomValue.darkened(by: 0.45).color
+                tokens.groundTopValue.darkened(by: 0.45).color,
+                tokens.groundBottomValue.darkened(by: 0.55).color
             ],
             startPoint: .top,
             endPoint: .bottom

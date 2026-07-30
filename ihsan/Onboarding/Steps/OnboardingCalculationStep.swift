@@ -164,8 +164,12 @@ struct OnboardingMethodRow: View {
 
     private func angleText(_ angles: CalculationMethodAngles) -> some View {
         Text(angles.inlineDescription)
+            // Ink, not gold: gold on the morning parchment measures
+            // 2.5:1, and these figures exist to be read against a
+            // printed timetable. The tabular face already sets them
+            // apart from the serif name beside them.
             .font(.system(.subheadline, design: .rounded).monospacedDigit())
-            .foregroundStyle(tokens.leafGold)
+            .foregroundStyle(tokens.ink)
             .fixedSize(horizontal: true, vertical: false)
             .layoutPriority(1)
     }

@@ -23,6 +23,8 @@ struct ReflectionFeedCard: View {
     let onTogglePlayback: () -> Void
     let onTap: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var typeSize
+
     var body: some View {
         Button(action: onTap) {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
@@ -166,19 +168,47 @@ struct ReflectionFeedCard: View {
 
     // MARK: - Metadata
 
+    /// The two dates a card carries.
+    ///
+    /// Both are functional text and both scale the whole way — the
+    /// Gregorian one used to be capped at accessibility1, which is
+    /// exactly the size where someone who needs accessibility5 stops
+    /// being able to read which day a reflection belongs to. Past the
+    /// large accessibility sizes they stack instead of sharing a line,
+    /// because two dates squeezed side by side is the same failure in
+    /// a different shape.
     private var metadata: some View {
-        HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
-            Text(gregorianLabel)
-                .font(.system(.title3, weight: .medium))
-                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
-                .foregroundStyle(tokens.ink)
-            Spacer(minLength: IhsanSpacing.sm)
-            Text(hijriLabel)
-                .font(IhsanFont.inscription)
-                .tracking(1.4)
-                .foregroundStyle(tokens.inkSecondary)
+        Group {
+            if typeSize >= .accessibility2 {
+                VStack(alignment: .leading, spacing: 2) {
+                    gregorianText
+                    hijriText
+                }
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+                    gregorianText
+                    Spacer(minLength: IhsanSpacing.sm)
+                    hijriText
+                }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    private var gregorianText: some View {
+        Text(gregorianLabel)
+            .font(.system(.title3, weight: .medium))
+            .foregroundStyle(tokens.ink)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var hijriText: some View {
+        Text(hijriLabel)
+            .font(IhsanFont.inscription)
+            .tracking(1.4)
+            .foregroundStyle(tokens.inkSecondary)
+            .fixedSize(horizontal: false, vertical: true)
     }
 
     private var gregorianLabel: String {
