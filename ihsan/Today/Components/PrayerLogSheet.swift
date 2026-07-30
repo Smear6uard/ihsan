@@ -1,152 +1,313 @@
-import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
+import IhsanPrayerTimes
+import SwiftUI
 
-/// The modal sheet presented when the user taps a prayer row.
+/// The log sheet, rebuilt on the two-axis model.
 ///
-/// The visual hierarchy follows the manuscript-redirect spec: the sheet
-/// container itself reads as iOS 26 Liquid Glass (the platform identity
-/// surface), while the five status options inside the glass render as
-/// illuminated parchment rows with iridescent brass borders. This is
-/// the only place in the app where illuminated rows sit on glass —
-/// elsewhere they sit on the manuscript page background.
+/// Structure mirrors the data: **jamāʿah is a toggle** (the
+/// congregation axis) presented distinctly above the **timing
+/// choice** (one exclusive selection — On Time / Late / Qadā /
+/// Missed). The ornament states ARE the iconography: each timing
+/// tile shows this prayer's own ornament in exactly the state that
+/// choice would produce on the plate — gilded for On Time, the warm
+/// outline for Late, the lapis pigment for Qadā, the quiet passed
+/// state for Missed. The sheet teaches the plate's language.
 ///
-/// The sheet folds the existing confirmation-dialog flow into one
-/// considered surface: the five status taps each map to a single
-/// `Choice`, and the bottom-bar ADHAN SOUND button toggles per-prayer
-/// adhan playback (the same toggle as the inline row's mute icon).
+/// Times format through `PlateTimeFormat` in the **place's**
+/// timezone — the sheet can never again disagree with the plate
+/// about when a window ends.
+///
+/// Chrome: the sheet rides the platform's glass presentation with
+/// the palette's `chromeTint` backing (warm on the day grounds,
+/// clear on jewel grounds), content as illuminated panels.
 struct PrayerLogSheet: View {
     let prayer: Prayer
     let scheduledTime: Date
-    /// Optional end of the prayer's window. `Fajr` ends at sunrise;
-    /// other prayers end at the next prayer's scheduled time. Pass
-    /// `nil` for Isha (the window extends past midnight; the
-    /// inscription drops the "ENDS" clause when this is `nil`).
+    /// End of the prayer's window, from `PrayerWindowRule` — the one
+    /// rule every surface reads.
     let windowEndTime: Date?
+    /// The place's timezone: the display frame for every clock time.
+    let timeZone: TimeZone
+    let tokens: SkyPaletteTokens
     let currentStatus: PrayerStatus?
     let isJamaah: Bool
-    let adhanEnabled: Bool
     var isPaused: Bool = false
 
-    let onSelect: (Choice) -> Void
-    let onToggleAdhan: () -> Void
+    /// One commit: the chosen timing plus the jamāʿah flag, together.
+    let onCommit: (PrayerStatus, Bool) -> Void
     var onTogglePause: () -> Void = {}
     let onCancel: () -> Void
 
     @Environment(\.dismiss) private var dismiss
 
-    /// Combined status + jamaʿah option. The "in jamaʿah" case sets
-    /// status to `.onTime` and jamaʿah to `true` in one tap; the plain
-    /// "on time" case sets status to `.onTime` and jamaʿah to `false`.
-    enum Choice: Hashable {
-        case inJamaah
-        case onTime
-        case late
-        case qada
-        case missed
+    @State private var selectedTiming: PrayerStatus?
+    @State private var jamaahOn: Bool
+
+    init(
+        prayer: Prayer,
+        scheduledTime: Date,
+        windowEndTime: Date?,
+        timeZone: TimeZone,
+        tokens: SkyPaletteTokens,
+        currentStatus: PrayerStatus?,
+        isJamaah: Bool,
+        isPaused: Bool = false,
+        onCommit: @escaping (PrayerStatus, Bool) -> Void,
+        onTogglePause: @escaping () -> Void = {},
+        onCancel: @escaping () -> Void
+    ) {
+        self.prayer = prayer
+        self.scheduledTime = scheduledTime
+        self.windowEndTime = windowEndTime
+        self.timeZone = timeZone
+        self.tokens = tokens
+        self.currentStatus = currentStatus
+        self.isJamaah = isJamaah
+        self.isPaused = isPaused
+        self.onCommit = onCommit
+        self.onTogglePause = onTogglePause
+        self.onCancel = onCancel
+        // Editing an existing log opens with its state preselected.
+        _selectedTiming = State(initialValue: currentStatus)
+        _jamaahOn = State(initialValue: isJamaah)
     }
 
     var body: some View {
         VStack(spacing: 0) {
-            header
-            OrnamentalDivider()
-                .padding(.horizontal, IhsanSpacing.lg)
-                .padding(.top, IhsanSpacing.md)
+            // Scrolls only when it must (accessibility type sizes);
+            // at standard sizes the sheet is one still composition.
+            ScrollView {
+                VStack(spacing: 0) {
+                    header
+                        .padding(.top, IhsanSpacing.xl)
 
-            statusRows
-                .padding(.horizontal, IhsanSpacing.md)
-                .padding(.top, IhsanSpacing.lg)
+                    jamaahRow
+                        .padding(.horizontal, IhsanSpacing.md)
+                        .padding(.top, IhsanSpacing.lg)
+
+                    timingGrid
+                        .padding(.horizontal, IhsanSpacing.md)
+                        .padding(.top, IhsanSpacing.md)
+                }
+            }
+            .scrollBounceBehavior(.basedOnSize)
 
             Spacer(minLength: IhsanSpacing.md)
 
-            actionBar
+            commitBar
+                .padding(.horizontal, IhsanSpacing.md)
+            footer
+                .padding(.horizontal, IhsanSpacing.lg)
+                .padding(.top, IhsanSpacing.sm)
+                .padding(.bottom, IhsanSpacing.lg)
         }
-        .padding(.top, IhsanSpacing.xl)
-        // The sheet renders on the system's Liquid Glass presentation
-        // backing (configured at the call site via
-        // `.presentationBackground(.thinMaterial)`). Internal rows
-        // sit on top as illuminated parchment panels.
+        .background {
+            // The warm backing under the platform glass — never a
+            // gray scrim over the scene's warmth.
+            tokens.chromeTint.ignoresSafeArea()
+        }
         .accessibilityElement(children: .contain)
     }
 
     // MARK: - Header
+
+    /// "12:38 PM · ENDS 5:06 PM" — the place's clock, always.
+    private var timeRangeInscription: String {
+        let start = PlateTimeFormat.time(scheduledTime, in: timeZone).uppercased()
+        guard let end = windowEndTime else { return start }
+        return "\(start) · ENDS \(PlateTimeFormat.time(end, in: timeZone).uppercased())"
+    }
 
     private var header: some View {
         VStack(spacing: IhsanSpacing.xs) {
             Text("LOG PRAYER")
                 .font(IhsanFont.inscription)
                 .tracking(2.4)
-                .foregroundStyle(IhsanColor.brassDark)
+                .foregroundStyle(tokens.inkSecondary)
 
             HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
                 Text(prayer.displayNameEnglish)
                     .font(IhsanFont.heroPrayerName)
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                 Text(prayer.displayNameArabic)
                     .font(IhsanFont.bodyArabic)
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
+                    .foregroundStyle(tokens.ink.opacity(0.72))
             }
             .padding(.top, IhsanSpacing.xxs)
 
             Text(timeRangeInscription)
                 .font(IhsanFont.inscription)
                 .tracking(1.6)
-                .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
+                .monospacedDigit()
+                .foregroundStyle(tokens.inkSecondary)
                 .padding(.top, IhsanSpacing.xxs)
         }
         .frame(maxWidth: .infinity)
         .padding(.horizontal, IhsanSpacing.lg)
     }
 
-    private var timeRangeInscription: String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "h:mm a"
-        let start = formatter.string(from: scheduledTime).uppercased()
-        guard let end = windowEndTime else { return start }
-        return "\(start) · ENDS \(formatter.string(from: end).uppercased())"
-    }
+    // MARK: - The congregation axis
 
-    // MARK: - Status rows
-
-    private var statusRows: some View {
-        VStack(spacing: IhsanSpacing.sm) {
-            StatusOptionRow(
-                choice: .inJamaah,
-                isSelected: currentStatus == .onTime && isJamaah,
-                onTap: { handle(.inJamaah) }
-            )
-            StatusOptionRow(
-                choice: .onTime,
-                isSelected: currentStatus == .onTime && !isJamaah,
-                onTap: { handle(.onTime) }
-            )
-            StatusOptionRow(
-                choice: .late,
-                isSelected: currentStatus == .late,
-                onTap: { handle(.late) }
-            )
-            StatusOptionRow(
-                choice: .qada,
-                isSelected: currentStatus == .qada,
-                onTap: { handle(.qada) }
-            )
-            StatusOptionRow(
-                choice: .missed,
-                isSelected: currentStatus == .missed,
-                onTap: { handle(.missed) }
-            )
+    /// Jamāʿah is orthogonal to timing, and the layout says so: one
+    /// toggle, its own panel, above the timing choice — never a
+    /// sibling of it. Missed prayers can't have been in congregation.
+    private var jamaahRow: some View {
+        let disabled = selectedTiming == .missed
+        return HStack(spacing: IhsanSpacing.md) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("In Jamāʿah")
+                    .font(IhsanFont.rowPrayerName)
+                    .foregroundStyle(tokens.ink.opacity(disabled ? 0.4 : 1))
+                Text("PRAYED IN CONGREGATION")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.4)
+                    .foregroundStyle(tokens.inkSecondary.opacity(disabled ? 0.5 : 1))
+            }
+            Spacer()
+            Toggle("", isOn: $jamaahOn)
+                .labelsHidden()
+                .tint(tokens.leafGold)
+                .disabled(disabled)
+        }
+        .padding(.horizontal, IhsanSpacing.md)
+        .padding(.vertical, IhsanSpacing.sm + 2)
+        .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: jamaahOn && !disabled)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("In jamāʿah, prayed in congregation")
+        .accessibilityValue(disabled ? "unavailable for missed" : (jamaahOn ? "on" : "off"))
+        .accessibilityAddTraits(.isToggle)
+        .onTapGesture {
+            guard !disabled else { return }
+            Haptics.impact(.light)
+            jamaahOn.toggle()
         }
     }
 
-    private func handle(_ choice: Choice) {
-        Haptics.impact(.light)
-        onSelect(choice)
-        dismiss()
+    // MARK: - The timing axis
+
+    private var timingGrid: some View {
+        let columns = [
+            GridItem(.flexible(), spacing: IhsanSpacing.sm),
+            GridItem(.flexible(), spacing: IhsanSpacing.sm),
+        ]
+        return LazyVGrid(columns: columns, spacing: IhsanSpacing.sm) {
+            timingTile(.onTime, title: "On Time", caption: "PRAYED IN ITS WINDOW")
+            timingTile(.late, title: "Late", caption: "PRAYED AFTER ITS WINDOW")
+            timingTile(.qada, title: "Qadā", caption: "MADE UP LATER")
+            timingTile(.missed, title: "Missed", caption: "ITS WINDOW PASSED UNPRAYED")
+        }
     }
 
-    // MARK: - Action bar
+    private func timingTile(
+        _ timing: PrayerStatus, title: String, caption: String
+    ) -> some View {
+        let selected = selectedTiming == timing
+        return Button {
+            Haptics.impact(.light)
+            selectedTiming = timing
+            if timing == .missed { jamaahOn = false }
+        } label: {
+            VStack(spacing: IhsanSpacing.xs + 2) {
+                tileOrnament(for: timing)
+                    .frame(width: 30, height: 30)
+                Text(title)
+                    .font(IhsanFont.rowPrayerName)
+                    .foregroundStyle(tokens.ink)
+                Text(caption)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.1)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .multilineTextAlignment(.center)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.8)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, IhsanSpacing.md)
+            .padding(.horizontal, IhsanSpacing.xs)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: selected)
+        .overlay {
+            if selected {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .strokeBorder(tokens.leafGold.opacity(0.85), lineWidth: 1.2)
+            }
+        }
+        .accessibilityLabel("\(title), \(caption.lowercased())")
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
 
-    private var actionBar: some View {
+    /// The ornament in the state the choice would produce — the
+    /// sheet's tiles and the plate's markers speak one language.
+    @ViewBuilder
+    private func tileOrnament(for timing: PrayerStatus) -> some View {
+        switch timing {
+        case .onTime:
+            // Gilded: solid leaf bounded by the keyline.
+            GildedOrnamentGlyph(prayer: prayer, size: 30, tokens: tokens)
+        case .late:
+            // The warm metal outline.
+            PrayerOrnamentShape(prayer: prayer, mode: .outline)
+                .stroke(tokens.metal.opacity(0.85), lineWidth: 1.3)
+        case .qada:
+            // The pigment without the leaf: lapis body, keyline edge —
+            // made up later, warm, never alarming.
+            ZStack {
+                PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                    .fill(tokens.lapis, style: FillStyle(eoFill: true))
+                PrayerOrnamentShape(prayer: prayer, mode: .filled)
+                    .stroke(tokens.keyline, lineWidth: 0.75)
+            }
+        case .missed:
+            // The quiet passed state.
+            PrayerOrnamentShape(prayer: prayer, mode: .outline)
+                .stroke(tokens.inkSecondary.opacity(0.75), lineWidth: 1.0)
+        }
+    }
+
+    // MARK: - Commit
+
+    private var commitBar: some View {
+        Button {
+            guard let timing = selectedTiming else { return }
+            // Haptic first — commit feel lands with the tap, the
+            // optimistic model update follows within the same beat,
+            // and the plate's materialize animation plays off it.
+            Haptics.notification(.success)
+            onCommit(timing, jamaahOn)
+            dismiss()
+        } label: {
+            Text(currentStatus == nil ? "LOG PRAYER" : "SAVE CHANGES")
+                .font(IhsanFont.inscription)
+                .tracking(2.2)
+                .foregroundStyle(commitEnabled ? tokens.keyline : tokens.inkSecondary.opacity(0.5))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, IhsanSpacing.sm + 4)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(commitEnabled ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.panelFill.opacity(0.6)))
+                }
+                .overlay {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(
+                            commitEnabled ? tokens.keyline.opacity(0.55) : tokens.panelStroke.opacity(0.6),
+                            lineWidth: 0.8
+                        )
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(!commitEnabled)
+        .accessibilityLabel(currentStatus == nil ? "Log prayer" : "Save changes")
+        .accessibilityHint(commitEnabled ? "" : "Choose a timing first.")
+    }
+
+    private var commitEnabled: Bool { selectedTiming != nil }
+
+    // MARK: - Footer
+
+    private var footer: some View {
         HStack(spacing: IhsanSpacing.md) {
             Button {
                 Haptics.impact(.light)
@@ -156,242 +317,34 @@ struct PrayerLogSheet: View {
                 Text("CANCEL")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
-                    .foregroundStyle(IhsanColor.brassDark)
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.vertical, IhsanSpacing.sm + 2)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .padding(.vertical, IhsanSpacing.sm)
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Cancel")
 
             Spacer()
 
-            // The excused-pause droplet: discreet, unlabeled, one tap to
-            // begin a pause and the same control to end it. Ihsan does not
-            // ask why.
+            // The excused-pause droplet, with its quiet name. One tap
+            // begins a pause, the same control ends it. Ihsan does
+            // not ask why.
             Button {
                 Haptics.impact(.medium)
                 onTogglePause()
                 dismiss()
             } label: {
-                Image(systemName: isPaused ? "drop.fill" : "drop")
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(IhsanColor.brassDark)
-                    .frame(width: 40, height: 40)
-                    .overlay {
-                        Circle()
-                            .strokeBorder(IhsanColor.brassDark.opacity(0.4), lineWidth: 0.5)
-                    }
+                HStack(spacing: IhsanSpacing.xs) {
+                    Image(systemName: isPaused ? "drop.fill" : "drop")
+                        .font(.system(size: 14, weight: .regular))
+                    Text(isPaused ? "PAUSED" : "PAUSE")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                }
+                .foregroundStyle(tokens.inkSecondary)
+                .padding(.vertical, IhsanSpacing.sm)
             }
             .buttonStyle(.plain)
             .accessibilityLabel(isPaused ? "End the pause" : "Begin a pause")
-
-            Button {
-                Haptics.impact(.light)
-                onToggleAdhan()
-            } label: {
-                HStack(spacing: IhsanSpacing.xs) {
-                    Image(systemName: adhanEnabled
-                          ? "speaker.wave.2.fill"
-                          : "speaker.slash.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("ADHAN SOUND")
-                        .font(IhsanFont.inscription)
-                        .tracking(1.8)
-                }
-                .foregroundStyle(IhsanColor.inkDeep)
-                .padding(.horizontal, IhsanSpacing.md + 2)
-                .padding(.vertical, IhsanSpacing.sm + 2)
-                .background {
-                    Capsule()
-                        .fill(IhsanIridescence.brassStroke(opacity: 0.95))
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(IhsanColor.brassDark.opacity(0.55), lineWidth: 0.5)
-                }
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel(
-                adhanEnabled
-                    ? "Mute adhan for \(prayer.displayNameEnglish)"
-                    : "Unmute adhan for \(prayer.displayNameEnglish)"
-            )
-        }
-        .padding(.horizontal, IhsanSpacing.lg)
-        .padding(.bottom, IhsanSpacing.lg)
-    }
-}
-
-// MARK: - Status option row
-
-/// One status option inside the sheet. Renders as an illuminated
-/// parchment row with a left-edge status marker, a two-line label
-/// (status name + small-caps description), and a trailing chevron.
-/// Selected rows fill their marker in brass; unselected rows show
-/// the outlined marker.
-private struct StatusOptionRow: View {
-    let choice: PrayerLogSheet.Choice
-    let isSelected: Bool
-    let onTap: () -> Void
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: IhsanSpacing.md) {
-                StatusMarker(choice: choice, isSelected: isSelected)
-                    .frame(width: 36, height: 36)
-
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(choice.title)
-                        .font(IhsanFont.rowPrayerName)
-                        .foregroundStyle(IhsanColor.inkDeep)
-                    Text(choice.subtitle)
-                        .font(IhsanFont.inscription)
-                        .tracking(1.4)
-                        .foregroundStyle(IhsanColor.brassDark)
-                }
-
-                Spacer(minLength: IhsanSpacing.sm)
-
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.55))
-            }
-            .padding(.horizontal, IhsanSpacing.md)
-            .padding(.vertical, IhsanSpacing.sm + 2)
-            .frame(minHeight: 60)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .ihsanIlluminatedPanel(intensity: .prayerRow, isActive: isSelected)
-        .accessibilityLabel(choice.accessibilityLabel)
-        .accessibilityAddTraits(isSelected ? [.isSelected] : [])
-    }
-}
-
-/// The left-edge status marker — a square containing the option's
-/// identifying glyph (J, ✓, ○, Q, —). Selected rows fill the
-/// square in brass with the glyph in deep ink; unselected rows
-/// outline the square and render the glyph in brass.
-private struct StatusMarker: View {
-    let choice: PrayerLogSheet.Choice
-    let isSelected: Bool
-
-    var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 8, style: .continuous)
-        ZStack {
-            if isSelected {
-                shape.fill(IhsanIridescence.brassStroke(opacity: 0.95))
-            } else {
-                shape
-                    .fill(IhsanColor.panelDay.opacity(0.45))
-            }
-            shape.strokeBorder(
-                IhsanIridescence.brassStroke(opacity: isSelected ? 0.95 : 0.55),
-                lineWidth: isSelected ? 1.0 : 0.75
-            )
-            glyph
-                .foregroundStyle(isSelected ? IhsanColor.inkDeep : IhsanColor.brassDark)
         }
     }
-
-    @ViewBuilder
-    private var glyph: some View {
-        switch choice {
-        case .inJamaah:
-            Text("J")
-                .font(.system(size: 16, weight: .bold, design: .serif))
-        case .onTime:
-            Image(systemName: "checkmark")
-                .font(.system(size: 14, weight: .bold))
-        case .late:
-            Image(systemName: "circle")
-                .font(.system(size: 14, weight: .semibold))
-        case .qada:
-            Text("Q")
-                .font(.system(size: 16, weight: .bold, design: .serif))
-        case .missed:
-            Image(systemName: "minus")
-                .font(.system(size: 16, weight: .bold))
-        }
-    }
-}
-
-private extension PrayerLogSheet.Choice {
-    var title: String {
-        switch self {
-        case .inJamaah: return "In Jamaʿah"
-        case .onTime: return "On Time"
-        case .late: return "Late"
-        case .qada: return "Qadā"
-        case .missed: return "Missed"
-        }
-    }
-
-    var subtitle: String {
-        switch self {
-        case .inJamaah: return "PRAYED IN CONGREGATION"
-        case .onTime: return "PRAYED WITHIN THE WINDOW"
-        case .late: return "PRAYED AFTER THE WINDOW"
-        case .qada: return "MADE UP AFTER MISSING"
-        case .missed: return "NOT YET PRAYED"
-        }
-    }
-
-    var accessibilityLabel: String {
-        "\(title), \(subtitle.lowercased())"
-    }
-}
-
-// MARK: - Preview
-
-#Preview("Log sheet — Dhuhr, not yet logged") {
-    let calendar = Calendar.current
-    let today = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 806_000_000))
-    let scheduled = calendar.date(byAdding: .second, value: 12 * 3600 + 38 * 60, to: today) ?? today
-    let windowEnd = calendar.date(byAdding: .second, value: 16 * 3600 + 2 * 60, to: today) ?? today
-
-    return Color.clear
-        .ihsanManuscriptPage()
-        .sheet(isPresented: .constant(true)) {
-            PrayerLogSheet(
-                prayer: .dhuhr,
-                scheduledTime: scheduled,
-                windowEndTime: windowEnd,
-                currentStatus: nil,
-                isJamaah: false,
-                adhanEnabled: true,
-                onSelect: { _ in },
-                onToggleAdhan: {},
-                onCancel: {}
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(.thinMaterial)
-        }
-}
-
-#Preview("Log sheet — Fajr, in jamaʿah") {
-    let calendar = Calendar.current
-    let today = calendar.startOfDay(for: Date(timeIntervalSinceReferenceDate: 806_000_000))
-    let scheduled = calendar.date(byAdding: .second, value: 5 * 3600 + 14 * 60, to: today) ?? today
-    let windowEnd = calendar.date(byAdding: .second, value: 6 * 3600 + 32 * 60, to: today) ?? today
-
-    return Color.clear
-        .ihsanManuscriptPage()
-        .sheet(isPresented: .constant(true)) {
-            PrayerLogSheet(
-                prayer: .fajr,
-                scheduledTime: scheduled,
-                windowEndTime: windowEnd,
-                currentStatus: .onTime,
-                isJamaah: true,
-                adhanEnabled: false,
-                onSelect: { _ in },
-                onToggleAdhan: {},
-                onCancel: {}
-            )
-            .presentationDetents([.medium, .large])
-            .presentationDragIndicator(.visible)
-            .presentationBackground(.thinMaterial)
-        }
 }

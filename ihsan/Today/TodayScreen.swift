@@ -167,7 +167,16 @@ private struct TodayReadyView: View {
     }
 
     @State private var focusedPrayer: Prayer?
-    @State private var sheetSelection: LogSheetSelection?
+    @State private var sheetSelection: LogSheetSelection? = {
+        // `-IhsanDebugPresentLogSheet <prayer>` — simulator screenshot
+        // harness; mirrors -IhsanDebugPresentQibla.
+        let arguments = ProcessInfo.processInfo.arguments
+        guard let index = arguments.firstIndex(of: "-IhsanDebugPresentLogSheet"),
+              index + 1 < arguments.count,
+              let prayer = Prayer(rawValue: arguments[index + 1])
+        else { return nil }
+        return LogSheetSelection(prayer: prayer)
+    }()
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = ProcessInfo.processInfo
         .arguments.contains("-IhsanDebugPresentQibla")
@@ -306,7 +315,7 @@ private struct TodayReadyView: View {
             }
             .sheet(item: $sheetSelection) { selection in
                 logSheet(for: selection.prayer)
-                    .presentationDetents([.medium, .large])
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
                     .presentationBackground(.thinMaterial)
             }
@@ -661,25 +670,31 @@ private struct TodayReadyView: View {
         }
     }
 
-    // MARK: - Edge-case log sheet (still used for qadā, missed, edit)
+    // MARK: - Log sheet (the long tail: qadā, missed, edit)
 
     @ViewBuilder
     private func logSheet(for prayer: Prayer) -> some View {
         let prayerTime = snapshot.dayTimes.allFardh.first { $0.prayer == prayer }
         let log = log(for: prayer)
-        let adhanEnabled = settingsRows.first?.adhanEnabled(for: prayer) ?? true
+        // Presentation-time palette — the sheet lives on the same
+        // SkyPhase as the plate behind it.
+        let tokens = PaletteState.resolved(
+            for: SkyPhase.resolve(at: nowProvider.now(), events: solarEvents)
+        )
 
         if let prayerTime {
             PrayerLogSheet(
                 prayer: prayer,
                 scheduledTime: prayerTime.scheduledTime,
                 windowEndTime: windowEndTime(for: prayer),
+                timeZone: snapshot.place.timeZone,
+                tokens: tokens,
                 currentStatus: log?.status,
                 isJamaah: log?.withJamaah ?? false,
-                adhanEnabled: adhanEnabled,
                 isPaused: activePause != nil,
-                onSelect: { choice in handleSheetChoice(choice, for: prayer) },
-                onToggleAdhan: { Task { await viewModel.toggleAdhanEnabled(for: prayer) } },
+                onCommit: { status, jamaah in
+                    commit(status: status, isJamaah: jamaah, for: prayer)
+                },
                 onTogglePause: { togglePause() },
                 onCancel: {}
             )
@@ -710,25 +725,6 @@ private struct TodayReadyView: View {
         }
     }
 
-    private func handleSheetChoice(_ choice: PrayerLogSheet.Choice, for prayer: Prayer) {
-        let currentJamaah = log(for: prayer)?.withJamaah ?? false
-        Task {
-            switch choice {
-            case .inJamaah:
-                await viewModel.setStatus(.onTime, for: prayer)
-                if !currentJamaah { await viewModel.toggleJamaah(for: prayer) }
-            case .onTime:
-                await viewModel.setStatus(.onTime, for: prayer)
-                if currentJamaah { await viewModel.toggleJamaah(for: prayer) }
-            case .late:
-                await viewModel.setStatus(.late, for: prayer)
-            case .qada:
-                await viewModel.setStatus(.qada, for: prayer)
-            case .missed:
-                await viewModel.setStatus(.missed, for: prayer)
-            }
-        }
-    }
 }
 
 /// Identifies which prayer's log sheet is currently presented.
