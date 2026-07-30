@@ -21,25 +21,35 @@ struct QiblaLancetMark: View {
     /// this; at rest it stands faint but present.
     var glowStrength: Double = 0.22
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     private var length: CGFloat { ringRadius * 0.175 }
     private var width: CGFloat { ringRadius * 0.062 }
 
     var body: some View {
         ZStack {
-            Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            warmGlow.opacity(0.55 * glowStrength),
-                            warmGlow.opacity(0.18 * glowStrength),
-                            warmGlow.opacity(0),
-                        ],
-                        center: .center,
-                        startRadius: width * 0.4,
-                        endRadius: length * 1.6
+            // Under Reduce Transparency the glow collapses to one
+            // flat disc — the state stays marked without a ramp.
+            if reduceTransparency {
+                Circle()
+                    .fill(warmGlow.opacity(0.20 * glowStrength))
+                    .frame(width: length * 2.0, height: length * 2.0)
+            } else {
+                Circle()
+                    .fill(
+                        RadialGradient(
+                            colors: [
+                                warmGlow.opacity(0.55 * glowStrength),
+                                warmGlow.opacity(0.18 * glowStrength),
+                                warmGlow.opacity(0),
+                            ],
+                            center: .center,
+                            startRadius: width * 0.4,
+                            endRadius: length * 1.6
+                        )
                     )
-                )
-                .frame(width: length * 3.2, height: length * 3.2)
+                    .frame(width: length * 3.2, height: length * 3.2)
+            }
 
             LancetShape()
                 .fill(tokens.leafGold)

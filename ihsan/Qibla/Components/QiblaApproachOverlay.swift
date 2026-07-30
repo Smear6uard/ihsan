@@ -18,6 +18,8 @@ struct QiblaApproachOverlay: View {
     let approach: QiblaApproach
     let isAligned: Bool
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
         Canvas { context, size in
             let radius = min(size.width, size.height) / 2
@@ -52,10 +54,10 @@ struct QiblaApproachOverlay: View {
             clockwise: false
         )
         var layer = context
-        layer.addFilter(.blur(radius: 7))
+        if !reduceTransparency { layer.addFilter(.blur(radius: 7)) }
         layer.stroke(
             path,
-            with: .color(warmGlow.opacity(0.09 * approach.ringWarmth)),
+            with: .color(warmGlow.opacity((reduceTransparency ? 0.06 : 0.09) * approach.ringWarmth)),
             style: StrokeStyle(lineWidth: radius * 0.13, lineCap: .round)
         )
     }
@@ -77,11 +79,11 @@ struct QiblaApproachOverlay: View {
             clockwise: false
         )
         var layer = context
-        layer.addFilter(.blur(radius: 3.5))
+        if !reduceTransparency { layer.addFilter(.blur(radius: 3.5)) }
         layer.stroke(
             path,
-            with: .color(warmGlow.opacity(0.55 * approach.bridgeStrength)),
-            style: StrokeStyle(lineWidth: 4.5, lineCap: .round)
+            with: .color(warmGlow.opacity((reduceTransparency ? 0.40 : 0.55) * approach.bridgeStrength)),
+            style: StrokeStyle(lineWidth: reduceTransparency ? 2.5 : 4.5, lineCap: .round)
         )
     }
 
@@ -97,12 +99,14 @@ struct QiblaFusionGlow: View {
     let tokens: SkyPaletteTokens
     let ringRadius: CGFloat
 
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
     var body: some View {
         let length = ringRadius * (0.96 - 0.14)
         Capsule()
-            .fill(warmGlow.opacity(0.60))
-            .frame(width: 11, height: length)
-            .blur(radius: 7)
+            .fill(warmGlow.opacity(reduceTransparency ? 0.35 : 0.60))
+            .frame(width: reduceTransparency ? 5 : 11, height: length)
+            .blur(radius: reduceTransparency ? 0 : 7)
             .offset(y: -(ringRadius * 0.14 + length / 2))
             .allowsHitTesting(false)
             .accessibilityHidden(true)

@@ -16,6 +16,7 @@ struct QiblaScreen: View {
 
     @Environment(\.nowProvider) private var nowProvider
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @State private var viewModel = QiblaViewModel()
     @State private var tiltMonitor = DeviceTiltMonitor()
     /// One multiplier grows the whole instrument's engravings with
@@ -171,8 +172,10 @@ struct QiblaScreen: View {
         ZStack {
             // One calm breath across the ring at the moment of
             // arrival — keyed to the entry counter, so it can never
-            // repeat while alignment holds.
-            if !reduceMotion {
+            // repeat while alignment holds. Skipped under Reduce
+            // Motion and Reduce Transparency alike: the fused column
+            // and the inscription carry the moment.
+            if !reduceMotion && !reduceTransparency {
                 QiblaBloomView(tokens: tokens, trigger: viewModel.bloomCount)
             }
 
