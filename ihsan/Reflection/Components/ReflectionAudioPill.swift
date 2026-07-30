@@ -15,11 +15,10 @@ struct ReflectionAudioPill: View {
     var body: some View {
         Button(action: onToggle) {
             HStack(spacing: IhsanSpacing.sm) {
-                Image(systemName: iconName)
-                    .font(.system(size: 14, weight: .semibold))
+                PlaybackMark(isPause: isActive && isPlaying)
+                    .fill(tokens.ink)
+                    .frame(width: 12, height: 12)
                     .frame(width: 22, height: 22)
-                    .foregroundStyle(tokens.ink)
-                    .contentTransition(.symbolEffect(.replace))
 
                 ProgressTrack(progress: progress, tokens: tokens)
                     .frame(height: 2)
@@ -46,10 +45,6 @@ struct ReflectionAudioPill: View {
         .accessibilityLabel(accessibilityLabel)
         .accessibilityValue(accessibilityValue)
         .accessibilityAddTraits(.isButton)
-    }
-
-    private var iconName: String {
-        isActive && isPlaying ? "pause.fill" : "play.fill"
     }
 
     private var progress: Double {
@@ -130,4 +125,30 @@ private struct ProgressTrack: View {
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .ihsanManuscriptPage()
+}
+
+
+/// Drawn playback marks — a triangle and two bars, never symbols.
+private struct PlaybackMark: Shape {
+    let isPause: Bool
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        if isPause {
+            let barWidth = rect.width * 0.3
+            p.addRoundedRect(
+                in: CGRect(x: rect.minX, y: rect.minY, width: barWidth, height: rect.height),
+                cornerSize: CGSize(width: 1, height: 1)
+            )
+            p.addRoundedRect(
+                in: CGRect(x: rect.maxX - barWidth, y: rect.minY, width: barWidth, height: rect.height),
+                cornerSize: CGSize(width: 1, height: 1)
+            )
+        } else {
+            p.move(to: CGPoint(x: rect.minX, y: rect.minY))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.midY))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            p.closeSubpath()
+        }
+        return p
+    }
 }

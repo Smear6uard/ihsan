@@ -524,3 +524,36 @@ PrayerLogCommitUITests, RetroactiveLogUITests); these need hardware:
   sheet's backing doesn't clash against the Today plate when
   switching tabs at sunset (the approximation can lag the real sky
   by tens of minutes).
+
+## House phases 0.5–4 — chrome, pages, sweep (2026-07-30)
+
+Source-level work is pinned by tests (PageChromeContrastTests across
+all four phases, TimingAvailability property sweep, six UI tests);
+these need eyes on hardware:
+
+- **Native bar minimize feel.** `.tabBarMinimizeBehavior(.onScrollDown)`
+  verified in the simulator; confirm the recede/return timing and the
+  content lensing read well on device, on all four tabs.
+- **Path glance test (the maintainer's own gate).** From arm's
+  length, a month of mixed states should read as a texture before
+  any dot is inspected — morning, sunset, and night grounds.
+- **VoiceOver walk of the Path pattern.** The gestalt grid is ONE
+  element with a per-period summary; day rows and day×prayer cells
+  announce per-day summaries ("Dhuhr, Saturday, August 15, qadā").
+  Confirm the rotor order feels like days, not dot noise, on device.
+- **Dynamic Type at accessibility sizes.** Body copy scales; the
+  day×prayer ledger and the feed-card date are deliberately capped
+  (xxxLarge / accessibility1) so dates don't wrap per-glyph. The
+  serif page titles and small-caps inscriptions are fixed-size
+  registers (IhsanFont) — decide on-device whether the titles should
+  adopt scaled metrics in the polish pass.
+- **Approximate-phase seams.** Secondary pages ride the clock-derived
+  SkyPhase.approximate (fixed 6:00/13:00/19:00/20:30 anchors), not
+  the solar schedule; near sunset the Today plate and the page
+  grounds can disagree by tens of minutes. Confirm tab switches near
+  maghrib don't jar; if they do, the fix is feeding the real solar
+  events into the page chrome.
+- **Legacy note.** The v1 celestial palette (parchment family)
+  survives only under the Today screen's Duha card and the no-token
+  celestialPanel variant — untouched here (celestial plate is out of
+  scope); fold into the celestial polish pass.

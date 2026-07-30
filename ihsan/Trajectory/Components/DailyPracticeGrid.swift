@@ -35,6 +35,10 @@ struct DailyPracticeGrid: View {
         .padding(IhsanSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .celestialPanel(tokens: tokens, cornerRadius: 18)
+        // A data matrix cannot reflow per-glyph: cap type growth here
+        // and let the per-day VoiceOver summaries carry the detail at
+        // accessibility sizes.
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
     }
 
     // MARK: - Header

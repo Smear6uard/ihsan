@@ -39,10 +39,20 @@ struct ReflectionRecorderControl: View {
                             )
                     }
 
-                    Image(systemName: isRecording ? "stop.fill" : "mic.fill")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(tokens.ink)
-                        .contentTransition(.symbolEffect(.replace))
+                    Group {
+                        if isRecording {
+                            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                                .fill(tokens.ink)
+                                .frame(width: 11, height: 11)
+                        } else {
+                            MicMark()
+                                .stroke(
+                                    tokens.ink,
+                                    style: StrokeStyle(lineWidth: 1.3, lineCap: .round)
+                                )
+                                .frame(width: 13, height: 15)
+                        }
+                    }
                 }
                 .frame(width: 32, height: 32)
 
@@ -130,4 +140,29 @@ struct ReflectionRecorderControl: View {
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
     .ihsanManuscriptPage()
+}
+
+
+/// The engraved mic: capsule head, cradle arc, and stand.
+private struct MicMark: Shape {
+    func path(in rect: CGRect) -> Path {
+        let w = rect.width
+        let h = rect.height
+        var p = Path()
+        p.addRoundedRect(
+            in: CGRect(x: rect.minX + 0.32 * w, y: rect.minY, width: 0.36 * w, height: 0.55 * h),
+            cornerSize: CGSize(width: 0.18 * w, height: 0.18 * w)
+        )
+        p.move(to: CGPoint(x: rect.minX + 0.12 * w, y: rect.minY + 0.42 * h))
+        p.addArc(
+            center: CGPoint(x: rect.midX, y: rect.minY + 0.42 * h),
+            radius: 0.38 * w,
+            startAngle: .degrees(180),
+            endAngle: .degrees(0),
+            clockwise: true
+        )
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY + 0.80 * h))
+        p.addLine(to: CGPoint(x: rect.midX, y: rect.maxY))
+        return p
+    }
 }

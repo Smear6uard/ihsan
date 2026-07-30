@@ -170,6 +170,7 @@ struct ReflectionFeedCard: View {
         HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
             Text(gregorianLabel)
                 .font(.system(.title3, weight: .medium))
+                .dynamicTypeSize(...DynamicTypeSize.accessibility1)
                 .foregroundStyle(tokens.ink)
             Spacer(minLength: IhsanSpacing.sm)
             Text(hijriLabel)

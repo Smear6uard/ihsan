@@ -115,10 +115,9 @@ struct ReflectionInputComposer: View {
             Spacer()
 
             Button(role: .destructive, action: onDiscardAudio) {
-                Image(systemName: "trash")
-                    .font(.system(size: 14, weight: .semibold))
+                SettingsGlyphView(.remove, color: tokens.inkSecondary, lineWidth: 1.2)
+                    .frame(width: 15, height: 15)
                     .frame(width: 32, height: 32)
-                    .foregroundStyle(tokens.inkSecondary)
                     .background {
                         Circle()
                             .fill(tokens.panelFill.opacity(0.55))
