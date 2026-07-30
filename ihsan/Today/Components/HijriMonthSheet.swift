@@ -127,6 +127,11 @@ struct HijriMonthSheet: View {
             Text("\(day.components.day)")
                 .font(.system(.footnote, design: .serif, weight: isToday ? .semibold : .regular))
                 .monospacedDigit()
+                .lineLimit(1)
+                // The grid stays a grid at accessibility sizes: the
+                // numeral fits its cell rather than clipping to one
+                // digit. The cell's a11y label carries the full date.
+                .minimumScaleFactor(0.35)
                 .foregroundStyle(isToday ? tokens.keyline : tokens.ink)
                 .frame(width: 26, height: 26)
                 .background {

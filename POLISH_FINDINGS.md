@@ -557,3 +557,44 @@ these need eyes on hardware:
   survives only under the Today screen's Duha card and the no-token
   celestialPanel variant — untouched here (celestial plate is out of
   scope); fold into the celestial polish pass.
+
+## Wider-worship pass (dawn, Hijri, fasting, dhikr) — device items
+
+Source-level work is pinned by tests (dawn in every contrast suite,
+Fajr-window and closed-tense properties, DST countdown anchors, the
+V3→V4 seeded migration, the banned-language sweep, a driven 33-count
+UI cycle); these need eyes and hands on hardware:
+
+- **Dawn on OLED.** The fajr→sunrise progression (indigo lightening,
+  stars thinning, the growing east wash, the sunrise crest) was tuned
+  on simulator captures at 20-min-post-Fajr / 5-min-pre-sunrise /
+  10-min-post-sunrise. Confirm the pre-sunrise mid-crossing (the
+  deliberate "lamps come on" passage) doesn't read gray on device,
+  and that the below-horizon sun truly renders no disc to the eye.
+- **The wall-time override habit.** `-IhsanNowOverride` now accepts
+  local wall time ("2026-07-30T05:27:00", no suffix) — DST-proof.
+  Explicit-offset forms are honored as written; review recipes
+  should prefer the suffix-less form from here on.
+- **Dhikr haptic signature.** Soft tap per count, one distinct
+  success at 33 — felt right in code review; the rhythm's
+  count-without-looking quality is a hand test. VoiceOver speaks
+  only 11/22/33 by design (chatty per-tap counts defeat the rhythm);
+  confirm with a VO user that the waypoints suffice.
+- **VoiceOver walk of the new surfaces.** Hijri sheet cells announce
+  "Safar 14, today, white day"; the significant-day line hints
+  dismiss vs. record-intention; the fasting inscriptions and the
+  Ramadan offer are labeled buttons; the tasbīḥ ring is one element
+  with a custom count action. Confirm rotor order on device.
+- **Fixed inscriptions at accessibility sizes.** New surfaces use
+  scaled text styles (the Hijri sheet grid scales, numerals fit
+  their cells at accessibility5); the fasting/sunrise inscriptions
+  and plate labels remain the app's fixed small-caps register —
+  fold into the app-wide functional-text rule in the polish pass.
+- **Tab bar linework glyphs.** The bar now draws the app's own set
+  (day arc, gestalt dots, book, engraved dial) as template images —
+  confirm optical weight against the system glass at both sizes,
+  and that selected-state tinting reads on the day grounds.
+- **Approximate-phase seams — CLOSED.** Page chrome now rides the
+  published real solar events (IhsanPageChrome.publish) with the
+  clock anchors only as the cold-launch fallback; the earlier
+  tens-of-minutes disagreement near maghrib no longer exists.

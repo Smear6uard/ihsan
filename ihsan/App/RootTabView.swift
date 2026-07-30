@@ -50,18 +50,28 @@ struct RootTabView: View {
         .arguments.contains("-IhsanDebugPresentDhikr")
 
     var body: some View {
+        // The glyphs are the app's own linework set (`TabGlyphs`),
+        // rendered as template images — never SF Symbols.
         TabView(selection: $selectedTab) {
-            SwiftUI.Tab("Today", systemImage: "calendar", value: AppTab.today) {
+            SwiftUI.Tab(value: AppTab.today) {
                 TodayScreen()
+            } label: {
+                Label { Text("Today") } icon: { Image(uiImage: TabGlyphs.today) }
             }
-            SwiftUI.Tab("Path", systemImage: "chart.dots.scatter", value: AppTab.trajectory) {
+            SwiftUI.Tab(value: AppTab.trajectory) {
                 TrajectoryScreen()
+            } label: {
+                Label { Text("Path") } icon: { Image(uiImage: TabGlyphs.path) }
             }
-            SwiftUI.Tab("Reflect", systemImage: "book.closed", value: AppTab.reflection) {
+            SwiftUI.Tab(value: AppTab.reflection) {
                 ReflectionScreen()
+            } label: {
+                Label { Text("Reflect") } icon: { Image(uiImage: TabGlyphs.reflect) }
             }
-            SwiftUI.Tab("Set", systemImage: "gearshape", value: AppTab.settings) {
+            SwiftUI.Tab(value: AppTab.settings) {
                 SettingsScreen()
+            } label: {
+                Label { Text("Set") } icon: { Image(uiImage: TabGlyphs.set) }
             }
         }
         .tabBarMinimizeBehavior(.onScrollDown)

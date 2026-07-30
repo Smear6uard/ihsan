@@ -96,11 +96,14 @@ final class RetroactiveLogUITests: XCTestCase {
         XCTAssertTrue(passedCard.waitForExistence(timeout: 3))
         passedCard.tap()
 
-        // Truth rule: On Time is visible but disabled; the
-        // after-the-fact states are live.
+        // The corrected truth rule: the timing axis describes when
+        // the prayer was PERFORMED, not when the entry is created —
+        // a closed window offers all four states, On Time included
+        // (praying in the window and logging after it is the most
+        // common pattern).
         let onTimeTile = app.buttons["On Time, prayed in its window"]
         XCTAssertTrue(onTimeTile.waitForExistence(timeout: 5))
-        XCTAssertFalse(onTimeTile.isEnabled, "On Time cannot be true after the window closed.")
+        XCTAssertTrue(onTimeTile.isEnabled, "A closed window must keep On Time available.")
 
         let lateTile = app.buttons["Late, prayed after its window"]
         XCTAssertTrue(lateTile.isEnabled)
