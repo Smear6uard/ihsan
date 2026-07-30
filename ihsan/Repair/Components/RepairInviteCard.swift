@@ -8,8 +8,12 @@ struct RepairInviteCard: View {
     let onBegin: () -> Void
     let onDismiss: () -> Void
 
+    /// The Returning card carries the Repair identity on every
+    /// ground: the sunset family's deep plum, deliberately darker
+    /// than the sunset panel itself, with the sunset ink and gold.
+    /// A fixed identity — the card does not follow the page's hour.
     private var tokens: SkyPaletteTokens {
-        RepairPalette.tokens()
+        PaletteState.sunset.tokens
     }
 
     var body: some View {
@@ -29,13 +33,20 @@ struct RepairInviteCard: View {
                     Haptics.impact(.light)
                     onBegin()
                 } label: {
+                    // Gilded: solid leaf bounded by the keyline — the
+                    // same emphasis grammar as the sheet's commit.
                     Text("Begin")
                         .font(IhsanFont.bodyEnglishBold)
-                        .foregroundStyle(tokens.ink)
+                        .foregroundStyle(tokens.keyline)
                         .padding(.horizontal, IhsanSpacing.md)
                         .frame(minHeight: 40)
+                        .background {
+                            Capsule().fill(tokens.leafGold)
+                        }
                         .overlay {
-                            Capsule().stroke(tokens.metal, lineWidth: 1.2)
+                            Capsule().strokeBorder(
+                                tokens.keyline.opacity(0.55), lineWidth: 0.8
+                            )
                         }
                 }
                 .buttonStyle(.plain)
@@ -58,11 +69,21 @@ struct RepairInviteCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tokens.panelFill)
+                .fill(plumPanel)
         }
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(tokens.panelStroke, lineWidth: 1)
         }
+    }
+
+    /// The sunset panel deepened toward the plum ground plane — the
+    /// "plum deepened" of the spec, stable across every page phase.
+    private var plumPanel: Color {
+        SRGBValue.mix(
+            tokens.panelFillValue,
+            tokens.groundPlaneValue,
+            amount: 0.30
+        ).color
     }
 }

@@ -7,7 +7,9 @@ import IhsanDesignSystem
 /// `PaletteState.resolved(for: .fixed(state))` returns exact canonical tokens.
 enum RepairPalette {
     static func tokens(at date: Date = .now, calendar: Calendar = .current) -> SkyPaletteTokens {
-        state(at: date, calendar: calendar).tokens
+        // The one page-chrome resolver — Repair rides the same
+        // clock-derived phase as the rest of the secondary pages.
+        IhsanPageChrome.tokens(at: date)
     }
 
     static func state(at date: Date = .now, calendar: Calendar = .current) -> PaletteState {

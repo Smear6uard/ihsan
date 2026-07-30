@@ -31,7 +31,7 @@ struct OnboardingCalculationMethodPicker: View {
                 .padding(IhsanSpacing.md)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ihsanBackground()
+            .ihsanManuscriptPage()
             .navigationTitle("Calculation method")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

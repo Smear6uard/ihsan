@@ -176,7 +176,7 @@ public struct OrnamentalDivider: View {
                 // shape reads cleanly even when the rule passes behind it.
                 .background {
                     Capsule()
-                        .fill(IhsanColor.panelDay.opacity(0.001))
+                        .fill(Color.white.opacity(0.001))
                 }
         }
         .frame(maxWidth: ruleWidth)
@@ -209,5 +209,5 @@ public struct OrnamentalDivider: View {
         OrnamentalFlourish(size: 6, tint: IhsanColor.brass, opacity: 0.60)
     }
     .padding()
-    .background(IhsanColor.panelDay)
+    .background(PaletteState.afternoon.tokens.panelFill)
 }

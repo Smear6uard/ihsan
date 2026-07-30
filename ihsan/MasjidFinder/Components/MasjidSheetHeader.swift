@@ -42,5 +42,5 @@ struct MasjidSheetHeader: View {
         Spacer()
     }
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

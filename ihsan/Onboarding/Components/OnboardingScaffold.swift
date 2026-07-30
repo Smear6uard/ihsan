@@ -57,6 +57,6 @@ struct OnboardingScaffold<Hero: View, Content: View, Actions: View>: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
-        .ihsanBackground()
+        .ihsanManuscriptPage()
     }
 }

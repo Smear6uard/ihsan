@@ -69,5 +69,5 @@ public struct ReflectionPromptCard: View {
     )
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

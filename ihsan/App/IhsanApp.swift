@@ -178,18 +178,23 @@ private struct RootGate: View {
         // `-IhsanDebugLogPrayer dhuhr:late` seeds today; an optional
         // third component is a day offset — `dhuhr:late:-1` seeds
         // yesterday (relative to the NowProvider clock, so it
-        // composes with -IhsanNowOverride).
+        // composes with -IhsanNowOverride). Multiple specs join with
+        // ";" so a screenshot run can stage a whole month:
+        // `fajr:onTime:0;dhuhr:qada:-1;asr:missed:-2`.
         if let flagIndex = arguments.firstIndex(of: "-IhsanDebugLogPrayer"),
            arguments.indices.contains(flagIndex + 1) {
-            let parts = arguments[flagIndex + 1].split(separator: ":")
-            if parts.count >= 2,
-               let prayer = Prayer(rawValue: String(parts[0])),
-               let status = PrayerStatus(rawValue: String(parts[1])) {
-                let dayOffset = parts.count >= 3 ? Int(parts[2]) ?? 0 : 0
-                let date: Date? = dayOffset == 0 ? nil : Calendar.current.date(
-                    byAdding: .day, value: dayOffset, to: NowProvider.active.now()
-                )
-                Task {
+            let specs = arguments[flagIndex + 1].split(separator: ";")
+            Task {
+                for spec in specs {
+                    let parts = spec.split(separator: ":")
+                    guard parts.count >= 2,
+                          let prayer = Prayer(rawValue: String(parts[0])),
+                          let status = PrayerStatus(rawValue: String(parts[1]))
+                    else { continue }
+                    let dayOffset = parts.count >= 3 ? Int(parts[2]) ?? 0 : 0
+                    let date: Date? = dayOffset == 0 ? nil : Calendar.current.date(
+                        byAdding: .day, value: dayOffset, to: NowProvider.active.now()
+                    )
                     _ = try? await LogPrayerWithStatusIntent(
                         prayer: prayer, status: status, date: date
                     ).perform()

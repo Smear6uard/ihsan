@@ -123,7 +123,7 @@ struct ReflectionScreen: View {
             Text("LOADING REFLECTIONS…")
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(IhsanColor.skyForegroundSecondary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).inkSecondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
@@ -135,7 +135,7 @@ struct ReflectionScreen: View {
                 .foregroundStyle(IhsanColor.brassDark)
             Text(message)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
                 .multilineTextAlignment(.center)
         }
         .padding()
@@ -199,7 +199,7 @@ struct ReflectionScreen: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("The day's quiet account")
                 .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
 
             Text("REFLECTION · \(HijriDateFormatter.string(from: promptDate).uppercased())")
                 .font(IhsanFont.inscription)

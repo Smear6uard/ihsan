@@ -38,14 +38,18 @@ struct TodayHeader: View {
     let moment: PrayerMoment?
     /// Timezone of the place the times belong to.
     let timeZone: TimeZone
+    /// Resolved v2 palette tokens for this moment — the same set the
+    /// plate and card read, so the header's ink can never disagree
+    /// with the scene it annotates.
+    let tokens: SkyPaletteTokens
     /// Tap callback for the moon-phase glyph — opens the celestial
     /// reference / qibla compass overlay.
     let onMoonPhaseTap: () -> Void
 
     var body: some View {
-        let foreground = IhsanColor.skyForegroundPrimary(at: now)
-        let foregroundSecondary = IhsanColor.skyForegroundSecondary(at: now)
-        let shadowColor = legibilityShadowColor(for: foreground)
+        let foreground = tokens.ink
+        let foregroundSecondary = tokens.inkSecondary
+        let shadowColor = legibilityShadowColor()
         let nextInscription = nextPrayerInscription
 
         HStack(alignment: .top, spacing: IhsanSpacing.md) {
@@ -108,8 +112,8 @@ struct TodayHeader: View {
         return "NEXT: \(name) \(time)"
     }
 
-    private func legibilityShadowColor(for foreground: Color) -> Color {
-        foreground == IhsanColor.inkDeep
+    private func legibilityShadowColor() -> Color {
+        tokens.inkValue.relativeLuminance < 0.5
             ? .white.opacity(0.42)
             : .black.opacity(0.48)
     }

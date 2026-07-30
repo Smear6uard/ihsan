@@ -58,40 +58,12 @@ public enum IhsanColor {
     // the manuscript aesthetic MUST sample from here rather than inventing
     // off-spec values.
 
-    /// Persian indigo `#1A1F4A`. The night page — deep but saturated, never
-    /// flat black. Used as the dominant background colour from Isha through
-    /// pre-Fajr.
-    public static let nightPage = Color(hex: 0x1A1F4A)
-
-    /// Rose-tinted indigo `#2D2547`. The transitional page colour at dawn
-    /// (just before Fajr) and at the maghrib→isha boundary. Also used as
-    /// the `Qada` status accent.
-    public static let duskPage = Color(hex: 0x2D2547)
-
-    /// Sunset vermillion `#B85F3A`. The maghrib horizon. The most dramatic
-    /// page colour of the day; visible for the ~2 hour sunset window.
-    public static let dawnRose = Color(hex: 0xB85F3A)
-
-    /// Deep amber-cream `#C9B584`. Afternoon page colour leading into Asr.
-    public static let parchmentDeep = Color(hex: 0xC9B584)
-
-    /// Warm parchment `#E8DCC0`. Late-morning page colour, slightly warmer
-    /// than `parchmentLight`.
-    public static let parchmentWarm = Color(hex: 0xE8DCC0)
-
-    /// Bright parchment `#F0E5D0`. The brightest page colour of the day,
-    /// visible from sunrise through mid-morning.
-    public static let parchmentLight = Color(hex: 0xF0E5D0)
-
-    /// Sunlit-paper cream `#FFFAF0` — the illuminated-panel body colour
-    /// during daylight hours. Brighter than the sky stops so the panel
-    /// reads as a sheet of sunlit paper on a darker desk, with clearly
-    /// visible separation from the page beneath.
-    public static let panelDay = Color(hex: 0xFFFAF0)
-
-    /// Amber-cream `#3D3328` — the illuminated-panel body colour at night.
-    /// Bone cream reads cleanly on top of this; ink dark would disappear.
-    public static let panelNight = Color(hex: 0x3D3328)
+    // The rust-brown page ramp (`nightPage` / `duskPage` / `dawnRose` /
+    // the parchment triplet) and the olive-taupe panel pair
+    // (`panelDay` / `panelNight`) are DELETED. The page ground and
+    // panel material now come exclusively from palette v2
+    // (`IhsanPageChrome`, `SkyPaletteTokens`) — no page-local
+    // overrides, no parallel ground system.
 
     /// Brass `#C9A876` — the illumination-border colour and the dominant
     /// accent for arc strokes, prayer-list active borders, and small-caps
@@ -176,27 +148,9 @@ public enum IhsanColor {
     /// Vermillion `#C73E1D`. Missed-status indicator.
     public static let vermillionMissed = vermillion
 
-    /// Deeper indigo `#2D2547`. Qada status indicator — same hue as
-    /// `duskPage`, signalling "made up later" with a calm twilight tone.
-    public static let indigoQada = duskPage
-
-    // MARK: - Backwards-compatible aliases
-    //
-    // Pre-redirect screens consume these names; they now resolve to the
-    // canonical manuscript palette values above.
-
-    /// Daytime card surface — alias of `panelDay` (`#F5EBD5`). The
-    /// historical name is preserved so non-Today screens compile unchanged.
-    public static let cardCreamLight = panelDay
-
-    /// Nighttime card surface — alias of `panelNight` (`#3D3328`).
-    public static let cardAmberDark = panelNight
-
-    /// Foreground text on a daytime cream card — alias of `inkDeep`.
-    public static let textInkDark = inkDeep
-
-    /// Foreground text on a nighttime amber card — alias of `boneCream`.
-    public static let textBoneCream = boneCream
+    /// Deeper indigo `#2D2547`. Qada status indicator — a calm
+    /// twilight tone for "made up later".
+    public static let indigoQada = Color(hex: 0x2D2547)
 
     /// Primary brass accent — alias of `brass` (`#C9A876`).
     public static let accentBrass = brass
@@ -205,182 +159,6 @@ public enum IhsanColor {
     /// returned by `accentWarm(at:)` (the manuscript redirect unifies the
     /// active accent on brass at all times of day).
     public static let accentRoseGold = Color(hex: 0xC77B5C)
-
-    // MARK: - RGB stop interpolation (sky / card)
-
-    typealias RGB = (red: Double, green: Double, blue: Double)
-    typealias RGBStop = (progress: Double, rgb: RGB)
-
-    /// Sky TOP keyframes — the page colour at the top edge of the screen
-    /// at each moment of the day. The keyframe progression encodes the
-    /// manuscript-page sequence: Persian indigo at night, parchment cream
-    /// through daylight, deeper parchment into the afternoon, vermillion
-    /// at maghrib, dusk indigo trailing into night.
-    ///
-    /// The sunrise flip from indigo to parchment is intentionally tight
-    /// (`0.250 → 0.252` = ~3 minutes of clock time) so the user reads it
-    /// as "the moment of sunrise" rather than a long pastel transition.
-    static let skyTopStops: [RGBStop] = [
-        (0.000, hexRGB(0x1A1F4A)),  // 00:00 — Persian indigo (night)
-        (0.167, hexRGB(0x1A1F4A)),  // 04:00 — still night
-        (0.250, hexRGB(0x2D2547)),  // 05:59:48 — dusk top, last moment before sunrise
-        (0.252, hexRGB(0xF0E5D0)),  // 06:02:53 — SUNRISE flip to parchment
-        (0.417, hexRGB(0xE8DCC0)),  // 10:00 — warming parchment
-        (0.542, hexRGB(0xD9C9A0)),  // 13:00 — Dhuhr golden cream
-        (0.667, hexRGB(0xC9B584)),  // 16:00 — Asr deeper parchment
-        (0.792, hexRGB(0xB85F3A)),  // 19:00 — Maghrib vermillion
-        (0.875, hexRGB(0x2D2547)),  // 21:00 — Isha dusk indigo
-        (0.958, hexRGB(0x1A1F4A)),  // 23:00 — full night indigo
-        (1.000, hexRGB(0x1A1F4A))   // 24:00 — Persian indigo
-    ]
-
-    /// Sky BOTTOM keyframes — the page colour at the bottom edge of the
-    /// screen. Each window's bottom is one step warmer than its top, so
-    /// the gradient reads as "sky above, horizon below" without ever
-    /// becoming a hard band. The bottom holds vermillion through the
-    /// asr→maghrib window (so the page reads as uniform sunset, not
-    /// muddy crimson at 17:00) and only descends to indigo across the
-    /// maghrib→isha hours.
-    static let skyBottomStops: [RGBStop] = [
-        (0.000, hexRGB(0x1A1F4A)),  // 00:00 — uniform night
-        (0.167, hexRGB(0x1A1F4A)),  // 04:00
-        (0.250, hexRGB(0x2D2547)),  // 05:59:48 — dusk bottom
-        (0.252, hexRGB(0xE8DCC0)),  // 06:02:53 — sunrise warm parchment
-        (0.417, hexRGB(0xD9C9A0)),  // 10:00 — warming gold
-        (0.542, hexRGB(0xC9B584)),  // 13:00 — Dhuhr amber
-        (0.667, hexRGB(0xB85F3A)),  // 16:00 — Asr horizon already vermillion
-        (0.792, hexRGB(0xB85F3A)),  // 19:00 — Maghrib uniform vermillion bottom
-        (0.875, hexRGB(0x1A1F4A)),  // 21:00 — Isha night settled at horizon
-        (0.958, hexRGB(0x1A1F4A)),  // 23:00
-        (1.000, hexRGB(0x1A1F4A))   // 24:00
-    ]
-
-    /// Card SURFACE keyframes — `panelDay` parchment during daylight,
-    /// `panelNight` amber-cream at night. The crossover at sunrise
-    /// (`0.2496 → 0.2503`) and at maghrib (`0.7916 → 0.7920`) is sub-minute
-    /// so users read each flip as the literal moment of sunrise / sunset.
-    /// Half-hour test samples never fall inside the crossover, so the
-    /// `SkyAndCardTests.cardForegroundContrastAcrossEveryHour` WCAG AA
-    /// contract holds.
-    static let cardSurfaceStops: [RGBStop] = [
-        (0.0000, hexRGB(0x3D3328)),  // 00:00 — panelNight
-        (0.1667, hexRGB(0x3D3328)),  // 04:00
-        (0.2496, hexRGB(0x3D3328)),  // 05:59:25 — last night moment
-        (0.2503, hexRGB(0xFFFAF0)),  // 06:00:25 — SUNRISE flip to panelDay
-        (0.7916, hexRGB(0xFFFAF0)),  // 18:59:51 — last day moment
-        (0.7920, hexRGB(0x3D3328)),  // 19:00:29 — MAGHRIB flip to panelNight
-        (0.8750, hexRGB(0x3D3328)),  // 21:00
-        (1.0000, hexRGB(0x3D3328))   // 24:00
-    ]
-
-    private static func hexRGB(_ hex: Int) -> RGB {
-        (
-            red: Double((hex >> 16) & 0xFF) / 255.0,
-            green: Double((hex >> 8) & 0xFF) / 255.0,
-            blue: Double(hex & 0xFF) / 255.0
-        )
-    }
-
-    /// Linear RGB interpolation across an ordered keyframe table.
-    /// Internal-but-testable so we can pin chromatic checkpoints
-    /// (Fajr is dark, Dhuhr is cream, Maghrib pulls rose, etc.).
-    static func interpolatedRGB(stops: [RGBStop], at progress: Double) -> RGB {
-        let clamped = max(0.0, min(1.0, progress))
-        for i in 0..<(stops.count - 1) {
-            let a = stops[i]
-            let b = stops[i + 1]
-            if clamped >= a.progress && clamped <= b.progress {
-                let span = b.progress - a.progress
-                let t = span > 0 ? (clamped - a.progress) / span : 0
-                return (
-                    red: a.rgb.red + (b.rgb.red - a.rgb.red) * t,
-                    green: a.rgb.green + (b.rgb.green - a.rgb.green) * t,
-                    blue: a.rgb.blue + (b.rgb.blue - a.rgb.blue) * t
-                )
-            }
-        }
-        return stops.last?.rgb ?? (0, 0, 0)
-    }
-
-    /// Sky-gradient TOP colour at the given moment.
-    public static func skyTopColor(at date: Date = .now) -> Color {
-        let rgb = interpolatedRGB(stops: skyTopStops, at: dayProgress(for: date))
-        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
-    }
-
-    /// Sky-gradient BOTTOM colour at the given moment.
-    public static func skyBottomColor(at date: Date = .now) -> Color {
-        let rgb = interpolatedRGB(stops: skyBottomStops, at: dayProgress(for: date))
-        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
-    }
-
-    /// The card's base surface colour at the given moment. Warm cream
-    /// during the day, deep amber at night.
-    public static func cardSurfaceColor(at date: Date = .now) -> Color {
-        let rgb = interpolatedRGB(stops: cardSurfaceStops, at: dayProgress(for: date))
-        return Color(red: rgb.red, green: rgb.green, blue: rgb.blue)
-    }
-
-    /// Internal RGB form of the card surface colour. Used by the foreground
-    /// brightness check and by tests.
-    static func cardSurfaceRGB(at date: Date) -> RGB {
-        interpolatedRGB(stops: cardSurfaceStops, at: dayProgress(for: date))
-    }
-
-    /// WCAG-style relative luminance of the card surface at the given
-    /// moment. Used to decide whether the foreground text should be the
-    /// dark ink or the bone cream.
-    static func cardSurfaceLuminance(at date: Date) -> Double {
-        let rgb = cardSurfaceRGB(at: date)
-        func channel(_ c: Double) -> Double {
-            c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * channel(rgb.red)
-            + 0.7152 * channel(rgb.green)
-            + 0.0722 * channel(rgb.blue)
-    }
-
-    /// Threshold above which the card is "light enough" that dark text reads
-    /// against it. The sub-minute card flips at sunrise and maghrib keep
-    /// HH:30 samples firmly on one side of this threshold so contrast
-    /// stays in the AAA zone at every test hour.
-    static let cardForegroundLuminanceThreshold: Double = 0.32
-
-    /// Primary text colour for content sitting on a `cardSurfaceColor(at:)`
-    /// surface. Resolves to `inkDeep` when the panel is light and to
-    /// `boneCream` when the panel is dark. Both poles clear WCAG AA with
-    /// significant headroom.
-    public static func cardForegroundPrimary(at date: Date = .now) -> Color {
-        cardSurfaceLuminance(at: date) > cardForegroundLuminanceThreshold
-            ? inkDeep
-            : boneCream
-    }
-
-    /// The illuminated-panel body colour at the given moment — `panelDay`
-    /// during daylight hours, `panelNight` at night. Resolves via the same
-    /// luminance threshold used by `cardForegroundPrimary`, so the surface
-    /// and its text foreground stay in lockstep across the sunrise /
-    /// maghrib flips. Use this when composing a custom illuminated
-    /// surface (e.g. a small chip) that needs to match the page's
-    /// dominant card material without going through the
-    /// `.ihsanIlluminatedPanel` modifier.
-    public static func panelSurface(at date: Date = .now) -> Color {
-        cardSurfaceLuminance(at: date) > cardForegroundLuminanceThreshold
-            ? panelDay
-            : panelNight
-    }
-
-    /// Secondary text on a card surface — primary at 72% opacity.
-    public static func cardForegroundSecondary(at date: Date = .now) -> Color {
-        cardForegroundPrimary(at: date).opacity(0.72)
-    }
-
-    /// Muted / metadata text on a card surface — primary at 50% opacity.
-    /// Only safe at body+ sizes; reuse in display contexts requires a fresh
-    /// contrast check.
-    public static func cardForegroundMuted(at date: Date = .now) -> Color {
-        cardForegroundPrimary(at: date).opacity(0.50)
-    }
 
     /// Warm brass accent at the given moment. The manuscript redirect
     /// unifies the active accent on brass throughout the day; previous
@@ -392,74 +170,6 @@ public enum IhsanColor {
         // a warmer maghrib accent without API churn.
         _ = date
         return brass
-    }
-
-    // MARK: - Foreground colours for content sitting on the sky
-    //
-    // The header (city name, Hijri date, icon chips) sits directly on the
-    // page gradient near the top of the screen. The card-foreground helpers
-    // above don't apply: the sky transitions between dark and light at
-    // different clock times than the cards do, so reusing
-    // `cardForegroundPrimary` would give a dark-text-on-dark-sky moment
-    // around sunrise.
-    //
-    // These helpers consult sky-TOP luminance specifically because that's
-    // where the header actually sits.
-
-    /// Internal RGB form of the sky top colour. Drives the foreground
-    /// brightness check below and is reused by tests to assert the
-    /// daylight / night flip happens at the right hour.
-    static func skyTopRGB(at date: Date) -> RGB {
-        interpolatedRGB(stops: skyTopStops, at: dayProgress(for: date))
-    }
-
-    /// WCAG-style relative luminance of the sky top at the given moment.
-    static func skyTopLuminance(at date: Date) -> Double {
-        let rgb = skyTopRGB(at: date)
-        func channel(_ c: Double) -> Double {
-            c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
-        }
-        return 0.2126 * channel(rgb.red)
-            + 0.7152 * channel(rgb.green)
-            + 0.0722 * channel(rgb.blue)
-    }
-
-    /// Approximate WCAG luminance of the two foreground extremes. Hard-
-    /// coded so the picker below doesn't have to recompute them per call.
-    /// `inkDeep` is `#1A1F2E` (luminance ≈ 0.0130). `boneCream` is `#F5EBD5`
-    /// (luminance ≈ 0.8372).
-    static let textInkLuminance: Double = 0.0130
-    static let textBoneLuminance: Double = 0.8372
-
-    /// Primary text colour for content sitting DIRECTLY on the sky
-    /// (header, status overlays, anything not inside a warm card).
-    ///
-    /// Instead of using a single threshold (which would pick the wrong
-    /// pole near the mid-tone transition zones around sunrise and
-    /// maghrib), this returns whichever of ink-dark or bone-cream has
-    /// the BETTER WCAG contrast against the current sky top. Callers
-    /// should still pair the colour with a small opposite-tinted text
-    /// shadow when their text would otherwise sit on a mid-tone sky.
-    public static func skyForegroundPrimary(at date: Date = .now) -> Color {
-        let skyLum = skyTopLuminance(at: date)
-        let inkContrast = wcagContrast(skyLum, textInkLuminance)
-        let creamContrast = wcagContrast(skyLum, textBoneLuminance)
-        return inkContrast >= creamContrast ? inkDeep : boneCream
-    }
-
-    /// WCAG contrast ratio between two relative luminances.
-    static func wcagContrast(_ a: Double, _ b: Double) -> Double {
-        let lighter = max(a, b)
-        let darker = min(a, b)
-        return (lighter + 0.05) / (darker + 0.05)
-    }
-
-    public static func skyForegroundSecondary(at date: Date = .now) -> Color {
-        skyForegroundPrimary(at: date).opacity(0.72)
-    }
-
-    public static func skyForegroundMuted(at date: Date = .now) -> Color {
-        skyForegroundPrimary(at: date).opacity(0.50)
     }
 
     // MARK: - Status indicator colors

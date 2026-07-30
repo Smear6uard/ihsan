@@ -66,5 +66,5 @@ struct RadiusSelector: View {
     return RadiusSelector(radius: $radius)
         .padding()
         .frame(maxWidth: .infinity)
-        .ihsanBackground()
+        .ihsanManuscriptPage()
 }

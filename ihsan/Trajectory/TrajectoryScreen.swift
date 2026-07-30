@@ -59,12 +59,26 @@ struct TrajectoryScreen: View {
     }
 
     var body: some View {
+        // The page's one clock: a single quiet timeline resolves the
+        // moment through the injected provider; the tokens and the
+        // ground follow it together. `timeOfDayOverride` pins the
+        // shared page-chrome modifiers to the same instant.
+        TimelineView(.periodic(from: .distantPast, by: 60)) { context in
+            let now = nowProvider.resolve(context.date)
+            let tokens = IhsanPageChrome.tokens(at: now)
+            page(tokens: tokens)
+                .environment(\.timeOfDayOverride, now)
+        }
+    }
+
+    @ViewBuilder
+    private func page(tokens: SkyPaletteTokens) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-                header
+                header(tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
-                PeriodSelector(period: $viewModel.period)
+                PeriodSelector(period: $viewModel.period, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
                 if let settings, !settings.qadaTrackingEnabled, !settings.qadaPathCardDismissed {
@@ -78,7 +92,7 @@ struct TrajectoryScreen: View {
                     .padding(.horizontal, IhsanSpacing.md)
                 }
 
-                content
+                content(tokens: tokens)
 
                 if settings?.qadaTrackingEnabled == true {
                     RepairSection(onOpen: { showingRepairDetail = true })
@@ -144,18 +158,18 @@ struct TrajectoryScreen: View {
     // MARK: - Header
 
     @ViewBuilder
-    private var header: some View {
+    private func header(tokens: SkyPaletteTokens) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("A pattern of days")
                 .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(tokens.ink)
 
             Text(subtitleText)
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(IhsanColor.brass)
+                .foregroundStyle(tokens.inkSecondary)
 
-            OrnamentalDivider()
+            OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
                 .padding(.top, IhsanSpacing.xs)
         }
     }
@@ -174,16 +188,16 @@ struct TrajectoryScreen: View {
     // MARK: - Content
 
     @ViewBuilder
-    private var content: some View {
+    private func content(tokens: SkyPaletteTokens) -> some View {
         switch viewModel.state {
         case .loading:
             ProgressView()
-                .tint(IhsanColor.brass)
+                .tint(tokens.inkSecondary)
                 .frame(maxWidth: .infinity)
                 .padding(.top, IhsanSpacing.xxl)
 
         case .empty:
-            TrajectoryEmptyState()
+            TrajectoryEmptyState(tokens: tokens)
                 .padding(.top, IhsanSpacing.xxl)
 
         case .ready(let snapshot):
@@ -191,19 +205,20 @@ struct TrajectoryScreen: View {
                 if settings?.sunnahLayerEnabled == true {
                     HStack {
                         Spacer()
-                        naflOverlayToggle
+                        naflOverlayToggle(tokens: tokens)
                     }
                     .padding(.horizontal, IhsanSpacing.md)
                 }
 
-                gestaltPanel(snapshot: snapshot)
+                gestaltPanel(snapshot: snapshot, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
-                QuietSummaryRow(aggregate: snapshot.aggregate)
+                QuietSummaryRow(aggregate: snapshot.aggregate, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
                 DailyPracticeGrid(
                     days: snapshot.days,
+                    tokens: tokens,
                     onDayTap: { day in
                         selectedDay = day
                     },
@@ -226,15 +241,18 @@ struct TrajectoryScreen: View {
     /// padding stays in lockstep with the other illuminated panels on
     /// the page.
     @ViewBuilder
-    private func gestaltPanel(snapshot: TrajectoryState.Snapshot) -> some View {
+    private func gestaltPanel(
+        snapshot: TrajectoryState.Snapshot, tokens: SkyPaletteTokens
+    ) -> some View {
         GestaltGrid(
             days: snapshot.days,
             period: snapshot.period,
+            tokens: tokens,
             naflDays: overlayNaflDays
         )
         .padding(IhsanSpacing.lg)
         .frame(maxWidth: .infinity)
-        .ihsanIlluminatedPanel(intensity: .regular)
+        .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
 
     // MARK: - Nafl overlay
@@ -306,7 +324,7 @@ struct TrajectoryScreen: View {
     /// The quiet in-Path switch for the overlay: a small outlined chip,
     /// filled while the sixth row shows. Visible only when the sunnah
     /// layer itself is on.
-    private var naflOverlayToggle: some View {
+    private func naflOverlayToggle(tokens: SkyPaletteTokens) -> some View {
         let isOn = settings?.pathNaflOverlayEnabled == true
         return Button {
             Haptics.impact(.light)
@@ -315,18 +333,18 @@ struct TrajectoryScreen: View {
         } label: {
             HStack(spacing: 5) {
                 FourPointedStar()
-                    .stroke(IhsanColor.brass.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
+                    .stroke(tokens.metal.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
                     .frame(width: 9, height: 9)
                 Text("NAFL")
                     .font(IhsanFont.inscription)
                     .tracking(1.6)
-                    .foregroundStyle(IhsanColor.brass.opacity(isOn ? 0.95 : 0.6))
+                    .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary.opacity(0.8))
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .overlay {
                 Capsule()
-                    .strokeBorder(IhsanColor.brass.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
+                    .strokeBorder(tokens.metal.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
             }
         }
         .buttonStyle(.plain)

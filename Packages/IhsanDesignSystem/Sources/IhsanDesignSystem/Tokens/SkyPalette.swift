@@ -319,6 +319,55 @@ public struct SkyPaletteTokens: Sendable, Equatable {
         sheetBackingValue.color.opacity(sheetBackingOpacity)
     }
 
+    // MARK: - Page ground (secondary pages)
+
+    /// Top anchor of the secondary pages' ground — a QUIETER
+    /// derivative of the sky at this phase: same family and warmth,
+    /// lower drama. The zenith blue is omitted entirely and the top
+    /// starts a third of the way toward the bottom value, so the
+    /// gradient reads as a settled wash rather than a painted sky.
+    /// Path, Reflect, and Set all consume this one definition.
+    public var pageGroundTopValue: SRGBValue {
+        SRGBValue.mix(groundTopValue, groundBottomValue, amount: 0.35)
+    }
+
+    /// Bottom anchor of the page ground — the sky gradient's own
+    /// bottom, unchanged, so a tab switch keeps the horizon family.
+    public var pageGroundBottomValue: SRGBValue {
+        groundBottomValue
+    }
+
+    /// The quiet page gradient for secondary pages.
+    public var pageGround: LinearGradient {
+        LinearGradient(
+            colors: [pageGroundTopValue.color, pageGroundBottomValue.color],
+            startPoint: .top,
+            endPoint: .bottom
+        )
+    }
+
+    /// Flat page ground — the Reduce Transparency fallback.
+    public var pageGroundFlatValue: SRGBValue {
+        SRGBValue.mix(pageGroundTopValue, pageGroundBottomValue, amount: 0.5)
+    }
+
+    public var pageGroundFlat: Color { pageGroundFlatValue.color }
+}
+
+/// The one resolver for secondary-page chrome: SkyPhase → the quiet
+/// page ground and the token set its panels and ink read from.
+/// Defined once here so no page can derive its own ground.
+public enum IhsanPageChrome {
+    /// Tokens for a page that has no solar schedule of its own —
+    /// resolved through the clock-derived approximate phase.
+    public static func tokens(at date: Date, timeZone: TimeZone = .current) -> SkyPaletteTokens {
+        PaletteState.resolved(for: SkyPhase.approximate(at: date, timeZone: timeZone))
+    }
+
+    /// The quiet page ground for a given phase.
+    public static func pageGround(for phase: SkyPhase) -> LinearGradient {
+        PaletteState.resolved(for: phase).pageGround
+    }
 }
 
 // MARK: - Canonical states

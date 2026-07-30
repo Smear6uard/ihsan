@@ -25,14 +25,21 @@ struct TodayScreen: View {
             }
     }
 
+    /// Chrome tokens for the pre-ready states, resolved through the
+    /// injected clock — the same quiet page system the secondary
+    /// pages ride.
+    private var chromeTokens: SkyPaletteTokens {
+        IhsanPageChrome.tokens(at: nowProvider.now())
+    }
+
     @ViewBuilder
     private var content: some View {
         switch viewModel?.state {
         case .loading, nil:
-            TodayLoadingView()
+            TodayLoadingView(tokens: chromeTokens)
                 .ihsanManuscriptPage()
         case .needsLocationPermission:
-            TodayNeedsLocationView { Task { await viewModel?.bootstrap() } }
+            TodayNeedsLocationView(tokens: chromeTokens) { Task { await viewModel?.bootstrap() } }
                 .ihsanManuscriptPage()
         case .ready(let snapshot):
             if let viewModel {
@@ -43,7 +50,7 @@ struct TodayScreen: View {
                 )
             }
         case .error(let message):
-            TodayErrorView(message: message) { Task { await viewModel?.bootstrap() } }
+            TodayErrorView(tokens: chromeTokens, message: message) { Task { await viewModel?.bootstrap() } }
                 .ihsanManuscriptPage()
         }
     }
@@ -52,8 +59,10 @@ struct TodayScreen: View {
 // MARK: - State views
 
 private struct TodayLoadingView: View {
+    let tokens: SkyPaletteTokens
+
     var body: some View {
-        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
+        let foregroundSecondary = tokens.inkSecondary
         VStack(spacing: IhsanSpacing.md) {
             ProgressView()
                 .progressViewStyle(.circular)
@@ -69,13 +78,14 @@ private struct TodayLoadingView: View {
 }
 
 private struct TodayNeedsLocationView: View {
+    let tokens: SkyPaletteTokens
     let onRetry: () -> Void
 
     var body: some View {
-        let foreground = IhsanColor.skyForegroundPrimary()
-        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
-        let foregroundMuted = IhsanColor.skyForegroundMuted()
-        let accent = IhsanColor.accentWarm()
+        let foreground = tokens.ink
+        let foregroundSecondary = tokens.inkSecondary
+        let foregroundMuted = tokens.inkSecondary.opacity(0.7)
+        let accent = tokens.leafGold
         VStack(spacing: IhsanSpacing.lg) {
             Image(systemName: "location.slash.fill")
                 .font(.system(size: 48))
@@ -102,13 +112,14 @@ private struct TodayNeedsLocationView: View {
 }
 
 private struct TodayErrorView: View {
+    let tokens: SkyPaletteTokens
     let message: String
     let onRetry: () -> Void
 
     var body: some View {
-        let foreground = IhsanColor.skyForegroundPrimary()
-        let foregroundSecondary = IhsanColor.skyForegroundSecondary()
-        let foregroundMuted = IhsanColor.skyForegroundMuted()
+        let foreground = tokens.ink
+        let foregroundSecondary = tokens.inkSecondary
+        let foregroundMuted = tokens.inkSecondary.opacity(0.7)
         VStack(spacing: IhsanSpacing.md) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 32))
@@ -283,6 +294,7 @@ private struct TodayReadyView: View {
                         now: now,
                         moment: moment,
                         timeZone: snapshot.place.timeZone,
+                        tokens: tokens,
                         onMoonPhaseTap: { isCelestialReferencePresented = true }
                     )
                     .padding(.horizontal, IhsanSpacing.md)

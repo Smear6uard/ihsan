@@ -7,6 +7,7 @@ import IhsanDesignSystem
 /// rather than as a standalone control element.
 struct PeriodSelector: View {
     @Binding var period: TrajectoryPeriod
+    let tokens: SkyPaletteTokens
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Namespace private var underlineNamespace
@@ -27,13 +28,13 @@ struct PeriodSelector: View {
                             .tracking(1.6)
                             .foregroundStyle(
                                 period == option
-                                    ? IhsanColor.brass
-                                    : IhsanColor.brassDark.opacity(0.50)
+                                    ? tokens.ink
+                                    : tokens.inkSecondary.opacity(0.75)
                             )
 
                         if period == option {
                             Capsule()
-                                .fill(IhsanIridescence.brassStroke(opacity: 0.95))
+                                .fill(tokens.metal.opacity(0.95))
                                 .frame(width: 18, height: 1.5)
                                 .matchedGeometryEffect(id: "underline", in: underlineNamespace)
                         } else {

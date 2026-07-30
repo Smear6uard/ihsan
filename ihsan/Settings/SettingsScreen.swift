@@ -190,7 +190,7 @@ struct SettingsScreen: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("Quiet preferences")
                 .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
                 .accessibilityAddTraits(.isHeader)
             Text("SETTINGS")
                 .font(IhsanFont.inscription)
@@ -1016,7 +1016,7 @@ private struct RawatibCountRow: View {
                 .overlay(IhsanColor.brass.opacity(0.18))
             Text(prayer.displayNameEnglish)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
             HStack(spacing: IhsanSpacing.lg) {
                 miniCountControl(
                     label: "Before",
@@ -1095,7 +1095,7 @@ private func miniCountControl(
         Text(label.uppercased())
             .font(IhsanFont.inscription)
             .tracking(1.2)
-            .foregroundStyle(IhsanColor.skyForegroundMuted())
+            .foregroundStyle(IhsanPageChrome.tokens(at: .now).inkSecondary.opacity(0.7))
         HStack(spacing: IhsanSpacing.sm) {
             Button {
                 Haptics.impact(.light)
@@ -1112,7 +1112,7 @@ private func miniCountControl(
 
             Text("\(value)")
                 .font(.system(.body, design: .monospaced).monospacedDigit())
-                .foregroundStyle(IhsanColor.skyForegroundPrimary())
+                .foregroundStyle(IhsanPageChrome.tokens(at: .now).ink)
                 .frame(minWidth: 28)
                 .contentTransition(.numericText())
 

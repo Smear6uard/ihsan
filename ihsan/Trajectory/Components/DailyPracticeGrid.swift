@@ -2,23 +2,20 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// The day-by-day detail grid that sits beneath the gestalt dot pattern.
+/// The day-by-day detail grid beneath the gestalt pattern.
 ///
-/// Renders the period's days as rows and the five fardh prayers as
-/// columns; each cell is a `DayPrayerCell` carrying both status and
-/// jamaʿah modifier in one small illuminated square. The gestalt grid
-/// above is the visual headline of the screen; this matrix exists for
-/// the user who wants to drill into the specific outcomes — which day,
-/// which prayer.
-///
-/// The grid is wrapped in an illuminated parchment panel so it reads
-/// as one composed surface — the period's record laid out on a single
-/// page of the manuscript — rather than as a free-floating chart.
+/// Days as rows (newest first), the five fardh prayers as columns.
+/// The column headers are the five prayer ornaments at small scale —
+/// the same forms the plate teaches, VoiceOver-labeled with the
+/// prayer names. Cells speak the dot-state language; the date labels
+/// sit in the system register. A cell tap opens the log sheet for
+/// that prayer and day — the canonical way to log yesterday and
+/// earlier.
 struct DailyPracticeGrid: View {
     let days: [DayCompletion]
+    let tokens: SkyPaletteTokens
     let onDayTap: (DayCompletion) -> Void
-    /// A cell tap opens the log sheet for that prayer and day — the
-    /// canonical way to log yesterday and earlier.
+    /// A cell tap opens the log sheet for that prayer and day.
     let onCellTap: (DayCompletion, PrayerCompletion) -> Void
 
     var body: some View {
@@ -28,8 +25,7 @@ struct DailyPracticeGrid: View {
             columnHeaders
 
             // Rows render newest-first so today sits at the top of
-            // the grid (matches the spec mockup; matches user
-            // intuition that the most recent record reads first).
+            // the grid.
             VStack(spacing: rowSpacing) {
                 ForEach(days.reversed()) { day in
                     row(for: day)
@@ -38,7 +34,7 @@ struct DailyPracticeGrid: View {
         }
         .padding(IhsanSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .ihsanIlluminatedPanel(intensity: .regular)
+        .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
 
     // MARK: - Header
@@ -48,13 +44,13 @@ struct DailyPracticeGrid: View {
             Text("DAILY PRACTICE")
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(IhsanColor.brassDark)
+                .foregroundStyle(tokens.inkSecondary)
             Spacer()
             if let range = dateRangeText {
                 Text(range)
                     .font(IhsanFont.inscription)
                     .tracking(1.4)
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.75))
+                    .foregroundStyle(tokens.inkSecondary.opacity(0.8))
             }
         }
     }
@@ -70,22 +66,23 @@ struct DailyPracticeGrid: View {
         return "\(oldest) — \(newest)"
     }
 
-    // MARK: - Column headers (prayer abbreviations)
+    // MARK: - Column headers (the five ornaments at small scale)
 
     private var columnHeaders: some View {
         HStack(spacing: cellSpacing) {
             // Left gutter matches the date column width below so the
-            // five prayer codes align with their cells.
+            // five ornaments align with their cells.
             Color.clear.frame(width: dateColumnWidth)
             ForEach(Prayer.allCases, id: \.self) { prayer in
-                Text(prayer.threeLetterCode)
-                    .font(IhsanFont.inscription)
-                    .tracking(1.2)
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
+                PrayerOrnamentShape(prayer: prayer, mode: .outline)
+                    .stroke(tokens.metal.opacity(0.85), lineWidth: 1.0)
+                    .frame(width: ornamentSize, height: ornamentSize)
                     .frame(width: cellSize, alignment: .center)
+                    .accessibilityLabel(prayer.displayNameEnglish)
             }
             Spacer(minLength: 0)
         }
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - Row
@@ -115,8 +112,13 @@ struct DailyPracticeGrid: View {
                     Haptics.tap()
                     onCellTap(day, completion)
                 } label: {
-                    DayPrayerCell(completion: completion, size: cellSize)
-                        .contentShape(Rectangle())
+                    DayPrayerCell(
+                        completion: completion,
+                        isPausedDay: day.isPaused,
+                        size: cellSize,
+                        tokens: tokens
+                    )
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel(cellAccessibilityLabel(day: day, completion: completion))
@@ -133,44 +135,51 @@ struct DailyPracticeGrid: View {
         formatter.dateFormat = "EEEE, MMMM d"
         let dateText = formatter.string(from: day.date)
         let statusText: String
-        switch completion.status {
-        case .onTime: statusText = completion.withJamaah
-            ? "on time, in \(IhsanVocabulary.jamaah)" : "on time"
-        case .late: statusText = "late"
-        case .missed: statusText = "missed"
-        case .qada: statusText = "qadā"
-        case nil: statusText = "not logged"
+        if day.isPaused {
+            statusText = "excused"
+        } else {
+            switch completion.status {
+            case .onTime: statusText = completion.withJamaah
+                ? "on time, in \(IhsanVocabulary.jamaah)" : "on time"
+            case .late: statusText = "late"
+            case .missed: statusText = "missed"
+            case .qada: statusText = "qadā"
+            case nil: statusText = "not logged"
+            }
         }
         return "\(completion.prayer.displayNameEnglish), \(dateText), \(statusText)"
     }
 
+    /// The date column, set in the system register: abbreviated month
+    /// and day, the weekday beneath, the travel plane footnoting a
+    /// traveling day.
     private func dateLabel(for day: DayCompletion, isToday: Bool) -> some View {
         HStack(spacing: 4) {
-            // Today gets a small brass dot to its left — the manuscript
-            // equivalent of "you are here".
+            // Today gets a small metal dot to its left — "you are
+            // here" in the pattern's own metal.
             Circle()
-                .fill(isToday ? IhsanColor.brass : .clear)
+                .fill(isToday ? tokens.metal : .clear)
                 .frame(width: 5, height: 5)
             VStack(alignment: .leading, spacing: 0) {
-                Text(dayOfMonth(for: day.date))
-                    .font(.system(size: 16, weight: .medium, design: .serif))
-                    .foregroundStyle(IhsanColor.inkDeep)
-                Text(dayOfWeek(for: day.date))
-                    .font(.system(size: 10, weight: .semibold, design: .default).smallCaps())
-                    .tracking(1.0)
-                    .foregroundStyle(IhsanColor.brassDark.opacity(0.75))
+                Text(day.date, format: .dateTime.month(.abbreviated).day())
+                    .font(.system(.footnote, weight: .medium))
+                    .foregroundStyle(tokens.ink)
+                HStack(spacing: 3) {
+                    Text(weekday(for: day.date))
+                        .font(.system(.caption2, weight: .semibold))
+                        .foregroundStyle(tokens.inkSecondary.opacity(0.85))
+                    if day.isTraveling {
+                        TravelPlaneMark()
+                            .fill(tokens.metal.opacity(0.60))
+                            .frame(width: 8, height: 8)
+                    }
+                }
             }
         }
         .frame(width: dateColumnWidth, alignment: .leading)
     }
 
-    private func dayOfMonth(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MMM d"
-        return formatter.string(from: date)
-    }
-
-    private func dayOfWeek(for date: Date) -> String {
+    private func weekday(for date: Date) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "EEE"
         return formatter.string(from: date).uppercased()
@@ -179,10 +188,7 @@ struct DailyPracticeGrid: View {
     // MARK: - Geometry
 
     /// Cell size scales down for longer periods so the matrix fits
-    /// on a single iPhone screen without horizontal scrolling. The
-    /// gestalt dot grid above is the visual headline now, so the
-    /// detail-grid cells are demoted to ~85% of their previous size —
-    /// still legible, no longer dominant.
+    /// on a single iPhone screen without horizontal scrolling.
     private var cellSize: CGFloat {
         switch days.count {
         case ...7: return 30
@@ -190,6 +196,10 @@ struct DailyPracticeGrid: View {
         case ...30: return 20
         default: return 15
         }
+    }
+
+    private var ornamentSize: CGFloat {
+        min(16, max(10, cellSize * 0.6))
     }
 
     private var cellSpacing: CGFloat {
@@ -229,22 +239,10 @@ struct DailyPracticeGrid: View {
     }
 }
 
-private extension Prayer {
-    /// Three-letter small-caps code rendered in the column header.
-    var threeLetterCode: String {
-        switch self {
-        case .fajr: return "FAJ"
-        case .dhuhr: return "DHU"
-        case .asr: return "ASR"
-        case .maghrib: return "MAG"
-        case .isha: return "ISH"
-        }
-    }
-}
-
 #Preview("Daily practice grid — 14 days") {
     let calendar = Calendar.current
     let today = calendar.startOfDay(for: .now)
+    let tokens = PaletteState.afternoon.tokens
     let days: [DayCompletion] = (0..<14).map { offset in
         let date = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
         let statuses: [PrayerStatus?] = [
@@ -262,12 +260,12 @@ private extension Prayer {
             date: date,
             prayerCompletions: completions,
             isPaused: false,
-            isTraveling: false
+            isTraveling: offset == 3
         )
     }
     return ScrollView {
-        DailyPracticeGrid(days: days, onDayTap: { _ in }, onCellTap: { _, _ in })
+        DailyPracticeGrid(days: days, tokens: tokens, onDayTap: { _ in }, onCellTap: { _, _ in })
             .padding()
     }
-    .ihsanManuscriptPage()
+    .background(tokens.pageGroundFlat)
 }

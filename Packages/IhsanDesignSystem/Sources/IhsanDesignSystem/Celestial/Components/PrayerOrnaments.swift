@@ -395,5 +395,5 @@ public struct OpenCrescentShape: Shape {
     }
     .padding(40)
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .background(IhsanColor.panelDay)
+    .background(PaletteState.afternoon.tokens.panelFill)
 }

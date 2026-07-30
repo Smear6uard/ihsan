@@ -24,7 +24,23 @@ enum AppTab: Int, CaseIterable, Hashable {
 /// custom bar and must not be recreated. Reduce Motion / Reduce
 /// Transparency behavior now comes from the system.
 struct RootTabView: View {
-    @State private var selectedTab: AppTab = .today
+    @State private var selectedTab: AppTab = {
+        // `-IhsanDebugTab trajectory|reflection|settings` — screenshot
+        // harness; opens directly on a secondary page.
+        #if DEBUG
+        let arguments = ProcessInfo.processInfo.arguments
+        if let index = arguments.firstIndex(of: "-IhsanDebugTab"),
+           index + 1 < arguments.count {
+            switch arguments[index + 1] {
+            case "trajectory": return .trajectory
+            case "reflection": return .reflection
+            case "settings": return .settings
+            default: break
+            }
+        }
+        #endif
+        return .today
+    }()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
 

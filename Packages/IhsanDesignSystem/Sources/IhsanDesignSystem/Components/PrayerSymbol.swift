@@ -53,5 +53,5 @@ public struct PrayerSymbol: View {
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

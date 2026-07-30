@@ -66,5 +66,5 @@ struct MasjidEmptyState: View {
 
 #Preview {
     MasjidEmptyState(radiusLabel: "1 km") {}
-        .ihsanBackground()
+        .ihsanManuscriptPage()
 }

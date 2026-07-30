@@ -119,7 +119,7 @@ struct ReflectionInputComposer: View {
                     .foregroundStyle(IhsanColor.brassDark)
                     .background {
                         Circle()
-                            .fill(IhsanColor.panelDay.opacity(0.55))
+                            .fill(IhsanPageChrome.tokens(at: .now).panelFill.opacity(0.55))
                             .overlay {
                                 Circle()
                                     .strokeBorder(IhsanColor.brass.opacity(0.40), lineWidth: 0.5)

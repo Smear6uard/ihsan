@@ -56,5 +56,5 @@ struct OnboardingProgressDots: View {
     }
     .padding()
     .frame(maxWidth: .infinity, maxHeight: .infinity)
-    .ihsanBackground()
+    .ihsanManuscriptPage()
 }

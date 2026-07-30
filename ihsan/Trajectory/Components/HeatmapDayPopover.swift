@@ -2,30 +2,30 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// Sheet content shown when the user taps a day in the daily-practice
-/// grid. Shows the date (both Gregorian and Hijri) and the five-prayer
-/// breakdown for that day. Read-only — editing happens on the Today
-/// screen.
-///
-/// The sheet sits on iOS 26 Liquid Glass material; each prayer row
-/// inside renders as an illuminated parchment panel, the same hybrid
-/// hierarchy used for the Today screen's prayer log sheet.
+/// Sheet content shown when the user taps a day label in the
+/// daily-practice grid. Shows the date (both Gregorian and Hijri) and
+/// the five-prayer breakdown for that day, in the dot-state language.
+/// Read-only — logging happens through the cells and the Today screen.
 struct HeatmapDayPopover: View {
     let day: DayCompletion
+
+    private var tokens: SkyPaletteTokens {
+        IhsanPageChrome.tokens(at: .now)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
             VStack(alignment: .leading, spacing: 4) {
                 Text(gregorianDate)
                     .font(.system(size: 24, weight: .medium, design: .serif))
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                 Text(hijriDate.uppercased())
                     .font(IhsanFont.inscription)
                     .tracking(1.6)
-                    .foregroundStyle(IhsanColor.brassDark)
+                    .foregroundStyle(tokens.inkSecondary)
             }
 
-            OrnamentalDivider()
+            OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
 
             VStack(spacing: IhsanSpacing.sm) {
                 ForEach(day.prayerCompletions, id: \.prayer) { completion in
@@ -34,16 +34,26 @@ struct HeatmapDayPopover: View {
             }
 
             if day.isPaused {
-                Label("Paused day — excluded from totals", systemImage: "pause.circle")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.4)
-                    .foregroundStyle(IhsanColor.brassDark)
+                HStack(spacing: IhsanSpacing.xs) {
+                    RoundedRectangle(cornerRadius: 2, style: .continuous)
+                        .fill(tokens.inkSecondary.opacity(0.5))
+                        .frame(width: 10, height: 2)
+                    Text("PAUSED DAY — EXCLUDED FROM TOTALS")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .foregroundStyle(tokens.inkSecondary)
+                }
             }
             if day.isTraveling {
-                Label("Traveling", systemImage: "airplane")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.4)
-                    .foregroundStyle(IhsanColor.brassDark)
+                HStack(spacing: IhsanSpacing.xs) {
+                    TravelPlaneMark()
+                        .fill(tokens.metal.opacity(0.7))
+                        .frame(width: 10, height: 10)
+                    Text("TRAVELING")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .foregroundStyle(tokens.inkSecondary)
+                }
             }
 
             Spacer(minLength: 0)
@@ -56,25 +66,33 @@ struct HeatmapDayPopover: View {
     @ViewBuilder
     private func prayerRow(_ completion: PrayerCompletion) -> some View {
         HStack(spacing: IhsanSpacing.md) {
-            PrayerSymbol(completion.prayer, size: 18, tint: IhsanColor.brass.opacity(0.80))
+            PrayerOrnamentShape(prayer: completion.prayer, mode: .outline)
+                .stroke(tokens.metal.opacity(0.85), lineWidth: 1.0)
+                .frame(width: 18, height: 18)
                 .frame(width: 28)
+                .accessibilityHidden(true)
 
             HStack(spacing: IhsanSpacing.sm) {
                 Text(completion.prayer.displayNameEnglish)
                     .font(IhsanFont.rowPrayerName)
-                    .foregroundStyle(IhsanColor.inkDeep)
+                    .foregroundStyle(tokens.ink)
                 Text(completion.prayer.displayNameArabic)
                     .font(IhsanFont.bodyArabic)
-                    .foregroundStyle(IhsanColor.inkDeep.opacity(0.72))
+                    .foregroundStyle(tokens.inkSecondary)
             }
 
             Spacer(minLength: IhsanSpacing.sm)
 
-            DayPrayerCell(completion: completion, size: 26)
+            DayPrayerCell(
+                completion: completion,
+                isPausedDay: day.isPaused,
+                size: 26,
+                tokens: tokens
+            )
         }
         .padding(.horizontal, IhsanSpacing.md)
         .padding(.vertical, IhsanSpacing.sm)
-        .ihsanIlluminatedPanel(intensity: .prayerRow)
+        .celestialPanel(tokens: tokens, cornerRadius: 16)
     }
 
     private var gregorianDate: String {

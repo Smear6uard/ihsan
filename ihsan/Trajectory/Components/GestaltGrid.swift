@@ -2,32 +2,48 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// The visual heart of the Trajectory screen — a 5×N matrix of small
-/// dots that lets the user read their pattern of prayer at a glance,
-/// before any number is shown.
+/// The visual heart of the Path screen — a 5×N matrix of small marks
+/// that lets the user read their pattern of prayer at a glance,
+/// before any number is shown. The gestalt IS the headline: from
+/// arm's length a month of mixed states reads as a texture; on
+/// inspection each mark is one prayer on one day, speaking the
+/// plate's ornament-state language at dot scale:
 ///
-/// Five rows, top to bottom, are the five fardh prayers in chronological
-/// order through the day (Fajr at top, Isha at bottom). Each column is
-/// one unit of time:
+/// - **On time** — the filled gilded form: leaf gold bounded by the
+///   keyline.
+/// - **Jamāʿah** — the gilded form ringed in the bright metal: the
+///   congregation distinguishes itself by a halo, not a new hue.
+/// - **Late** — the warm metal outline, hollow centre.
+/// - **Missed** — the quiet passed form: a secondary-ink outline,
+///   present but subdued. Never vermillion; the record does not
+///   scold.
+/// - **Qadā** — the lapis pigment bounded by metal, the sheet's own
+///   made-up-later voice.
+/// - **Unlogged / future** — the faintest metal ring.
+/// - **Excused pause** — a calm neutral dash across the whole
+///   column: excluded, never negative.
+/// - **Travel** — the day's marks render normally and the column is
+///   footnoted with the engraved plane mark.
 ///
-/// - **7D**: 7 columns, one per day. Dot is large enough to read each
-///   day individually.
-/// - **30D**: 30 columns, one per day. Dots compact.
-/// - **90D**: 90 columns, one per day. Dots tiny — the long-term pattern
-///   becomes the figure.
-/// - **YEAR**: 52 columns, one per week. Each dot encodes the *modal*
-///   status the user logged for that prayer across the seven days in
-///   that week.
-///
-/// A small brass four-pointed star ornament sits beneath the rightmost
-/// column as the manuscript equivalent of "you are here".
+/// Five rows, Fajr at top through Isha at bottom. 7D/30D/90D give a
+/// column per day; YEAR gives a column per week (modal status).
 struct GestaltGrid: View {
     let days: [DayCompletion]
     let period: TrajectoryPeriod
+    /// Resolved page tokens — the grid never picks its own colors.
+    let tokens: SkyPaletteTokens
     /// Days carrying any voluntary record. Non-nil only when the user
     /// turned the Path overlay on; it adds a sixth, quieter row beneath
     /// the five fardh rows — presence only, no denominator, no figure.
     var naflDays: Set<Date>? = nil
+
+    /// One rendered column: the five-prayer slate plus the day-level
+    /// state that colors it.
+    private struct Column {
+        let slate: [PrayerCompletion]
+        let isPaused: Bool
+        let isTraveling: Bool
+    }
 
     var body: some View {
         GeometryReader { proxy in
@@ -36,7 +52,7 @@ struct GestaltGrid: View {
 
             VStack(spacing: IhsanSpacing.sm) {
                 grid(columns: columns, metrics: metrics)
-                todayMarker(columnCount: columns.count, metrics: metrics)
+                annotationRow(columns: columns, metrics: metrics)
             }
             .frame(maxWidth: .infinity)
         }
@@ -49,7 +65,7 @@ struct GestaltGrid: View {
 
     @ViewBuilder
     private func grid(
-        columns: [[PrayerCompletion]],
+        columns: [Column],
         metrics: Metrics
     ) -> some View {
         VStack(spacing: metrics.spacing) {
@@ -57,8 +73,10 @@ struct GestaltGrid: View {
                 HStack(spacing: metrics.spacing) {
                     ForEach(0..<columns.count, id: \.self) { col in
                         GestaltDot(
-                            completion: columns[col][row],
-                            size: metrics.dotSize
+                            completion: columns[col].slate[row],
+                            isPausedDay: columns[col].isPaused,
+                            size: metrics.dotSize,
+                            tokens: tokens
                         )
                     }
                 }
@@ -69,7 +87,8 @@ struct GestaltGrid: View {
                     ForEach(0..<naflColumns.count, id: \.self) { col in
                         NaflOverlayDot(
                             present: naflColumns[col],
-                            size: metrics.dotSize
+                            size: metrics.dotSize,
+                            tokens: tokens
                         )
                     }
                 }
@@ -91,21 +110,26 @@ struct GestaltGrid: View {
         }
     }
 
-    /// A small brass four-pointed star centred under the rightmost
-    /// column. Mirrors the grid's HStack structure 1:1 so the star
-    /// lands exactly under the last dot's centre regardless of period
-    /// or device width.
-    private func todayMarker(
-        columnCount: Int,
+    /// The under-column annotations: the four-pointed star under the
+    /// rightmost column ("you are here"), and the engraved plane mark
+    /// under travel columns when the scale gives it room. Mirrors the
+    /// grid's HStack structure 1:1 so marks land under their columns.
+    private func annotationRow(
+        columns: [Column],
         metrics: Metrics
     ) -> some View {
         let starSize: CGFloat = max(6, min(10, metrics.dotSize + 4))
+        let planeVisible = metrics.dotSize >= 5
         return HStack(spacing: metrics.spacing) {
-            ForEach(0..<columnCount, id: \.self) { col in
+            ForEach(0..<columns.count, id: \.self) { col in
                 Group {
-                    if col == columnCount - 1 {
+                    if col == columns.count - 1 {
                         FourPointedStar()
-                            .fill(IhsanIridescence.brassStroke(opacity: 0.95))
+                            .fill(tokens.metal.opacity(0.95))
+                            .frame(width: starSize, height: starSize)
+                    } else if columns[col].isTraveling, planeVisible {
+                        TravelPlaneMark()
+                            .fill(tokens.metal.opacity(0.60))
                             .frame(width: starSize, height: starSize)
                     } else {
                         Color.clear
@@ -119,14 +143,24 @@ struct GestaltGrid: View {
 
     // MARK: - Columns source
 
-    /// For 7D / 30D / 90D returns the `days`' five-prayer slates directly.
-    /// For YEAR returns 52 week-aggregated columns via `GestaltAggregation`.
-    private var columns: [[PrayerCompletion]] {
+    /// For 7D / 30D / 90D returns the `days`' five-prayer slates with
+    /// their day states. For YEAR returns 52 week-aggregated columns —
+    /// week columns carry no pause/travel footnote (the aggregation
+    /// already abstracts the day).
+    private var columns: [Column] {
         switch period {
         case .year:
-            return GestaltAggregation.yearWeekColumns(days: days)
+            return GestaltAggregation.yearWeekColumns(days: days).map {
+                Column(slate: $0, isPaused: false, isTraveling: false)
+            }
         default:
-            return days.map { $0.prayerCompletions }
+            return days.map {
+                Column(
+                    slate: $0.prayerCompletions,
+                    isPaused: $0.isPaused,
+                    isTraveling: $0.isTraveling
+                )
+            }
         }
     }
 
@@ -187,7 +221,7 @@ struct GestaltGrid: View {
     /// The grid needs a stable height for the parent's VStack layout; the
     /// inner GeometryReader recomputes spacing per device, but height
     /// barely varies across the supported widths so we pin to the spec
-    /// dot size + the today-marker block.
+    /// dot size + the annotation block.
     private var gridHeight: CGFloat {
         let dot: CGFloat
         let spacing: CGFloat
@@ -214,6 +248,12 @@ struct GestaltGrid: View {
         case .year: span = "the last year, aggregated by week"
         }
         var label = "Pattern of prayer across \(span). Five rows, Fajr at top through Isha at bottom. Today is the rightmost column."
+        if days.contains(where: \.isPaused) {
+            label += " Paused days show as neutral dashes and are excluded from totals."
+        }
+        if days.contains(where: \.isTraveling) {
+            label += " Traveling days carry a small plane mark."
+        }
         if naflDays != nil {
             label += " A quieter sixth row marks days with voluntary prayer."
         }
@@ -230,13 +270,14 @@ struct GestaltGrid: View {
 private struct NaflOverlayDot: View {
     let present: Bool
     let size: CGFloat
+    let tokens: SkyPaletteTokens
 
     var body: some View {
         Group {
             if present {
                 FourPointedStar()
                     .stroke(
-                        IhsanColor.brass.opacity(0.40),
+                        tokens.metal.opacity(0.40),
                         lineWidth: max(0.5, size * 0.14)
                     )
             } else {
@@ -249,114 +290,122 @@ private struct NaflOverlayDot: View {
 
 // MARK: - GestaltDot
 
-/// A single dot in the gestalt grid. Encodes one prayer's status:
-///
-/// - **Jamaʿah** (on-time, congregational): filled gold — the highest tier.
-/// - **On Time** (alone): filled brass.
-/// - **Qadā** (made up later): filled twilight indigo at 80% opacity.
-/// - **Late**: an outlined brass ring at 60% opacity, hollow centre.
-/// - **Missed**: filled vermillion at 70% opacity.
-/// - **Unlogged / future**: an outlined ring at 30% opacity.
-///
-/// The fills come straight from the manuscript palette so the grid sits
-/// in the same chromatic key as the rest of the page. The hollow rings
-/// for "late" and "unlogged" are deliberate — at small sizes the eye
-/// reads them as the absence of solid presence, which matches the
-/// semantics.
-private struct GestaltDot: View {
+/// A single mark in the gestalt grid — the ornament-state language at
+/// dot scale. Static treatment functions expose the exact values so
+/// `PathPatternContrastTests` audits what the dots render.
+struct GestaltDot: View {
     let completion: PrayerCompletion
+    /// The whole day is excused: every mark in the column renders the
+    /// calm neutral dash.
+    var isPausedDay: Bool = false
     let size: CGFloat
+    let tokens: SkyPaletteTokens
+
+    /// The qadā body at dot scale — the sheet's lifted-lapis rule.
+    static func qadaBodyValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.panelFillValue.relativeLuminance < 0.5
+            ? tokens.lapisValue.scalingLightness(by: 1.4)
+            : tokens.lapisValue
+    }
+
+    /// The missed outline — quiet secondary ink, present but subdued.
+    static func missedOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.inkSecondaryValue
+    }
+
+    /// The late outline — the sheet's rule at dot scale: warm metal on
+    /// jewel panels; deepened toward the keyline on the near-white
+    /// days, where plain metal falls under the 3:1 floor.
+    static func lateOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.panelFillValue.relativeLuminance < 0.5
+            ? tokens.metalValue
+            : SRGBValue.mix(tokens.metalValue, tokens.keylineValue, amount: 0.30)
+    }
 
     var body: some View {
         Group {
-            switch (completion.status, completion.withJamaah) {
-            case (.onTime, true):
-                Circle()
-                    .fill(IhsanColor.gold)
-            case (.onTime, _):
-                Circle()
-                    .fill(IhsanColor.brass)
-            case (.qada, _):
-                Circle()
-                    .fill(IhsanColor.indigoQada.opacity(0.80))
-            case (.missed, _):
-                Circle()
-                    .fill(IhsanColor.vermillion.opacity(0.70))
-            case (.late, _):
-                Circle()
-                    .strokeBorder(
-                        IhsanColor.brass.opacity(0.60),
-                        lineWidth: lateStrokeWidth
-                    )
-            case (.none, _):
-                Circle()
-                    .strokeBorder(
-                        IhsanColor.brass.opacity(0.30),
-                        lineWidth: unloggedStrokeWidth
-                    )
+            if isPausedDay {
+                // The excused dash: calm neutral, excluded, never
+                // negative.
+                RoundedRectangle(cornerRadius: size, style: .continuous)
+                    .fill(tokens.inkSecondary.opacity(0.35))
+                    .frame(width: size, height: max(1, size * 0.22))
+                    .frame(width: size, height: size)
+            } else {
+                mark
             }
         }
         .frame(width: size, height: size)
     }
 
-    /// Hollow rings need a stroke proportional to the dot size — too thin
-    /// and they disappear at 3pt; too thick and the 16pt 7D dots look
-    /// like Os instead of rings.
-    private var lateStrokeWidth: CGFloat {
-        max(0.6, size * 0.22)
-    }
-
-    private var unloggedStrokeWidth: CGFloat {
-        max(0.5, size * 0.18)
-    }
-}
-
-// MARK: - Preview
-
-#Preview("Gestalt grid — 7D / 30D / 90D / YEAR") {
-    let calendar = Calendar.current
-    let today = calendar.startOfDay(for: .now)
-    let buildDays: (Int) -> [DayCompletion] = { count in
-        (0..<count).reversed().map { offset in
-            let date = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
-            let statuses: [PrayerStatus?] = [
-                .onTime, .onTime, .late, .missed,
-                [.qada, .onTime, .onTime, nil].randomElement() ?? nil
-            ]
-            let completions = zip(Prayer.allCases, statuses).map { prayer, status in
-                PrayerCompletion(
-                    prayer: prayer,
-                    status: status,
-                    withJamaah: prayer == .fajr && status == .onTime && Bool.random()
-                )
-            }
-            return DayCompletion(
-                id: date,
-                date: date,
-                prayerCompletions: completions,
-                isPaused: false,
-                isTraveling: false
-            )
-        }
-    }
-
-    return ScrollView {
-        VStack(spacing: IhsanSpacing.lg) {
-            ForEach([TrajectoryPeriod.sevenDays, .thirtyDays, .ninetyDays, .year], id: \.self) { period in
-                VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-                    Text(period.label.uppercased())
-                        .font(IhsanFont.inscription)
-                        .tracking(1.6)
-                        .foregroundStyle(IhsanColor.brassDark)
-                    GestaltGrid(days: buildDays(period.dayCount), period: period)
+    @ViewBuilder
+    private var mark: some View {
+        let keylineWidth = max(0.5, size * 0.09)
+        switch (completion.status, completion.withJamaah) {
+        case (.onTime, true):
+            // The jamāʿah halo: the gilded form ringed in bright metal.
+            // At tiny scales the ring has no room — the brighter
+            // highlight fill carries the distinction instead.
+            if size >= 10 {
+                ZStack {
+                    Circle()
+                        .fill(tokens.leafGold)
+                        .overlay {
+                            Circle().strokeBorder(
+                                tokens.keyline.opacity(0.9), lineWidth: keylineWidth
+                            )
+                        }
+                        .padding(size * 0.18)
+                    Circle().strokeBorder(
+                        tokens.metalHighlight.opacity(0.95),
+                        lineWidth: max(0.6, size * 0.08)
+                    )
                 }
-                .padding(IhsanSpacing.lg)
-                .frame(maxWidth: .infinity)
-                .ihsanIlluminatedPanel(intensity: .regular)
-                .padding(.horizontal, IhsanSpacing.md)
+            } else {
+                Circle().fill(tokens.metalHighlight)
             }
+        case (.onTime, _):
+            if size >= 6 {
+                Circle()
+                    .fill(tokens.leafGold)
+                    .overlay {
+                        Circle().strokeBorder(
+                            tokens.keyline.opacity(0.9), lineWidth: keylineWidth
+                        )
+                    }
+            } else {
+                Circle().fill(tokens.leafGold)
+            }
+        case (.qada, _):
+            if size >= 6 {
+                Circle()
+                    .fill(Self.qadaBodyValue(for: tokens).color)
+                    .overlay {
+                        Circle().strokeBorder(
+                            tokens.metal.opacity(0.9), lineWidth: keylineWidth
+                        )
+                    }
+            } else {
+                Circle().fill(Self.qadaBodyValue(for: tokens).color)
+            }
+        case (.late, _):
+            Circle()
+                .strokeBorder(
+                    Self.lateOutlineValue(for: tokens).color.opacity(0.95),
+                    lineWidth: max(0.6, size * 0.20)
+                )
+        case (.missed, _):
+            Circle()
+                .strokeBorder(
+                    Self.missedOutlineValue(for: tokens).color.opacity(0.60),
+                    lineWidth: max(0.5, size * 0.16)
+                )
+        case (.none, _):
+            Circle()
+                .strokeBorder(
+                    tokens.metal.opacity(0.28),
+                    lineWidth: max(0.5, size * 0.16)
+                )
         }
-        .padding(.vertical)
     }
-    .ihsanManuscriptPage()
 }

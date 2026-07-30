@@ -13,6 +13,7 @@ import IhsanDesignSystem
 /// One line if it fits, two if not (handled by `QuietRowLayout` below).
 struct QuietSummaryRow: View {
     let aggregate: TrajectoryAggregate
+    let tokens: SkyPaletteTokens
 
     var body: some View {
         QuietRowLayout(spacing: IhsanSpacing.lg, rowSpacing: IhsanSpacing.xs) {
@@ -30,10 +31,10 @@ struct QuietSummaryRow: View {
             Text("\(label):")
                 .font(IhsanFont.inscription)
                 .tracking(1.4)
-                .foregroundStyle(IhsanColor.brassDark.opacity(0.85))
+                .foregroundStyle(tokens.inkSecondary)
             Text("\(count)")
                 .font(IhsanFont.tabular)
-                .foregroundStyle(IhsanColor.brassDark)
+                .foregroundStyle(tokens.ink)
         }
         .fixedSize()
     }
@@ -159,7 +160,7 @@ private struct QuietRowLayout: Layout {
     )
     return VStack {
         Spacer()
-        QuietSummaryRow(aggregate: aggregate)
+        QuietSummaryRow(aggregate: aggregate, tokens: PaletteState.afternoon.tokens)
             .padding(.horizontal, IhsanSpacing.md)
         Spacer()
     }
