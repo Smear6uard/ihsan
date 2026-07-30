@@ -22,6 +22,9 @@ struct QiblaInscriptionsBlock: View {
 
             directionLine
         }
+        // "FACING QIBLA" arrives and departs as a calm crossfade —
+        // the reversal is as graceful as the arrival.
+        .animation(.easeInOut(duration: 0.35), value: isAligned)
         .accessibilityHidden(true) // Spoken through the instrument element.
     }
 
