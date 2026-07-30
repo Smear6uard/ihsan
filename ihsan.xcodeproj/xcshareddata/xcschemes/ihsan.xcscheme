@@ -40,6 +40,16 @@
                ReferencedContainer = "container:ihsan.xcodeproj">
             </BuildableReference>
          </TestableReference>
+         <TestableReference
+            skipped = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "428FEEB32FAF234C0097E665"
+               BuildableName = "ihsanUITests.xctest"
+               BlueprintName = "ihsanUITests"
+               ReferencedContainer = "container:ihsan.xcodeproj">
+            </BuildableReference>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction

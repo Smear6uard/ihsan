@@ -1,28 +1,25 @@
 import IhsanCore
 import SwiftData
 
+/// Thin facade over the process-wide `IhsanSharedModelContainer`.
+///
+/// The intent funnel must write into the same container the app UI
+/// reads — the app registers its container at launch, and extension
+/// processes fall back to a lazily created instance of their own.
 internal actor ModelContainerAccess {
     static let shared = ModelContainerAccess()
-
-    private var cachedContainer: ModelContainer?
 
     private init() {}
 
     func container() throws -> ModelContainer {
-        if let cachedContainer {
-            return cachedContainer
-        }
-
-        let newContainer = try IhsanModelContainerFactory.makeContainer(inMemory: false)
-        cachedContainer = newContainer
-        return newContainer
+        try IhsanSharedModelContainer.shared.container()
     }
 
     func setContainer(_ container: ModelContainer) {
-        cachedContainer = container
+        IhsanSharedModelContainer.shared.register(container)
     }
 
     func reset() {
-        cachedContainer = nil
+        IhsanSharedModelContainer.shared.reset()
     }
 }

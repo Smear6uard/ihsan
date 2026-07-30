@@ -32,6 +32,13 @@ struct IhsanApp: App {
                 fatalError("Failed to create in-memory ModelContainer: \(error)")
             }
         }
+        // Register the app's container as the process's one shared
+        // instance BEFORE any intent or scheduler can run. Without
+        // this, the intent funnel lazily creates a second
+        // CloudKit-mirrored container over the same store — CloudKit
+        // setup fails (CoreData 134422) and commits from the log
+        // sheet never reach the container the UI's @Querys observe.
+        IhsanSharedModelContainer.shared.register(modelContainer)
 
         #if canImport(ActivityKit) && os(iOS)
         Task {
@@ -148,11 +155,19 @@ private struct RootGate: View {
     /// - `-IhsanDebugCompletedOnboarding` marks onboarding complete.
     /// - `-IhsanDebugLogPrayer dhuhr:onTime` logs one prayer through
     ///   the standard intent funnel (dedup and idempotency hold).
+    /// - `-IhsanDebugResetStore` empties the prayer/nafl/pause tables
+    ///   so UI tests start hermetic regardless of prior runs.
     ///
     /// Release builds compile this to a no-op.
     private func applyDebugLaunchArguments() {
         #if DEBUG
         let arguments = ProcessInfo.processInfo.arguments
+        if arguments.contains("-IhsanDebugResetStore") {
+            try? modelContext.delete(model: PrayerLog.self)
+            try? modelContext.delete(model: NaflLog.self)
+            try? modelContext.delete(model: PauseInterval.self)
+            try? modelContext.save()
+        }
         if arguments.contains("-IhsanDebugCompletedOnboarding") {
             if let settings = try? UserSettings.fetchOrCreate(in: modelContext),
                !settings.hasCompletedOnboarding {

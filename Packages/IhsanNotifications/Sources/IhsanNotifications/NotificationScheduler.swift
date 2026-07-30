@@ -119,7 +119,9 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
     public init() {}
 
     public func currentNotificationSettings() async throws -> NotificationScheduleSettings {
-        let container = try IhsanModelContainerFactory.makeContainer(inMemory: false)
+        // The process's one container — never a second mirrored
+        // instance over the same store (CoreData 134422).
+        let container = try IhsanSharedModelContainer.shared.container()
         let context = ModelContext(container)
         let settings = try UserSettings.fetchOrCreate(in: context)
 

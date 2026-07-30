@@ -484,3 +484,25 @@ tests); these need eyes on hardware:
 - **Sheet detent fit.** The log sheet's content-sized detent was
   verified at standard type; walk the accessibility type sizes and
   confirm the clamp + scroll handoff has no jump.
+
+## House phase 0 — the commit path (2026-07-30)
+
+The log sheet's dead commit was a process-level container split: the
+intent funnel lazily built a second CloudKit-mirrored ModelContainer
+over the store the app was already mirroring (CoreData 134422
+"another instance of this persistent store is actively syncing"),
+so sheet commits never reached the container the UI's @Querys
+observe on an account-active device. Fixed by registering the app's
+container as the process-wide shared instance
+(`IhsanSharedModelContainer`); pinned by `PrayerLogCommitUITests`
+(fresh + edit paths) and `LogPrayerWithStatusIntentTests`. Verified
+in the simulator (no iCloud account there — the 134422 conflict is
+account-gated); these need eyes on signed-in hardware:
+
+- **Commit on an account-active device.** Tap commit on the sheet:
+  the sheet dismisses, the focused card and plate ornament gild, and
+  Path reflects the entry — with an iCloud account signed in and
+  CloudKit mirroring live. Console should show no CoreData 134422.
+- **Materialize + haptic fire once.** The ornament-materialize
+  animation and the success haptic on commit fire exactly once per
+  commit (haptics are untestable in the simulator).
