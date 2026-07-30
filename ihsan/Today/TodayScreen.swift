@@ -169,7 +169,8 @@ private struct TodayReadyView: View {
     @State private var focusedPrayer: Prayer?
     @State private var sheetSelection: LogSheetSelection?
     @State private var revertFocusTask: Task<Void, Never>?
-    @State private var isCelestialReferencePresented = false
+    @State private var isCelestialReferencePresented = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugPresentQibla")
     /// Entrance choreography target — 0 until the first frame has a
     /// chance to render at rest-zero, then 1; the scene's layers
     /// animate toward it on their staggered clocks. Replays after a
@@ -309,12 +310,14 @@ private struct TodayReadyView: View {
                     .presentationDragIndicator(.visible)
                     .presentationBackground(.thinMaterial)
             }
-            .fullScreenCover(isPresented: $isCelestialReferencePresented) {
-                CelestialReferenceView(
+            .sheet(isPresented: $isCelestialReferencePresented) {
+                QiblaScreen(
                     latitude: snapshot.place.coordinates.latitude,
                     longitude: snapshot.place.coordinates.longitude,
-                    onDismiss: { isCelestialReferencePresented = false }
+                    solarEvents: solarEvents
                 )
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.thinMaterial)
             }
             .confirmationDialog(
                 "How many rak'ah?",
