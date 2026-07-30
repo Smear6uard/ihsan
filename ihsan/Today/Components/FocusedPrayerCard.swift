@@ -86,6 +86,10 @@ struct FocusedPrayerCard: View {
     /// the expanded state's MORE OPTIONS link.
     let onMoreOptions: () -> Void
 
+    /// Opens the tasbīḥ instrument — the logged card's quiet link,
+    /// the natural post-prayer moment. `nil` renders no link.
+    var onTasbih: (() -> Void)? = nil
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var mode: Mode = ProcessInfo.processInfo.arguments
         .contains("-IhsanDebugExpandCard") ? .expanded : .collapsed
@@ -562,23 +566,43 @@ struct FocusedPrayerCard: View {
     private var loggedContent: some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: IhsanSpacing.md) {
-                ornament
-                VStack(alignment: .leading, spacing: 4) {
-                    prayerNameRow
-                    Text(inscription.uppercased())
-                        .font(IhsanFont.inscription)
-                        .tracking(1.4)
-                        .foregroundStyle(tokens.inkSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.8)
-                        .shadow(color: tokens.inkHaloDark, radius: 1)
-                        .shadow(color: tokens.inkHaloLight, radius: 3)
+                HStack(spacing: IhsanSpacing.md) {
+                    ornament
+                    VStack(alignment: .leading, spacing: 4) {
+                        prayerNameRow
+                        Text(inscription.uppercased())
+                            .font(IhsanFont.inscription)
+                            .tracking(1.4)
+                            .foregroundStyle(tokens.inkSecondary)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
+                            .shadow(color: tokens.inkHaloDark, radius: 1)
+                            .shadow(color: tokens.inkHaloLight, radius: 3)
+                    }
                 }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(accessibilityLabelForLoggedState)
+                .accessibilityHint("Double-tap to edit.")
+
                 Spacer()
+
+                if let onTasbih {
+                    Button {
+                        Haptics.impact(.light)
+                        onTasbih()
+                    } label: {
+                        Text("TASBĪḤ")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                            .foregroundStyle(tokens.metal.opacity(0.70))
+                            .padding(.vertical, 8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Tasbīḥ")
+                    .accessibilityHint("Opens the tasbīḥ counter.")
+                }
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(accessibilityLabelForLoggedState)
-            .accessibilityHint("Double-tap to edit.")
 
             if let nightSet {
                 nightRow(nightSet)

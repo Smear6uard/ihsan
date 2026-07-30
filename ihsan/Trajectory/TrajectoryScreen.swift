@@ -37,6 +37,8 @@ struct TrajectoryScreen: View {
 
     @Query(sort: \NaflLog.naflDate, order: .reverse)
     private var naflLogs: [NaflLog]
+    @Query(sort: \DhikrSession.sessionDate)
+    private var dhikrSessions: [DhikrSession]
 
     @State private var viewModel = TrajectoryViewModel()
     @State private var selectedDay: DayCompletion?
@@ -203,13 +205,14 @@ struct TrajectoryScreen: View {
 
         case .ready(let snapshot):
             VStack(spacing: IhsanSpacing.lg) {
-                if settings?.sunnahLayerEnabled == true {
-                    HStack {
-                        Spacer()
+                HStack(spacing: IhsanSpacing.sm) {
+                    Spacer()
+                    if settings?.sunnahLayerEnabled == true {
                         naflOverlayToggle(tokens: tokens)
                     }
-                    .padding(.horizontal, IhsanSpacing.md)
+                    dhikrOverlayToggle(tokens: tokens)
                 }
+                .padding(.horizontal, IhsanSpacing.md)
 
                 gestaltPanel(snapshot: snapshot, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
@@ -249,7 +252,8 @@ struct TrajectoryScreen: View {
             days: snapshot.days,
             period: snapshot.period,
             tokens: tokens,
-            naflDays: overlayNaflDays
+            naflDays: overlayNaflDays,
+            dhikrDays: overlayDhikrDays
         )
         .padding(IhsanSpacing.lg)
         .frame(maxWidth: .infinity)
@@ -267,6 +271,16 @@ struct TrajectoryScreen: View {
         else { return nil }
         let calendar = Calendar.current
         return Set(naflLogs.map { calendar.startOfDay(for: $0.naflDate) })
+    }
+
+    // MARK: - Dhikr overlay
+
+    /// Days with a recorded tasbīḥ sitting, when the overlay is on.
+    /// Presence only — factual, no goal, no figure.
+    private var overlayDhikrDays: Set<Date>? {
+        guard settings?.pathDhikrOverlayEnabled == true else { return nil }
+        let calendar = Calendar.current
+        return Set(dhikrSessions.map { calendar.startOfDay(for: $0.sessionDate) })
     }
 
     // MARK: - Retroactive logging (the ledger's way in)
@@ -352,6 +366,37 @@ struct TrajectoryScreen: View {
         .accessibilityLabel("Voluntary prayer overlay")
         .accessibilityValue(isOn ? "on" : "off")
         .accessibilityHint("Adds a quieter sixth row to the pattern.")
+    }
+
+    /// The quiet in-Path switch for the dhikr presence — off by
+    /// default, factual presence only, exactly like the nafl overlay.
+    private func dhikrOverlayToggle(tokens: SkyPaletteTokens) -> some View {
+        let isOn = settings?.pathDhikrOverlayEnabled == true
+        return Button {
+            Haptics.impact(.light)
+            settings?.pathDhikrOverlayEnabled.toggle()
+            settings?.modifiedAt = .now
+        } label: {
+            HStack(spacing: 5) {
+                Circle()
+                    .stroke(tokens.metal.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
+                    .frame(width: 8, height: 8)
+                Text("DHIKR")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary.opacity(0.8))
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .overlay {
+                Capsule()
+                    .strokeBorder(tokens.metal.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Dhikr overlay")
+        .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityHint("Adds a quieter row marking days with recorded dhikr.")
     }
 }
 

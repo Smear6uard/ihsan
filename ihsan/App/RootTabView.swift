@@ -44,6 +44,11 @@ struct RootTabView: View {
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
 
+    /// The tasbīḥ instrument rides over whichever tab is up — entered
+    /// from the logged card's quiet link or the Siri/Shortcut intent.
+    @State private var isDhikrPresented = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugPresentDhikr")
+
     var body: some View {
         TabView(selection: $selectedTab) {
             SwiftUI.Tab("Today", systemImage: "calendar", value: AppTab.today) {
@@ -74,6 +79,9 @@ struct RootTabView: View {
             if hasFreshReflectionDeeplink() {
                 selectedTab = .reflection
             }
+            if hasFreshDeeplink(forKey: StartTasbihIntent.deeplinkUserDefaultsKey) {
+                isDhikrPresented = true
+            }
             runMissedFlowSweep()
         }
         .onReceive(
@@ -85,6 +93,13 @@ struct RootTabView: View {
             // the intent ran inline, and the notification fires here.
             selectedTab = .reflection
         }
+        .onReceive(
+            NotificationCenter.default.publisher(
+                for: StartTasbihIntent.inAppNotificationName
+            )
+        ) { _ in
+            isDhikrPresented = true
+        }
         .onChange(of: scenePhase) { _, newPhase in
             // If the app comes back to foreground because of a Siri /
             // Shortcut invocation, the flag is already set; re-check.
@@ -92,8 +107,17 @@ struct RootTabView: View {
                 if hasFreshReflectionDeeplink() {
                     selectedTab = .reflection
                 }
+                if hasFreshDeeplink(forKey: StartTasbihIntent.deeplinkUserDefaultsKey) {
+                    isDhikrPresented = true
+                }
                 runMissedFlowSweep()
             }
+        }
+        .fullScreenCover(isPresented: $isDhikrPresented) {
+            DhikrScreen(onDismiss: {
+                isDhikrPresented = false
+                clearDeeplink(forKey: StartTasbihIntent.deeplinkUserDefaultsKey)
+            })
         }
     }
 
@@ -112,14 +136,23 @@ struct RootTabView: View {
     /// has applied input focus; this lets both views observe the same
     /// signal from their respective lifecycles.
     private func hasFreshReflectionDeeplink() -> Bool {
+        hasFreshDeeplink(forKey: OpenReflectionIntent.deeplinkUserDefaultsKey)
+    }
+
+    private func hasFreshDeeplink(forKey key: String) -> Bool {
         guard let defaults = UserDefaults(
             suiteName: IhsanModelContainerFactory.appGroupIdentifier
         ),
-        let stored = defaults.object(forKey: OpenReflectionIntent.deeplinkUserDefaultsKey) as? Double
+        let stored = defaults.object(forKey: key) as? Double
         else {
             return false
         }
         let age = Date.now.timeIntervalSince1970 - stored
         return age >= 0 && age <= 60
+    }
+
+    private func clearDeeplink(forKey key: String) {
+        UserDefaults(suiteName: IhsanModelContainerFactory.appGroupIdentifier)?
+            .removeObject(forKey: key)
     }
 }

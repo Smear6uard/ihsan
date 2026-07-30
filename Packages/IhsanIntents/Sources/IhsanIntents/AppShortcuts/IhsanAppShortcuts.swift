@@ -34,6 +34,16 @@ public struct IhsanAppShortcuts: AppShortcutsProvider {
             systemImageName: "book.closed.fill"
         )
         AppShortcut(
+            intent: StartTasbihIntent(),
+            phrases: [
+                "Start tasbīḥ in \(.applicationName)",
+                "Begin tasbīḥ in \(.applicationName)",
+                "Start dhikr in \(.applicationName)"
+            ],
+            shortTitle: "Start Tasbīḥ",
+            systemImageName: "circle.grid.cross"
+        )
+        AppShortcut(
             intent: LogMakeupPrayerIntent(),
             phrases: [
                 "Log a makeup prayer in \(.applicationName)",

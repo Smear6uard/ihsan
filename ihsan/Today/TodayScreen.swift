@@ -456,6 +456,13 @@ private struct TodayReadyView: View {
             },
             onMoreOptions: {
                 sheetSelection = LogSheetSelection(prayer: prayer)
+            },
+            onTasbih: {
+                // The natural post-prayer moment: the instrument rides
+                // over the tabs; the root router presents it.
+                NotificationCenter.default.post(
+                    name: StartTasbihIntent.inAppNotificationName, object: nil
+                )
             }
         )
     }

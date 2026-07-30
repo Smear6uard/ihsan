@@ -36,6 +36,9 @@ struct GestaltGrid: View {
     /// turned the Path overlay on; it adds a sixth, quieter row beneath
     /// the five fardh rows — presence only, no denominator, no figure.
     var naflDays: Set<Date>? = nil
+    /// Days carrying a recorded tasbīḥ sitting. Non-nil only when the
+    /// dhikr overlay is on — the same quiet presence-only register.
+    var dhikrDays: Set<Date>? = nil
 
     /// One rendered column: the five-prayer slate plus the day-level
     /// state that colors it.
@@ -93,6 +96,18 @@ struct GestaltGrid: View {
                     }
                 }
             }
+
+            if let dhikrColumns, dhikrColumns.count == columns.count {
+                HStack(spacing: metrics.spacing) {
+                    ForEach(0..<dhikrColumns.count, id: \.self) { col in
+                        DhikrOverlayDot(
+                            present: dhikrColumns[col],
+                            size: metrics.dotSize,
+                            tokens: tokens
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -100,13 +115,22 @@ struct GestaltGrid: View {
     /// fardh columns.
     private var naflColumns: [Bool]? {
         guard let naflDays else { return nil }
+        return presenceColumns(for: naflDays)
+    }
+
+    private var dhikrColumns: [Bool]? {
+        guard let dhikrDays else { return nil }
+        return presenceColumns(for: dhikrDays)
+    }
+
+    private func presenceColumns(for daysWithRecord: Set<Date>) -> [Bool] {
         switch period {
         case .year:
             return GestaltAggregation.yearWeekDayGroups(days: days).map { week in
-                week.contains { naflDays.contains($0.date) }
+                week.contains { daysWithRecord.contains($0.date) }
             }
         default:
-            return days.map { naflDays.contains($0.date) }
+            return days.map { daysWithRecord.contains($0.date) }
         }
     }
 
@@ -231,7 +255,9 @@ struct GestaltGrid: View {
         case .ninetyDays: dot = 3;  spacing = 1.0
         case .year:       dot = 5;  spacing = 1.5
         }
-        let rowCount: CGFloat = naflDays == nil ? 5 : 6
+        let rowCount: CGFloat = 5
+            + (naflDays == nil ? 0 : 1)
+            + (dhikrDays == nil ? 0 : 1)
         let rows = rowCount * dot + (rowCount - 1) * spacing
         let starSize = max(6, min(10, dot + 4))
         return rows + IhsanSpacing.sm + starSize
@@ -257,7 +283,38 @@ struct GestaltGrid: View {
         if naflDays != nil {
             label += " A quieter sixth row marks days with voluntary prayer."
         }
+        if dhikrDays != nil {
+            label += " A quieter row marks days with recorded dhikr."
+        }
         return label
+    }
+}
+
+// MARK: - Dhikr overlay dot
+
+/// One cell of the optional dhikr row: a small outlined ring — the
+/// tasbīḥ ring at dot scale — where the day (or week) holds a
+/// recorded sitting. Outline only, never a fill: visible if sought,
+/// invisible if not.
+private struct DhikrOverlayDot: View {
+    let present: Bool
+    let size: CGFloat
+    let tokens: SkyPaletteTokens
+
+    var body: some View {
+        Group {
+            if present {
+                Circle()
+                    .stroke(
+                        tokens.metal.opacity(0.40),
+                        lineWidth: max(0.5, size * 0.14)
+                    )
+                    .padding(size * 0.12)
+            } else {
+                Color.clear
+            }
+        }
+        .frame(width: size, height: size)
     }
 }
 
