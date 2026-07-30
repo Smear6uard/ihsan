@@ -2,6 +2,7 @@ import Foundation
 import IhsanCore
 import IhsanLocation
 import SwiftUI
+import UIKit
 
 /// Drives the qibla instrument from `QiblaEngine`. This is the only
 /// object between CoreLocation's heading stream and the view — the
@@ -48,6 +49,8 @@ final class QiblaViewModel {
     /// its seat. Latched: jitter at a boundary cannot re-fire them.
     private var detent15 = QiblaDetentLatch(threshold: 15)
     private var detent5 = QiblaDetentLatch(threshold: 5, rearmMargin: 4)
+    private var guidanceScript = QiblaGuidanceScript()
+    private var hasAnnouncedEntry = false
     @ObservationIgnored private var settleTask: Task<Void, Never>?
     @ObservationIgnored private var lastDetentAt: Date?
     private let locationProvider: LocationProviding
@@ -127,6 +130,7 @@ final class QiblaViewModel {
         }
         reading = next
         choreograph(next)
+        announceGuidance(next, at: sample.timestamp)
 
         if logsHeading {
             print(String(
@@ -177,6 +181,31 @@ final class QiblaViewModel {
         }
     }
 
+    // MARK: - VoiceOver guidance
+
+    /// Speaks the guidance script's lines. The script owns the whole
+    /// policy (bands, rate limit, alignment priority) and is unit
+    /// tested; this method only adds the one-time entry orientation
+    /// (distance + direction) and posts the announcement.
+    private func announceGuidance(_ next: QiblaEngine.Reading, at timestamp: Date) {
+        guard let line = guidanceScript.update(
+            signedDelta: next.signedDelta,
+            isAligned: next.isAligned,
+            at: timestamp
+        ) else { return }
+
+        let spoken: String
+        if hasAnnouncedEntry {
+            spoken = line
+        } else {
+            hasAnnouncedEntry = true
+            spoken = QiblaInscriptions.spokenDistance(km: distanceKm) + ". " + line
+        }
+        if logsHeading { print("QIBLA-VOICE \(spoken)") }
+        guard UIAccessibility.isVoiceOverRunning else { return }
+        AccessibilityNotification.Announcement(spoken).post()
+    }
+
     /// The detents are spaced 10° apart, so they cannot stack in
     /// normal turning; the interval guard only catches pathological
     /// sample bursts.
@@ -203,6 +232,9 @@ final class QiblaViewModel {
     ///   recordings and the full choreography sweep.
     /// - `delta:<degrees>` — hold the heading at a fixed signed offset
     ///   from the qibla bearing, for state screenshots.
+    /// - `calib` — hold 30° off with degraded accuracy, for the
+    ///   calibration state.
+    /// - `denied` — resolve straight to the location-denied surface.
     ///
     /// Debug builds only; the real ladder never runs in this mode.
     private func startSimulatedHeadingIfRequested() -> Bool {
@@ -210,6 +242,11 @@ final class QiblaViewModel {
         guard let flagIndex = arguments.firstIndex(of: "-IhsanQiblaSimulateHeading"),
               let mode = arguments.dropFirst(flagIndex + 1).first
         else { return false }
+
+        if mode == "denied" {
+            availability = .locationDenied
+            return true
+        }
 
         availability = .ready
         let bearing = qiblaBearing
@@ -221,15 +258,19 @@ final class QiblaViewModel {
                 guard let self else { return }
                 let elapsed = Date().timeIntervalSince(start)
                 let heading: Double
+                var accuracy = 8.0
                 if mode.hasPrefix("delta:"), let offset = Double(mode.dropFirst(6)) {
                     heading = QiblaMath.normalized(bearing - offset)
+                } else if mode == "calib" {
+                    heading = QiblaMath.normalized(bearing - 30)
+                    accuracy = 35
                 } else {
                     heading = QiblaMath.normalized(elapsed * 18)
                 }
                 self.ingest(HeadingSample(
                     trueHeading: heading,
                     magneticHeading: QiblaMath.normalized(heading + 4.2),
-                    accuracy: 8,
+                    accuracy: accuracy,
                     timestamp: Date()
                 ))
                 try? await Task.sleep(nanoseconds: 50_000_000)

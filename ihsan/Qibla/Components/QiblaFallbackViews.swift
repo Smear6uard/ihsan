@@ -15,6 +15,7 @@ struct QiblaStaticBearingView: View {
     let qiblaBearing: Double
     let distanceKm: Double
     let ringSide: CGFloat
+    var typeScale: CGFloat = 1
 
     var body: some View {
         VStack(spacing: 0) {
@@ -28,12 +29,12 @@ struct QiblaStaticBearingView: View {
 
             VStack(spacing: 7) {
                 Text(QiblaInscriptions.staticBearing(qiblaBearing: qiblaBearing))
-                    .font(IhsanFont.inscription)
+                    .font(QiblaType.inscription(typeScale))
                     .tracking(1.8)
                     .monospacedDigit()
                     .foregroundStyle(tokens.inkSecondary)
                 Text(QiblaInscriptions.distance(km: distanceKm))
-                    .font(IhsanFont.inscription)
+                    .font(QiblaType.inscription(typeScale))
                     .tracking(1.8)
                     .monospacedDigit()
                     .foregroundStyle(tokens.inkSecondary)
@@ -55,6 +56,7 @@ struct QiblaStaticBearingView: View {
 /// breath, with the one-line path to Settings.
 struct QiblaLocationDeniedView: View {
     let tokens: SkyPaletteTokens
+    var typeScale: CGFloat = 1
 
     var body: some View {
         VStack(spacing: IhsanSpacing.md) {
@@ -75,7 +77,7 @@ struct QiblaLocationDeniedView: View {
             if let url = URL(string: UIApplication.openSettingsURLString) {
                 Link(destination: url) {
                     Text("ALLOW IN SETTINGS")
-                        .font(IhsanFont.inscription)
+                        .font(QiblaType.inscription(typeScale))
                         .tracking(1.8)
                         .foregroundStyle(tokens.leafGold)
                 }

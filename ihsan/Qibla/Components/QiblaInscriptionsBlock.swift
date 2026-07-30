@@ -11,11 +11,12 @@ struct QiblaInscriptionsBlock: View {
     /// heading sample (the direction line waits, the distance shows).
     let signedDelta: Double?
     let isAligned: Bool
+    var typeScale: CGFloat = 1
 
     var body: some View {
         VStack(spacing: 7) {
             Text(QiblaInscriptions.distance(km: distanceKm))
-                .font(IhsanFont.inscription)
+                .font(QiblaType.inscription(typeScale))
                 .tracking(1.8)
                 .monospacedDigit()
                 .foregroundStyle(tokens.inkSecondary)
@@ -31,13 +32,20 @@ struct QiblaInscriptionsBlock: View {
     @ViewBuilder
     private var directionLine: some View {
         if isAligned {
+            // Gold text sings on the night grounds but dies on the
+            // day vellum — there the engraved ink carries the words
+            // and the fused golden column carries the celebration.
             Text("FACING QIBLA")
-                .font(IhsanFont.inscription)
+                .font(QiblaType.inscription(typeScale))
                 .tracking(2.4)
-                .foregroundStyle(tokens.leafGold)
+                .foregroundStyle(
+                    tokens.groundBottomValue.relativeLuminance > 0.5
+                        ? tokens.ink
+                        : tokens.leafGold
+                )
         } else if let signedDelta {
             Text(QiblaInscriptions.relativeDirection(signedDelta: signedDelta))
-                .font(IhsanFont.inscription)
+                .font(QiblaType.inscription(typeScale))
                 .tracking(1.8)
                 .monospacedDigit()
                 .foregroundStyle(tokens.inkSecondary)
@@ -45,7 +53,7 @@ struct QiblaInscriptionsBlock: View {
             // Reserve the line so the block doesn't jump when the
             // first sample lands.
             Text(" ")
-                .font(IhsanFont.inscription)
+                .font(QiblaType.inscription(typeScale))
         }
     }
 }

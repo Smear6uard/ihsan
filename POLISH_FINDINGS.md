@@ -415,3 +415,41 @@ device:
   visibility at arm's length in the day states; confirm it reads as
   material, not noise, and that night grain (unchanged 3%) still
   masks gradient banding.
+
+
+## Qibla instrument rebuild — phases 1–4 (2026-07-29)
+
+Source-side work is unit-tested (63 engine/choreography/guidance tests
+in IhsanCore) and simulator-verified (day + night grounds, all approach
+stages, aligned + settled, calibration, hold-flat, denied, no-compass,
+AX5 Dynamic Type, Reduce Motion discrete states, ~62 fps sim recording,
+6/6 single-fire alignment haptics in the event log); these need a
+device:
+
+- **The outdoor turn.** The whole acceptance bar: standing up,
+  turning in place, does the approach choreography read as a gradient
+  of arrival and the alignment moment feel like a fine instrument
+  seating. τ = 0.18 s EMA tuned for weighted-not-laggy — judge on
+  hardware, outdoors, away from interference.
+- **Haptic balance.** Detents are `.light`, the alignment seat is
+  `.soft`; single-fire is guaranteed by the tested latches, but the
+  intensity balance (two ticks + one seat) needs the hand.
+- **Smoothed-vs-raw field capture.** Launch with
+  `-IhsanQiblaHeadingLog` and turn: QIBLA-TRACE lines carry raw vs
+  smoothed vs delta for filter verification against the synthetic
+  trace in `HeadingFilterTraceTests`.
+- **VoiceOver walk with screen curtain.** The guidance script
+  (entry orientation → banded updates → "Facing qibla") is
+  unit-tested and log-verified; the end-to-end find-the-qibla-by-ear
+  walk needs VoiceOver on hardware with the compass live.
+- **True-heading fallback.** In areas of high declination, confirm
+  the automatic magnetic fallback shows the MAGNETIC NORTH maker's
+  mark and the dial remains honest.
+- **Calibration + tilt thresholds.** Poor-accuracy entry/exit
+  (>20°) near magnetic interference, and the hold-flat hysteresis
+  (tilt in below |g.z| 0.45, recover above 0.60) — verify neither
+  flickers in normal handling.
+- **OLED glow floors.** The lancet's standing glow (0.22) and the
+  bloom's single breath were tuned in the simulator; confirm the
+  standing glow neither vanishes nor hums on OLED, and the bloom
+  reads as one calm breath, not a flash.
