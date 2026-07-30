@@ -80,9 +80,9 @@ struct SkyPhaseTests {
 
     @Test
     func plateausHoldSteadyAwayFromTransitions() {
-        // 0.05 into the night plateau and 0.30 into morning are both
-        // well clear of any transition band.
-        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.05)) == SkyPaletteTokens.night)
+        // Each unit sits well clear of every transition band.
+        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.01)) == SkyPaletteTokens.night)
+        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.125)) == SkyPaletteTokens.dawn)
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.30)) == SkyPaletteTokens.morning)
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.55)) == SkyPaletteTokens.afternoon)
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.80)) == SkyPaletteTokens.sunset)
@@ -94,6 +94,7 @@ struct SkyPhaseTests {
         // A temperate-latitude day, expressed as absolute instants.
         let base = Date(timeIntervalSinceReferenceDate: 800_000_000)
         return SolarDayEvents(
+            fajr: base.addingTimeInterval(4.5 * 3600),
             sunrise: base.addingTimeInterval(6 * 3600),
             solarNoon: base.addingTimeInterval(13 * 3600),
             maghrib: base.addingTimeInterval(20 * 3600),
@@ -104,10 +105,69 @@ struct SkyPhaseTests {
     @Test
     func eventsLandOnTheirPaletteAnchors() {
         let events = normalDay
+        #expect(abs(SkyPhase.resolve(at: events.fajr, events: events).unit - SkyPhase.fajrUnit) < 0.001)
         #expect(abs(SkyPhase.resolve(at: events.sunrise, events: events).unit - SkyPhase.sunriseUnit) < 0.001)
         #expect(abs(SkyPhase.resolve(at: events.solarNoon, events: events).unit - SkyPhase.solarNoonUnit) < 0.001)
         #expect(abs(SkyPhase.resolve(at: events.maghrib, events: events).unit - SkyPhase.maghribUnit) < 0.001)
         #expect(abs(SkyPhase.resolve(at: events.isha, events: events).unit - SkyPhase.ishaUnit) < 0.001)
+    }
+
+    // MARK: - Dawn
+
+    /// The dawn contract: for t in [fajr, sunrise) the dominant state
+    /// is night or dawn — never morning; the morning plateau begins
+    /// only after the sunrise transition band completes.
+    @Test
+    func fajrToSunriseIsDawnTwilightNeverMorning() {
+        let events = normalDay
+        let span = events.sunrise.timeIntervalSince(events.fajr)
+        for step in 0..<40 {
+            let t = events.fajr.addingTimeInterval(span * Double(step) / 40.0)
+            let dominant = SkyPhase.resolve(at: t, events: events).dominantState
+            #expect(
+                dominant == .night || dominant == .dawn,
+                "morning leaked into the fajr→sunrise passage at step \(step)"
+            )
+        }
+        // Mid-dawn holds the canonical dawn plateau.
+        let midDawn = events.fajr.addingTimeInterval(span / 2)
+        #expect(PaletteState.resolved(for: SkyPhase.resolve(at: midDawn, events: events)) == SkyPaletteTokens.dawn)
+    }
+
+    /// Stars fade progressively across the dawn passage: full before
+    /// fajr, monotonically thinning, and effectively gone at sunrise.
+    @Test
+    func nightnessFadesProgressivelyAcrossDawn() {
+        let events = normalDay
+        let beforeFajr = SkyPhase.resolve(at: events.fajr.addingTimeInterval(-3600), events: events)
+        #expect(beforeFajr.nightness > 0.95)
+
+        let span = events.sunrise.timeIntervalSince(events.fajr)
+        var previous = 2.0
+        for step in 0...20 {
+            let t = events.fajr.addingTimeInterval(span * Double(step) / 20.0)
+            let nightness = SkyPhase.resolve(at: t, events: events).nightness
+            #expect(nightness <= previous + 1e-9, "stars brightened mid-dawn at step \(step)")
+            previous = nightness
+        }
+        let atSunrise = SkyPhase.resolve(at: events.sunrise, events: events)
+        #expect(atSunrise.nightness < 0.10)
+
+        let midMorning = SkyPhase.resolve(at: events.sunrise.addingTimeInterval(2 * 3600), events: events)
+        #expect(midMorning.nightness == 0.0)
+    }
+
+    /// The dawn wash grows toward sunrise and hands off after it.
+    @Test
+    func dawnProgressGrowsTowardSunrise() {
+        let events = normalDay
+        #expect(SkyPhase.resolve(at: events.fajr.addingTimeInterval(-3600), events: events).dawnProgress == 0)
+        let span = events.sunrise.timeIntervalSince(events.fajr)
+        let early = SkyPhase.resolve(at: events.fajr.addingTimeInterval(span * 0.25), events: events).dawnProgress
+        let late = SkyPhase.resolve(at: events.fajr.addingTimeInterval(span * 0.75), events: events).dawnProgress
+        #expect(early < late)
+        #expect(SkyPhase.resolve(at: events.sunrise, events: events).dawnProgress > 0.95)
+        #expect(SkyPhase.resolve(at: events.sunrise.addingTimeInterval(2 * 3600), events: events).dawnProgress == 0)
     }
 
     @Test
@@ -151,6 +211,7 @@ struct SkyPhaseTests {
     func degenerateEventOrderingIsGuarded() {
         let base = Date(timeIntervalSinceReferenceDate: 800_000_000)
         let events = SolarDayEvents(
+            fajr: base.addingTimeInterval(10),  // after sunrise
             sunrise: base,
             solarNoon: base,          // coincident
             maghrib: base.addingTimeInterval(60),
@@ -169,9 +230,15 @@ struct SkyPhaseTests {
     func nightnessFadesInsteadOfStepping() {
         #expect(SkyPhase.fixed(.night).nightness == 1.0)
         #expect(SkyPhase.fixed(.morning).nightness == 0.0)
-        // Exactly at the sunrise boundary center the blend is half night.
-        let atSunrise = SkyPhase(unit: SkyPhase.sunriseUnit)
-        #expect(abs(atSunrise.nightness - 0.5) < 0.01)
+        // Mid-dawn the last stars are still out; by sunrise they are
+        // effectively gone — the fade spans the whole passage.
+        #expect(SkyPhase.fixed(.dawn).nightness > 0.2)
+        #expect(SkyPhase.fixed(.dawn).nightness < 0.8)
+        #expect(SkyPhase(unit: SkyPhase.sunriseUnit).nightness < 0.10)
+        // The evening side is untouched: at the isha boundary center
+        // the blend is half night.
+        let atIsha = SkyPhase(unit: SkyPhase.ishaUnit)
+        #expect(abs(atIsha.nightness - 0.5) < 0.01)
     }
 
     // MARK: - OKLab math

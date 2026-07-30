@@ -571,12 +571,13 @@ private struct TodayReadyView: View {
 
     // MARK: - Plate inputs
 
-    /// The four solar events that anchor the palette phase, taken from
+    /// The five solar events that anchor the palette phase, taken from
     /// the day's real schedule. Dhuhr stands in for solar noon — it is
     /// defined as the moment just after the sun's upper transit, which
     /// is exactly the anchor `SkyPhase` wants.
     private var solarEvents: SolarDayEvents {
         SolarDayEvents(
+            fajr: snapshot.dayTimes.fajr.scheduledTime,
             sunrise: snapshot.dayTimes.sunrise,
             solarNoon: snapshot.dayTimes.dhuhr.scheduledTime,
             maghrib: snapshot.dayTimes.maghrib.scheduledTime,
@@ -742,6 +743,7 @@ private struct TodayReadyView: View {
                     windowEndTime: windowEndTime(for: prayer),
                     currentStatus: log?.status
                 ),
+                now: now,
                 onCommit: { status, jamaah in
                     commit(status: status, isJamaah: jamaah, for: prayer)
                 },

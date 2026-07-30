@@ -1,15 +1,17 @@
+import Synchronization
 import SwiftUI
 
-/// The four canonical palette states of the celestial instrument.
+/// The five canonical palette states of the celestial instrument.
 ///
 /// Palette v2 inverts v1's placement of warmth: the ground is either
-/// jewel-deep (night, sunset) or luminous cool near-white (morning,
-/// afternoon), and ALL saturation lives in the ink, the metal, and the
-/// glow. No state may read as tan, beige, parchment, or dusty — the
-/// only parchment allowed anywhere is `panelTexture`, a ≤8%-opacity
-/// overlay on panels, never a surface fill.
+/// jewel-deep (night, dawn, sunset) or luminous cool near-white
+/// (morning, afternoon), and ALL saturation lives in the ink, the
+/// metal, and the glow. No state may read as tan, beige, parchment,
+/// or dusty — the only parchment allowed anywhere is `panelTexture`,
+/// a ≤8%-opacity overlay on panels, never a surface fill.
 public enum PaletteState: String, CaseIterable, Sendable {
     case night
+    case dawn
     case morning
     case afternoon
     case sunset
@@ -20,6 +22,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
     public var tokens: SkyPaletteTokens {
         switch self {
         case .night: return .night
+        case .dawn: return .dawn
         case .morning: return .morning
         case .afternoon: return .afternoon
         case .sunset: return .sunset
@@ -358,10 +361,37 @@ public struct SkyPaletteTokens: Sendable, Equatable {
 /// page ground and the token set its panels and ink read from.
 /// Defined once here so no page can derive its own ground.
 public enum IhsanPageChrome {
-    /// Tokens for a page that has no solar schedule of its own —
-    /// resolved through the clock-derived approximate phase.
+    /// The day's real solar events, published by the one surface that
+    /// owns a schedule (the Today snapshot refresh). While present
+    /// and current, every page ground rides the identical solar
+    /// transition as the celestial plate — dawn included; the clock
+    /// approximation remains only as the cold-launch fallback before
+    /// the first schedule resolves.
+    private static let publishedEvents = Mutex<SolarDayEvents?>(nil)
+
+    /// How far from the published day's solar noon the events are
+    /// still trusted. Beyond this the schedule is stale (the app slept
+    /// through a refresh) and the clock fallback is the honest answer.
+    private static let validitySpan: TimeInterval = 36 * 3600
+
+    /// Publish (or clear) the day's real solar events for page chrome.
+    public static func publish(_ events: SolarDayEvents?) {
+        publishedEvents.withLock { $0 = events }
+    }
+
+    /// The phase page chrome rides at `date`: the published solar
+    /// events when current, the clock approximation otherwise.
+    public static func phase(at date: Date, timeZone: TimeZone = .current) -> SkyPhase {
+        if let events = publishedEvents.withLock({ $0 }),
+           abs(date.timeIntervalSince(events.solarNoon)) < validitySpan {
+            return SkyPhase.resolve(at: date, events: events)
+        }
+        return SkyPhase.approximate(at: date, timeZone: timeZone)
+    }
+
+    /// Tokens for a secondary page at `date`.
     public static func tokens(at date: Date, timeZone: TimeZone = .current) -> SkyPaletteTokens {
-        PaletteState.resolved(for: SkyPhase.approximate(at: date, timeZone: timeZone))
+        PaletteState.resolved(for: phase(at: date, timeZone: timeZone))
     }
 
     /// The quiet page ground for a given phase.
@@ -374,7 +404,37 @@ public enum IhsanPageChrome {
 
 extension SkyPaletteTokens {
 
-    /// Night (isha → first light). Tinted near-black indigo ground —
+    /// Dawn (fajr → sunrise). Twilight as its own state, not a blend
+    /// artifact: deep indigo lightening toward the horizon, the last
+    /// stars still out, the sun below the chord with only its growing
+    /// glow. One family step lighter than night so the passage reads
+    /// as first light on the same page — the polarity flip to the
+    /// luminous morning ground happens at sunrise, as it does in the
+    /// sky.
+    static let dawn = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0x0C1132),
+        groundTop: SRGBValue(hex: 0x121838),
+        groundBottom: SRGBValue(hex: 0x232C5A),
+        groundPlane: SRGBValue(hex: 0x0C112E),
+        horizonWash: SRGBValue(hex: 0x3E3C6E),
+        ink: SRGBValue(hex: 0xEDEFF6),
+        inkSecondary: SRGBValue(hex: 0xAEB4CB),
+        metal: SRGBValue(hex: 0xC9A96A),
+        metalHighlight: SRGBValue(hex: 0xE8D5A3),
+        leafGold: SRGBValue(hex: 0xD2AC5C),
+        keyline: SRGBValue(hex: 0x10163A),
+        lapis: SRGBValue(hex: 0x3B4685),
+        glow: SRGBValue(hex: 0xF3C77F),
+        panelFill: SRGBValue(hex: 0x1B2350),
+        panelStroke: SRGBValue(hex: 0x655C58),
+        panelTexture: SRGBValue(hex: 0xE8D5A3),
+        panelTextureOpacity: 0.04,
+        positive: SRGBValue(hex: 0x8FBF9F),
+        attention: SRGBValue(hex: 0xE59A82),
+        inkHalo: SRGBValue(hex: 0x0C112E)
+    )
+
+    /// Night (isha → fajr). Tinted near-black indigo ground —
     /// never pure black, so panels don't float and OLED halation stays
     /// controlled. Warmth lives in the brass and the glow.
     static let night = SkyPaletteTokens(

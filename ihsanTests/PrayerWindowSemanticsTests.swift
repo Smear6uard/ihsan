@@ -76,6 +76,33 @@ struct PrayerWindowSemanticsTests {
         #expect(moment.next.prayer == .asr)
     }
 
+    /// The dawn property, pinned after the device review caught the
+    /// card advanced to Dhuhr at 5:27 AM with sunrise at 5:47: for
+    /// EVERY t in [fajr, sunrise), the current prayer is Fajr and its
+    /// window end is sunrise — the focused card cannot advance while
+    /// Fajr is open. At sunrise the window closes atomically and
+    /// Dhuhr becomes next/upcoming per the temporal rules.
+    @Test
+    func fajrIsCurrentFromAdhanUntilSunrise() throws {
+        let w = try window(at: noon)
+        var tick = w.day.fajr.scheduledTime
+        var samples = 0
+        while tick < w.day.sunrise {
+            let moment = w.moment(at: tick)
+            #expect(moment.current?.prayer == .fajr, "Fajr not current at \(tick)")
+            #expect(moment.currentWindowEnd == w.day.sunrise)
+            #expect(moment.next.prayer == .dhuhr)
+            tick = tick.addingTimeInterval(30)
+            samples += 1
+        }
+        #expect(samples > 50)
+
+        // The boundary instant itself belongs to the closed state.
+        let atSunrise = w.moment(at: w.day.sunrise)
+        #expect(atSunrise.current == nil)
+        #expect(atSunrise.next.prayer == .dhuhr)
+    }
+
     /// The forenoon gap is the only span with no open window: after
     /// sunrise, before Dhuhr. Header shows next, card shows upcoming,
     /// nothing is loggable as "on time".

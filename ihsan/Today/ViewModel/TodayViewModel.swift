@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import SwiftData
 import IhsanCore
+import IhsanDesignSystem
 import IhsanIntents
 import IhsanLocation
 import IhsanNotifications
@@ -99,6 +100,17 @@ final class TodayViewModel {
             scheduleWindow: scheduleWindow,
             ramadanContext: RamadanContext(at: now, calendar: hijriCalendar),
             night: relevantNight(now: now, place: place, settings: settings)
+        ))
+
+        // Secondary pages ride the same solar transition as the plate:
+        // publish the day's real events so page chrome resolves through
+        // them instead of the clock-anchor approximation.
+        IhsanPageChrome.publish(SolarDayEvents(
+            fajr: scheduleWindow.day.fajr.scheduledTime,
+            sunrise: scheduleWindow.day.sunrise,
+            solarNoon: scheduleWindow.day.dhuhr.scheduledTime,
+            maghrib: scheduleWindow.day.maghrib.scheduledTime,
+            isha: scheduleWindow.day.isha.scheduledTime
         ))
 
         // Snapshot refreshes fire on foreground and on significant

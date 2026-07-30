@@ -68,18 +68,21 @@ public struct NowProvider: Sendable, Equatable {
     public static let overrideArgumentName = "-IhsanNowOverride"
 
     /// Build a provider from process launch arguments. Debug builds
-    /// honor `-IhsanNowOverride 2026-07-29T10:30:00Z` (anchored at
+    /// honor `-IhsanNowOverride 2026-07-30T05:27:00` (anchored at
     /// `systemStart`, flowing forward); release builds and malformed
     /// arguments always yield `.system`.
     public static func fromLaunchArguments(
         _ arguments: [String] = ProcessInfo.processInfo.arguments,
-        systemStart: Date = Date()
+        systemStart: Date = Date(),
+        timeZone: TimeZone = .current
     ) -> NowProvider {
         #if DEBUG
         guard
             let flagIndex = arguments.firstIndex(of: overrideArgumentName),
             arguments.indices.contains(flagIndex + 1),
-            let overrideStart = ISO8601DateFormatter().date(from: arguments[flagIndex + 1])
+            let overrideStart = parseOverrideInstant(
+                arguments[flagIndex + 1], timeZone: timeZone
+            )
         else {
             return .system
         }
@@ -87,5 +90,51 @@ public struct NowProvider: Sendable, Equatable {
         #else
         return .system
         #endif
+    }
+
+    /// Resolve the override argument to an instant.
+    ///
+    /// Two forms are accepted:
+    ///
+    /// - **Local wall time, no suffix** — `2026-07-30T05:27:00` (or
+    ///   without seconds). Resolved in `timeZone` *at that date*, so
+    ///   the anchor lands on the wall-clock moment the reviewer means
+    ///   regardless of DST. This is the form review recipes should
+    ///   use.
+    /// - **Explicit offset** — `…Z` or `…+03:00`, taken exactly as
+    ///   written (standard ISO 8601).
+    ///
+    /// The dawn review bug lived here: an anchor composed with the
+    /// zone's *standard* offset during daylight-saving time resolved
+    /// one hour ahead of the intended wall clock — Fajr appeared
+    /// closed before sunrise, the focused card advanced to Dhuhr, the
+    /// closed tense rendered early, and the countdown ran an hour
+    /// short. A wall-time anchor cannot shift, because the calendar
+    /// resolves the offset for the anchored date itself.
+    static func parseOverrideInstant(
+        _ raw: String, timeZone: TimeZone = .current
+    ) -> Date? {
+        // Explicit offset wins when present.
+        if let explicit = ISO8601DateFormatter().date(from: raw) {
+            return explicit
+        }
+
+        // Local wall time: yyyy-MM-dd'T'HH:mm[:ss], resolved by the
+        // Gregorian calendar in `timeZone` for that very date.
+        let pieces = raw.split(separator: "T", maxSplits: 1)
+        guard pieces.count == 2 else { return nil }
+        let dateParts = pieces[0].split(separator: "-").compactMap { Int($0) }
+        let timeParts = pieces[1].split(separator: ":").compactMap { Int($0) }
+        guard dateParts.count == 3, (2...3).contains(timeParts.count) else { return nil }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let components = DateComponents(
+            year: dateParts[0], month: dateParts[1], day: dateParts[2],
+            hour: timeParts[0], minute: timeParts[1],
+            second: timeParts.count == 3 ? timeParts[2] : 0
+        )
+        guard components.isValidDate(in: calendar) else { return nil }
+        return calendar.date(from: components)
     }
 }

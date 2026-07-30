@@ -1,17 +1,20 @@
 import Foundation
 
-/// The four solar events that anchor the day's palette. The package
+/// The five solar events that anchor the day's palette. The package
 /// never computes prayer times — the caller (which already owns an
 /// Adhan-derived schedule) supplies these, and everything downstream
 /// resolves from them. Clock hours are never consulted.
 public struct SolarDayEvents: Sendable, Equatable {
 
+    /// First light — dawn twilight begins here, not at a clock hour.
+    public var fajr: Date
     public var sunrise: Date
     public var solarNoon: Date
     public var maghrib: Date
     public var isha: Date
 
-    public init(sunrise: Date, solarNoon: Date, maghrib: Date, isha: Date) {
+    public init(fajr: Date, sunrise: Date, solarNoon: Date, maghrib: Date, isha: Date) {
+        self.fajr = fajr
         self.sunrise = sunrise
         self.solarNoon = solarNoon
         self.maghrib = maghrib
@@ -25,20 +28,22 @@ public struct SolarDayEvents: Sendable, Equatable {
 ///
 /// ```
 /// 0.000  deep night        (plateau center)
-/// 0.125  sunrise           (night → morning transition center)
-/// 0.250  mid-morning       (plateau center)
-/// 0.375  solar noon        (morning → afternoon transition center)
-/// 0.500  mid-afternoon     (plateau center)
-/// 0.625  maghrib           (afternoon → sunset transition center)
-/// 0.750  sunset heart      (plateau center)
+/// 0.070  fajr              (night → dawn transition center)
+/// 0.125  dawn heart        (plateau center)
+/// 0.180  sunrise           (dawn → morning transition center)
+/// 0.290  mid-morning       (plateau center)
+/// 0.400  solar noon        (morning → afternoon transition center)
+/// 0.525  mid-afternoon     (plateau center)
+/// 0.650  maghrib           (afternoon → sunset transition center)
+/// 0.760  sunset heart      (plateau center)
 /// 0.875  isha              (sunset → night transition center)
 /// ```
 ///
 /// `resolve(at:events:)` maps a real moment onto this scale by
 /// piecewise-linear interpolation between the supplied solar events,
-/// so the palette transitions always straddle the actual sunrise /
-/// noon / maghrib / isha moments regardless of season or latitude.
-/// Tokens are then continuous functions of `unit` (see
+/// so the palette transitions always straddle the actual fajr /
+/// sunrise / noon / maghrib / isha moments regardless of season or
+/// latitude. Tokens are then continuous functions of `unit` (see
 /// `PaletteState.resolved(for:)`) — there is no boundary at which
 /// colors can snap.
 public struct SkyPhase: Sendable, Equatable, Hashable {
@@ -58,19 +63,23 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
 
     // MARK: - Resolution from solar events
 
-    /// Palette-space positions of the four solar events.
-    static let sunriseUnit = 0.125
-    static let solarNoonUnit = 0.375
-    static let maghribUnit = 0.625
+    /// Palette-space positions of the five solar events.
+    static let fajrUnit = 0.070
+    static let sunriseUnit = 0.180
+    static let solarNoonUnit = 0.400
+    static let maghribUnit = 0.650
     static let ishaUnit = 0.875
 
-    /// Chrome fallback for surfaces that have no solar schedule (the
-    /// secondary pages, whose grounds follow the hour, not the sun):
-    /// maps the local clock onto palette space through fixed anchor
-    /// hours — 6:00 sunrise, 13:00 solar noon, 19:00 maghrib, 20:30
+    /// Chrome fallback for surfaces that have no solar schedule (a
+    /// cold launch before any schedule resolves): maps the local
+    /// clock onto palette space through fixed anchor hours — 4:45
+    /// fajr, 6:00 sunrise, 13:00 solar noon, 19:00 maghrib, 20:30
     /// isha. Surfaces that DO know the day's real events must use
-    /// `resolve(at:events:)`; this is deliberately coarse, and only
-    /// ever drives ground/panel tints — never the celestial plate.
+    /// `resolve(at:events:)`; secondary-page chrome rides the real
+    /// events through `IhsanPageChrome.publish(_:)` and falls back
+    /// here only before the first schedule arrives. This mapping is
+    /// deliberately coarse, and only ever drives ground/panel tints —
+    /// never the celestial plate.
     public static func approximate(
         at date: Date, timeZone: TimeZone = .current
     ) -> SkyPhase {
@@ -80,14 +89,15 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
         let seconds = date.timeIntervalSince(midnight)
 
         // (hour anchor, palette unit), with the previous isha and the
-        // next sunrise wrapping the night exactly like resolve(at:).
+        // next fajr wrapping the night exactly like resolve(at:).
         let anchors: [(time: TimeInterval, unit: Double)] = [
             (20.5 * 3600 - 86_400, ishaUnit - 1.0),
+            (4.75 * 3600, fajrUnit),
             (6.0 * 3600, sunriseUnit),
             (13.0 * 3600, solarNoonUnit),
             (19.0 * 3600, maghribUnit),
             (20.5 * 3600, ishaUnit),
-            (6.0 * 3600 + 86_400, sunriseUnit + 1.0),
+            (4.75 * 3600 + 86_400, fajrUnit + 1.0),
         ]
 
         if seconds <= anchors[0].time {
@@ -104,9 +114,9 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     }
 
     /// Map a real moment onto palette space using the day's solar
-    /// events. Times before sunrise interpolate from the previous
+    /// events. Times before fajr interpolate from the previous
     /// night's isha (approximated one day earlier); times after isha
-    /// interpolate toward the next sunrise (one day later). Degenerate
+    /// interpolate toward the next fajr (one day later). Degenerate
     /// event orderings (extreme-latitude schedules where a caller
     /// supplies near-coincident events) are guarded by a minimum
     /// segment length so the mapping stays monotonic and finite.
@@ -116,17 +126,18 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
 
         // Control points as (time, palette unit), strictly increasing
         // in both coordinates. The night wraps: previous isha sits one
-        // day before this day's, the next sunrise one day after.
+        // day before this day's, the next fajr one day after.
         var points: [(time: TimeInterval, unit: Double)] = []
         var cursor = events.isha.timeIntervalSinceReferenceDate - day
         points.append((cursor, ishaUnit - 1.0))
 
         for (time, unit) in [
+            (events.fajr.timeIntervalSinceReferenceDate, fajrUnit),
             (events.sunrise.timeIntervalSinceReferenceDate, sunriseUnit),
             (events.solarNoon.timeIntervalSinceReferenceDate, solarNoonUnit),
             (events.maghrib.timeIntervalSinceReferenceDate, maghribUnit),
             (events.isha.timeIntervalSinceReferenceDate, ishaUnit),
-            (events.sunrise.timeIntervalSinceReferenceDate + day, sunriseUnit + 1.0)
+            (events.fajr.timeIntervalSinceReferenceDate + day, fajrUnit + 1.0)
         ] {
             cursor = max(time, cursor + minSegment)
             points.append((cursor, unit))
@@ -152,9 +163,10 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     public static func fixed(_ state: PaletteState) -> SkyPhase {
         switch state {
         case .night: return SkyPhase(unit: 0.0)
-        case .morning: return SkyPhase(unit: 0.25)
-        case .afternoon: return SkyPhase(unit: 0.50)
-        case .sunset: return SkyPhase(unit: 0.75)
+        case .dawn: return SkyPhase(unit: 0.125)
+        case .morning: return SkyPhase(unit: 0.29)
+        case .afternoon: return SkyPhase(unit: 0.525)
+        case .sunset: return SkyPhase(unit: 0.7625)
         }
     }
 
@@ -183,7 +195,8 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     static let figureHalfWidth = 0.005
 
     private static let boundaries: [(center: Double, from: PaletteState, to: PaletteState)] = [
-        (SkyPhase.sunriseUnit, .night, .morning),
+        (SkyPhase.fajrUnit, .night, .dawn),
+        (SkyPhase.sunriseUnit, .dawn, .morning),
         (SkyPhase.solarNoonUnit, .morning, .afternoon),
         (SkyPhase.maghribUnit, .afternoon, .sunset),
         (SkyPhase.ishaUnit, .sunset, .night)
@@ -195,9 +208,10 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
             let raw = (u - (boundary.center - hw)) / (2 * hw)
             return (boundary.from, boundary.to, Self.smootherstep(raw))
         }
-        // Plateau — pick the state whose quarter contains the phase.
+        // Plateau — pick the state whose span contains the phase.
         switch u {
-        case ..<Self.sunriseUnit: return (.night, .night, 0)
+        case ..<Self.fajrUnit: return (.night, .night, 0)
+        case ..<Self.sunriseUnit: return (.dawn, .dawn, 0)
         case ..<Self.solarNoonUnit: return (.morning, .morning, 0)
         case ..<Self.maghribUnit: return (.afternoon, .afternoon, 0)
         case ..<Self.ishaUnit: return (.sunset, .sunset, 0)
@@ -244,11 +258,43 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     /// How "night" this phase is, `0...1` — drives the star field and
     /// other night-only atmospherics so they fade with the palette
     /// rather than popping at a threshold.
+    ///
+    /// Across the dawn passage the stars do not vanish with the
+    /// night→dawn palette blend: they fade PROGRESSIVELY over the
+    /// whole fajr→sunrise span, from full at the passage's start to
+    /// gone as the sun crests — dawn twilight keeps its last stars.
+    /// Outside that span the palette blend decides, exactly as
+    /// before.
     public var nightness: Double {
+        let hw = Self.atmosphereHalfWidth
+        let dawnStart = Self.fajrUnit - hw
+        let dawnEnd = Self.sunriseUnit + hw
+        if unit >= dawnStart && unit <= dawnEnd {
+            return 1.0 - Self.smootherstep((unit - dawnStart) / (dawnEnd - dawnStart))
+        }
         let mix = blend
         let fromWeight = mix.from == .night ? 1.0 - mix.amount : 0.0
         let toWeight = mix.to == .night ? mix.amount : 0.0
         return fromWeight + toWeight
+    }
+
+    /// How strongly the dawn wash paints right now, `0...1` — 0 until
+    /// fajr, growing to 1 as the sun crests at sunrise, then handing
+    /// off to the risen sun's own bloom across the sunrise transition
+    /// band. The sky view scales the pre-dawn horizon glow by this,
+    /// so first light grows toward sunrise instead of arriving all at
+    /// once.
+    public var dawnProgress: Double {
+        let hw = Self.atmosphereHalfWidth
+        if unit >= Self.fajrUnit && unit <= Self.sunriseUnit {
+            return Self.smootherstep(
+                (unit - Self.fajrUnit) / (Self.sunriseUnit - Self.fajrUnit)
+            )
+        }
+        if unit > Self.sunriseUnit && unit <= Self.sunriseUnit + hw {
+            return 1.0 - Self.smootherstep((unit - Self.sunriseUnit) / hw)
+        }
+        return 0.0
     }
 
     /// C²-continuous ease — zero first and second derivatives at both

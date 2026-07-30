@@ -201,6 +201,10 @@ struct CelestialPlateScene: View {
 
                 engravedField(plate: plate, tokens: tokens, date: date)
                     .opacity(entrance)
+                    .overlay {
+                        sunriseMark(plate: plate, tokens: tokens)
+                            .opacity(entrance)
+                    }
                     .mask {
                         // The draw-in: the arc's canvas reveals left to
                         // right, so the filament traces the day's
@@ -221,7 +225,8 @@ struct CelestialPlateScene: View {
                     }
                     bodies(
                         plate: plate, tokens: tokens, sun: sun, moon: moon,
-                        apexAltitude: apexAltitude
+                        apexAltitude: apexAltitude,
+                        beforeSunrise: date < solarEvents.sunrise
                     )
                 }
                 .opacity(entrance)
@@ -420,8 +425,9 @@ struct CelestialPlateScene: View {
     private static let filamentClearance: CGFloat = 7
 
     /// The bounding forms filaments must terminate at: each marker's
-    /// ornament box and its two-line label block. Real geometry for
-    /// `PlateGeometry`'s segmentation — never background patches.
+    /// ornament box, its two-line label block, and the sunrise
+    /// inscription. Real geometry for `PlateGeometry`'s segmentation —
+    /// never background patches.
     private func knockoutRects(plate: PlateGeometry) -> [CGRect] {
         markers.flatMap { marker -> [CGRect] in
             let position = plate.markerPosition(for: marker.time)
@@ -436,7 +442,51 @@ struct CelestialPlateScene: View {
                 width: 56, height: 26
             )
             return [ornament, label]
+        } + [sunriseLabelRect(plate: plate)]
+    }
+
+    // MARK: - The sunrise mark
+
+    /// Where the sunrise inscription sits: down-right of the tick,
+    /// inside the plate's interior, clear of Fajr's marker label. A
+    /// knockout like any label block, so every filament terminates
+    /// short of the text.
+    private func sunriseLabelRect(plate: PlateGeometry) -> CGRect {
+        let tick = plate.markerPosition(for: solarEvents.sunrise)
+        return CGRect(x: tick.x + 10, y: tick.y + 8, width: 104, height: 16)
+    }
+
+    /// Sunrise on the plate: a fine engraved tick crossing the arc at
+    /// the sunrise position, with a quiet small-caps inscription. NO
+    /// ornament — sunrise is not a prayer; it is subordinate to the
+    /// five by construction. Always present; during dawn it is the
+    /// visible endpoint of Fajr's window.
+    @ViewBuilder
+    private func sunriseMark(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
+        let tick = plate.markerPosition(for: solarEvents.sunrise)
+        let label = sunriseLabelRect(plate: plate)
+
+        Canvas { context, _ in
+            context.fill(
+                Path(plate.midnightFilamentPath(at: tick, length: 12, thickness: 1.2)),
+                with: .color(tokens.metal.opacity(0.65))
+            )
         }
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+
+        Text("SUNRISE · \(Self.timeString(solarEvents.sunrise, in: timeZone).uppercased())")
+            .font(Self.labelFont)
+            .tracking(1.2)
+            .foregroundStyle(tokens.inkSecondary.opacity(0.9))
+            .lineLimit(1)
+            .fixedSize()
+            .shadow(color: tokens.inkHaloDark, radius: 1)
+            .shadow(color: tokens.inkHaloLight, radius: 2.5)
+            .frame(width: label.width, height: label.height, alignment: .leading)
+            .position(x: label.midX, y: label.midY)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
     }
 
     /// The day's scale and its field, engraved with knockout
@@ -687,7 +737,8 @@ struct CelestialPlateScene: View {
         tokens: SkyPaletteTokens,
         sun: SolarPosition,
         moon: LunarPosition,
-        apexAltitude: Double
+        apexAltitude: Double,
+        beforeSunrise: Bool
     ) -> some View {
         // The moon is drawn first so the sun's halo passes over it
         // during the daytime conjunctions rather than under it.
@@ -713,7 +764,7 @@ struct CelestialPlateScene: View {
         )
 
         LuminousBody(kind: .sun, diameter: Self.sunDiameter, tokens: tokens)
-            .opacity(submergedPresence(altitudeDegrees: sun.altitude))
+            .opacity(sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise))
             .position(
                 plate.bodyPosition(
                     altitudeDegrees: sun.altitude,
@@ -721,6 +772,20 @@ struct CelestialPlateScene: View {
                     apexAltitudeDegrees: apexAltitude
                 )
             )
+    }
+
+    /// Before sunrise the sun renders NO disc — dawn is its glow at
+    /// the horizon, nothing else. The disc fades in only across the
+    /// last two degrees below the chord, so the crest at sunrise is
+    /// continuous rather than a pop. After sunset the engraved
+    /// below-horizon trace remains — that is maghrib's drama, and the
+    /// evening side is untouched.
+    private func sunPresence(altitudeDegrees: Double, beforeSunrise: Bool) -> Double {
+        guard beforeSunrise, altitudeDegrees < 0 else {
+            return submergedPresence(altitudeDegrees: altitudeDegrees)
+        }
+        let crest = max(0.0, 1.0 + altitudeDegrees / 2.0)
+        return crest * crest * submergedPresence(altitudeDegrees: altitudeDegrees)
     }
 
     /// The plate's horizontal parameter for a body, from its local hour

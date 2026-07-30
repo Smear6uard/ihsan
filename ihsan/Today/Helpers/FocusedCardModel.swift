@@ -72,10 +72,14 @@ enum FocusedCardModel {
         windowEndTime: Date?,
         scheduledTime: Date,
         now: Date,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        windowEndDescriptor: String? = nil
     ) -> String {
         switch phase {
         case .active(let until):
+            if let windowEndDescriptor {
+                return "Now · until \(windowEndDescriptor) \(PlateTimeFormat.time(until, in: timeZone))"
+            }
             return "Now · until \(PlateTimeFormat.time(until, in: timeZone))"
         case .upcoming:
             return "Opens in · \(countdown(until: scheduledTime, now: now))"

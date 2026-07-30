@@ -119,7 +119,8 @@ public struct CelestialSkyView: View {
                     plateHeight: plateHeight ?? size.height,
                     time: time,
                     flat: reduceTransparency,
-                    seed: starSeed
+                    seed: starSeed,
+                    dawnProgress: phase.dawnProgress
                 )
                 probe?.record(CFAbsoluteTimeGetCurrent() - start)
             }
@@ -156,7 +157,8 @@ public struct CelestialSkyView: View {
         plateHeight: CGFloat? = nil,
         time: TimeInterval,
         flat: Bool,
-        seed: UInt64
+        seed: UInt64,
+        dawnProgress: Double = 0
     ) {
         // The horizon band: ~8% of the *plate* height, inside the
         // spec's 6–10% window.
@@ -191,6 +193,36 @@ public struct CelestialSkyView: View {
                     Gradient(stops: stops),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: max(horizonY, 1))
+                )
+            )
+        }
+
+        // First light: the dawn wash in the east — a soft painted
+        // lift rising from the horizon around the sun's coming
+        // position, growing with the phase's dawnProgress and gone
+        // the moment morning owns the sky. Local like every light on
+        // the plate: radial around the sunrise point, dying within
+        // ~55% of the width. Skipped flat (Reduce Transparency) —
+        // the dawn ground itself carries the state there.
+        if !flat, dawnProgress > 0.01, let sunX {
+            let washColor = SRGBValue.mix(
+                tokens.horizonWashValue, tokens.glowValue, amount: 0.40
+            ).color
+            let radius = size.width * 0.55
+            let strength = 0.30 * dawnProgress
+            var wash = context
+            wash.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: horizonY)))
+            wash.fill(
+                Path(CGRect(origin: .zero, size: size)),
+                with: .radialGradient(
+                    Gradient(stops: [
+                        .init(color: washColor.opacity(strength), location: 0),
+                        .init(color: washColor.opacity(strength * 0.35), location: 0.5),
+                        .init(color: washColor.opacity(0), location: 1)
+                    ]),
+                    center: CGPoint(x: sunX, y: horizonY),
+                    startRadius: 0,
+                    endRadius: radius
                 )
             )
         }

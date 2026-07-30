@@ -4,13 +4,18 @@ import IhsanCore
 /// The sheet's temporal truth rule: which timing choices can be TRUE
 /// at `now` for the prayer and civil day being logged.
 ///
-/// - Live window open → only **On Time** (Late / Qadā / Missed are
-///   rendered quiet and disabled — visible for learnability, not
-///   selectable).
-/// - Window ended today → **Late / Qadā / Missed** (the window is
-///   gone; "on time" can no longer become true).
-/// - A past civil day → all four (memory, not the clock, is the
-///   authority for a day that has closed).
+/// The timing axis describes when the prayer was PERFORMED, not when
+/// the log entry is created. Praying within the window and logging
+/// afterward is the most common usage pattern and must never be
+/// blocked.
+///
+/// - Live window open → only **On Time** (Late / Qadā / Missed
+///   describe a window that has passed, which cannot yet be true —
+///   rendered quiet and disabled, visible for learnability).
+/// - Window ended, today or any past day → **all four**. "On time"
+///   remains true of a prayer performed inside the window and logged
+///   after it; memory, not the clock, is the authority once the
+///   window has closed.
 /// - A future day, or today before the window opens → nothing (the
 ///   UI never offers the sheet there; the empty set is the honest
 ///   defensive answer).
@@ -72,6 +77,6 @@ enum TimingAvailability {
         if now < windowEndTime {
             return [.onTime]
         }
-        return [.late, .qada, .missed]
+        return [.onTime, .late, .qada, .missed]
     }
 }

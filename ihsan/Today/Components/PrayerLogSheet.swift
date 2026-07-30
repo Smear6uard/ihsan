@@ -42,6 +42,10 @@ struct PrayerLogSheet: View {
     /// ledger): the header inscribes the date instead of the window's
     /// clock times.
     var displayDate: Date? = nil
+    /// The resolved moment at presentation — the header's tense
+    /// derives from comparing it to the window boundary, same rule as
+    /// the card. `nil` (retroactive days) shows the date, no clock.
+    var now: Date? = nil
 
     /// One commit: the chosen timing plus the jamāʿah flag, together.
     let onCommit: (PrayerStatus, Bool) -> Void
@@ -70,6 +74,7 @@ struct PrayerLogSheet: View {
         isPaused: Bool = false,
         availableStatuses: Set<PrayerStatus>,
         displayDate: Date? = nil,
+        now: Date? = nil,
         onCommit: @escaping (PrayerStatus, Bool) -> Void,
         onTogglePause: @escaping () -> Void = {},
         onCancel: @escaping () -> Void
@@ -84,6 +89,7 @@ struct PrayerLogSheet: View {
         self.isPaused = isPaused
         self.availableStatuses = availableStatuses
         self.displayDate = displayDate
+        self.now = now
         self.onCommit = onCommit
         self.onTogglePause = onTogglePause
         self.onCancel = onCancel
@@ -153,12 +159,32 @@ struct PrayerLogSheet: View {
     /// "12:38 PM · ENDS 5:06 PM" — the place's clock, always. A
     /// retroactive day has no clock to show; it inscribes its date.
     private var timeRangeInscription: String {
+        Self.timeRangeInscription(
+            scheduledTime: scheduledTime,
+            windowEndTime: windowEndTime,
+            displayDate: displayDate,
+            now: now,
+            timeZone: timeZone
+        )
+    }
+
+    /// The header's tense follows the derived window state, exactly
+    /// as the card's does: before the boundary "ENDS", after it
+    /// "ENDED". Without a resolved moment the neutral present holds.
+    static func timeRangeInscription(
+        scheduledTime: Date,
+        windowEndTime: Date?,
+        displayDate: Date?,
+        now: Date?,
+        timeZone: TimeZone
+    ) -> String {
         if let displayDate {
             return PlateTimeFormat.dayMonth(displayDate, in: timeZone).uppercased()
         }
         let start = PlateTimeFormat.time(scheduledTime, in: timeZone).uppercased()
         guard let end = windowEndTime else { return start }
-        return "\(start) · ENDS \(PlateTimeFormat.time(end, in: timeZone).uppercased())"
+        let verb = if let now { now >= end ? "ENDED" : "ENDS" } else { "ENDS" }
+        return "\(start) · \(verb) \(PlateTimeFormat.time(end, in: timeZone).uppercased())"
     }
 
     private var header: some View {

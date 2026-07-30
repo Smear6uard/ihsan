@@ -123,7 +123,8 @@ struct FocusedPrayerCard: View {
             windowEndTime: windowEndTime,
             scheduledTime: scheduledTime,
             now: now,
-            timeZone: timeZone
+            timeZone: timeZone,
+            windowEndDescriptor: PrayerWindowRule.windowEndDescriptor(for: prayer)
         )
     }
 
@@ -324,7 +325,11 @@ struct FocusedPrayerCard: View {
         var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
         switch phase {
         case .active(let until):
-            parts.append("in its window until \(PlateTimeFormat.time(until, in: timeZone))")
+            if let descriptor = PrayerWindowRule.windowEndDescriptor(for: prayer) {
+                parts.append("in its window until \(descriptor) at \(PlateTimeFormat.time(until, in: timeZone))")
+            } else {
+                parts.append("in its window until \(PlateTimeFormat.time(until, in: timeZone))")
+            }
         case .upcoming(let opensAt):
             parts.append("opens in \(FocusedCardModel.spokenCountdown(until: opensAt, now: now))")
             parts.append("scheduled at \(PlateTimeFormat.time(scheduledTime, in: timeZone))")

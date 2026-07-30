@@ -34,12 +34,16 @@ struct TimingAvailabilityTests {
         )
     }
 
-    // MARK: - The three spec cases, swept across the whole day
+    // MARK: - The corrected mapping, swept across the whole day
+    //
+    // The timing axis describes when the prayer was PERFORMED, not
+    // when the log entry is created. Praying inside the window and
+    // logging afterward is the most common pattern — a closed window
+    // therefore offers ALL FOUR states, On Time included.
 
     /// Property: at every minute of the civil day, the allowed set is
     /// exactly one of the three spec answers — pre-window nothing,
-    /// open window On Time alone, closed window the three
-    /// after-the-fact states.
+    /// open window On Time alone, closed window all four.
     @Test
     func everyMinuteOfTodayMapsToExactlyTheSpecSet() {
         for minute in stride(from: 0, to: 24 * 60, by: 1) {
@@ -53,7 +57,7 @@ struct TimingAvailabilityTests {
             } else if now < windowEnd {
                 expected = [.onTime]
             } else {
-                expected = [.late, .qada, .missed]
+                expected = [.onTime, .late, .qada, .missed]
             }
             #expect(result == expected, "minute \(minute): \(result)")
         }
@@ -65,12 +69,14 @@ struct TimingAvailabilityTests {
         #expect(allowed(now: now, scheduledTime: scheduled, windowEndTime: windowEnd) == [.onTime])
     }
 
+    /// A prayer performed in its window and logged after it must never
+    /// be blocked from On Time — the closed window opens every state.
     @Test
-    func closedWindowOffersTheAfterStatesAndNeverOnTime() {
+    func closedWindowOffersAllFourOnTimeIncluded() {
         let now = windowEnd.addingTimeInterval(60)
         #expect(
             allowed(now: now, scheduledTime: scheduled, windowEndTime: windowEnd)
-                == [.late, .qada, .missed]
+                == [.onTime, .late, .qada, .missed]
         )
     }
 
@@ -81,7 +87,7 @@ struct TimingAvailabilityTests {
         #expect(allowed(now: scheduled, scheduledTime: scheduled, windowEndTime: windowEnd) == [.onTime])
         #expect(
             allowed(now: windowEnd, scheduledTime: scheduled, windowEndTime: windowEnd)
-                == [.late, .qada, .missed]
+                == [.onTime, .late, .qada, .missed]
         )
     }
 
@@ -156,5 +162,26 @@ struct PrayerLogSheetCopyTests {
         for prayer in Prayer.allCases {
             #expect(PrayerLogSheet.commitTitle(prayer: prayer, isEditing: true) == "Save Changes")
         }
+    }
+
+    /// The sheet header's tense derives from the boundary, same rule
+    /// as the card: "ENDS" while the window is open, "ENDED" after.
+    @Test
+    func headerTenseFollowsTheDerivedWindowState() {
+        let timeZone = TimeZone(identifier: "America/Chicago")!
+        let start = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let end = start.addingTimeInterval(2 * 3600)
+
+        let open = PrayerLogSheet.timeRangeInscription(
+            scheduledTime: start, windowEndTime: end,
+            displayDate: nil, now: end.addingTimeInterval(-60), timeZone: timeZone
+        )
+        #expect(open.contains("ENDS") && !open.contains("ENDED"))
+
+        let closed = PrayerLogSheet.timeRangeInscription(
+            scheduledTime: start, windowEndTime: end,
+            displayDate: nil, now: end, timeZone: timeZone
+        )
+        #expect(closed.contains("ENDED"))
     }
 }
