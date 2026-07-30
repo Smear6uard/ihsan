@@ -3,26 +3,53 @@ import IhsanCore
 import IhsanDesignSystem
 import IhsanIntents
 
+/// The app's four surfaces.
+enum AppTab: Int, CaseIterable, Hashable {
+    case today
+    case trajectory
+    case reflection
+    case settings
+}
+
+/// The root tab scaffold — the NATIVE iOS 26 tab bar, exactly as the
+/// system ships it: a floating Liquid Glass capsule with real content
+/// lensing beneath, the system's own selection treatment, and
+/// `.tabBarMinimizeBehavior(.onScrollDown)` so the bar recedes while
+/// the user reads and returns on scroll-up or tap.
+///
+/// Customization discipline: the linework glyphs and labels, plus one
+/// warm tint through the sanctioned `.tint` API. No custom
+/// backgrounds, shadows, or materials on or behind the bar; no custom
+/// selection indicator — the old sliding underline died with the
+/// custom bar and must not be recreated. Reduce Motion / Reduce
+/// Transparency behavior now comes from the system.
 struct RootTabView: View {
-    @State private var selectedTab: Tab = .today
+    @State private var selectedTab: AppTab = .today
     @Environment(\.scenePhase) private var scenePhase
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.modelContext) private var modelContext
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            tabContent
-                .safeAreaInset(edge: .bottom) {
-                    Color.clear
-                        .frame(height: IhsanSpacing.tabBarHeight + IhsanSpacing.xl)
-                        .allowsHitTesting(false)
-                }
-
-            CustomTabBar(selectedTab: $selectedTab)
-                .padding(.horizontal, IhsanSpacing.md)
-                .padding(.bottom, IhsanSpacing.sm)
+        TabView(selection: $selectedTab) {
+            SwiftUI.Tab("Today", systemImage: "calendar", value: AppTab.today) {
+                TodayScreen()
+            }
+            SwiftUI.Tab("Path", systemImage: "chart.dots.scatter", value: AppTab.trajectory) {
+                TrajectoryScreen()
+            }
+            SwiftUI.Tab("Reflect", systemImage: "book.closed", value: AppTab.reflection) {
+                ReflectionScreen()
+            }
+            SwiftUI.Tab("Set", systemImage: "gearshape", value: AppTab.settings) {
+                SettingsScreen()
+            }
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: selectedTab)
+        .tabBarMinimizeBehavior(.onScrollDown)
+        // The one sanctioned accent: the manuscript's warm gold on the
+        // selected item; everything else is the system's own glass.
+        .tint(IhsanColor.gold)
+        .onChange(of: selectedTab) { _, _ in
+            Haptics.impact(.medium)
+        }
         .task {
             Haptics.prepareAll()
             // Cold-launch: the OpenReflectionIntent has already written
@@ -62,20 +89,6 @@ struct RootTabView: View {
     private func runMissedFlowSweep() {
         try? QadaLedgerWriter().reconcile(in: modelContext)
         try? QadaMissedFlowSweep().sweep(in: modelContext)
-    }
-
-    @ViewBuilder
-    private var tabContent: some View {
-        switch selectedTab {
-        case .today:
-            TodayScreen()
-        case .trajectory:
-            TrajectoryScreen()
-        case .reflection:
-            ReflectionScreen()
-        case .settings:
-            SettingsScreen()
-        }
     }
 
     /// Reads the App Group UserDefaults flag without clearing it. The

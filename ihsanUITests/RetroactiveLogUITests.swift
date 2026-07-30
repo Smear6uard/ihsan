@@ -129,7 +129,7 @@ final class RetroactiveLogUITests: XCTestCase {
             extraArguments: ["-IhsanDebugLogPrayer", "fajr:onTime"]
         )
 
-        app.buttons["Trajectory tab"].tap()
+        app.tabBars.buttons["Path"].tap()
 
         let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), not logged"]
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
@@ -163,7 +163,7 @@ final class RetroactiveLogUITests: XCTestCase {
             extraArguments: ["-IhsanDebugLogPrayer", "dhuhr:late:-1"]
         )
 
-        app.buttons["Trajectory tab"].tap()
+        app.tabBars.buttons["Path"].tap()
 
         let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), late"]
         XCTAssertTrue(cell.waitForExistence(timeout: 10))

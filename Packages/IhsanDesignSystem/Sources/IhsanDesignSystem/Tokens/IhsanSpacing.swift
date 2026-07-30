@@ -23,7 +23,6 @@ public enum IhsanSpacing {
     // MARK: - Component-specific
 
     public static let prayerRowHeight: CGFloat = 72
-    public static let tabBarHeight: CGFloat = 56
     public static let heatmapDotSize: CGFloat = 12
     public static let heatmapDotSpacing: CGFloat = 6
 
