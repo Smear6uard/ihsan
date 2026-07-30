@@ -38,16 +38,22 @@ enum FocusedCardModel {
         now: Date
     ) -> Phase {
         if isLogged { return .logged }
-        if isInWindow, let end = windowEndTime, now < end {
-            return .active(until: end)
-        }
+        // The never-early rule, checked before anything else: for any
+        // now earlier than the prayer's start, the prayer is never
+        // active — whatever an upstream `isInWindow` flag claims.
+        // `FocusedCardModelTests` pins this as a property over random
+        // inputs; no combination of the other arguments can reach
+        // `.active` from here.
         if now < scheduledTime {
             return .upcoming(opensAt: scheduledTime)
+        }
+        if isInWindow, let end = windowEndTime, now < end {
+            return .active(until: end)
         }
         if let end = windowEndTime, now >= end {
             return .windowClosed(at: end)
         }
-        // In-window without a known end (defensive; the schedule
+        // Past the start without a known end (defensive; the schedule
         // window always supplies one).
         return .active(until: windowEndTime ?? scheduledTime)
     }

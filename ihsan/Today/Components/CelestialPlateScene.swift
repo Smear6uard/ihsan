@@ -32,16 +32,30 @@ struct CelestialPlateScene: View {
 
     /// One prayer on the plate: which ornament, when, and what
     /// lifecycle state it is in.
+    ///
+    /// `time` places the marker on the arc — always today's instant,
+    /// so the arc's engraved scale stays the civil day. `displayTime`
+    /// is what the label prints: the caller passes the same display
+    /// instant the header and card show (post-Isha, Fajr's label
+    /// rolls to tomorrow's Fajr), so no two surfaces can disagree
+    /// about a time to the minute.
     struct Marker: Identifiable, Equatable {
         let prayer: Prayer
         let time: Date
+        let displayTime: Date
         let state: PrayerMarkerState
 
         var id: Prayer { prayer }
 
-        init(prayer: Prayer, time: Date, state: PrayerMarkerState) {
+        init(
+            prayer: Prayer,
+            time: Date,
+            displayTime: Date? = nil,
+            state: PrayerMarkerState
+        ) {
             self.prayer = prayer
             self.time = time
+            self.displayTime = displayTime ?? time
             self.state = state
         }
     }
@@ -436,12 +450,25 @@ struct CelestialPlateScene: View {
         let arcSegments = plate.arcFilamentSegments(
             avoiding: knockouts, clearance: Self.filamentClearance
         )
+        // The gilded passage carries its own, heavier ribbon set: the
+        // traversed line differs in WEIGHT as well as warmth, so even
+        // the short runs between the crowded evening markers read
+        // gilded at arm's length instead of pinching to hairlines.
+        let gildSegments = plate.arcFilamentSegments(
+            avoiding: knockouts, clearance: Self.filamentClearance,
+            maxThickness: 2.6
+        )
         let almucantarSegments = Self.almucantarRises.flatMap {
             plate.almucantarFilamentSegments(
                 riseFraction: $0, avoiding: knockouts,
                 clearance: Self.filamentClearance
             )
         }
+        // Traversal is anchored on time-of-day progression through the
+        // prayer sequence — the same mapping that places the markers —
+        // never on the sun's position, which stops being a clock the
+        // moment it sets. Past Isha the fraction clamps to 1 and the
+        // whole arc reads traversed.
         let gildEdgeX: CGFloat? = markers.first.flatMap { first in
             date >= first.time ? plate.markerPosition(for: date).x : nil
         }
@@ -454,11 +481,11 @@ struct CelestialPlateScene: View {
                 context.fill(Path(segment), with: .color(tokens.metal.opacity(0.34)))
             }
 
-            // The gilded passage: the same segments, warmer and
-            // ~2× stronger, masked to the traversed side of `now`.
+            // The gilded passage: the same run, heavier and warmer,
+            // masked to the traversed side of `now`.
             if let gildEdgeX, size.width > 0 {
                 var clip = Path()
-                for segment in arcSegments { clip.addPath(Path(segment)) }
+                for segment in gildSegments { clip.addPath(Path(segment)) }
                 var gilded = context
                 gilded.clip(to: clip)
 
@@ -543,6 +570,20 @@ struct CelestialPlateScene: View {
             context.fill(
                 Path(plate.nightArcFilamentPath()),
                 with: .color(tokens.metal.opacity(0.22))
+            )
+
+            // The traversed night: the day arc's gilded passage
+            // continues below the horizon, from nightfall to the
+            // present moment. Time-anchored like the day's gilding —
+            // the ribbon's taper dissolves exactly at the cursor, so
+            // the line burns up to "now" and no further.
+            context.fill(
+                Path(plate.nightTraversedFilamentPath(
+                    nightStart: night.start,
+                    nightEnd: night.end,
+                    now: date
+                )),
+                with: .color(tokens.metalHighlight.opacity(0.60))
             )
 
             // Nisf al-layl: a fine metal filament crossing the arc.
@@ -772,7 +813,7 @@ struct CelestialPlateScene: View {
                 .textCase(.uppercase)
                 .tracking(1.2)
                 .foregroundStyle(tokens.ink)
-            Text(Self.timeString(marker.time, in: timeZone))
+            Text(Self.timeString(marker.displayTime, in: timeZone))
                 .font(Self.labelFont)
                 .tracking(0.9)
                 .foregroundStyle(tokens.inkSecondary)
@@ -793,7 +834,7 @@ struct CelestialPlateScene: View {
     }
 
     private func accessibilityLabel(for marker: Marker) -> String {
-        let time = Self.timeString(marker.time, in: timeZone)
+        let time = Self.timeString(marker.displayTime, in: timeZone)
         let state: String
         switch marker.state {
         case .current: state = "happening now"

@@ -391,11 +391,19 @@ private struct TodayReadyView: View {
         tokens: SkyPaletteTokens
     ) -> some View {
         let prayer = effectiveFocusedPrayer(moment: moment)
-        let log = log(for: prayer)
+        // A rolled prayer is tomorrow's instance: today's log no
+        // longer attaches to it and its window end is not tonight's
+        // business — the card shows a pure upcoming state.
+        let rolled = TodayDisplaySchedule.isRolledToTomorrow(
+            prayer, window: snapshot.scheduleWindow, now: now
+        )
+        let log = rolled ? nil : log(for: prayer)
         FocusedPrayerCard(
             prayer: prayer,
-            scheduledTime: scheduledTime(for: prayer),
-            windowEndTime: windowEndTime(for: prayer),
+            scheduledTime: TodayDisplaySchedule.displayTime(
+                for: prayer, window: snapshot.scheduleWindow, now: now
+            ),
+            windowEndTime: rolled ? nil : windowEndTime(for: prayer),
             now: now,
             timeZone: snapshot.place.timeZone,
             tokens: tokens,
@@ -572,9 +580,11 @@ private struct TodayReadyView: View {
             CelestialPlateScene.Marker(
                 prayer: time.prayer,
                 time: time.scheduledTime,
+                displayTime: TodayDisplaySchedule.displayTime(
+                    for: time.prayer, window: snapshot.scheduleWindow, now: now
+                ),
                 state: markerState(
                     for: time.prayer,
-                    scheduledTime: time.scheduledTime,
                     now: now,
                     moment: moment
                 )
@@ -582,12 +592,14 @@ private struct TodayReadyView: View {
         }
     }
 
-    /// The luminous marker is always the prayer the card is about, so
-    /// the plate and the card never disagree about where "now" is. A
-    /// logged prayer only reads as logged once its window has moved on.
+    /// A marker is luminous only while its own window contains the
+    /// moment — a prayer that has not begun is never presented as
+    /// current, on the plate or anywhere else. When no window is open
+    /// (the forenoon gap, the pre-dawn hours) no marker is luminous;
+    /// the focused card still carries the next prayer's upcoming
+    /// state, and at night the bowl's cursor carries "now."
     private func markerState(
         for prayer: Prayer,
-        scheduledTime: Date,
         now: Date,
         moment: PrayerMoment
     ) -> PrayerMarkerState {
@@ -595,9 +607,19 @@ private struct TodayReadyView: View {
         // state — no glow, no passed-unlogged ink. Times stay readable;
         // nothing is asked.
         if activePause != nil { return .upcoming }
-        if prayer == currentPlatePrayer(moment: moment) { return .current }
+        if prayer == displayCurrentPrayer(moment: moment) { return .current }
+        // A rolled marker represents tomorrow's instance — upcoming by
+        // definition, today's log no longer speaks for it.
+        if TodayDisplaySchedule.isRolledToTomorrow(
+            prayer, window: snapshot.scheduleWindow, now: now
+        ) {
+            return .upcoming
+        }
         if log(for: prayer) != nil { return .logged }
-        return scheduledTime > now ? .upcoming : .passedUnlogged
+        let displayTime = TodayDisplaySchedule.displayTime(
+            for: prayer, window: snapshot.scheduleWindow, now: now
+        )
+        return displayTime > now ? .upcoming : .passedUnlogged
     }
 
     /// The moment's current prayer projected onto *today's* plate: nil
@@ -611,7 +633,12 @@ private struct TodayReadyView: View {
         return current.prayer
     }
 
-    private func currentPlatePrayer(moment: PrayerMoment) -> Prayer {
+    /// The card's default focus: the open window's prayer, or the
+    /// next prayer when no window is open. Focus is not a "current"
+    /// claim — the card renders the upcoming state for a prayer whose
+    /// window hasn't opened, and only `displayCurrentPrayer` can make
+    /// a marker luminous.
+    private func defaultFocusPrayer(moment: PrayerMoment) -> Prayer {
         displayCurrentPrayer(moment: moment) ?? moment.next.prayer
     }
 
@@ -621,7 +648,7 @@ private struct TodayReadyView: View {
     /// can override the default by tapping a marker on the scene; the
     /// override reverts to the next-upcoming after 8 sec per spec.
     private func effectiveFocusedPrayer(moment: PrayerMoment) -> Prayer {
-        focusedPrayer ?? currentPlatePrayer(moment: moment)
+        focusedPrayer ?? defaultFocusPrayer(moment: moment)
     }
 
     private func handleMarkerTap(_ prayer: Prayer) {
@@ -641,10 +668,6 @@ private struct TodayReadyView: View {
     }
 
     // MARK: - Prayer time / log lookups
-
-    private func scheduledTime(for prayer: Prayer) -> Date {
-        snapshot.dayTimes.time(for: prayer)
-    }
 
     /// End of `prayer`'s window — the one rule, shared with the sheet
     /// and pinned against `moment(at:)` by `PrayerWindowSemanticsTests`.
@@ -678,14 +701,19 @@ private struct TodayReadyView: View {
         let log = log(for: prayer)
         // Presentation-time palette — the sheet lives on the same
         // SkyPhase as the plate behind it.
+        let now = nowProvider.now()
         let tokens = PaletteState.resolved(
-            for: SkyPhase.resolve(at: nowProvider.now(), events: solarEvents)
+            for: SkyPhase.resolve(at: now, events: solarEvents)
         )
 
-        if let prayerTime {
+        if prayerTime != nil {
             PrayerLogSheet(
                 prayer: prayer,
-                scheduledTime: prayerTime.scheduledTime,
+                // The same display instant the plate label, header,
+                // and card show — one source, one formatter.
+                scheduledTime: TodayDisplaySchedule.displayTime(
+                    for: prayer, window: snapshot.scheduleWindow, now: now
+                ),
                 windowEndTime: windowEndTime(for: prayer),
                 timeZone: snapshot.place.timeZone,
                 tokens: tokens,

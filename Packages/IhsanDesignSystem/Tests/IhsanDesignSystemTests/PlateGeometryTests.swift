@@ -283,4 +283,51 @@ struct BodyApexMappingTests {
         let without = plate.bodyPosition(altitudeDegrees: -9.0, azimuthUnit: 0.3)
         #expect(with == without)
     }
+
+    // MARK: - Night traversal (corrective G)
+
+    /// The below-horizon traversal is anchored on time progression
+    /// through the night, monotone from nightfall to dawn, and its
+    /// gilded ribbon ends exactly at the cursor's position — the
+    /// gilding fades at "now," never at some earlier landmark.
+    @Test
+    func nightTraversalTracksTimeAndEndsAtTheCursor() {
+        let nightStart = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let nightEnd = nightStart.addingTimeInterval(7 * 3600)
+
+        var lastFraction = -1.0
+        for hour in stride(from: 0.0, through: 7.0, by: 0.5) {
+            let now = nightStart.addingTimeInterval(hour * 3600)
+            let fraction = plate.nightTraversalFraction(
+                for: now, nightStart: nightStart, nightEnd: nightEnd
+            )
+            #expect(fraction > lastFraction, "traversal must advance with time")
+            lastFraction = fraction
+
+            guard fraction > 0.01 else { continue }
+            let ribbon = plate.nightTraversedFilamentPath(
+                nightStart: nightStart, nightEnd: nightEnd, now: now
+            )
+            let cursor = plate.nightPosition(
+                for: now, nightStart: nightStart, nightEnd: nightEnd
+            )
+            let box = ribbon.boundingBox
+            #expect(!ribbon.isEmpty)
+            // The ribbon reaches the cursor (the taper dissolves to a
+            // point there) and never extends past it. The night arc
+            // runs west (right) to east (left), so "past the cursor"
+            // means to the cursor's left.
+            #expect(abs(box.minX - cursor.x) < 1.5)
+            // And it begins at the arc's west end, inside the plate.
+            #expect(box.maxX <= plate.rect.maxX)
+            #expect(box.minY >= plate.horizonY - 2)
+        }
+
+        // Before nightfall there is nothing to gild.
+        let empty = plate.nightTraversedFilamentPath(
+            nightStart: nightStart, nightEnd: nightEnd,
+            now: nightStart.addingTimeInterval(-60)
+        )
+        #expect(empty.isEmpty)
+    }
 }

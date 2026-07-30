@@ -31,25 +31,69 @@ struct TodayMomentDerivationTests {
         )!
     }
 
-    /// Whenever the next prayer is one of today's five, its instant is
-    /// identical to the marker's instant for that prayer — so the one
-    /// shared formatter cannot produce two different strings.
+    /// Corrective G, phase 1 — the formatter-unity invariant, with no
+    /// carve-outs: at EVERY minute of the schedule window's span, the
+    /// display instant `TodayDisplaySchedule` supplies for the
+    /// moment's next prayer IS `moment.next.scheduledTime`. The four
+    /// surfaces (header "NEXT:", plate marker label, focused card,
+    /// log sheet) all format that one instant through the one
+    /// `PlateTimeFormat`, so they render identical strings —
+    /// including the post-Isha stretch where Fajr rolls to tomorrow
+    /// and the plate used to print yesterday's minute.
     @Test
-    func headerNextAgreesWithMarkerTimeToTheMinute() throws {
+    func allFourSurfacesRenderIdenticalStringsForIdenticalTimes() throws {
         let w = try window(at: noon)
-        for offset in stride(from: 0.0, through: 60_000.0, by: 4_000.0) {
-            let now = w.day.fajr.scheduledTime.addingTimeInterval(offset)
+        var now = w.day.fajr.scheduledTime
+        let end = w.tomorrowFajr.scheduledTime
+        while now < end {
             let moment = w.moment(at: now)
-            guard moment.next.prayer != .fajr || moment.next.scheduledTime <= w.day.isha.scheduledTime else {
-                continue // rolled to tomorrow's Fajr — no marker for it today
-            }
-            let markerTime = w.day.time(for: moment.next.prayer)
-            guard markerTime == moment.next.scheduledTime else {
-                continue // next is tomorrow's instance of this prayer
-            }
+            let display = TodayDisplaySchedule.displayTime(
+                for: moment.next.prayer, window: w, now: now
+            )
+            // One source: the display schedule and the moment agree
+            // about which instant "next" means…
+            #expect(display == moment.next.scheduledTime)
+
+            // …so the four surfaces' rendered strings are identical.
+            let header = PlateTimeFormat.time(moment.next.scheduledTime, in: chicago)
+            let plateLabel = PlateTimeFormat.time(display, in: chicago)
+            let card = PlateTimeFormat.time(display, in: chicago)
+            let sheet = PlateTimeFormat.time(display, in: chicago)
+            #expect(header == plateLabel)
+            #expect(header == card)
+            #expect(header == sheet)
+
+            now = now.addingTimeInterval(60)
+        }
+    }
+
+    /// The concrete regression: after Isha begins, the plate's Fajr
+    /// label shows tomorrow's Fajr — the same instant the header and
+    /// card show — never this morning's, which is typically a minute
+    /// different.
+    @Test
+    func fajrLabelRollsToTomorrowOnceIshaOpens() throws {
+        let w = try window(at: noon)
+        let beforeIsha = w.day.isha.scheduledTime.addingTimeInterval(-60)
+        let afterIsha = w.day.isha.scheduledTime.addingTimeInterval(60)
+
+        #expect(
+            TodayDisplaySchedule.displayTime(for: .fajr, window: w, now: beforeIsha)
+                == w.day.fajr.scheduledTime
+        )
+        #expect(!TodayDisplaySchedule.isRolledToTomorrow(.fajr, window: w, now: beforeIsha))
+
+        #expect(
+            TodayDisplaySchedule.displayTime(for: .fajr, window: w, now: afterIsha)
+                == w.tomorrowFajr.scheduledTime
+        )
+        #expect(TodayDisplaySchedule.isRolledToTomorrow(.fajr, window: w, now: afterIsha))
+
+        // The other four prayers never roll.
+        for prayer in [Prayer.dhuhr, .asr, .maghrib, .isha] {
             #expect(
-                PlateTimeFormat.time(moment.next.scheduledTime, in: chicago)
-                    == PlateTimeFormat.time(markerTime, in: chicago)
+                TodayDisplaySchedule.displayTime(for: prayer, window: w, now: afterIsha)
+                    == w.day.time(for: prayer)
             )
         }
     }

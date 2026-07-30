@@ -79,6 +79,44 @@ public extension PlateGeometry {
         return PlateGeometry.taperedRibbonPath(along: points, maxThickness: maxThickness)
     }
 
+    /// How far through the night an instant lies, `0...1`, clamped —
+    /// the same mapping `nightPosition(for:)` uses, exposed so the
+    /// traversed-gilding math is testable as a pure function.
+    func nightTraversalFraction(
+        for time: Date,
+        nightStart: Date,
+        nightEnd: Date
+    ) -> Double {
+        let span = max(60, nightEnd.timeIntervalSince(nightStart))
+        return max(0.0, min(1.0, time.timeIntervalSince(nightStart) / span))
+    }
+
+    /// The traversed portion of the night arc, from nightfall (west
+    /// end) to `now`, as a tapered ribbon — the below-horizon
+    /// continuation of the day arc's gilded passage. Anchored on
+    /// time-of-day progression, never on the sun: once the sun sets,
+    /// only the night's own clock advances this line. The taper
+    /// dissolves to a point exactly at the cursor's position, so the
+    /// gilding visibly fades at "now."
+    func nightTraversedFilamentPath(
+        nightStart: Date,
+        nightEnd: Date,
+        now: Date,
+        samples: Int = 64,
+        maxThickness: CGFloat = 2.2
+    ) -> CGPath {
+        let fraction = nightTraversalFraction(
+            for: now, nightStart: nightStart, nightEnd: nightEnd
+        )
+        guard fraction > 0.001, samples >= 2 else { return CGMutablePath() }
+        let vStart = angularInsetFraction
+        let vEnd = angularInsetFraction + fraction * (1 - 2 * angularInsetFraction)
+        let points = (0...samples).map { i in
+            nightArcPoint(at: vStart + (vEnd - vStart) * Double(i) / Double(samples))
+        }
+        return PlateGeometry.taperedRibbonPath(along: points, maxThickness: maxThickness)
+    }
+
     /// The region between the last third's start and dawn, bounded by the
     /// chord above and the night arc below — the surface that receives the
     /// quiet luminance lift.

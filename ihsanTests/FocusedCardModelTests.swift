@@ -50,6 +50,44 @@ struct FocusedCardModelTests {
         #expect(atEnd == .windowClosed(at: windowEnd))
     }
 
+    /// Corrective G, phase 1: the never-early property at the card.
+    /// For ANY now earlier than the prayer's start, the resolved
+    /// phase is `.upcoming` — across every combination of the other
+    /// inputs, including a stale or wrong `isInWindow` flag and a
+    /// missing or inconsistent window end. "Isha · NOW" twenty-two
+    /// minutes before Isha is unrepresentable.
+    @Test
+    func neverActiveBeforeTheStartWhateverTheFlagsSay() {
+        var state: UInt64 = 0x0426_1A5F
+        func nextUnit() -> Double {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            z ^= z >> 31
+            return Double(z >> 11) / Double(1 << 53)
+        }
+
+        for _ in 0..<200 {
+            let start = Date(
+                timeIntervalSinceReferenceDate: 700_000_000 + nextUnit() * 200_000_000
+            )
+            // now strictly before the start: from one second to a week.
+            let now = start.addingTimeInterval(-1 - nextUnit() * 604_800)
+            let end: Date? = nextUnit() < 0.2
+                ? nil
+                : start.addingTimeInterval(-3600 + nextUnit() * 4 * 86_400)
+            let phase = FocusedCardModel.resolve(
+                scheduledTime: start,
+                windowEndTime: end,
+                isInWindow: nextUnit() < 0.5,
+                isLogged: false,
+                now: now
+            )
+            #expect(phase == .upcoming(opensAt: start))
+        }
+    }
+
     @Test
     func loggedWinsOverEverything() {
         let phase = FocusedCardModel.resolve(
