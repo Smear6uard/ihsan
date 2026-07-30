@@ -98,7 +98,11 @@ final class TodayViewModel {
             place: place,
             dayTimes: scheduleWindow.day,
             scheduleWindow: scheduleWindow,
-            ramadanContext: RamadanContext(at: now, calendar: hijriCalendar),
+            ramadanContext: RamadanContext(
+                at: now,
+                calendar: hijriCalendar,
+                offsetDays: settings.hijriCalendarOffsetDays
+            ),
             night: relevantNight(now: now, place: place, settings: settings)
         ))
 

@@ -45,6 +45,13 @@ struct TodayHeader: View {
     /// Tap callback for the moon-phase glyph — opens the celestial
     /// reference / qibla compass overlay.
     let onMoonPhaseTap: () -> Void
+    /// Tap callback for the Hijri date — opens the Hijri month sheet.
+    var onHijriTap: (() -> Void)? = nil
+    /// A curated significant-day inscription for today ("WHITE DAY ·
+    /// SAFAR 14"), quiet and dismissible. `nil` renders nothing.
+    var significantDayInscription: String? = nil
+    /// Tapping the line dismisses it for the day.
+    var onSignificantDayTap: (() -> Void)? = nil
 
     var body: some View {
         let foreground = tokens.ink
@@ -54,18 +61,56 @@ struct TodayHeader: View {
 
         HStack(alignment: .top, spacing: IhsanSpacing.md) {
             VStack(alignment: .leading, spacing: 4) {
-                Text(cityName)
-                    .font(.system(.title3, design: .serif))
-                    .foregroundStyle(foreground)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .shadow(color: shadowColor, radius: 2, x: 0, y: 0.5)
+                Button {
+                    Haptics.impact(.light)
+                    onHijriTap?()
+                } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(cityName)
+                            .font(.system(.title3, design: .serif))
+                            .foregroundStyle(foreground)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
+                            .shadow(color: shadowColor, radius: 2, x: 0, y: 0.5)
 
-                inscriptionLine(
-                    nextInscription: nextInscription,
-                    foreground: foregroundSecondary,
-                    shadowColor: shadowColor
-                )
+                        inscriptionLine(
+                            nextInscription: nextInscription,
+                            foreground: foregroundSecondary,
+                            shadowColor: shadowColor
+                        )
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(onHijriTap == nil)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel(accessibilityLabel(nextInscription: nextInscription))
+                .accessibilityHint(onHijriTap == nil ? "" : "Opens the Hijri month.")
+                .accessibilityAddTraits(.isHeader)
+
+                if let significantDayInscription {
+                    Button {
+                        Haptics.impact(.light)
+                        onSignificantDayTap?()
+                    } label: {
+                        HStack(spacing: 6) {
+                            Rectangle()
+                                .fill(tokens.metal.opacity(0.75))
+                                .frame(width: 10, height: 1.2)
+                            Text(significantDayInscription)
+                                .font(.system(size: 10, weight: .semibold).smallCaps())
+                                .tracking(1.4)
+                                .foregroundStyle(foregroundSecondary)
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.7)
+                                .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(significantDayInscription)
+                    .accessibilityHint("Dismisses this note for today.")
+                }
             }
 
             Spacer(minLength: IhsanSpacing.sm)
@@ -75,9 +120,7 @@ struct TodayHeader: View {
                 onTap: onMoonPhaseTap
             )
         }
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel(nextInscription: nextInscription))
-        .accessibilityAddTraits(.isHeader)
+        .accessibilityElement(children: .contain)
     }
 
     @ViewBuilder

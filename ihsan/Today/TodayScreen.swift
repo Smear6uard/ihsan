@@ -191,6 +191,12 @@ private struct TodayReadyView: View {
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = ProcessInfo.processInfo
         .arguments.contains("-IhsanDebugPresentQibla")
+    @State private var isHijriSheetPresented = ProcessInfo.processInfo
+        .arguments.contains("-IhsanDebugPresentHijriSheet")
+    /// Civil-day key ("2026-07-30") of the day the user dismissed the
+    /// significant-day line — presentation state, not worship data.
+    @AppStorage("IhsanSignificantDayDismissedDay")
+    private var significantDayDismissedDay: String = ""
     /// Entrance choreography target — 0 until the first frame has a
     /// chance to render at rest-zero, then 1; the scene's layers
     /// animate toward it on their staggered clocks. Replays after a
@@ -295,7 +301,10 @@ private struct TodayReadyView: View {
                         moment: moment,
                         timeZone: snapshot.place.timeZone,
                         tokens: tokens,
-                        onMoonPhaseTap: { isCelestialReferencePresented = true }
+                        onMoonPhaseTap: { isCelestialReferencePresented = true },
+                        onHijriTap: { isHijriSheetPresented = true },
+                        significantDayInscription: significantDayInscription(at: now),
+                        onSignificantDayTap: { dismissSignificantDay(at: now) }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                     .padding(.top, IhsanSpacing.md)
@@ -339,6 +348,9 @@ private struct TodayReadyView: View {
                 )
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+            }
+            .sheet(isPresented: $isHijriSheetPresented) {
+                hijriMonthSheet
             }
             .confirmationDialog(
                 "How many rak'ah?",
@@ -567,6 +579,57 @@ private struct TodayReadyView: View {
         case .witr:
             return [1, 3, 5, 7, 9, 11]
         }
+    }
+
+    // MARK: - Hijri awareness
+
+    private var hijriOffsetDays: Int {
+        sunnahSettings?.hijriCalendarOffsetDays ?? 0
+    }
+
+    /// The quiet significant-day line for the header — present on a
+    /// curated day, dismissed by a tap until tomorrow.
+    private func significantDayInscription(at now: Date) -> String? {
+        guard significantDayDismissedDay != civilDayKey(at: now) else { return nil }
+        let components = HijriConverter.components(
+            for: now, offsetDays: hijriOffsetDays, timeZone: snapshot.place.timeZone
+        )
+        guard let significance = HijriConverter.significance(of: components).first else {
+            return nil
+        }
+        return significance.inscription(for: components).uppercased()
+    }
+
+    private func dismissSignificantDay(at now: Date) {
+        significantDayDismissedDay = civilDayKey(at: now)
+    }
+
+    private func civilDayKey(at now: Date) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = snapshot.place.timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: now)
+        return "\(parts.year ?? 0)-\(parts.month ?? 0)-\(parts.day ?? 0)"
+    }
+
+    @ViewBuilder
+    private var hijriMonthSheet: some View {
+        let now = nowProvider.now()
+        let tokens = PaletteState.resolved(
+            for: SkyPhase.resolve(at: now, events: solarEvents)
+        )
+        HijriMonthSheet(
+            days: HijriConverter.monthDays(
+                containing: now,
+                offsetDays: hijriOffsetDays,
+                timeZone: snapshot.place.timeZone
+            ),
+            today: HijriConverter.components(
+                for: now, offsetDays: hijriOffsetDays, timeZone: snapshot.place.timeZone
+            ),
+            timeZone: snapshot.place.timeZone,
+            weekStartsOnSaturday: sunnahSettings?.weekStartsOnSaturday ?? true,
+            tokens: tokens
+        )
     }
 
     // MARK: - Plate inputs

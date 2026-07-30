@@ -1,15 +1,14 @@
 import Foundation
+import IhsanCore
 
-/// Renders a Gregorian date in the Umm al-Qura Hijri calendar (e.g.
-/// "21 Dhu al-Qa'dah 1447 AH"). The formatter is constructed per-call so it's
-/// safe to use across actors without external synchronization.
+/// Renders a Gregorian date in the Hijri calendar (e.g. "Safar 14,
+/// 1448 AH") through THE one converter, with the user's published
+/// moonsighting adjustment applied — every surface that names a
+/// Hijri date reads the same mapping.
 enum HijriDateFormatter {
     static func string(from date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .islamicUmmAlQura)
-        formatter.locale = Locale(identifier: "en_US")
-        formatter.dateStyle = .long
-        formatter.timeStyle = .none
-        return formatter.string(from: date)
+        HijriConverter.string(
+            for: date, offsetDays: HijriDisplay.offsetDays
+        )
     }
 }

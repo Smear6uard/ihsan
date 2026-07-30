@@ -5,13 +5,20 @@ public struct RamadanContext: Sendable, Equatable {
 
     public let date: Date
     public let calendar: Calendar
+    /// The user's moonsighting adjustment — Ramadan recognition rides
+    /// THE one Hijri mapping (`HijriConverter`), offset included, so
+    /// the fasting layer and the header can never disagree about the
+    /// month.
+    public let offsetDays: Int
 
     public init(
         at date: Date = .now,
-        calendar: Calendar = RamadanContext.currentHijriCalendar
+        calendar: Calendar = RamadanContext.currentHijriCalendar,
+        offsetDays: Int = 0
     ) {
         self.date = date
         self.calendar = calendar
+        self.offsetDays = offsetDays
     }
 
     public static var currentHijriCalendar: Calendar {
@@ -26,15 +33,27 @@ public struct RamadanContext: Sendable, Equatable {
     }
 
     public var isCurrentlyRamadan: Bool {
-        Self.isCurrentlyRamadan(at: date, calendar: calendar)
+        hijriComponents.month == Self.ramadanMonth
     }
 
     public var daysIntoRamadan: Int? {
-        Self.daysIntoRamadan(at: date, calendar: calendar)
+        isCurrentlyRamadan ? hijriComponents.day : nil
     }
 
     public var daysRemainingInRamadan: Int? {
-        Self.daysRemainingInRamadan(at: date, calendar: calendar)
+        guard isCurrentlyRamadan else { return nil }
+        // Umm al-Qura months run 29 or 30 days; length comes from the
+        // tabulation for the adjusted month.
+        let days = HijriConverter.monthDays(
+            containing: date, offsetDays: offsetDays, timeZone: calendar.timeZone
+        ).count
+        return max(0, days - hijriComponents.day)
+    }
+
+    private var hijriComponents: HijriConverter.Components {
+        HijriConverter.components(
+            for: date, offsetDays: offsetDays, timeZone: calendar.timeZone
+        )
     }
 
     public static func isCurrentlyRamadan(

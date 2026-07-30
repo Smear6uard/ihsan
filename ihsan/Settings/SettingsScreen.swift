@@ -1169,7 +1169,76 @@ private struct DisplaySection: View {
                     path.append(.theme)
                 }
             )
+
+            hijriAdjustmentControl
+                .padding(.vertical, IhsanSpacing.xs)
+
+            SettingsDescriptionText("Moonsighting varies by community; shift the Hijri date up to two days either way.")
         }
+    }
+
+    /// The Hijri adjustment: ±2 days, signed display, published to
+    /// every Hijri formatter the moment it changes.
+    private var hijriAdjustmentControl: some View {
+        let value = settings.hijriCalendarOffsetDays
+        return VStack(alignment: .leading, spacing: 4) {
+            Text("HIJRI ADJUSTMENT")
+                .font(IhsanFont.inscription)
+                .tracking(1.2)
+                .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary.opacity(0.7))
+            HStack(spacing: IhsanSpacing.sm) {
+                stepButton(isPlus: false) {
+                    setOffset(max(HijriConverter.offsetRange.lowerBound, value - 1))
+                }
+                Text(value > 0 ? "+\(value)" : "\(value)")
+                    .font(.system(.body, design: .monospaced).monospacedDigit())
+                    .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).ink)
+                    .frame(minWidth: 34)
+                    .contentTransition(.numericText())
+                Text(value == 0 ? "DAYS · UMM AL-QURA" : "DAY\(abs(value) == 1 ? "" : "S")")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.2)
+                    .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary.opacity(0.7))
+                stepButton(isPlus: true) {
+                    setOffset(min(HijriConverter.offsetRange.upperBound, value + 1))
+                }
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Hijri adjustment in days")
+        .accessibilityValue("\(value)")
+        .accessibilityAdjustableAction { direction in
+            switch direction {
+            case .increment:
+                setOffset(min(HijriConverter.offsetRange.upperBound, value + 1))
+            case .decrement:
+                setOffset(max(HijriConverter.offsetRange.lowerBound, value - 1))
+            @unknown default:
+                break
+            }
+        }
+    }
+
+    private func setOffset(_ newValue: Int) {
+        Haptics.impact(.light)
+        settings.hijriCalendarOffsetDays = newValue
+        settings.modifiedAt = .now
+        HijriDisplay.publish(offsetDays: newValue)
+    }
+
+    private func stepButton(isPlus: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            StepMark(isPlus: isPlus)
+                .stroke(
+                    IhsanPageChrome.tokens(at: NowProvider.active.now()).metal,
+                    style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
+                )
+                .frame(width: 10, height: 10)
+                .frame(width: 28, height: 28)
+                .background(Circle().strokeBorder(IhsanPageChrome.tokens(at: NowProvider.active.now()).metal.opacity(0.45), lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityHidden(true)
     }
 }
 

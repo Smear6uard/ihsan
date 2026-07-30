@@ -102,6 +102,12 @@ private struct RootGate: View {
             sweepOrphanReflectionAudio()
             didResolveInitialSettings = true
         }
+        // One Hijri mapping everywhere: the user's moonsighting
+        // adjustment is published for every formatter the moment
+        // settings resolve, and re-published when the row changes.
+        .onChange(of: allSettings.first?.hijriCalendarOffsetDays, initial: true) { _, offset in
+            HijriDisplay.publish(offsetDays: offset ?? 0)
+        }
         #if canImport(ActivityKit) && os(iOS)
         .task(id: liveActivityLogSignature) {
             await endLiveActivitiesForNewLogs()
