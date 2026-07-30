@@ -85,7 +85,8 @@ struct FocusedPrayerCard: View {
     let onMoreOptions: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var mode: Mode = .collapsed
+    @State private var mode: Mode = ProcessInfo.processInfo.arguments
+        .contains("-IhsanDebugExpandCard") ? .expanded : .collapsed
     @State private var jamaahPending: Bool = false
     @State private var autoCollapseTask: Task<Void, Never>?
     @State private var rawatibRevealed: Bool = false
@@ -298,9 +299,13 @@ struct FocusedPrayerCard: View {
 
     // MARK: - Expanded state
 
+    /// Expanded, tightened: name row, jamāʿah toggle, the two commit
+    /// buttons, then a slim footer — rawatib leading, MORE OPTIONS
+    /// trailing. Every region exactly as tall as its content; no
+    /// floating elements, no dead middle.
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: IhsanSpacing.sm) {
                 ornament
                 prayerNameRow
@@ -316,6 +321,29 @@ struct FocusedPrayerCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Close")
+            }
+
+            JamaahToggleControl(isOn: $jamaahPending, tokens: tokens)
+                .frame(maxWidth: .infinity, alignment: .center)
+                .onChange(of: jamaahPending) { _, _ in
+                    scheduleAutoCollapse()
+                }
+
+            HStack(spacing: 8) {
+                TimingCommitButton(
+                    label: "On Time",
+                    prominent: true,
+                    tokens: tokens
+                ) {
+                    commit(.onTime)
+                }
+                TimingCommitButton(
+                    label: "Late",
+                    prominent: false,
+                    tokens: tokens
+                ) {
+                    commit(.late)
+                }
             }
 
             HStack(spacing: IhsanSpacing.sm) {
@@ -336,34 +364,7 @@ struct FocusedPrayerCard: View {
                 .accessibilityLabel("More options")
                 .accessibilityHint("Opens the full prayer log sheet.")
             }
-            .frame(height: 20)
-
-            Spacer(minLength: 0)
-
-            JamaahToggleControl(isOn: $jamaahPending, tokens: tokens)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .onChange(of: jamaahPending) { _, _ in
-                    scheduleAutoCollapse()
-                }
-
-            HStack(spacing: 8) {
-                TimingCommitButton(
-                    label: "On Time",
-                    glyph: "checkmark",
-                    prominent: true,
-                    tokens: tokens
-                ) {
-                    commit(.onTime)
-                }
-                TimingCommitButton(
-                    label: "Late",
-                    glyph: "L",
-                    prominent: false,
-                    tokens: tokens
-                ) {
-                    commit(.late)
-                }
-            }
+            .frame(height: 18)
         }
     }
 
@@ -624,12 +625,13 @@ private struct JamaahToggleControl: View {
 
 // MARK: - Timing commit button
 
-/// One of the two pill buttons in the expanded state. Tap → flat
-/// metal fill → call `action`. On Time takes the brighter metal pole,
-/// Late the base metal.
+/// One of the two pill buttons in the expanded state — labels only,
+/// no glyphs, in the panel language. On the press, On Time takes the
+/// primary gilded fill (leaf bounded by keyline ink); Late fills in
+/// base metal. The fill plays just ahead of the logged transition,
+/// synchronized with the ornament's materialize pour.
 private struct TimingCommitButton: View {
     let label: String
-    let glyph: String
     let prominent: Bool
     let tokens: SkyPaletteTokens
     let action: () -> Void
@@ -649,39 +651,35 @@ private struct TimingCommitButton: View {
                 action()
             }
         } label: {
-            HStack(spacing: 8) {
-                if glyph == "checkmark" {
-                    Image(systemName: "checkmark")
-                        .font(.system(size: 13, weight: .bold))
-                } else {
-                    Text(glyph)
-                        .font(.system(size: 14, weight: .bold, design: .serif))
+            Text(label.uppercased())
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(pressedForeground)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity)
+                .background {
+                    Capsule()
+                        .fill(prominent ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.metal))
+                        .opacity(isPressing ? 1 : 0)
                 }
-                Text(label.uppercased())
-                    .font(IhsanFont.inscription)
-                    .tracking(1.8)
-            }
-            .foregroundStyle(isPressing ? tokens.panelFill : tokens.ink)
-            .padding(.vertical, 9)
-            .frame(maxWidth: .infinity)
-            .background {
-                Capsule()
-                    .fill(tokens.metal)
-                    .opacity(isPressing ? 1 : 0)
-            }
-            .overlay {
-                Capsule()
-                    .strokeBorder(
-                        prominent
-                            ? tokens.metalHighlight.opacity(0.95)
-                            : tokens.metal.opacity(0.75),
-                        lineWidth: 1
-                    )
-            }
+                .overlay {
+                    Capsule()
+                        .strokeBorder(
+                            prominent
+                                ? tokens.metalHighlight.opacity(0.95)
+                                : tokens.metal.opacity(0.75),
+                            lineWidth: prominent ? 1.1 : 1
+                        )
+                }
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Log as \(label)")
         .accessibilityHint("Double-tap to log as \(label.lowercased()).")
+    }
+
+    private var pressedForeground: Color {
+        guard isPressing else { return tokens.ink }
+        return prominent ? tokens.keyline : tokens.panelFill
     }
 }
 
