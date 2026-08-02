@@ -237,6 +237,8 @@ private struct TodayReadyView: View {
     /// having to run at midnight.
     @AppStorage("IhsanAdhkarDismissedDay")
     private var adhkarDismissedDay: String = ""
+    /// The tasbīḥ link asked which one; waiting on the answer.
+    @State private var isChoosingPostPrayer = false
 
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
@@ -460,6 +462,19 @@ private struct TodayReadyView: View {
                 )
             }
             .confirmationDialog(
+                "After the prayer",
+                isPresented: $isChoosingPostPrayer,
+                titleVisibility: .visible
+            ) {
+                Button("After-prayer adhkār") {
+                    adhkarSelection = AdhkarSelection(category: .postPrayer)
+                }
+                Button("Free tasbīḥ") {
+                    openFreeTasbih()
+                }
+                Button("Cancel", role: .cancel) {}
+            }
+            .confirmationDialog(
                 "How many rak'ah?",
                 isPresented: Binding(
                     get: { pendingRakahNafl != nil },
@@ -557,11 +572,16 @@ private struct TodayReadyView: View {
                 sheetSelection = LogSheetSelection(prayer: prayer)
             },
             onTasbih: {
-                // The natural post-prayer moment: the instrument rides
-                // over the tabs; the root router presents it.
-                NotificationCenter.default.post(
-                    name: StartTasbihIntent.inAppNotificationName, object: nil
-                )
+                // The natural post-prayer moment. With the
+                // after-prayer set turned on there are two things a
+                // person might mean by it, so the link asks; with it
+                // off the link does exactly what it always did, and
+                // nothing hints that a second option exists.
+                if isPostPrayerSetOffered {
+                    isChoosingPostPrayer = true
+                } else {
+                    openFreeTasbih()
+                }
             }
         )
     }
@@ -710,6 +730,22 @@ private struct TodayReadyView: View {
                 ),
                 isContentAvailable: AdhkarAvailability.isAvailable
             )
+        )
+    }
+
+    /// Whether the after-prayer set is something this person has asked
+    /// for. Governs only whether the tasbīḥ link asks a question.
+    private var isPostPrayerSetOffered: Bool {
+        AdhkarAvailability.isAvailable
+            && sunnahSettings?.adhkarLayerEnabled == true
+            && sunnahSettings?.adhkarPostPrayerEnabled == true
+    }
+
+    private func openFreeTasbih() {
+        // The instrument rides over the tabs; the root router presents
+        // it.
+        NotificationCenter.default.post(
+            name: StartTasbihIntent.inAppNotificationName, object: nil
         )
     }
 

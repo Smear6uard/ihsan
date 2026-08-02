@@ -83,6 +83,7 @@ struct SettingsScreen: View {
                             wakeFallbackNote: nightWakeFallbackNote,
                             onWakeSettingsChanged: { refreshNightWake(for: settings) }
                         )
+                        AdhkarSection(settings: settings, path: $path)
                         FastingSection(settings: settings)
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
@@ -245,6 +246,8 @@ struct SettingsScreen: View {
             RawatibCountsPicker(settings: settings)
         case .duhaWindow:
             DuhaWindowPicker(settings: settings)
+        case .adhkarWindows:
+            AdhkarWindowsPicker(settings: settings)
         }
     }
 
@@ -498,6 +501,7 @@ private enum SettingsRoute: Hashable {
     case theme
     case rawatibCounts
     case duhaWindow
+    case adhkarWindows
 
     #if DEBUG
     init?(debugName: String) {
@@ -510,6 +514,7 @@ private enum SettingsRoute: Hashable {
         case "theme": self = .theme
         case "rawatibCounts": self = .rawatibCounts
         case "duhaWindow": self = .duhaWindow
+        case "adhkarWindows": self = .adhkarWindows
         default: return nil
         }
     }
@@ -1049,6 +1054,183 @@ private struct SunnahSection: View {
 
     private var duhaWindowSubtitle: String {
         "Sunrise +\(settings.duhaSunriseOffsetMinutes) min to Dhuhr −\(settings.duhaDhuhrMarginMinutes) min"
+    }
+}
+
+/// The Adhkar group.
+///
+/// Off by default and invisible in the off state — the same discipline
+/// as the sunnah layer. Nothing here mentions what is missing, and
+/// nothing here schedules a notification: the windows offer, they never
+/// call.
+///
+/// While the bundled content is unreviewed, a release build has no
+/// adhkar at all and this section does not appear. A DEBUG build shows
+/// it, and says DRAFT plainly.
+private struct AdhkarSection: View {
+    let settings: UserSettings
+    @Binding var path: [SettingsRoute]
+
+    var body: some View {
+        if AdhkarAvailability.isAvailable {
+            SettingsSectionCard("Adhkār") {
+                SettingsRow(title: "Adhkār & duʿāʾ", glyph: .book) {
+                    Toggle("", isOn: Binding(
+                        get: { settings.adhkarLayerEnabled },
+                        set: { enabled in
+                            settings.adhkarLayerEnabled = enabled
+                            if enabled,
+                               !settings.adhkarMorningEnabled,
+                               !settings.adhkarEveningEnabled,
+                               !settings.adhkarPostPrayerEnabled,
+                               !settings.adhkarSleepEnabled {
+                                // First enable turns the whole layer
+                                // on; each set stays switchable below.
+                                settings.adhkarMorningEnabled = true
+                                settings.adhkarEveningEnabled = true
+                                settings.adhkarPostPrayerEnabled = true
+                                settings.adhkarSleepEnabled = true
+                            }
+                            settings.modifiedAt = .now
+                        }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                    .accessibilityLabel("Adhkār and duʿāʾ")
+                }
+
+                if settings.adhkarLayerEnabled {
+                    SettingsRow(title: "Morning", subtitle: "Fajr into mid-morning", glyph: .sun) {
+                        toggle(
+                            label: "Morning adhkār",
+                            get: { settings.adhkarMorningEnabled },
+                            set: { settings.adhkarMorningEnabled = $0 }
+                        )
+                    }
+
+                    SettingsRow(title: "Evening", subtitle: "ʿAṣr into the early night", glyph: .nightMoon) {
+                        toggle(
+                            label: "Evening adhkār",
+                            get: { settings.adhkarEveningEnabled },
+                            set: { settings.adhkarEveningEnabled = $0 }
+                        )
+                    }
+
+                    SettingsRow(title: "After each prayer", subtitle: "From a logged prayer", glyph: .rawatib) {
+                        toggle(
+                            label: "After-prayer adhkār",
+                            get: { settings.adhkarPostPrayerEnabled },
+                            set: { settings.adhkarPostPrayerEnabled = $0 }
+                        )
+                    }
+
+                    SettingsRow(title: "Before sleep", subtitle: "After ʿIshāʾ is logged", glyph: .nightMoon) {
+                        toggle(
+                            label: "Before-sleep adhkār",
+                            get: { settings.adhkarSleepEnabled },
+                            set: { settings.adhkarSleepEnabled = $0 }
+                        )
+                    }
+
+                    SettingsRow(
+                        title: "Window bounds",
+                        subtitle: windowSubtitle,
+                        glyph: .clock,
+                        action: {
+                            Haptics.impact(.light)
+                            path.append(.adhkarWindows)
+                        }
+                    )
+
+                    SettingsRow(title: "Show transliteration", subtitle: "Romanised, beneath the Arabic", glyph: .book) {
+                        toggle(
+                            label: "Show transliteration",
+                            get: { settings.adhkarShowsTransliteration },
+                            set: { settings.adhkarShowsTransliteration = $0 }
+                        )
+                    }
+
+                    SettingsDescriptionText("Each set is offered inside its own window and nowhere else. Sittings are recorded as plain facts and count toward nothing. Nothing here sends a notification.")
+
+                    if AdhkarAvailability.isShowingDraftContent {
+                        SettingsDescriptionText("DRAFT — these texts are awaiting a scholar's review and cannot ship. See ADHKAR_REVIEW.md.")
+                    }
+                } else {
+                    SettingsDescriptionText("The day's remembrance, offered at its own times. Nothing is shown until you choose it.")
+                }
+            }
+        }
+    }
+
+    private func toggle(
+        label: String,
+        get: @escaping () -> Bool,
+        set: @escaping (Bool) -> Void
+    ) -> some View {
+        Toggle("", isOn: Binding(
+            get: get,
+            set: { newValue in
+                set(newValue)
+                settings.modifiedAt = .now
+            }
+        ))
+        .labelsHidden()
+        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+        .accessibilityLabel(label)
+    }
+
+    private var windowSubtitle: String {
+        "Sunrise +\(settings.adhkarMorningEndsAfterSunriseMinutes) min · Maghrib +\(settings.adhkarEveningExtendsAfterMaghribMinutes) min"
+    }
+}
+
+private struct AdhkarWindowsPicker: View {
+    let settings: UserSettings
+
+    var body: some View {
+        PickerScaffold(title: "Adhkār Windows") {
+            SettingsSectionCard("The morning") {
+                VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+                    miniCountControl(
+                        label: "Ends after sunrise (min)",
+                        value: settings.adhkarMorningEndsAfterSunriseMinutes,
+                        step: 15,
+                        range: 0...240,
+                        accessibilityLabel: "Minutes after sunrise the morning window ends"
+                    ) {
+                        settings.adhkarMorningEndsAfterSunriseMinutes = $0
+                        settings.modifiedAt = .now
+                    }
+                }
+                .settingsControlInset()
+                .padding(.vertical, IhsanSpacing.xs)
+
+                SettingsDescriptionText("The morning begins at Fajr. Schools differ on where it ends — at sunrise for some, into mid-morning for others. It never runs past Dhuhr.")
+            }
+
+            SettingsSectionCard("The evening") {
+                VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+                    miniCountControl(
+                        label: "Extends past Maghrib (min)",
+                        value: settings.adhkarEveningExtendsAfterMaghribMinutes,
+                        step: 15,
+                        range: 0...180,
+                        accessibilityLabel: "Minutes after Maghrib the evening window ends"
+                    ) {
+                        settings.adhkarEveningExtendsAfterMaghribMinutes = $0
+                        settings.modifiedAt = .now
+                    }
+                }
+                .settingsControlInset()
+                .padding(.vertical, IhsanSpacing.xs)
+
+                SettingsDescriptionText("The evening begins at ʿAṣr. Some hold it closes at Maghrib — set this to zero for that — and others that it runs through the early night. It never runs past ʿIshāʾ.")
+            }
+
+            SettingsSectionCard("Before sleep") {
+                SettingsDescriptionText("Offered from ʿIshāʾ until the coming Fajr, once ʿIshāʾ is logged. It follows the prayer rather than the hour, so there is nothing to set.")
+            }
+        }
     }
 }
 
