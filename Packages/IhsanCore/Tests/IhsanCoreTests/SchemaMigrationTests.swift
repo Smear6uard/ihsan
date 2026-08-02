@@ -278,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV6.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV7.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -439,6 +439,108 @@ private func assertV5StoreMigratesToV6() throws {
         // And the new field lands quiet: the silent switch is honoured
         // until someone says otherwise.
         #expect(settings.adhanPlaysInSilentMode == false)
+    }
+}
+
+/// A store shaped like a real 1.0.0 install: worship records, the
+/// sunnah layer on, a dhikr sitting already recorded.
+private func seedV6Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV6.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let log = IhsanSchemaV6.PrayerLog()
+    log.id = seededLogID
+    log.dedupKey = "fajr-2023-03-09"
+    log.prayerRaw = Prayer.fajr.rawValue
+    log.prayerDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
+    log.loggedTimeZoneIdentifier = "America/Toronto"
+    log.statusRaw = PrayerStatus.onTime.rawValue
+    log.withJamaah = true
+    log.note = "quiet fajr"
+    context.insert(log)
+
+    let dhikr = IhsanSchemaV6.DhikrSession()
+    dhikr.sessionDate = Date(timeIntervalSinceReferenceDate: 700_000_000)
+    dhikr.count = 66
+    dhikr.phraseRaw = DhikrPhrase.subhanallah.rawValue
+    context.insert(dhikr)
+
+    let pause = IhsanSchemaV6.PauseInterval()
+    pause.id = seededPauseID
+    pause.startDate = Date(timeIntervalSinceReferenceDate: 699_900_000)
+    pause.note = "resting"
+    context.insert(pause)
+
+    let settings = IhsanSchemaV6.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.sunnahLayerEnabled = true
+    settings.sunnahDuhaEnabled = true
+    settings.adhanPlaysInSilentMode = true
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
+@Test
+func migratingSeededV6StoreToV7KeepsEveryRecordAndLandsAdhkarOff() async {
+    await #expect(processExitsWith: .success) {
+        try assertV6StoreMigratesToV7()
+    }
+}
+
+private func assertV6StoreMigratesToV7() throws {
+    try withMigratedStore(seed: seedV6Store) { context in
+        // Nothing a person recorded may be disturbed by adding a
+        // remembrance table.
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 1)
+        #expect(logs.first?.id == seededLogID)
+        #expect(logs.first?.note == "quiet fajr")
+        #expect(logs.first?.withJamaah == true)
+
+        let dhikr = try context.fetch(FetchDescriptor<DhikrSession>())
+        #expect(dhikr.count == 1)
+        #expect(dhikr.first?.count == 66)
+
+        let pauses = try context.fetch(FetchDescriptor<PauseInterval>())
+        #expect(pauses.first?.id == seededPauseID)
+        #expect(pauses.first?.note == "resting")
+
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.sunnahLayerEnabled == true)
+        #expect(settings.adhanPlaysInSilentMode == true)
+
+        // Every adhkar preference lands off, exactly like the sunnah
+        // layer did. Nobody is opted into a new surface by upgrading.
+        #expect(settings.adhkarLayerEnabled == false)
+        #expect(settings.adhkarMorningEnabled == false)
+        #expect(settings.adhkarEveningEnabled == false)
+        #expect(settings.adhkarPostPrayerEnabled == false)
+        #expect(settings.adhkarSleepEnabled == false)
+        // …except the reading aid, which is on so the surface is
+        // usable the first time it is opened.
+        #expect(settings.adhkarShowsTransliteration == true)
+        // Neutral window bounds.
+        #expect(settings.adhkarMorningEndsAfterSunriseMinutes == 90)
+        #expect(settings.adhkarEveningExtendsAfterMaghribMinutes == 60)
+
+        // The new table exists, empty and writable.
+        #expect(try context.fetch(FetchDescriptor<AdhkarSession>()).isEmpty)
+        context.insert(AdhkarSession(
+            sessionDate: Date(timeIntervalSinceReferenceDate: 700_000_000),
+            category: .morning,
+            completedItemCount: 11
+        ))
+        try context.save()
+
+        let sessions = try context.fetch(FetchDescriptor<AdhkarSession>())
+        #expect(sessions.count == 1)
+        #expect(sessions.first?.category == .morning)
+        #expect(sessions.first?.completedItemCount == 11)
     }
 }
 

@@ -220,43 +220,32 @@ struct DhikrScreen: View {
     // MARK: - The ring
 
     private func ring(tokens: SkyPaletteTokens) -> some View {
-        GeometryReader { proxy in
-            let side = min(proxy.size.width, proxy.size.height)
-            let radius = side / 2 - 14
-
-            ZStack {
-                ForEach(0..<Self.cycleLength, id: \.self) { index in
-                    RingMark(
-                        gilded: index < filledMarks,
-                        justGilded: index == filledMarks - 1,
-                        tokens: tokens,
-                        reduceMotion: reduceMotion
-                    )
-                    .frame(width: 3.5, height: 16)
-                    .offset(y: -radius)
-                    .rotationEffect(.degrees(Double(index) / Double(Self.cycleLength) * 360))
-                }
-
-                VStack(spacing: 2) {
-                    Text("\(filledMarks)")
-                        .font(.system(size: 64, weight: .thin, design: .serif))
+        // The ring is `RemembranceRing` from the design system — the
+        // same component the adhkar sets count on, so the instrument
+        // and the guided sets can never drift into two different
+        // objects.
+        RemembranceRing(
+            count: Self.cycleLength,
+            filled: filledMarks,
+            tokens: tokens,
+            reduceMotion: reduceMotion
+        ) {
+            VStack(spacing: 2) {
+                Text("\(filledMarks)")
+                    .font(.system(size: 64, weight: .thin, design: .serif))
+                    .monospacedDigit()
+                    .foregroundStyle(tokens.ink)
+                    .contentTransition(.numericText())
+                if totalCount > Self.cycleLength {
+                    Text("TOTAL \(totalCount)")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
                         .monospacedDigit()
-                        .foregroundStyle(tokens.ink)
+                        .foregroundStyle(tokens.inkSecondary)
                         .contentTransition(.numericText())
-                    if totalCount > Self.cycleLength {
-                        Text("TOTAL \(totalCount)")
-                            .font(IhsanFont.inscription)
-                            .tracking(1.6)
-                            .monospacedDigit()
-                            .foregroundStyle(tokens.inkSecondary)
-                            .contentTransition(.numericText())
-                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .animation(reduceMotion ? nil : .snappy(duration: 0.18), value: filledMarks)
         }
-        .aspectRatio(1, contentMode: .fit)
         .frame(maxWidth: 340)
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("dhikr.counter")
@@ -294,30 +283,3 @@ struct DhikrScreen: View {
     }
 }
 
-/// One engraved mark of the ring: a fine outline until its count
-/// arrives, then gilded — solid gold bounded by the keyline, with the
-/// materialize pour at small scale. Under Reduce Motion the pour is
-/// an instant fill.
-private struct RingMark: View {
-    let gilded: Bool
-    let justGilded: Bool
-    let tokens: SkyPaletteTokens
-    let reduceMotion: Bool
-
-    var body: some View {
-        Capsule()
-            .fill(gilded ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(.clear))
-            .overlay {
-                Capsule().strokeBorder(
-                    gilded ? tokens.keyline.opacity(0.55) : tokens.metal.opacity(0.40),
-                    lineWidth: gilded ? 0.8 : 0.7
-                )
-            }
-            .scaleEffect(scale)
-    }
-
-    private var scale: Double {
-        guard !reduceMotion, justGilded else { return 1 }
-        return 1.18
-    }
-}

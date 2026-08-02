@@ -138,6 +138,35 @@ public final class UserSettings {
     public var nightWakeEnabled: Bool = false
     /// Minutes before the last third's start to wake; 0 wakes at its start.
     public var nightWakeOffsetMinutes: Int = 0
+
+    // MARK: - Adhkar
+    //
+    // The remembrance layer, invisible until the user turns it on —
+    // the same discipline as the sunnah layer. Nothing in the off
+    // state hints that anything is missing, and nothing here ever
+    // schedules a notification: the windows offer, they never call.
+
+    public var adhkarLayerEnabled: Bool = false
+    public var adhkarMorningEnabled: Bool = false
+    public var adhkarEveningEnabled: Bool = false
+    public var adhkarPostPrayerEnabled: Bool = false
+    public var adhkarSleepEnabled: Bool = false
+
+    /// Whether the reading surface shows romanised Arabic beneath the
+    /// line. On by default: someone still learning the words needs it,
+    /// and someone who does not can turn it off in one tap.
+    public var adhkarShowsTransliteration: Bool = true
+
+    /// How far past sunrise the morning window runs. Schools differ on
+    /// where the morning ends; the default carries it into
+    /// mid-morning, and the bound is the user's to set.
+    public var adhkarMorningEndsAfterSunriseMinutes: Int = 90
+
+    /// How far past Maghrib the evening window runs. Some hold the
+    /// evening closes at Maghrib, others that it runs through the
+    /// early night; the default sits between them and is the user's to
+    /// set — 0 closes it at Maghrib exactly.
+    public var adhkarEveningExtendsAfterMaghribMinutes: Int = 60
     public var lastDataExportAt: Date?
     public var lastDataDeletionRequestAt: Date?
     public var schemaVersion: Int = 1

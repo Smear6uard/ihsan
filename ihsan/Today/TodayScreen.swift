@@ -222,6 +222,21 @@ private struct TodayReadyView: View {
     /// A nafl waiting on the rak'ah dialog — only ever set when the user
     /// opted into counts.
     @State private var pendingRakahNafl: PendingNafl?
+    /// The remembrance set being read, if one is open.
+    /// `-IhsanDebugPresentAdhkar morning|evening|postPrayer|sleep`
+    /// opens one directly for the capture harness.
+    @State private var adhkarSelection: AdhkarSelection? = {
+        guard let raw = DebugLaunch.value(after: "-IhsanDebugPresentAdhkar"),
+              let category = AdhkarCategory(rawValue: raw)
+        else { return nil }
+        return AdhkarSelection(category: category)
+    }()
+    /// Which remembrance offers have been put away today. Presentation
+    /// state, like the significant-day and yesterday lines above it —
+    /// never worship data, and a new day clears it without anything
+    /// having to run at midnight.
+    @AppStorage("IhsanAdhkarDismissedDay")
+    private var adhkarDismissedDay: String = ""
 
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
@@ -319,7 +334,8 @@ private struct TodayReadyView: View {
                 safeAreaTop: proxy.safeAreaInsets.top,
                 safeAreaBottom: proxy.safeAreaInsets.bottom,
                 cardHeight: FocusedPrayerCard.cardHeight,
-                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
+                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil,
+                hasAdhkarCard: adhkarOffer(at: now) != nil
             )
 
             ZStack(alignment: .bottom) {
@@ -389,6 +405,23 @@ private struct TodayReadyView: View {
                             )
                         }
                     }
+
+                    // OUTSIDE the pause branch, deliberately. A pause
+                    // suspends salah and fasting — the things a person
+                    // is excused from. It does not suspend remembrance,
+                    // which is exactly what remains available to them.
+                    // `AdhkarOfferTests` holds the rule; this is where
+                    // it has to be true.
+                    if let offer = adhkarOffer(at: now) {
+                        AdhkarQuietCard(
+                            category: offer.category,
+                            window: offer.window,
+                            timeZone: snapshot.place.timeZone,
+                            tokens: tokens,
+                            onOpen: { adhkarSelection = AdhkarSelection(category: offer.category) },
+                            onDismiss: { dismissAdhkar(offer.category, at: now) }
+                        )
+                    }
                 }
                 .padding(.bottom, IhsanSpacing.md)
             }
@@ -416,6 +449,15 @@ private struct TodayReadyView: View {
             }
             .sheet(isPresented: $isYesterdaySheetPresented) {
                 yesterdaySheet(at: now)
+            }
+            // The reading surface rides over everything, like the
+            // tasbīḥ instrument it grew out of.
+            .fullScreenCover(item: $adhkarSelection) { selection in
+                AdhkarSetScreen(
+                    category: selection.category,
+                    showsTransliteration: sunnahSettings?.adhkarShowsTransliteration ?? true,
+                    onDismiss: { adhkarSelection = nil }
+                )
             }
             .confirmationDialog(
                 "How many rak'ah?",
@@ -618,6 +660,64 @@ private struct TodayReadyView: View {
               window.interval.contains(now)
         else { return nil }
         return window
+    }
+
+    // MARK: - The remembrance layer
+
+    /// The day's remembrance windows, derived from its own solar
+    /// events. The two settable bounds carry the places the schools
+    /// differ; both defaults sit between the positions.
+    private func adhkarWindows(at now: Date) -> AdhkarOffer.Windows {
+        let day = snapshot.scheduleWindow.day
+        let settings = sunnahSettings
+        return AdhkarOffer.Windows(
+            morning: AdhkarWindowResolver.morning(
+                fajr: day.fajr.scheduledTime,
+                sunrise: day.sunrise,
+                dhuhr: day.dhuhr.scheduledTime,
+                endsAfterSunrise: TimeInterval(
+                    (settings?.adhkarMorningEndsAfterSunriseMinutes ?? 90) * 60
+                )
+            ),
+            evening: AdhkarWindowResolver.evening(
+                asr: day.asr.scheduledTime,
+                maghrib: day.maghrib.scheduledTime,
+                isha: day.isha.scheduledTime,
+                extendsAfterMaghrib: TimeInterval(
+                    (settings?.adhkarEveningExtendsAfterMaghribMinutes ?? 60) * 60
+                )
+            ),
+            sleep: AdhkarWindowResolver.sleep(
+                isha: day.isha.scheduledTime,
+                nextFajr: snapshot.scheduleWindow.tomorrowFajr.scheduledTime
+            )
+        )
+    }
+
+    private func adhkarOffer(at now: Date) -> AdhkarOffer.Offer? {
+        AdhkarOffer.offer(
+            AdhkarOffer.Context(
+                now: now,
+                windows: adhkarWindows(at: now),
+                preferences: AdhkarOffer.Preferences(settings: sunnahSettings),
+                isIshaLogged: log(for: .isha) != nil,
+                // Passed, and deliberately not acted on — see
+                // `AdhkarOffer.pauseSuppresses`.
+                isPaused: activePause != nil,
+                dismissedCategories: AdhkarDismissal.decode(
+                    adhkarDismissedDay,
+                    dayKey: AdhkarDismissal.dayKey(now, calendar: placeCalendar)
+                ),
+                isContentAvailable: AdhkarAvailability.isAvailable
+            )
+        )
+    }
+
+    private func dismissAdhkar(_ category: AdhkarCategory, at now: Date) {
+        let key = AdhkarDismissal.dayKey(now, calendar: placeCalendar)
+        var dismissed = AdhkarDismissal.decode(adhkarDismissedDay, dayKey: key)
+        dismissed.insert(category)
+        adhkarDismissedDay = AdhkarDismissal.encode(dismissed, dayKey: key)
     }
 
     private func naflDay(for kind: NaflKind, at now: Date) -> Date {
@@ -1132,4 +1232,10 @@ private struct LogSheetSelection: Identifiable, Hashable {
 private struct PendingNafl: Identifiable {
     let kind: NaflKind
     var id: String { kind.storageKey }
+}
+
+/// The remembrance set currently open, as a presentation selection.
+private struct AdhkarSelection: Identifiable {
+    let category: AdhkarCategory
+    var id: String { category.rawValue }
 }

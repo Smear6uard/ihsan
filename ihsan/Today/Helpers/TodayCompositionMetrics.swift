@@ -20,6 +20,10 @@ struct TodayCompositionMetrics: Equatable {
     let safeAreaBottom: CGFloat
     let cardHeight: CGFloat
     let hasDuhaCard: Bool
+    /// Whether a remembrance window is open and offering. It rides the
+    /// same stack as the duha card and takes the same room — and it
+    /// appears during an excused pause, when the duha card does not.
+    var hasAdhkarCard: Bool = false
 
     /// Vertical room the header occupies below the safe area. The plate
     /// keeps its arc, markers, and labels clear of this band; the
@@ -29,8 +33,18 @@ struct TodayCompositionMetrics: Equatable {
     static let cardBottomPadding: CGFloat = IhsanSpacing.md
     /// Optical gap between the plate's marker zone and the card.
     static let sceneToCardGap: CGFloat = 8
-    /// Height reserved for the Duha quiet card when present.
+    /// Height reserved for one quiet card beneath the focused card —
+    /// duha, or a remembrance offer.
     static let duhaCardHeight: CGFloat = 54
+
+    /// Room the quiet cards below the focused card take together,
+    /// including the spacing each adds above itself.
+    var quietCardsHeight: CGFloat {
+        let count = (hasDuhaCard ? 1 : 0) + (hasAdhkarCard ? 1 : 0)
+        guard count > 0 else { return 0 }
+        return CGFloat(count) * Self.duhaCardHeight
+            + CGFloat(count - 1) * Self.cardStackSpacing
+    }
     /// Spacing between the focused card and the Duha card in the
     /// bottom stack (IhsanSpacing.sm).
     static let cardStackSpacing: CGFloat = IhsanSpacing.sm
@@ -52,7 +66,7 @@ struct TodayCompositionMetrics: Equatable {
             + Self.cardBottomPadding
             + cardHeight
             + Self.sceneToCardGap
-            + (hasDuhaCard ? Self.duhaCardHeight : 0)
+            + quietCardsHeight
     }
 
     var plateHeight: CGFloat {
@@ -77,7 +91,7 @@ struct TodayCompositionMetrics: Equatable {
     /// focused card up by its height plus the stack spacing.
     var cardTop: CGFloat {
         size.height - safeAreaBottom - Self.cardBottomPadding - cardHeight
-            - (hasDuhaCard ? Self.duhaCardHeight + Self.cardStackSpacing : 0)
+            - (quietCardsHeight > 0 ? quietCardsHeight + Self.cardStackSpacing : 0)
     }
 
     /// The ground band between the chord and the card — the page's

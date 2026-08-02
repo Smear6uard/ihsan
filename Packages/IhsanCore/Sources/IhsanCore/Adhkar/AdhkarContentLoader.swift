@@ -112,7 +112,7 @@ public enum AdhkarContentLoader {
 /// so the cache holds the error and every caller sees the same empty
 /// content rather than the app half-working.
 public enum BundledAdhkar {
-    private nonisolated(unsafe) static let cached: Result<AdhkarContent, any Error> = {
+    private static let cached: Result<AdhkarContent, any Error> = {
         Result { try AdhkarContentLoader.loadBundled() }
     }()
 

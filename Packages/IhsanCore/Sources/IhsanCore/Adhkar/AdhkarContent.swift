@@ -48,6 +48,19 @@ public enum AdhkarCategory: String, Codable, CaseIterable, Sendable {
         case .situational: "OCCASIONS"
         }
     }
+
+    /// The one line at the end of a set. Written per category rather
+    /// than assembled from `displayName`, because "the before sleep
+    /// remembrance" is not a sentence anybody wrote on purpose.
+    public var completionLine: String {
+        switch self {
+        case .morning: "The morning's remembrance is recorded."
+        case .evening: "The evening's remembrance is recorded."
+        case .postPrayer: "This prayer's remembrance is recorded."
+        case .sleep: "Tonight's remembrance is recorded."
+        case .situational: "Recorded."
+        }
+    }
 }
 
 /// Where a text comes from. `reference` is the collection's own

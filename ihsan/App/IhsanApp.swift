@@ -274,6 +274,19 @@ private struct RootGate: View {
                 try? modelContext.save()
             }
         }
+        // `-IhsanDebugEnableAdhkar` turns the remembrance layer and all
+        // four sets on — the screenshot harness for the offer cards and
+        // the reading surface. Off by default everywhere else.
+        if arguments.contains("-IhsanDebugEnableAdhkar") {
+            if let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                settings.adhkarLayerEnabled = true
+                settings.adhkarMorningEnabled = true
+                settings.adhkarEveningEnabled = true
+                settings.adhkarPostPrayerEnabled = true
+                settings.adhkarSleepEnabled = true
+                try? modelContext.save()
+            }
+        }
         // `-IhsanDebugLogFast ramadan:kept` seeds today's fast through
         // the standard funnel; composes with -IhsanNowOverride.
         if let flagIndex = arguments.firstIndex(of: "-IhsanDebugLogFast"),
