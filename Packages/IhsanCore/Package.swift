@@ -19,6 +19,11 @@ let package = Package(
     targets: [
         .target(
             name: "IhsanCore",
+            resources: [
+                // The bundled remembrance content — the ONE file any
+                // Arabic text, translation, or citation may come from.
+                .process("Resources")
+            ],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
