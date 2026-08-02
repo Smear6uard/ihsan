@@ -86,4 +86,16 @@ public enum IhsanFont {
     public static let inscriptionLarge: Font = .system(
         size: 15, weight: .semibold, design: .default
     ).smallCaps()
+
+    /// Romanised Arabic beneath a vocalised line — a pronunciation aid,
+    /// not an academic apparatus. Upright rather than italic (the
+    /// citation face): italic makes a reader treat it as a gloss on the
+    /// text, when it is a way into saying it. One step below body so it
+    /// yields to both the Arabic above and the translation below.
+    ///
+    /// Arabic itself is set by `IhsanArabicType`, which owns the face,
+    /// the scale, and the leading tashkeel needs.
+    public static let transliteration: Font = .system(
+        size: 15, weight: .regular, design: .default
+    )
 }

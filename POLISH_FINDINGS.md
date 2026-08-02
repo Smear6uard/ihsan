@@ -629,3 +629,43 @@ device to judge.
   element has a label and that markers voice prayer, time, and state.
   How the speech synthesiser says "Qadā", "jamāʿah", and "takbīrāt" —
   and the Arabic prayer names — needs listening to.
+
+## Adhkar — Arabic typography (phase 1)
+
+The typography gate can be opened on device with:
+
+```
+xcrun simctl ui <udid> content_size accessibility-extra-extra-extra-large
+xcrun simctl launch <udid> com.sameerstudios.ihsan \
+    -IhsanDebugCompletedOnboarding -IhsanDebugAdhkarTypeGallery \
+    -IhsanDebugAdhkarGround night
+```
+
+The ground buttons across the top switch between the five SkyPhases;
+the type size comes from the device's own setting.
+
+- **Arabic at arm's length.** `ArabicTypographyTests` shapes every
+  shipped text through CoreText and proves the ink of a line fits its
+  line box at every register and every Dynamic Type scale — but it
+  measures the macOS build of SF Arabic, and it cannot judge colour,
+  weight, or how the page reads. The gallery is the other half of the
+  gate and it needs eyes on a real display.
+- **SF Arabic versus a bundled Naskh.** iOS 26 always ships SF Arabic
+  and Geeza Pro; Mishafi, Damascus, Al Nile and Farah are optional app
+  fonts. SF Arabic was chosen on mark positioning and Dynamic Type
+  support, and nothing is bundled. If the maintainer's eye disagrees
+  at reading size, the decision is one token
+  (`IhsanArabicType.font`) and a licensing question, not a rewrite.
+- **The three reading registers.** 32 / 25 / 21 pt, chosen from the
+  actual length distribution of the content file and pinned by a
+  CoreText typesetting test against a phone-width column. Whether the
+  step from 32 to 21 pt reads as one system or as three is a device
+  judgement.
+- **`.environment(\.dynamicTypeSize, …)` does not drive font
+  resolution.** Setting the environment key in a capture harness
+  changes what `@Environment(\.dynamicTypeSize)` reports without
+  changing the size `Font.system(size:)` resolves to, which makes for
+  a convincing screenshot of something that never happens. Use
+  `simctl ui <udid> content_size <category>` — the launch argument
+  `-UIPreferredContentSizeCategoryName` is also ignored. Verified by
+  capturing the same screen both ways.

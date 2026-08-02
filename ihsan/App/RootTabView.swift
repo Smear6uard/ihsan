@@ -54,6 +54,9 @@ struct RootTabView: View {
     /// sizes, so the phase gate has a picture of a surface no test
     /// harness can place on a home screen.
     @State private var isWidgetGalleryPresented = DebugLaunch.flag("-IhsanDebugWidgetGallery")
+    /// `-IhsanDebugAdhkarTypeGallery` — the Arabic typography gate,
+    /// judged on a real display at arm's length.
+    @State private var isAdhkarTypeGalleryPresented = DebugLaunch.flag("-IhsanDebugAdhkarTypeGallery")
     #endif
 
     var body: some View {
@@ -139,6 +142,9 @@ struct RootTabView: View {
         #if DEBUG
         .fullScreenCover(isPresented: $isWidgetGalleryPresented) {
             WidgetFaceGallery()
+        }
+        .fullScreenCover(isPresented: $isAdhkarTypeGalleryPresented) {
+            AdhkarTypeGalleryScreen(onDismiss: { isAdhkarTypeGalleryPresented = false })
         }
         #endif
     }

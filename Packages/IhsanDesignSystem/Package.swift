@@ -38,7 +38,7 @@ let package = Package(
         ),
         .testTarget(
             name: "IhsanDesignSystemTests",
-            dependencies: ["IhsanDesignSystem"],
+            dependencies: ["IhsanDesignSystem", "IhsanCore"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]
