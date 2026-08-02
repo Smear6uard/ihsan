@@ -78,16 +78,38 @@ public struct SequenceMark: View {
             .fill(state == .complete ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(.clear))
             .overlay {
                 SequenceLozengeShape()
-                    .stroke(strokeColor, lineWidth: state == .pending ? 0.8 : 1.0)
+                    .stroke(strokeColor, lineWidth: lineWidth)
             }
             .frame(width: 9, height: 14)
     }
 
+    /// The three states, on tokens that actually separate from every
+    /// ground rather than on the ones that look most like brass.
+    ///
+    /// `metal` was the obvious choice for the quiet state and measures
+    /// 2.58:1 at full strength on the worst ground — below the 3:1 bar
+    /// a functional mark owes, and this mark is functional: it says an
+    /// item has not been counted yet. `inkSecondary` at 0.70 measures
+    /// 3.48:1 at worst. The current state is `ink`, because "the one
+    /// you are reading" should be the most legible thing in the band;
+    /// `keyline` alone measures 1.01:1 somewhere and would have made
+    /// the current mark vanish on that ground. Only the completed
+    /// state keeps the gilding, and it earns its edge the way every
+    /// gilded form here does — leaf bounded by keyline, whichever of
+    /// the two separates on a given ground.
     private var strokeColor: Color {
         switch state {
-        case .pending: tokens.metal.opacity(0.40)
-        case .current: tokens.keyline
+        case .pending: tokens.inkSecondary.opacity(0.70)
+        case .current: tokens.ink
         case .complete: tokens.keyline.opacity(0.60)
+        }
+    }
+
+    private var lineWidth: CGFloat {
+        switch state {
+        case .pending: 0.8
+        case .current: 1.4
+        case .complete: 1.0
         }
     }
 }

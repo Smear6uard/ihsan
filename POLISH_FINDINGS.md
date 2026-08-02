@@ -669,3 +669,61 @@ the type size comes from the device's own setting.
   `simctl ui <udid> content_size <category>` — the launch argument
   `-UIPreferredContentSizeCategoryName` is also ignored. Verified by
   capturing the same screen both ways.
+
+## Adhkar — device verification (phases 2–4)
+
+Repro recipe for every frame below:
+
+```
+xcrun simctl location <udid> set 41.8781,-87.6298     # do this FIRST
+xcrun simctl ui <udid> content_size large             # or accessibility-*
+xcrun simctl launch <udid> com.sameerstudios.ihsan \
+    -IhsanDebugCompletedOnboarding -IhsanDebugEnableAdhkar \
+    -IhsanDebugPresentAdhkar morning|evening|postPrayer|sleep \
+    -IhsanNowOverride 2026-08-02T06:10:00
+```
+
+- **The settle at an item boundary.** Each tap is a light impact and
+  each item's transmitted count closes on `Haptics.settle()` — the
+  same weight-coming-to-rest every other commit in the app wears. On a
+  hundred-count item that is ninety-nine light taps and one settle,
+  which is a rhythm the simulator cannot render. It needs a hand.
+- **The gilding at speed.** A tap arriving inside the 450 ms a
+  completed item rests gilded now advances the set and counts, so
+  nothing is lost at a steady rhythm. Whether the advance still reads
+  as an arrival rather than a jump, at a real tapping speed, is a
+  device judgement.
+- **The ungilded mark's new colour.** Pending marks moved from `metal`
+  to `inkSecondary` at 70% because metal measures 2.58:1 at worst
+  against the day grounds — an uncounted mark nobody can see on a
+  bright morning. The composited stroke measures 3.48:1 at worst. This
+  also changes the tasbīḥ instrument's ring, which shares the
+  component. It is more legible and less brassy; whether the trade is
+  right at arm's length is the maintainer's call, and it is one token
+  (`RemembranceRingPending.stroke`).
+- **The divided ring at small counts.** Counts of three, seven and ten
+  draw as arc segments rather than ticks. Verified in the simulator at
+  every transmitted count; how the arcs read against the plate's own
+  curves on hardware is worth a look.
+- **XCUITest sees the steppers, VoiceOver does not.** The ± glyphs in
+  `miniCountControl` are `accessibilityHidden` and the control speaks
+  as one labelled adjustable element — the correct design. XCUITest
+  enumerates the drawn glyphs anyway; verified identically against the
+  pre-existing duha-window picker, so this is a query artifact rather
+  than a defect, and the adhkar walk excludes them by size. Worth
+  confirming with VoiceOver actually running.
+- **Simulator location lapses between runs.** Four VoiceOver tests
+  failed with "the set did not present" purely because the simulator
+  had lost its location fix and the app was still resolving the day.
+  Re-issue `simctl location set` before any adhkar run; it is not
+  sticky across a long session.
+- **Three UI tests fail, and they were failing before this work.**
+  `OnboardingUITests.testFirstRunReachesTheLiveAppInUnderAMinute`,
+  `PrayerLogCommitUITests.testFreshCommitLogsPrayerAndUpdatesCard`,
+  and `PrayerLogCommitUITests.testEditingExistingLogSavesChanges`.
+  Verified by running the same two classes from a worktree at
+  `7606982` — the last commit before the adhkar work — where they fail
+  identically, with the same assertions ("Tapping the question must be
+  what raises the dialog", "Choosing a timing must enable the
+  commit"). They are not caused by the remembrance layer and were not
+  fixed by it. Someone should look at them.

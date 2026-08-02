@@ -72,6 +72,17 @@ public struct RemembranceRing<Center: View>: View {
     /// instrument's own figure, kept so both surfaces sit identically.
     private static var trackInset: CGFloat { 14 }
 
+    /// The quiet state of a mark not yet counted.
+    ///
+    /// `metal` — the app's brass — measures 2.58:1 at full strength on
+    /// the worst ground, below the 3:1 a functional mark owes, and an
+    /// uncounted mark is functional: it is how far there is to go.
+    /// `inkSecondary` at 0.70 measures 3.48:1 at worst. Gilded marks
+    /// keep the leaf-and-keyline silhouette unchanged.
+    static func pendingStroke(_ tokens: SkyPaletteTokens) -> Color {
+        RemembranceRingPending.stroke(tokens)
+    }
+
     public init(
         count: Int,
         filled: Int,
@@ -110,7 +121,9 @@ public struct RemembranceRing<Center: View>: View {
             // fill.
             RingArc(startDegrees: 0, sweepDegrees: 360, radius: radius)
                 .stroke(
-                    filled >= 1 ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.metal.opacity(0.55)),
+                    filled >= 1
+                        ? AnyShapeStyle(tokens.leafGold)
+                        : AnyShapeStyle(Self.pendingStroke(tokens)),
                     style: StrokeStyle(lineWidth: filled >= 1 ? 5 : 2.0)
                 )
                 .overlay {
@@ -126,7 +139,9 @@ public struct RemembranceRing<Center: View>: View {
                 let start = Double(index) * 360 / Double(count) + gapDegrees / 2
                 RingArc(startDegrees: start, sweepDegrees: sweep, radius: radius)
                     .stroke(
-                        index < filled ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.metal.opacity(0.40)),
+                        index < filled
+                            ? AnyShapeStyle(tokens.leafGold)
+                            : AnyShapeStyle(Self.pendingStroke(tokens)),
                         style: StrokeStyle(lineWidth: index < filled ? 5 : 1.4, lineCap: .butt)
                     )
                     .overlay {
@@ -181,6 +196,14 @@ struct RingArc: Shape {
     }
 }
 
+/// Where the ungilded stroke's colour comes from, reachable from the
+/// tick view without going through the generic ring type.
+enum RemembranceRingPending {
+    static func stroke(_ tokens: SkyPaletteTokens) -> Color {
+        tokens.inkSecondary.opacity(0.70)
+    }
+}
+
 /// One engraved mark of the ring: a fine outline until its count
 /// arrives, then gilded — solid gold bounded by the keyline, with the
 /// materialize pour at small scale. Under Reduce Motion the pour is an
@@ -196,8 +219,10 @@ struct RingTick: View {
             .fill(gilded ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(.clear))
             .overlay {
                 Capsule().strokeBorder(
-                    gilded ? tokens.keyline.opacity(0.55) : tokens.metal.opacity(0.40),
-                    lineWidth: gilded ? 0.8 : 0.7
+                    gilded
+                        ? tokens.keyline.opacity(0.55)
+                        : RemembranceRingPending.stroke(tokens),
+                    lineWidth: gilded ? 0.8 : 0.9
                 )
             }
             .scaleEffect(scale)
