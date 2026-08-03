@@ -168,10 +168,11 @@ maghrib passages:
 2. Derive the glyph coverage mask from a reference render (same text,
    flat known ground).
 3. Take the glyph **core** (coverage ≥ 0.9), and the concentric bands
-   at Chebyshev distance 1…4 px from any covered pixel.
+   at Chebyshev distance 1…6 px from any covered pixel. Rendered at
+   `scale = 3`, so 6 px = 2 pt — just past the light ring's outer edge.
 4. Assert:
 
-   > within 4 px of a glyph stem there is a band whose luminance
+   > within 2 pt of a glyph stem there is a band whose luminance
    > differs from the stem's by ≥ 4.5:1 contrast
 
 Both primary and secondary ink. Both crossings.
@@ -512,8 +513,19 @@ the entire interface.)
 ### The fix
 
 Completing 33 advances the label to the next phrase and lights the
-cycle dot. After the third 33, the hundredth is offered. The sequence
-is what the ring does when the sitting starts at Subḥānallāh.
+cycle dot. The sequence is what the ring does when the sitting starts
+at Subḥānallāh.
+
+**The hundredth is named, not printed — and that is the gate's doing.**
+`DhikrPhrase`'s four labels are short, universally-known formulas
+hard-coded in `IhsanCore` and already shipping ungated. The hundredth
+is a full narrated supplication, and the copy of it in this repo lives
+in `adhkar-content.json` behind `reviewStatus: "draft"`. Printing it
+from Swift would route unreviewed text around the gate that exists to
+stop exactly that. So at 99 the third dot lights and the instrument
+shows a quiet completion inscription; the hundredth's text stays in the
+guided set, where the gate governs it. A POLISH_FINDINGS entry records
+that it becomes available to the instrument when the gate clears.
 
 Swiping the label row still pins a single phrase — starting anywhere
 other than Subḥānallāh, or on the custom slot, keeps the current
