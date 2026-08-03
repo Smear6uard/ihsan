@@ -727,3 +727,77 @@ xcrun simctl launch <udid> com.sameerstudios.ihsan \
   what raises the dialog", "Choosing a timing must enable the
   commit"). They are not caused by the remembrance layer and were not
   fixed by it. Someone should look at them.
+
+
+## Corrective H — the illuminated day (2026-08-02)
+
+Source-side work is token-tested, render-tested, and
+simulator-verified at all three requested overrides (mid-morning
+09:30, 14:00, late-afternoon 17:30, plus a Reduce Transparency pass).
+Measured on the host: ramp banding worst row-to-row step 0.0049
+(morning) / 0.0054 (afternoon) against a 0.015 bound; gold-dust ink
+budget 18% of the vellum grain's; sky speckle mean deviation 0.00335,
+peak 0.0797; nothing in the sky field clips at either end; celestial
+draw closure 0.060 ms avg / 0.145 ms max against a 4 ms device
+budget. These need a device:
+
+- **Five-second test, both day states.** The whole point of the pass:
+  at mid-morning and mid-afternoon, does the plate now read as an
+  illuminated page in daylight — deep sky overhead grading to a pale
+  luminous horizon, engraved field visible, worked ground — while the
+  five ornaments and the focused card remain the only things the eye
+  goes to first. If the sky competes, the zenith is too deep.
+- **Zenith depth on OLED.** The day zeniths moved from a near-white
+  tint (Y ≈ 0.67) to a real blue (morning #94BFFB, afternoon
+  #A9BEF5, Y ≈ 0.50). The ramp is 17 OKLCH stops and measures clean
+  on the host, but a long blue→near-white gradient is the classic
+  banding case on OLED gamma. Look for contouring in the upper third,
+  especially at low display brightness where dithering has least to
+  work with.
+- **Secondary ink on the deepened sky.** `inkSecondary` went one
+  value step darker on both day states (morning #4A5378 → #3E476B,
+  afternoon #4C4668 → #494365) to hold AA against the new zenith —
+  it measures 4.79:1 (morning) and 5.00:1 (afternoon) against the
+  zenith itself, and ≥ 8:1 everywhere else on the day surfaces.
+  Confirm the header's inscription line and the marker times read
+  comfortably outdoors, which is the condition this pair exists for.
+- **The sun's engraved ray collar.** Twelve ticks at 0.68–0.88 solar
+  diameters, `metal` at 0.20. On a phone in sunlight this may fall
+  below the threshold of visibility entirely; the brief's bar is
+  "found by someone who looks at the sun, never noticed by someone
+  reading the card". Check both halves of that. Also confirm the
+  collar reads as engraving rather than as a starburst at arm's
+  length — the first pass at 0.60–1.05 diameters and 0.34 opacity
+  read unmistakably as a lens artifact in the simulator.
+- **Gold dust at the threshold.** ~44 flecks over a phone-width sky,
+  peak alpha 0.13, versus the vellum grain's ~560 marks at ≤0.045.
+  It should read as light barely caught on leaf, never as texture.
+  This is the item most likely to disappear on a real display or,
+  worse, to read as dust on the screen — check both failure modes.
+- **Ground band value range.** The day band's gradient was
+  front-loaded (groundPlane → ×0.925 by 22% depth → ×0.86 at the
+  bottom) because the focused card covers most of the band and the
+  old full-height ramp spent its range where nobody sees it. Confirm
+  the exposed ~24 pt strip below the chord now reads as modelled
+  earth, and that the deeper floor behind the card and tab bar does
+  not muddy the Liquid Glass sampling it.
+- **Engraving raised for daylight.** Almucantars ramp 0.10 → 0.22
+  with `daylightPresence`, and the three ground filaments now sit
+  slightly above their night weights (0.52 / 0.34 / 0.21). Confirm
+  they read at arm's length in daylight without the field starting to
+  look busy.
+
+### Found, not fixed — out of this corrective's scope
+
+- **The daytime moon renders as a flat gray disc.** Visible on the
+  day plate whenever the moon is above the horizon in daylight (see
+  it at mid-morning). `lunarDaylightPresence` floors at 0.28 and
+  `moonCore`'s lit limb is `mix(ink, metalHighlight, 0.35)` — a dark
+  slate — so on a near-white sky the moon reads as a gray coin rather
+  than the pale ghost a daytime moon actually is. **This is
+  pre-existing**: verified by rebuilding at the pre-corrective-H
+  working tree and capturing the same instant, where it is identical.
+  It is the single element on the day plate that most competes with
+  the five ornaments. Left alone because retuning the moon is not one
+  of corrective H's six items and `MoonTreatmentTests` pins the
+  treatment deliberately; it wants its own decision.

@@ -136,12 +136,110 @@ public struct CelestialSkyView: View {
                     tint: tokens.inkValue.color,
                     seed: starSeed,
                     intensity: tokens.groundBottomValue.relativeLuminance > 0.5
-                        ? 0.045
+                        ? PlateGrainOverlay.dayIntensity
                         : 0.03
                 )
             }
         }
         .accessibilityHidden(true)
+    }
+
+    // MARK: - The sky ramp
+
+    /// Where `groundTop` sits in the sky's vertical span. Above it the
+    /// ramp travels zenith → groundTop; below it, groundTop →
+    /// groundBottom at the chord.
+    nonisolated static let skyBreakpoint: Double = 0.55
+    /// Samples above and below the breakpoint. The upper segment gets
+    /// far more because it carries the whole zenith→near-white
+    /// journey; the lower one crosses two near-identical near-whites.
+    nonisolated private static let zenithSegmentSamples = 11
+    nonisolated private static let horizonSegmentSamples = 5
+
+    /// The sky's stop table: zenith → groundTop → groundBottom,
+    /// sampled in OKLCH so the ramp keeps its chroma, with `groundTop`
+    /// pinned exactly at the breakpoint.
+    nonisolated static func skyGradientStops(tokens: SkyPaletteTokens) -> [Gradient.Stop] {
+        skySamples(tokens: tokens).map {
+            .init(color: $0.value.color, location: $0.location)
+        }
+    }
+
+    /// The same table as raw values. Internal rather than private so
+    /// the contrast audit can walk the EXACT field the plate paints:
+    /// the three ground tokens are only three points on a ramp that
+    /// plate text sits anywhere along.
+    nonisolated static func skySamples(
+        tokens: SkyPaletteTokens
+    ) -> [(location: Double, value: SRGBValue)] {
+        let zenith = tokens.skyZenithValue
+        let upper = tokens.groundTopValue
+        let lower = tokens.groundBottomValue
+        var samples: [(location: Double, value: SRGBValue)] = []
+        for i in 0...zenithSegmentSamples {
+            let f = Double(i) / Double(zenithSegmentSamples)
+            samples.append((
+                skyBreakpoint * f,
+                .mixOKLCH(zenith, upper, amount: f)
+            ))
+        }
+        for i in 1...horizonSegmentSamples {
+            let f = Double(i) / Double(horizonSegmentSamples)
+            samples.append((
+                skyBreakpoint + (1 - skyBreakpoint) * f,
+                .mixOKLCH(upper, lower, amount: f)
+            ))
+        }
+        return samples
+    }
+
+    /// The one flat colour that stands in for the whole graded sky
+    /// under Reduce Transparency: the ramp's length-weighted mean.
+    ///
+    /// `tokens.ground` — the midpoint of groundTop and groundBottom —
+    /// used to be close enough, because the zenith was a near-white
+    /// barely distinguishable from them. Corrective H made the day
+    /// zenith a real blue occupying the top half of the field, and a
+    /// flat fill that ignores it hands Reduce Transparency users a
+    /// blank white page where everyone else sees a sky. The fallback
+    /// cannot carry the gradient, but it can carry the sky's colour.
+    nonisolated static func skyFlatValue(tokens: SkyPaletteTokens) -> SRGBValue {
+        let samples = skySamples(tokens: tokens)
+        var red = 0.0, green = 0.0, blue = 0.0, weight = 0.0
+        for (a, b) in zip(samples, samples.dropFirst()) {
+            let span = b.location - a.location
+            red += (a.value.red + b.value.red) / 2 * span
+            green += (a.value.green + b.value.green) / 2 * span
+            blue += (a.value.blue + b.value.blue) / 2 * span
+            weight += span
+        }
+        guard weight > 0 else { return tokens.groundTopValue }
+        return SRGBValue(red: red / weight, green: green / weight, blue: blue / weight)
+    }
+
+    /// The painted sky colour at `fraction` of the way from the top of
+    /// the frame to the horizon chord — stop-table lookup with the
+    /// straight component interpolation SwiftUI applies between stops,
+    /// so this is what a pixel there actually is.
+    nonisolated static func skyValue(
+        atFraction fraction: Double,
+        tokens: SkyPaletteTokens
+    ) -> SRGBValue {
+        let samples = skySamples(tokens: tokens)
+        let t = max(0, min(1, fraction))
+        guard let upperIndex = samples.firstIndex(where: { $0.location >= t }) else {
+            return samples[samples.count - 1].value
+        }
+        guard upperIndex > 0 else { return samples[0].value }
+        let a = samples[upperIndex - 1]
+        let b = samples[upperIndex]
+        let span = b.location - a.location
+        let f = span > 0 ? (t - a.location) / span : 0
+        return SRGBValue(
+            red: a.value.red + (b.value.red - a.value.red) * f,
+            green: a.value.green + (b.value.green - a.value.green) * f,
+            blue: a.value.blue + (b.value.blue - a.value.blue) * f
+        )
     }
 
     // MARK: - Drawing
@@ -171,26 +269,23 @@ public struct CelestialSkyView: View {
         // blue→warm ramp keeps its chroma instead of graying out in
         // the middle; the gradient is anchored to the chord, and the
         // ground plane paints over everything beneath it.
+        //
+        // Corrective H raised the day zeniths to a real lapis-leaning
+        // blue, which roughly triples the perceptual distance the ramp
+        // has to travel. Stop count went 7 → 17 with it: the stops are
+        // OKLCH samples joined by SwiftUI's straight sRGB
+        // interpolation, so each segment is a chord across a curve, and
+        // a longer journey needs shorter chords to stay smooth.
+        // Seventeen fills cost nothing measurable — this is still one
+        // gradient.
         let skyRect = CGRect(origin: .zero, size: size)
         if flat {
-            context.fill(Path(skyRect), with: .color(tokens.ground))
+            context.fill(Path(skyRect), with: .color(Self.skyFlatValue(tokens: tokens).color))
         } else {
-            let zenith = tokens.skyZenithValue
-            let upper = tokens.groundTopValue
-            let lower = tokens.groundBottomValue
-            let breakpoint = 0.55
-            var stops: [Gradient.Stop] = []
-            for i in 0...6 {
-                let t = Double(i) / 6.0
-                let value: SRGBValue = t <= breakpoint
-                    ? .mixOKLCH(zenith, upper, amount: t / breakpoint)
-                    : .mixOKLCH(upper, lower, amount: (t - breakpoint) / (1 - breakpoint))
-                stops.append(.init(color: value.color, location: t))
-            }
             context.fill(
                 Path(skyRect),
                 with: .linearGradient(
-                    Gradient(stops: stops),
+                    Gradient(stops: Self.skyGradientStops(tokens: tokens)),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: max(horizonY, 1))
                 )
@@ -239,20 +334,53 @@ public struct CelestialSkyView: View {
             )
         }
 
+        // Gold dust — the day's answer to the star field. Under Reduce
+        // Transparency the whole field is flat fills, so it goes with
+        // the gradients.
+        if !flat, tokens.daylightPresence > 0.01 {
+            drawGoldDust(
+                into: &context,
+                size: size,
+                belowLimit: horizonY - bandHeight * 0.6,
+                tokens: tokens,
+                seed: seed
+            )
+        }
+
         // Ground plane below the chord — its own token, deepening
         // smoothly away from the horizon so the focused card sits on
-        // calm ground. Same material, one value step down at the
-        // bottom; never a new color. Flat under Reduce Transparency.
+        // calm ground. Same material, one value step down; never a new
+        // color. Flat under Reduce Transparency.
+        //
+        // Corrective H item 5 front-loaded the day ramp. The old
+        // two-stop light-ground gradient spent its whole (already
+        // slight) ×0.94 range across the full ground height — but the
+        // focused card covers nearly all of that height, so the only
+        // strip anyone sees, the ~24 pt between the chord and the
+        // card, was getting a couple of percent of the range and read
+        // dead flat. The day band now takes most of its value in the
+        // first fifth below the chord and continues to a deeper floor,
+        // so the earth is modelled exactly where it is visible. Still
+        // one token, scaled in lightness — same family, no new hues.
         let groundRect = CGRect(x: 0, y: horizonY, width: size.width, height: size.height - horizonY)
         if flat {
             context.fill(Path(groundRect), with: .color(tokens.groundPlane))
         } else {
-            let deep = tokens.groundPlaneValue
-                .scalingLightness(by: onDarkGround ? 0.78 : 0.94)
+            let plane = tokens.groundPlaneValue
+            let stops: [Gradient.Stop] = onDarkGround
+                ? [
+                    .init(color: plane.color, location: 0),
+                    .init(color: plane.scalingLightness(by: 0.78).color, location: 1)
+                ]
+                : [
+                    .init(color: plane.color, location: 0),
+                    .init(color: plane.scalingLightness(by: 0.925).color, location: 0.22),
+                    .init(color: plane.scalingLightness(by: 0.86).color, location: 1)
+                ]
             context.fill(
                 Path(groundRect),
                 with: .linearGradient(
-                    Gradient(colors: [tokens.groundPlane, deep.color]),
+                    Gradient(stops: stops),
                     startPoint: CGPoint(x: 0, y: horizonY),
                     endPoint: CGPoint(x: 0, y: size.height)
                 )
@@ -263,10 +391,16 @@ public struct CelestialSkyView: View {
         // terrain mark below the chord, shortening and fading as they
         // deepen — the ground is drawn, not merely painted. Depths
         // stay within the exposed strip between the chord and the
-        // focused card (~24 pt in the Today composition). On the
-        // jewel grounds (sunset, night) the engraving is lifted to
-        // visible-at-arm's-length; the near-white days keep the
-        // quieter weights.
+        // focused card (~24 pt in the Today composition).
+        //
+        // Corrective H item 3: the day weights used to be roughly half
+        // the night ones, which put them under the threshold of
+        // arm's-length visibility — the ground read as drawn only
+        // after dark. They now sit slightly ABOVE the night weights,
+        // because the same alpha buys less on a near-white field:
+        // `metal` measures ~6.4:1 against the night ground and ~2.6:1
+        // against the day ground, so matching the night's presence
+        // costs more ink, not less.
         let groundFilaments: [(depth: CGFloat, thickness: CGFloat, inset: CGFloat, opacity: Double)] =
             onDarkGround
                 ? [
@@ -275,9 +409,9 @@ public struct CelestialSkyView: View {
                     (21, 0.9, 0.24, 0.18)
                 ]
                 : [
-                    (7, 1.1, 0.11, 0.26),
-                    (14, 0.9, 0.17, 0.15),
-                    (21, 0.8, 0.24, 0.08)
+                    (7, 1.2, 0.11, 0.52),
+                    (14, 1.0, 0.17, 0.34),
+                    (21, 0.9, 0.24, 0.21)
                 ]
         for filament in groundFilaments {
             let y = horizonY + filament.depth
@@ -378,6 +512,70 @@ public struct CelestialSkyView: View {
         }
     }
 
+    /// Illumination speckle — the day's answer to the star field
+    /// (corrective H item 4).
+    ///
+    /// A leaf-gilded page never sits flat: burnished gold throws back
+    /// stray points of light as the page moves. This is that, and only
+    /// that. It is calibrated to stay UNDER the vellum grain the sky
+    /// view already lays down, which is itself set at the threshold of
+    /// visibility: the grain puts ~1 speck per 210 pt² at ≤4.5% alpha,
+    /// which over a 393 × 300 sky is ~560 marks; this puts 44 across
+    /// the same field. Two orders of magnitude sparser, marginally
+    /// brighter each — the difference between a texture and a
+    /// barely-caught glint, which is the whole acceptance criterion.
+    ///
+    /// Static, fixed seed, no twinkle: the same flecks in the same
+    /// places every launch, exactly like the stars. Nothing here reads
+    /// the clock, so Reduce Motion needs no branch.
+    private static func drawGoldDust(
+        into context: inout GraphicsContext,
+        size: CGSize,
+        belowLimit: CGFloat,
+        tokens: SkyPaletteTokens,
+        seed: UInt64
+    ) {
+        guard belowLimit > 4 else { return }
+        // Density per point² matched to the reference 393 × 300 sky,
+        // so the scatter thins and thickens with the plate rather than
+        // clumping on a compact one.
+        let count = max(6, Int((size.width * belowLimit / goldDustMarkArea).rounded()))
+        let tint = SRGBValue.mix(
+            tokens.metalHighlightValue, tokens.leafGoldValue, amount: 0.35
+        ).color
+        var rng = SeededGenerator(state: seed ^ 0x51ED_270B_D170_1A3F)
+        for _ in 0..<count {
+            let x = rng.unit() * size.width
+            let y = rng.unit() * belowLimit
+            let radius = 0.35 + rng.unit() * 0.55
+            // A ×3 spread in weight: most flecks are barely present,
+            // a few catch properly. An even scatter reads as a screen.
+            let weight = 0.34 + 0.66 * pow(rng.unit(), 2.2)
+            context.fill(
+                Path(ellipseIn: CGRect(
+                    x: x - radius, y: y - radius,
+                    width: radius * 2, height: radius * 2
+                )),
+                with: .color(
+                    tint.opacity(goldDustPeakOpacity * weight * tokens.daylightPresence)
+                )
+            )
+        }
+    }
+
+    /// Peak alpha of a single fleck. Above the grain's own ceiling,
+    /// deliberately: a fleck no brighter than the grain around it
+    /// would simply BE grain, and the whole point of the dust is that
+    /// it is a different kind of mark. Sparseness is what keeps the
+    /// field quiet — see `goldDustLaysLessInkThanTheGrain`, which pins
+    /// the two densities against each other so neither can be retuned
+    /// into a texture.
+    nonisolated static let goldDustPeakOpacity: Double = 0.13
+
+    /// One fleck per this many point² of sky. Two orders of magnitude
+    /// sparser than the grain's one-per-210.
+    nonisolated static let goldDustMarkArea: Double = 2_680
+
     private static func drawStars(
         into context: inout GraphicsContext,
         size: CGSize,
@@ -428,6 +626,13 @@ public struct CelestialSkyView: View {
 /// available; this Canvas layer is its exact static fallback.
 struct PlateGrainOverlay: View {
 
+    /// One grain mark per this many point². The gold-dust scatter is
+    /// calibrated against it.
+    static let markArea: Double = 210
+    /// Grain strength on the near-white day fields — the threshold of
+    /// visibility at arm's length. The night states keep 0.03.
+    static let dayIntensity: Double = 0.045
+
     let tint: Color
     let seed: UInt64
     var intensity: Double = 0.03
@@ -436,7 +641,7 @@ struct PlateGrainOverlay: View {
         Canvas { context, size in
             var rng = SeededGenerator(state: seed ^ 0xF11A_9AA1_77E1_D05B)
             let strength = min(0.05, intensity)
-            let count = Int((size.width * size.height / 210).rounded())
+            let count = Int((size.width * size.height / Self.markArea).rounded())
             for _ in 0..<count {
                 let x = rng.unit() * size.width
                 let y = rng.unit() * size.height

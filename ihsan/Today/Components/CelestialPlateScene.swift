@@ -198,7 +198,11 @@ struct CelestialPlateScene: View {
                 .opacity(entrance)
                 .animation(glowEntranceAnimation, value: entrance)
 
-                engravedField(plate: plate, tokens: tokens, date: date)
+                engravedField(
+                    plate: plate, tokens: tokens, date: date,
+                    sun: sun, apexAltitude: apexAltitude,
+                    beforeSunrise: date < solarEvents.sunrise
+                )
                     .opacity(entrance)
                     .overlay {
                         sunriseMark(plate: plate, tokens: tokens)
@@ -422,6 +426,11 @@ struct CelestialPlateScene: View {
     /// The knockout rule: linework terminates this far short of every
     /// ornament's and label's bounding form (spec: 6–8 pt).
     private static let filamentClearance: CGFloat = 7
+    /// Peak opacity of the sun's engraved ray collar. Set by the
+    /// discipline gate rather than by taste: at 0.34 the collar
+    /// competed with the five ornaments at a glance, which is
+    /// disqualifying however well it read up close.
+    private static let sunRayOpacity: Double = 0.20
 
     /// The bounding forms filaments must terminate at: each marker's
     /// ornament box, its two-line label block, and the sunrise
@@ -499,7 +508,10 @@ struct CelestialPlateScene: View {
     private func engravedField(
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
-        date: Date
+        date: Date,
+        sun: SolarPosition,
+        apexAltitude: Double,
+        beforeSunrise: Bool
     ) -> some View {
         let knockouts = knockoutRects(plate: plate)
         let arcSegments = plate.arcFilamentSegments(
@@ -528,9 +540,45 @@ struct CelestialPlateScene: View {
             date >= first.time ? plate.markerPosition(for: date).x : nil
         }
 
+        // The almucantars used to sit at a flat 0.10 in every state,
+        // which reads on the jewel grounds (metal clears 6:1 there)
+        // and vanishes on the near-white days (~2.6:1). Corrective H
+        // item 3 buys the day states back their structure: the
+        // engraved field is what makes the sky read as an instrument
+        // plate, and it was only doing that after dark. Ramped on
+        // `daylightPresence` so nothing switches at the crossings, and
+        // still less than a third of the arc's own weight at half its
+        // ribbon thickness — the day arc stays the dominant line.
+        let almucantarOpacity = 0.10 + 0.12 * tokens.daylightPresence
+
+        // The sun's engraved ray collar (corrective H item 2) — the
+        // Shamsa's twelve-fold construction around the real sun, cut
+        // by the same knockouts as every other line on the plate. It
+        // belongs to daylight and to the disc: it fades out with the
+        // day field, and with the sun's own presence as it sets, so
+        // the collar can never outlive the body it belongs to.
+        let raySegments = plate.sunRayFilamentSegments(
+            around: plate.bodyPosition(
+                altitudeDegrees: sun.altitude,
+                azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
+                apexAltitudeDegrees: apexAltitude
+            ),
+            bodyDiameter: Self.sunDiameter,
+            avoiding: knockouts,
+            clearance: Self.filamentClearance
+        )
+        let rayOpacity = Self.sunRayOpacity
+            * tokens.daylightPresence
+            * sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise)
+
         return Canvas { context, size in
             for segment in almucantarSegments {
-                context.fill(Path(segment), with: .color(tokens.metal.opacity(0.10)))
+                context.fill(Path(segment), with: .color(tokens.metal.opacity(almucantarOpacity)))
+            }
+            if rayOpacity > 0.01 {
+                for segment in raySegments {
+                    context.fill(Path(segment), with: .color(tokens.metal.opacity(rayOpacity)))
+                }
             }
             for segment in arcSegments {
                 context.fill(Path(segment), with: .color(tokens.metal.opacity(0.34)))

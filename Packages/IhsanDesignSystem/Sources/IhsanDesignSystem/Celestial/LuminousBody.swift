@@ -54,6 +54,11 @@ public struct LuminousBody: View {
         tokens.groundBottomValue.relativeLuminance < 0.5
     }
 
+    /// The sun's engraved ray collar is deliberately NOT drawn here.
+    /// It is linework, so it belongs to the plate's engraved field
+    /// where the knockout rule lives — see `EngravedSunRays` and
+    /// `PlateGeometry.sunRayFilamentSegments`. This view stays what it
+    /// has always been: light, and nothing else.
     public var body: some View {
         ZStack {
             halo

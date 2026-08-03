@@ -53,6 +53,17 @@ filament and bleeding a few points into the ground **only** inside
 that radius. Elsewhere the chord stays the quiet tapered gold with
 its paired lapis hairline.
 
+**Starbursts are lens renderings** (corrective H). The sun carries an
+engraved ray collar on the day states — twelve short ticks on the
+Shamsa's own angular construction, in `metal`, terminating short of
+every ornament like all the plate's linework. That is an engraving,
+and it is sanctioned. Run the same twelve rays out past the bloom and
+it becomes a star filter's rendering of a light source, which is
+banned. The line between the two is length and weight, so both are
+pinned in `EngravedSunRays`: the collar runs 0.68→0.88 diameters,
+never further, and never at an opacity that lets it compete with the
+five ornaments at a glance.
+
 ## What this design system encodes
 
 Ihsan is a private personal ibadah ledger for practicing Muslims. The

@@ -315,6 +315,30 @@ public struct PlateGeometry: Sendable, Equatable {
             .map { Self.taperedRibbonPath(along: $0, maxThickness: maxThickness) }
     }
 
+    /// The sun's engraved ray collar as filament segments — the
+    /// Shamsa's twelve-fold construction (see `EngravedSunRays`) run
+    /// through the plate's one linework rule.
+    ///
+    /// `center` is the sun's own plate position, so the collar travels
+    /// with the sun and never rotates. Around solar noon the sun
+    /// stands on Dhuhr's marker, which is exactly when the knockout
+    /// matters: the rays terminate short of the Shamsa and its label
+    /// rather than crossing them, the same way the day arc does.
+    public func sunRayFilamentSegments(
+        around center: CGPoint,
+        bodyDiameter: CGFloat,
+        avoiding knockouts: [CGRect],
+        clearance: CGFloat = 7,
+        maxThickness: CGFloat = 0.9
+    ) -> [CGPath] {
+        EngravedSunRays
+            .rayPolylines(around: center, bodyDiameter: bodyDiameter)
+            .flatMap {
+                Self.segments(of: $0, avoiding: knockouts, clearance: clearance)
+            }
+            .map { Self.taperedRibbonPath(along: $0, maxThickness: maxThickness) }
+    }
+
     /// One almucantar: the altitude line at `riseFraction` of the
     /// arc's rise, nested under the day arc — the structural linework
     /// that makes the sky read as an instrument plate.

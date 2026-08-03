@@ -51,15 +51,64 @@ struct IlluminationTokenTests {
 
     // MARK: - Phase 2: the chord
 
-    /// The day-state zenith is a genuine faint blue — a SKY — while
-    /// staying light enough that the field remains luminous.
+    /// The day-state zenith is a genuine sky, deepest overhead.
+    ///
+    /// Corrective H item 1 moved this contract's floor. Before, the
+    /// zenith was a faint tint held above 0.55 luminance — "a hint of
+    /// blue on a near-white page". A real sky is deepest at the top,
+    /// so the luminance floor drops to 0.40 (still firmly a light-key
+    /// field: the horizon it grades into sits above 0.88) and the
+    /// BLUENESS requirement tightens by 3× in its place. The zenith
+    /// can never again be a near-white, and it can never be a dark
+    /// ceiling either.
     @Test
     func dayZenithsCarryRealBlue() {
         for state in [PaletteState.morning, .afternoon] {
             let zenith = state.tokens.skyZenithValue
-            #expect(zenith.oklab.b <= -0.02, "\(state) zenith is not blue")
-            #expect(zenith.relativeLuminance >= 0.55, "\(state) zenith too heavy")
+            let lab = zenith.oklab
+            let chroma = (lab.a * lab.a + lab.b * lab.b).squareRoot()
+            #expect(lab.b <= -0.06, "\(state) zenith is not blue enough (b = \(lab.b))")
+            #expect(chroma >= 0.06, "\(state) zenith is a tint, not a sky (C = \(chroma))")
+            #expect(
+                zenith.relativeLuminance >= 0.40,
+                "\(state) zenith too heavy — the day field must stay light-key"
+            )
+            #expect(
+                zenith.relativeLuminance <= 0.62,
+                "\(state) zenith too pale to read as a zenith"
+            )
         }
+    }
+
+    /// The zenith is a real value step below the horizon it grades
+    /// into — the gradient has somewhere to go. Without this the sky
+    /// can satisfy "is blue" while still being flat.
+    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    func dayZenithIsDeeperThanItsHorizon(state: PaletteState) {
+        let tokens = state.tokens
+        let zenith = tokens.skyZenithValue.oklab.l
+        let horizon = tokens.groundBottomValue.oklab.l
+        #expect(
+            horizon - zenith >= 0.12,
+            "\(state) sky spans only \(horizon - zenith) in lightness — reads flat"
+        )
+    }
+
+    /// Morning is the cooler sky, afternoon the warmer one. In OKLCH
+    /// both sit in the blue quadrant; afternoon's hue is further round
+    /// toward violet, which is the warm direction from blue.
+    @Test
+    func morningZenithIsCoolerThanAfternoon() {
+        func hueDegrees(_ value: SRGBValue) -> Double {
+            let lab = value.oklab
+            return atan2(lab.b, lab.a) * 180 / .pi
+        }
+        let morning = hueDegrees(PaletteState.morning.tokens.skyZenithValue)
+        let afternoon = hueDegrees(PaletteState.afternoon.tokens.skyZenithValue)
+        #expect(
+            afternoon - morning >= 5.0,
+            "afternoon zenith (\(afternoon)°) is not warmer than morning's (\(morning)°)"
+        )
     }
 
     /// Lapis is ultramarine in every state: blue-side hue, real

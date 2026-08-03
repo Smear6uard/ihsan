@@ -292,6 +292,21 @@ public struct SkyPaletteTokens: Sendable, Equatable {
             : .clear
     }
 
+    /// How fully this state reads as a DAY field, `0...1`.
+    ///
+    /// Two elements belong to daylight alone — the sun's engraved ray
+    /// halo and the gold-dust scatter (corrective H items 2 and 4).
+    /// Gating them on `groundBottom.relativeLuminance > 0.5` would
+    /// switch them on and off at the sunrise and maghrib crossings,
+    /// which is precisely when the eye is already watching the sky.
+    /// This ramps them across the luminance band the polarity flip
+    /// happens in instead — the daylight counterpart of the way stars
+    /// ride `SkyPhase.nightness` rather than popping at a threshold.
+    public var daylightPresence: Double {
+        let luminance = groundBottomValue.relativeLuminance
+        return max(0.0, min(1.0, (luminance - 0.32) / 0.34))
+    }
+
     /// Legacy name for the ground plane, kept so older call sites and
     /// tests read the same token the sky view fills with.
     public var subterranean: Color { groundPlaneValue.color }
@@ -464,14 +479,27 @@ extension SkyPaletteTokens {
     /// cool near-white with a faint cool-blue horizon wash — early
     /// light on cool air, not antique paper. Saturation sits in the
     /// deep-indigo ink and the warm sun glow, never in the ground.
+    ///
+    /// The zenith is a real sky (corrective H item 1): a lapis-leaning
+    /// blue at the top of the plate grading down to the pale luminous
+    /// horizon, because real skies are deepest overhead. Morning is
+    /// the COOLER of the two day zeniths — OKLCH hue ≈ 257°, a step
+    /// toward cyan from afternoon's 268°.
     static let morning = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0xC3D8F0),
+        skyZenith: SRGBValue(hex: 0x94BFFB),
         groundTop: SRGBValue(hex: 0xF5F7FA),
         groundBottom: SRGBValue(hex: 0xEEF2F7),
         groundPlane: SRGBValue(hex: 0xE8E0CB),
         horizonWash: SRGBValue(hex: 0xDCE7F4),
         ink: SRGBValue(hex: 0x1B2350),
-        inkSecondary: SRGBValue(hex: 0x4A5378),
+        // One value step down from the pre-H #4A5378. The zenith is
+        // now a genuine blue field rather than a near-white, and the
+        // header's inscription line and the plate's marker times are
+        // secondary ink sitting ON it — this is what keeps them at AA
+        // against the deepest point of the sky. On every other day
+        // surface (near-white grounds, panels) the step only raises
+        // contrast.
+        inkSecondary: SRGBValue(hex: 0x3E476B),
         metal: SRGBValue(hex: 0xA8895A),
         metalHighlight: SRGBValue(hex: 0xC9A96A),
         leafGold: SRGBValue(hex: 0xC29B4C),
@@ -490,14 +518,21 @@ extension SkyPaletteTokens {
     /// Afternoon (solar noon → maghrib). A HINT of warmth in a
     /// near-white — deliberately one step from morning, nowhere near
     /// beige. Ink stays in the indigo family for continuity.
+    ///
+    /// The WARMER of the two day zeniths (corrective H item 1): OKLCH
+    /// hue ≈ 268°, a step toward violet from morning's 257°, and
+    /// slightly hazier — a shade lighter and less chromatic — so the
+    /// afternoon sky reads as air that has been standing in the light
+    /// all day rather than the cool clarity of morning.
     static let afternoon = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0xCBD8EB),
+        skyZenith: SRGBValue(hex: 0xA9BEF5),
         groundTop: SRGBValue(hex: 0xFAF8F3),
         groundBottom: SRGBValue(hex: 0xF5F1E9),
         groundPlane: SRGBValue(hex: 0xE9DFC2),
         horizonWash: SRGBValue(hex: 0xF3EAD6),
         ink: SRGBValue(hex: 0x231F3D),
-        inkSecondary: SRGBValue(hex: 0x4C4668),
+        // See morning's note — the same step, for the same reason.
+        inkSecondary: SRGBValue(hex: 0x494365),
         metal: SRGBValue(hex: 0xB8923F),
         metalHighlight: SRGBValue(hex: 0xE0BC6A),
         leafGold: SRGBValue(hex: 0xC79E45),
