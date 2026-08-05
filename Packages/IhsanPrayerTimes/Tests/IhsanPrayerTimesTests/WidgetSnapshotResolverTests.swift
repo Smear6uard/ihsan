@@ -237,3 +237,119 @@ struct WidgetSnapshotResolverTests {
         #expect(covered.tomorrow == snapshot.tomorrow.civilDayStart)
     }
 }
+
+// MARK: - The two clocks, carried in the snapshot
+
+/// A widget renders from the snapshot alone. So the snapshot has to
+/// carry both clocks, and carry them the way the app resolves them: the
+/// cycle its logged slate belongs to, and each covered day's evening
+/// turn. A widget that keeps the app's prayer answers but files its
+/// logged marks under a different day is the same defect wearing
+/// different clothes.
+@Suite("Widget snapshot carries both clocks")
+struct WidgetSnapshotClockTests {
+
+    private static let chicago = Coordinates(latitude: 41.8781, longitude: -87.6298)
+    private static let timeZone = TimeZone(identifier: "America/Chicago")!
+
+    private static func at(_ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.date(from: DateComponents(
+            year: 2026, month: 7, day: day, hour: hour, minute: minute
+        ))!
+    }
+
+    private func snapshot(builtAt: Date) throws -> WidgetSnapshot {
+        try WidgetSnapshotBuilder.build(
+            at: builtAt,
+            cityName: "Chicago",
+            qiblaBearingDegrees: nil,
+            provider: AdhanPrayerTimesProvider(),
+            coordinates: Self.chicago,
+            timeZone: Self.timeZone,
+            calculationMethod: .isna,
+            madhab: .standard,
+            highLatitudeRule: .middleOfNight,
+            facts: .empty
+        )
+    }
+
+    private func window(at instant: Date) throws -> PrayerScheduleWindow {
+        try AdhanPrayerTimesProvider().scheduleWindow(
+            for: instant,
+            coordinates: Self.chicago,
+            timeZone: Self.timeZone,
+            calculationMethod: .isna,
+            madhab: .standard,
+            highLatitudeRule: .middleOfNight
+        )
+    }
+
+    /// Clock 1: the snapshot's cycle is the app's cycle, at every hour
+    /// that used to disagree.
+    @Test
+    func theSnapshotCycleIsTheAppCycle() throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Self.timeZone
+
+        for instant in [
+            Self.at(30, 12, 0),   // midday
+            Self.at(30, 21, 30),  // after Isha
+            Self.at(30, 23, 59),  // last minute before midnight
+            Self.at(31, 0, 1),    // first minute after it
+            Self.at(31, 1, 0),    // the hour the defect lived at
+            Self.at(31, 6, 0),    // after Fajr: rolled
+        ] {
+            let snapshot = try snapshot(builtAt: instant)
+            let app = try window(at: instant).cycle(at: instant)
+            #expect(
+                snapshot.cycleDayStart == app.date,
+                "the snapshot filed \(instant) under a different cycle than the app"
+            )
+            #expect(snapshot.cycleRollsAt == app.rollsAt)
+            #expect(instant < snapshot.cycleRollsAt)
+        }
+    }
+
+    /// Midnight moves neither clock. A snapshot built at 23:59 and one
+    /// built at 00:01 name the same cycle.
+    @Test
+    func midnightMovesNeitherClock() throws {
+        let before = try snapshot(builtAt: Self.at(30, 23, 59))
+        let after = try snapshot(builtAt: Self.at(31, 0, 1))
+        #expect(before.cycleDayStart == after.cycleDayStart)
+        #expect(before.cycleRollsAt == after.cycleRollsAt)
+    }
+
+    /// Clock 2: each covered day carries its own Maghrib as the turn,
+    /// and the boundary set no longer contains civil midnight.
+    @Test
+    func eveningTurnsTravelWithEachDay() throws {
+        let builtAt = Self.at(30, 12, 0)
+        let snapshot = try snapshot(builtAt: builtAt)
+        let facts = try WidgetSnapshotBuilder.coveredDays(
+            at: builtAt,
+            provider: AdhanPrayerTimesProvider(),
+            coordinates: Self.chicago,
+            timeZone: Self.timeZone,
+            calculationMethod: .isna,
+            madhab: .standard,
+            highLatitudeRule: .middleOfNight
+        )
+        // Three days, so an evening late in the snapshot's run has a
+        // day to turn into.
+        #expect(facts.today < facts.tomorrow)
+        #expect(facts.tomorrow < facts.dayAfterTomorrow)
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = Self.timeZone
+        let midnight = calendar.startOfDay(for: Self.at(31, 12, 0))
+        let boundaries = snapshot.timelineBoundaries(
+            after: builtAt, until: snapshot.dayAfterTomorrowFajr
+        )
+        #expect(!boundaries.contains(midnight), "civil midnight is still a widget boundary")
+        #expect(boundaries.contains(snapshot.today.maghrib), "the evening turn is not a boundary")
+        #expect(boundaries.contains(snapshot.cycleRollsAt), "the cycle roll is not a boundary")
+    }
+}

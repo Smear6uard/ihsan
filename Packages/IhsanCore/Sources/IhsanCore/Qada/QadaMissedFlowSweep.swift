@@ -1,15 +1,22 @@
 import Foundation
 import SwiftData
 
-/// Walks the days that have fully ended since setup (bounded by a rolling
-/// window) and flows each silent prayer into the makeup ledger — but only
-/// when the user chose that at setup. A prayer with any log at all, of any
-/// status, never flows: an explicit record is the user's own account of the
-/// day. Pause-covered days and repeats are refused by `QadaLedgerWriter`.
+/// Walks the CYCLES that have fully ended since setup (bounded by a
+/// rolling window) and flows each silent prayer into the makeup ledger —
+/// but only when the user chose that at setup. A prayer with any log at
+/// all, of any status, never flows: an explicit record is the user's own
+/// account of the day. Pause-covered days and repeats are refused by
+/// `QadaLedgerWriter`.
+///
+/// Cycles, not civil days, and the distinction is not academic: a cycle
+/// ends at Fajr, so at 1 AM the evening's Isha is still open. Sweeping
+/// by civil day would have flowed a prayer whose window had not closed
+/// into the ledger as unmade — the app telling someone they had missed
+/// a prayer they were about to offer.
 @MainActor
 public struct QadaMissedFlowSweep {
-    /// Days are only swept once they have completely ended, so a quiet
-    /// morning never turns into entries by afternoon.
+    /// Cycles are only swept once they have completely ended, so a
+    /// quiet morning never turns into entries by afternoon.
     public static let maximumSweepDays = 30
 
     public init() {}
@@ -28,7 +35,7 @@ public struct QadaMissedFlowSweep {
             return []
         }
 
-        let todayStart = calendar.startOfDay(for: now)
+        let todayStart = PrayerCycleClock.sharedCycleDate(at: now, calendar: calendar)
         let windowFloor = calendar.date(
             byAdding: .day,
             value: -Self.maximumSweepDays,
