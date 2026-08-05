@@ -789,18 +789,11 @@ budget. These need a device:
 
 ### Found, not fixed — out of this corrective's scope
 
-- **The daytime moon renders as a flat gray disc.** Visible on the
-  day plate whenever the moon is above the horizon in daylight (see
-  it at mid-morning). `lunarDaylightPresence` floors at 0.28 and
-  `moonCore`'s lit limb is `mix(ink, metalHighlight, 0.35)` — a dark
-  slate — so on a near-white sky the moon reads as a gray coin rather
-  than the pale ghost a daytime moon actually is. **This is
-  pre-existing**: verified by rebuilding at the pre-corrective-H
-  working tree and capturing the same instant, where it is identical.
-  It is the single element on the day plate that most competes with
-  the five ornaments. Left alone because retuning the moon is not one
-  of corrective H's six items and `MoonTreatmentTests` pins the
-  treatment deliberately; it wants its own decision.
+- ~~**The daytime moon renders as a flat gray disc.**~~ **Resolved in
+  corrective I** (item 5). The lit limb is now polarity-aware and
+  `lunarDaylightPresence` floors at 0.12. The dark-ground branch is
+  byte-for-byte what it was, so `MoonTreatmentTests`' pinned intent is
+  intact. See the corrective I section for what the fix turned up.
 
 ## Corrective I — the crossing keyline
 
@@ -950,3 +943,77 @@ budget. These need a device:
   beyond corrective I. Worth noting the dip is currently masked: at
   every one of those 23 phases a ground pair is *also* under 3:1, so no
   phase is panel-only today. A palette change could separate them.
+
+### Corrective I — items 3 through 7, device checklist
+
+Captured on iPhone 17 Pro simulator, Chicago 2026-08-02, at 03:30,
+04:14, 05:00, 05:30, 05:45, 06:15, 06:54, 09:30, 20:00, 20:08, 20:20.
+Everything below is what a simulator can show; none of it is a device
+verification and none of it is asserted as one.
+
+- **A horizontal light streak still runs the horizon at both
+  crossings — reduced, not eliminated.** Item 4 made the three
+  worked-earth filaments recede on the bloom's own proximity term, and
+  in the captures they are correctly faint. But the **terrain chord and
+  its paired lapis hairline stay by design** ("they are the horizon, not
+  a field"), and with the sun sitting on the chord the chord itself
+  catches the bloom and reads as a bright full-width horizontal line —
+  clearest at 20:08, visible at 05:45. That is the shape the
+  painted-light ban names. Whether the horizon line is exempt *because*
+  it is the horizon, or whether it needs the same yielding treatment the
+  filaments now get, is a judgement this pass deliberately did not make
+  on the maintainer's behalf. Look at `today-2008.png` and decide.
+- **First light's chrome reads tan at 06:15.** `horizonWash` feeds
+  `chromeTint` and `sheetBackingValue`, and in the 06:15 capture the tab
+  bar, the Duha chip and the lower third read distinctly warm — closer to
+  tan than to "warm and quiet". The ground tokens themselves pass
+  `daytimeGroundsAreLuminousNotBeige` (that guardrail is on `groundTop`
+  and `groundBottom`, both cool near-white); what is warm is `groundPlane`
+  and the chrome derived from the wash, which the spec asked for as "the
+  gold on the ground". Confirm on a real display whether it reads as
+  golden hour or as parchment — the palette's own rule is that no state
+  may read as tan.
+- **Dawn at 05:00 now reads as its own page.** Lapis-violet, clearly not
+  the near-black it was, and clearly not sunset's plum-vermillion at
+  20:08. Measured against night: `skyZenith` 2.46×, `groundTop` 2.80×,
+  `groundBottom` 3.70×, `groundPlane` 2.06×, `horizonWash` 4.05×. Confirm
+  at arm's length that it reads as dawn rather than as "a lighter night",
+  and that the last stars still register.
+- **The daytime moon.** At 05:45 and 09:30 it renders as a pale disc
+  barely separated from the sky. The two failure modes are a gray coin
+  (the old defect) and nothing at all (the overcorrection) — confirm it
+  is findable if looked for and never noticed if not.
+- **Six chapters at a glance.** Whether the day now reads as six
+  distinct pages rather than five plus a blend is device-only. So is
+  whether first light's cool zenith over its warm horizon reads as
+  golden hour or as a colour error.
+- **The Path overlay rows at 90D.** The dot is 3 pt there. Confirm a
+  present dhikr bead is resolvable at arm's length, that it no longer
+  reads as an empty fardh cell, and that the overlay register still
+  reads quieter than the five fardh rows.
+- **The tasbīḥ handover.** The 33→34 phrase change is announced to
+  VoiceOver by name. Confirm it does not interrupt the counting rhythm
+  and that the settle haptic still reads as an arrival. The captures do
+  not cover the instrument; it was verified by unit test only.
+
+### Found, not fixed — corrective I (continued)
+
+- **The day zenith has almost no depth budget left.** The plan asked
+  first light for "the deepest day zenith". It is not deliverable while
+  the ink pair is morning's: the plate header stands on the zenith, so
+  it is a text ground, and with morning's ink the floor is luminance
+  0.472 while morning already sits at 0.505. The entire depth budget for
+  *any* day state is ~0.03. It ships at `#80BFFD`, one OKLab step under
+  morning, buying its separation in chroma and hue instead. A future
+  pass wanting a genuinely deeper day sky has to move the ink pair
+  first, and that reopens the polarity crossing.
+- **`midMorningResolvesToMorningPlateau` has ~10 minutes of margin.**
+  Unit 0.3332 against a plateau starting at 0.330 — a real consequence
+  of inserting a sixth anchor. Left tight rather than loosened. A future
+  change to `firstLightEndUnit` or to the 0.35 cap in
+  `firstLightEnd(for:)` could push it over.
+- **`ihsanWatchWidgets` could not be built in this environment.** Its
+  scheme resolves a visionOS destination and visionOS 26.5 is not
+  installed in this toolchain. `ihsan`, `ihsanWidgets` and `ihsanWatch`
+  all build clean with zero warnings; the fourth is unverified here and
+  wants a build wherever that SDK is present.
