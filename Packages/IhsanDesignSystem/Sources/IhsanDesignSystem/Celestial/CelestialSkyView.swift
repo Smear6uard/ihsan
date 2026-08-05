@@ -159,6 +159,16 @@ public struct CelestialSkyView: View {
     /// The sky's stop table: zenith → groundTop → groundBottom,
     /// sampled in OKLCH so the ramp keeps its chroma, with `groundTop`
     /// pinned exactly at the breakpoint.
+    /// How fully the worked-earth engraving draws, given the sun's
+    /// altitude. See `groundEngravingRecedesWhenTheSunSitsOnTheChord`.
+    /// Same `exp(-(alt/9)²)` proximity the horizon bloom uses, so the
+    /// engraving and the light it yields to always agree.
+    nonisolated static func groundEngravingPresence(
+        sunAltitudeDegrees: Double
+    ) -> Double {
+        1.0 - 0.85 * exp(-pow(sunAltitudeDegrees / 9.0, 2))
+    }
+
     nonisolated static func skyGradientStops(tokens: SkyPaletteTokens) -> [Gradient.Stop] {
         skySamples(tokens: tokens).map {
             .init(color: $0.value.color, location: $0.location)
@@ -413,6 +423,15 @@ public struct CelestialSkyView: View {
                     (14, 1.0, 0.17, 0.34),
                     (21, 0.9, 0.24, 0.21)
                 ]
+        // The engraving yields to the light. Three parallel full-width
+        // marks lit by the sun's own bloom read as rays off it — the
+        // one thing the painted-light ban exists to prevent — so as
+        // the sun approaches the chord these recede and the ground
+        // reads as ground. The terrain chord and its lapis hairline
+        // stay: they are the horizon, not a field.
+        let engravingPresence = Self.groundEngravingPresence(
+            sunAltitudeDegrees: sunAltitudeDegrees
+        )
         for filament in groundFilaments {
             let y = horizonY + filament.depth
             guard y < size.height - 4 else { continue }
@@ -423,7 +442,9 @@ public struct CelestialSkyView: View {
                     thickness: filament.thickness,
                     insetFraction: filament.inset
                 )),
-                with: .color(tokens.metalValue.color.opacity(filament.opacity))
+                with: .color(
+                    tokens.metalValue.color.opacity(filament.opacity * engravingPresence)
+                )
             )
         }
 

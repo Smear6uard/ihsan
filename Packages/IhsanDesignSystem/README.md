@@ -64,6 +64,18 @@ pinned in `EngravedSunRays`: the collar runs 0.68→0.88 diameters,
 never further, and never at an opacity that lets it compete with the
 five ornaments at a glance.
 
+**Engraving yields to light** (corrective I). The three worked-earth
+filaments below the chord are linework at constant opacity — identical
+at midnight, and not light by any reading. But with the sun sitting on
+the chord its bloom lights them, and three parallel full-width marks
+around a light source read as rays off it, which is the exact thing
+this list bans. So they recede as the sun approaches the horizon, on
+the same `exp(-(altitude/9)²)` proximity term the bloom itself uses
+(`CelestialSkyView.groundEngravingPresence`). The terrain chord and its
+paired lapis hairline stay — they are the horizon, not a field. The
+general rule: where engraving and painted light occupy the same pixels,
+the engraving yields.
+
 ## What this design system encodes
 
 Ihsan is a private personal ibadah ledger for practicing Muslims. The

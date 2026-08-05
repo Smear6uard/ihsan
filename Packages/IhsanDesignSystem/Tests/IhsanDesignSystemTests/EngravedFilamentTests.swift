@@ -124,4 +124,46 @@ struct EngravedFilamentTests {
         #expect(low.minY >= plate.rect.minY)
         #expect(high.minY >= plate.rect.minY)
     }
+
+    /// The engraving yields to the light.
+    ///
+    /// The three worked-earth filaments are linework, not light — they
+    /// are identical at midnight. But when the sun sits on the chord
+    /// its bloom lights them, and three parallel full-width marks
+    /// around a light source read as RAYS, which is precisely what the
+    /// painted-light ban exists to prevent. They therefore recede as
+    /// the sun approaches the chord, on the same proximity term the
+    /// bloom itself uses so the two can never disagree.
+    @Test
+    func groundEngravingRecedesWhenTheSunSitsOnTheChord() {
+        let high = CelestialSkyView.groundEngravingPresence(sunAltitudeDegrees: 45)
+        let onChord = CelestialSkyView.groundEngravingPresence(sunAltitudeDegrees: 0)
+        #expect(high > 0.99, "a high sun must leave the engraving untouched")
+        #expect(
+            onChord < 0.20 * high,
+            Comment(rawValue: "with the sun on the chord the engraving is still at "
+                + "\(onChord / high) of full strength — it will read as rays")
+        )
+    }
+
+    /// And it comes back: a sun well below the chord is not lighting
+    /// anything, so the worked earth is fully drawn again through the
+    /// night.
+    @Test
+    func groundEngravingReturnsAfterTheSunHasSet() {
+        #expect(CelestialSkyView.groundEngravingPresence(sunAltitudeDegrees: -25) > 0.99)
+    }
+
+    /// Continuous — no step the eye can catch.
+    @Test
+    func groundEngravingPresenceIsContinuous() {
+        var previous = CelestialSkyView.groundEngravingPresence(sunAltitudeDegrees: -40)
+        for tenth in stride(from: -400, through: 900, by: 1) {
+            let value = CelestialSkyView.groundEngravingPresence(
+                sunAltitudeDegrees: Double(tenth) / 10.0
+            )
+            #expect(abs(value - previous) < 0.02, "step at altitude \(Double(tenth) / 10.0)")
+            previous = value
+        }
+    }
 }
