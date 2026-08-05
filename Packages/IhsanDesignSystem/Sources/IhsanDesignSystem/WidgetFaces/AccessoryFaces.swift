@@ -345,7 +345,7 @@ public struct AccessoryFastingGaugeFace: View {
                     showsHours: true
                 )
                 .font(.system(size: 12, weight: .semibold, design: .rounded).monospacedDigit())
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.6)
             }
             .lineLimit(1)
         }

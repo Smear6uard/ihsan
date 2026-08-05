@@ -272,3 +272,23 @@ struct WidgetSnapshotTests {
         #expect(WidgetTimerInterval.countdown(from: entry, to: future) == entry...future)
     }
 }
+
+// MARK: - The relevant night
+
+extension WidgetSnapshotTests {
+    /// The night a face speaks about: in progress wins, otherwise the
+    /// one ahead — tonight through the day, tomorrow night late in
+    /// day two.
+    @Test
+    func relevantNightIsInProgressOrAhead() {
+        let snapshot = Self.makeSnapshot(writtenAt: Self.at(day: 30, 22, 0))
+        // Mid-afternoon: tonight lies ahead.
+        #expect(snapshot.relevantNight(at: Self.at(day: 30, 15, 0)) == snapshot.tonight)
+        // In the night: the night in progress.
+        #expect(snapshot.relevantNight(at: Self.at(day: 30, 23, 0)) == snapshot.tonight)
+        #expect(snapshot.relevantNight(at: Self.at(day: 31, 2, 0)) == snapshot.tonight)
+        // Day two afternoon: tomorrow night.
+        #expect(snapshot.relevantNight(at: Self.at(day: 31, 15, 0)) == snapshot.tomorrowNight)
+        #expect(snapshot.relevantNight(at: Self.at(day: 31, 22, 0)) == snapshot.tomorrowNight)
+    }
+}

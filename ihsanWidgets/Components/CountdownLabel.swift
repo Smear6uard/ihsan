@@ -46,7 +46,7 @@ enum CountdownLabel {
             Text(timerInterval: interval, countsDown: true)
                 .font(.system(size: 28 * scale, weight: .regular, design: .rounded).monospacedDigit())
                 .lineLimit(1)
-                .minimumScaleFactor(0.5)
+                .minimumScaleFactor(0.6)
         }
     }
 }

@@ -52,7 +52,7 @@ public struct HijriDayFace: View {
                     .tracking(0.8)
                     .foregroundStyle(mode == .accented ? AnyShapeStyle(.secondary) : AnyShapeStyle(tokens.metal))
                     .lineLimit(1)
-                    .minimumScaleFactor(0.55)
+                    .minimumScaleFactor(0.6)
             } else {
                 Text(hijri.monthName)
                     .font(.system(size: 15, weight: .regular, design: .serif))

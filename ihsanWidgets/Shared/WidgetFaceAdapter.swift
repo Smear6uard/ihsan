@@ -26,10 +26,14 @@ extension PrayerTimelineEntry.LiveDay {
         return WidgetDayModel(
             date: date,
             slots: slots.map {
-                WidgetDayModel.Slot(
+                let state = markerState(for: $0, at: date)
+                return WidgetDayModel.Slot(
                     prayer: $0.prayer,
                     time: $0.scheduledTime,
-                    state: markerState(for: $0, at: date)
+                    // An excused pause shows times, never absence: a
+                    // passed mark stands as the neutral outline, the
+                    // same form the future wears.
+                    state: isPaused && state == .passedUnlogged ? .upcoming : state
                 )
             },
             nextPrayer: focusPrayer,

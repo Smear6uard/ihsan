@@ -91,6 +91,14 @@ struct RootTabView: View {
         .onChange(of: selectedTab) { _, _ in
             Haptics.impact(.medium)
         }
+        // Widget taps arrive as URLs. Land on Today first, then let
+        // the Today screen present its own sheet — the same
+        // notification pattern the Siri intents use.
+        .onOpenURL { url in
+            guard let destination = WidgetDeeplinkRouter.destination(for: url) else { return }
+            selectedTab = .today
+            WidgetDeeplinkRouter.post(destination)
+        }
         .task {
             Haptics.prepareAll()
             // Cold-launch: the OpenReflectionIntent has already written
