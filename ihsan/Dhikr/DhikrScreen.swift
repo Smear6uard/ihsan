@@ -140,7 +140,9 @@ struct DhikrScreen: View {
         let sitting = sequence
         let custom = storedCustomPhrase
         if total > 0 {
-            let day = Calendar.current.startOfDay(for: nowProvider.now())
+            // The cycle the sitting happened in — a tasbīḥ at 1 AM
+            // belongs to that evening, not to the morning ahead.
+            let day = PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
             // A walked sitting recorded as one row would name only the
             // phrase it ended on. One row per third says what was
             // actually recited; a single-phrase sitting is one row, as

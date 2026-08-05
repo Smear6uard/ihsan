@@ -172,6 +172,15 @@ public final class UserSettings {
     /// early night; the default sits between them and is the user's to
     /// set — 0 closes it at Maghrib exactly.
     public var adhkarEveningExtendsAfterMaghribMinutes: Int = 60
+
+    /// Which generation of the cycle reattribution has run on this
+    /// store. Zero means never.
+    ///
+    /// The repair cannot live in a migration stage — it needs each
+    /// stored day's Fajr, Fajr needs coordinates, and coordinates are
+    /// never persisted. So it runs from the app once a real schedule
+    /// is in hand, and this is how it knows not to run twice.
+    public var cycleReattributionVersion: Int = 0
     public var lastDataExportAt: Date?
     public var lastDataDeletionRequestAt: Date?
     public var schemaVersion: Int = 1

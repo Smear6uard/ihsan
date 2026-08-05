@@ -9,7 +9,8 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             IhsanSchemaV4.self,
             IhsanSchemaV5.self,
             IhsanSchemaV6.self,
-            IhsanSchemaV7.self
+            IhsanSchemaV7.self,
+            IhsanSchemaV8.self
         ]
     }
 
@@ -38,6 +39,10 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             .lightweight(
                 fromVersion: IhsanSchemaV6.self,
                 toVersion: IhsanSchemaV7.self
+            ),
+            .lightweight(
+                fromVersion: IhsanSchemaV7.self,
+                toVersion: IhsanSchemaV8.self
             )
         ]
     }

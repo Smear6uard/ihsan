@@ -295,7 +295,7 @@ private struct RootGate: View {
             if parts.count == 2,
                let kind = FastKind(rawValue: String(parts[0])),
                let state = FastState(rawValue: String(parts[1])) {
-                let day = Calendar.current.startOfDay(for: NowProvider.active.now())
+                let day = HijriConverter.daytimeCivilDay(at: NowProvider.active.now())
                 Task {
                     _ = try? await LogFastIntent(kind: kind, state: state, fastDate: day).perform()
                 }

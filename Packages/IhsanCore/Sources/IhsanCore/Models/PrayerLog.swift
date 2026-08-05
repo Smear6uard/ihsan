@@ -29,6 +29,15 @@ public final class PrayerLog {
     public var qadaForPrayerLogID: UUID?
     public var sourceSurface: String = SourceSurface.app.rawValue
 
+    /// `PrayerLogReviewFlag.rawValue` when this row needs the user's
+    /// eye, `nil` — the overwhelming majority — when it does not.
+    ///
+    /// Set by the cycle reattribution when moving a post-midnight
+    /// entry to the evening it belongs to would land it on a cycle
+    /// that already holds one for that prayer. The app does not pick a
+    /// winner and delete the other: it keeps both and says so.
+    public var reviewFlagRaw: String?
+
     @Attribute(.allowsCloudEncryption)
     public var note: String?
 
@@ -54,6 +63,7 @@ public final class PrayerLog {
         combinationKind: CombinationKind? = nil,
         qadaForPrayerLogID: UUID? = nil,
         sourceSurface: SourceSurface = .app,
+        reviewFlag: PrayerLogReviewFlag? = nil,
         note: String? = nil,
         createdAt: Date = .now,
         modifiedAt: Date = .now
@@ -75,6 +85,7 @@ public final class PrayerLog {
         self.combinationKindRaw = combinationKind?.rawValue
         self.qadaForPrayerLogID = qadaForPrayerLogID
         self.sourceSurface = sourceSurface.rawValue
+        self.reviewFlagRaw = reviewFlag?.rawValue
         self.note = note
         self.createdAt = createdAt
         self.modifiedAt = modifiedAt
@@ -90,9 +101,31 @@ public final class PrayerLog {
     }
 }
 
+/// Why a stored prayer log wants a person's attention. Exactly one
+/// reason exists, and it is a question the app declines to answer for
+/// someone: which of two entries for one prayer is the real one.
+public enum PrayerLogReviewFlag: String, Sendable, CaseIterable {
+    /// The cycle reattribution found this entry's rightful cycle
+    /// already occupied. Both rows were kept; this is the one that
+    /// moved, and Path shows it for the user to settle.
+    case cycleDuplicate
+
+    /// The line Path reads out. States the fact and asks nothing.
+    public var inscription: String {
+        switch self {
+        case .cycleDuplicate:
+            return "Two entries for this prayer"
+        }
+    }
+}
+
 public extension PrayerLog {
     var prayer: Prayer? {
         Prayer(rawValue: prayerRaw)
+    }
+
+    var reviewFlag: PrayerLogReviewFlag? {
+        reviewFlagRaw.flatMap(PrayerLogReviewFlag.init(rawValue:))
     }
 
     var status: PrayerStatus? {

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftData
 import IhsanCore
 import IhsanDesignSystem
@@ -114,6 +115,13 @@ final class TodayViewModel {
             timeZone: place.timeZone
         )
 
+        // The one-shot repair of records filed under the midnight
+        // rule. It runs here and nowhere else, because here is the
+        // first moment a real schedule exists — and a schedule is the
+        // one thing the store itself can never supply, coordinates
+        // being transient by contract.
+        reattributeCyclesIfNeeded(now: now, place: place, settings: settings)
+
         // Publish the exact resolver table for widgets/watch
         // complications. Extensions never recalculate with a second
         // timezone or settings path, and coordinates remain transient.
@@ -175,6 +183,66 @@ final class TodayViewModel {
         // from the (possibly new) night.
         await NightWakeService.shared.refresh(using: modelContext)
     }
+
+    /// Move records filed under the midnight rule onto the cycles they
+    /// belong to, once, and say what moved.
+    ///
+    /// The day tables come from the same provider and the same
+    /// settings the rest of this refresh uses, computed lazily per day
+    /// that actually holds a record. A day the provider cannot resolve
+    /// is left alone and counted in the report rather than guessed at.
+    private func reattributeCyclesIfNeeded(
+        now: Date,
+        place: LocatedPlace,
+        settings: UserSettings
+    ) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = place.timeZone
+
+        func dayTimes(_ day: Date) -> DayPrayerTimes? {
+            try? prayerTimesProvider.dayTimes(
+                for: day,
+                coordinates: place.coordinates,
+                timeZone: place.timeZone,
+                calculationMethod: settings.calculationMethod,
+                madhab: settings.madhab,
+                highLatitudeRule: settings.highLatitudeRule,
+                tuning: settings.calculationTuning
+            )
+        }
+
+        do {
+            let report = try CycleReattributionSweep(calendar: calendar).runIfNeeded(
+                now: now,
+                boundaries: { day in
+                    guard
+                        let today = dayTimes(day),
+                        let next = calendar.date(byAdding: .day, value: 1, to: day),
+                        let tomorrow = dayTimes(next)
+                    else { return nil }
+                    return CycleDayBoundaries(
+                        fajr: today.fajr.scheduledTime,
+                        isha: today.isha.scheduledTime,
+                        nextFajr: tomorrow.fajr.scheduledTime
+                    )
+                },
+                in: modelContext
+            )
+            if let report {
+                Self.logger.notice("\(report.summary, privacy: .public)")
+            }
+        } catch {
+            // A failed sweep leaves the marker unset, so the next
+            // launch tries again. Records are never half-moved: the
+            // pass saves once, at its end.
+            Self.logger.error("Cycle reattribution failed: \(String(describing: error))")
+        }
+    }
+
+    private static let logger = Logger(
+        subsystem: "com.sameerstudios.ihsan",
+        category: "CycleReattribution"
+    )
 
     /// The night the plate should know about: before Fajr that is the
     /// night already in progress (yesterday's Maghrib onward); the rest

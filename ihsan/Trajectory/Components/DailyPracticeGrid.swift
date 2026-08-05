@@ -176,6 +176,14 @@ struct DailyPracticeGrid: View {
                             .fill(tokens.metal.opacity(0.60))
                             .frame(width: 8, height: 8)
                     }
+                    if day.needsReview {
+                        // Two records of one prayer, kept rather than
+                        // resolved. A hollow keyline ring — a question
+                        // in the sheet's own hand, not a warning.
+                        Circle()
+                            .strokeBorder(tokens.keyline.opacity(0.75), lineWidth: 1)
+                            .frame(width: 7, height: 7)
+                    }
                 }
             }
         }
@@ -238,7 +246,10 @@ struct DailyPracticeGrid: View {
         if day.isPaused {
             return "\(dateText), paused day, excluded from totals"
         }
-        return "\(dateText), \(count) of \(total) prayers on time"
+        let base = "\(dateText), \(count) of \(total) prayers on time"
+        return day.needsReview
+            ? "\(base). Two entries for one prayer, kept for your review."
+            : base
     }
 }
 

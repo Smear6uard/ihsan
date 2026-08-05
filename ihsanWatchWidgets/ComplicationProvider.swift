@@ -188,7 +188,10 @@ struct ComplicationProvider: TimelineProvider {
         let context = ModelContext(container)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? .current
-        let startOfDay = calendar.startOfDay(for: date)
+        // The cycle in progress, from the shared schedule cache — so a
+        // complication read at 1 AM shows the evening's own account
+        // rather than a blank face for a day that has not begun.
+        let startOfDay = PrayerCycleClock.sharedCycleDate(at: date, calendar: calendar)
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
         let descriptor = FetchDescriptor<PrayerLog>(
             predicate: #Predicate {

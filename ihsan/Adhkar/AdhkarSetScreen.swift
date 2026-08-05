@@ -363,7 +363,7 @@ struct AdhkarSetScreen: View {
             return
         }
         hasRecorded = true
-        let day = Calendar.current.startOfDay(for: nowProvider.now())
+        let day = PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
         let category = category
         Task {
             _ = try? await SaveAdhkarSessionIntent(

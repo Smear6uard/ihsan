@@ -25,7 +25,7 @@ public enum IhsanModelContainerFactory {
         inMemory: Bool = false,
         cloudSync: Bool = true
     ) throws -> ModelContainer {
-        let schema = Schema(IhsanSchemaV7.models)
+        let schema = Schema(IhsanSchemaV8.models)
         let configuration: ModelConfiguration
 
         if inMemory {

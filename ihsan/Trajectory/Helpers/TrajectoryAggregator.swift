@@ -31,6 +31,8 @@ enum TrajectoryAggregator {
 
             let isPaused = pauseIntervals.contains { $0.contains(cursor) }
             let isTraveling = travelIntervals.contains { $0.contains(cursor) }
+            // A duplicate the reattribution kept rather than resolved.
+            let needsReview = dayLogs.contains { $0.reviewFlag != nil }
 
             let completions = Prayer.allCases.map { prayer -> PrayerCompletion in
                 // Two kinds of qadā row exist. A LINKED makeup act
@@ -56,7 +58,8 @@ enum TrajectoryAggregator {
                     date: cursor,
                     prayerCompletions: completions,
                     isPaused: isPaused,
-                    isTraveling: isTraveling
+                    isTraveling: isTraveling,
+                    needsReview: needsReview
                 )
             )
 

@@ -278,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV7.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV8.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -748,5 +748,242 @@ private func assertMigratedStoreIsWritable() throws {
         let nafl = try #require(try context.fetch(FetchDescriptor<NaflLog>()).first)
         #expect(nafl.kind == .witr)
         #expect(nafl.rakahCount == 3)
+    }
+}
+
+// MARK: - V7 → V8: the cycle reattribution
+//
+// A store shaped like a real pre-corrective install, where the day
+// rolled at midnight: a 1 AM Isha filed on the wrong date and — having
+// been judged against a window twenty hours away — stored as qadā;
+// post-midnight qiyam and witr on the wrong night; a sitting at the
+// tasbīḥ after midnight; and the awkward case, a post-midnight Isha
+// whose rightful cycle is already occupied.
+//
+// The migration itself only adds a field. The repair runs afterwards
+// with a schedule the caller supplies, because Fajr needs coordinates
+// and coordinates are never stored.
+
+/// A UTC calendar, so the fixture's days and the sweep's agree.
+private var sweepCalendar: Calendar {
+    var calendar = Calendar(identifier: .gregorian)
+    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    return calendar
+}
+
+private func utcDay(_ year: Int, _ month: Int, _ day: Int) -> Date {
+    sweepCalendar.date(from: DateComponents(year: year, month: month, day: day))!
+}
+
+private func utcAt(_ day: Date, _ hour: Int, _ minute: Int) -> Date {
+    day.addingTimeInterval(TimeInterval(hour * 3600 + minute * 60))
+}
+
+/// Constant boundaries: Fajr at 04:40, Isha at 21:14. Real schedules
+/// drift by minutes across a week; the rule under test does not care,
+/// and a constant makes every expectation in the fixture exact.
+private func fixtureBoundaries(_ day: Date) -> CycleDayBoundaries {
+    CycleDayBoundaries(
+        fajr: utcAt(day, 4, 40),
+        isha: utcAt(day, 21, 14),
+        nextFajr: utcAt(day.addingTimeInterval(86_400), 4, 40)
+    )
+}
+
+private let eveningA = utcDay(2026, 8, 4)     // the cycle a 1 AM Isha belongs to
+private let morningB = utcDay(2026, 8, 5)     // where the midnight rule filed it
+private let plainDay = utcDay(2026, 8, 1)     // an ordinary evening Isha
+private let collisionEvening = utcDay(2026, 7, 28)
+private let collisionMorning = utcDay(2026, 7, 29)
+
+private func seedV7Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV7.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    func isha(
+        day: Date, loggedAt: Date, status: PrayerStatus, id: UUID = UUID()
+    ) -> IhsanSchemaV7.PrayerLog {
+        let log = IhsanSchemaV7.PrayerLog()
+        log.id = id
+        log.dedupKey = "isha-\(iso(day))"
+        log.prayerRaw = Prayer.isha.rawValue
+        log.prayerDate = day
+        log.loggedTimeZoneIdentifier = "UTC"
+        log.scheduledTime = utcAt(day, 21, 14)
+        log.loggedAt = loggedAt
+        log.statusRaw = status.rawValue
+        log.createdAt = loggedAt
+        log.modifiedAt = loggedAt
+        return log
+    }
+
+    // 1. The defect itself: prayed at 1:05 AM inside a window that was
+    //    still open, filed on the next day, and marked qadā for it.
+    context.insert(isha(
+        day: morningB, loggedAt: utcAt(morningB, 1, 5), status: .qada, id: seededLogID
+    ))
+
+    // 2. An ordinary evening Isha. Nothing may touch it.
+    context.insert(isha(
+        day: plainDay, loggedAt: utcAt(plainDay, 21, 40), status: .onTime
+    ))
+
+    // 3. The collision: a cycle that already holds its Isha, and a
+    //    post-midnight entry that wants the same slot.
+    context.insert(isha(
+        day: collisionEvening, loggedAt: utcAt(collisionEvening, 21, 30), status: .onTime
+    ))
+    context.insert(isha(
+        day: collisionMorning, loggedAt: utcAt(collisionMorning, 0, 50), status: .missed
+    ))
+
+    // 4. Night nafl, filed on the morning the clock had reached.
+    for kind in [NaflKind.qiyam, .witr] {
+        let nafl = IhsanSchemaV7.NaflLog()
+        nafl.dedupKey = "\(kind.storageKey)-\(iso(morningB))"
+        nafl.kindRaw = kind.storageKey
+        nafl.naflDate = morningB
+        nafl.loggedAt = utcAt(morningB, 2, 30)
+        nafl.loggedTimeZoneIdentifier = "UTC"
+        context.insert(nafl)
+    }
+
+    // 5. Duha on the same morning — a daytime kind, and untouchable.
+    let duha = IhsanSchemaV7.NaflLog()
+    duha.dedupKey = "duha-\(iso(morningB))"
+    duha.kindRaw = NaflKind.duha.storageKey
+    duha.naflDate = morningB
+    duha.loggedAt = utcAt(morningB, 10, 0)
+    duha.loggedTimeZoneIdentifier = "UTC"
+    context.insert(duha)
+
+    // 6. A sitting at the tasbīḥ after midnight.
+    let dhikr = IhsanSchemaV7.DhikrSession()
+    dhikr.sessionDate = morningB
+    dhikr.startedAt = utcAt(morningB, 1, 30)
+    dhikr.count = 100
+    dhikr.phraseRaw = DhikrPhrase.subhanallah.rawValue
+    context.insert(dhikr)
+
+    let settings = IhsanSchemaV7.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.sunnahLayerEnabled = true
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
+private func iso(_ day: Date) -> String {
+    let formatter = DateFormatter()
+    formatter.calendar = Calendar(identifier: .gregorian)
+    formatter.locale = Locale(identifier: "en_US_POSIX")
+    formatter.timeZone = TimeZone(secondsFromGMT: 0)
+    formatter.dateFormat = "yyyy-MM-dd"
+    return formatter.string(from: day)
+}
+
+@Test
+func migratingSeededV7StoreToV8PreservesEveryRecordAndReattributesTheCycle() async {
+    // The child's stdout is observed and echoed so the reattribution
+    // report lands in THIS test's output. A repair that rewrites
+    // worship records has to say what it did somewhere a person will
+    // actually read.
+    let result = await #expect(
+        processExitsWith: .success, observing: [\.standardOutputContent]
+    ) {
+        try assertV7StoreMigratesToV8()
+    }
+    if let output = result?.standardOutputContent {
+        let text = String(decoding: output, as: UTF8.self)
+        for line in text.split(separator: "\n") where line.contains("[migration]") {
+            print(line)
+        }
+    }
+}
+
+private func assertV7StoreMigratesToV8() throws {
+    try withMigratedStore(seed: seedV7Store) { context in
+        // Zero loss first: the field added by V8 disturbs nothing.
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 4)
+        #expect(try context.fetch(FetchDescriptor<NaflLog>()).count == 3)
+        #expect(try context.fetch(FetchDescriptor<DhikrSession>()).count == 1)
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.sunnahLayerEnabled == true)
+        #expect(settings.cycleReattributionVersion == 0)
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).allSatisfy { $0.reviewFlag == nil })
+
+        let report = try #require(try CycleReattributionSweep(calendar: sweepCalendar)
+            .runIfNeeded(
+                now: utcAt(utcDay(2026, 8, 6), 12, 0),
+                boundaries: fixtureBoundaries,
+                in: context
+            ))
+        // The migration's own record of what it moved. Printed, not
+        // just counted: a repair that rewrites worship records without
+        // saying so is not one anybody should have to take on trust.
+        print("[migration] \(report.summary)")
+
+        #expect(report.prayerLogsMoved == 1)
+        #expect(report.statusesRecomputed == ["qada→onTime"])
+        #expect(report.naflLogsMoved == 2)
+        #expect(report.dhikrSessionsMoved == 1)
+        #expect(report.collisionsFlagged == 1)
+        #expect(report.daysWithoutSchedule == 0)
+
+        // Nothing was deleted.
+        let logs = try context.fetch(FetchDescriptor<PrayerLog>())
+        #expect(logs.count == 4)
+        #expect(try context.fetch(FetchDescriptor<NaflLog>()).count == 3)
+        #expect(try context.fetch(FetchDescriptor<DhikrSession>()).count == 1)
+
+        // The 1 AM Isha now belongs to the evening it was offered in,
+        // measured against the window that was open, and is no longer
+        // called a makeup.
+        let moved = try #require(logs.first { $0.id == seededLogID })
+        #expect(moved.prayerDate == eveningA)
+        #expect(moved.dedupKey == "isha-2026-08-04")
+        #expect(moved.status == .onTime)
+        #expect(moved.scheduledTime == utcAt(eveningA, 21, 14))
+        #expect(moved.lateBySeconds == nil)
+        #expect(moved.reviewFlag == nil)
+
+        // The ordinary evening Isha was not touched.
+        let ordinary = try #require(logs.first { $0.prayerDate == plainDay })
+        #expect(ordinary.status == .onTime)
+        #expect(ordinary.dedupKey == "isha-2026-08-01")
+        #expect(ordinary.reviewFlag == nil)
+
+        // The collision: the entry that was already there keeps its
+        // place, the one that wanted it keeps its own date and carries
+        // the flag, and the person decides.
+        let sitting = try #require(logs.first { $0.prayerDate == collisionEvening })
+        #expect(sitting.status == .onTime)
+        #expect(sitting.reviewFlag == nil)
+        let duplicate = try #require(logs.first { $0.prayerDate == collisionMorning })
+        #expect(duplicate.reviewFlag == .cycleDuplicate)
+        #expect(duplicate.dedupKey == "isha-2026-07-29")
+
+        // Night nafl moved to the night it was offered in; duha did not
+        // move, because its window closes long before midnight.
+        let nafl = try context.fetch(FetchDescriptor<NaflLog>())
+        #expect(nafl.filter { $0.naflDate == eveningA }.count == 2)
+        #expect(nafl.first { $0.kind == .duha }?.naflDate == morningB)
+        #expect(nafl.first { $0.kind == .witr }?.dedupKey == "witr-2026-08-04")
+
+        // And the sitting at the tasbīḥ.
+        #expect(try context.fetch(FetchDescriptor<DhikrSession>()).first?.sessionDate == eveningA)
+
+        // The marker is set, so a second launch does no work.
+        #expect(settings.cycleReattributionVersion == CycleReattributionSweep.currentVersion)
+        let second = try CycleReattributionSweep(calendar: sweepCalendar).runIfNeeded(
+            now: utcAt(utcDay(2026, 8, 6), 12, 5),
+            boundaries: fixtureBoundaries,
+            in: context
+        )
+        #expect(second == nil)
     }
 }

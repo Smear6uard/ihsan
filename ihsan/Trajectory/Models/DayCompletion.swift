@@ -12,6 +12,10 @@ struct DayCompletion: Identifiable, Hashable, Sendable {
     let prayerCompletions: [PrayerCompletion]
     let isPaused: Bool
     let isTraveling: Bool
+    /// This cycle holds an entry the app declined to resolve on the
+    /// user's behalf — a second record of one prayer, surfaced by the
+    /// cycle reattribution rather than deleted.
+    var needsReview: Bool = false
 
     /// Number of fardh prayers logged with status `.onTime`.
     var onTimeCount: Int {
