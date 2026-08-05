@@ -1054,3 +1054,37 @@ system's half of each contract.
   5.6 ms avg, strip 4.0 ms avg at 2×); WidgetKit's ~30 MB extension
   ceiling can only be observed in Instruments with the extension
   attached.
+
+## Corrective J — the four device findings
+
+- **The expanded card's swipe, in the hand.** Both destinations and the
+  wobble rejection are pinned live by `FocusedCardSwipeUITests`, but a
+  40 pt threshold and a 0.45 drag damping are judgments about a thumb,
+  not about a simulator. Confirm on device that opening the sheet feels
+  willing rather than twitchy, that collapsing does not fire while
+  reaching for `DELAYED`, and that a drag begun near the card's lower
+  edge is not eaten by the system Home gesture. The card sits above the
+  floating tab bar so it should have clearance; that is an argument,
+  not an observation.
+- **The card's growth at 120 Hz.** Collapsed 140 pt → expanded 176 pt
+  on `.smooth(duration: 0.28)`. Confirm the growth reads as the card
+  opening rather than the celestial scene jumping, and that switching
+  focused prayers while expanded still collapses cleanly.
+- **The expanded card at accessibility type sizes.** The card's height
+  is fixed per state, so `ON TIME` / `DELAYED` / `IN JAMĀʿAH` will
+  clip somewhere above xxxLarge. Walk the Dynamic Type range on device
+  and decide whether the expanded state should scroll, reflow the
+  footer, or grow further.
+- **"Delayed" in VoiceOver.** The word replaced "late" across the app,
+  the watch, and Siri's spoken dialog. Confirm the pronunciation in the
+  card's logged inscription, the Path counts, and
+  `LogPrayerWithStatusIntent`'s reply ("Fajr logged as delayed").
+- **The Path key row's contrast on a near-white day ground.** The key
+  draws each presence row's real mark at 11 pt against the panel;
+  `GestaltGrid.overlayMarkValue` deepens toward the keyline on light
+  panels, but the key is larger than any period's dot and was not part
+  of the measured set. Judge it on the afternoon and dawn grounds.
+- **The Remembrance band in a crowded bottom stack.** With a live
+  adhkār offer card, a duha card, and the band all present under the
+  focused card, confirm the stack still clears the floating tab bar on
+  the smallest supported iPhone.

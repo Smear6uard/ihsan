@@ -239,6 +239,14 @@ private struct TodayReadyView: View {
     private var adhkarDismissedDay: String = ""
     /// The tasbīḥ link asked which one; waiting on the answer.
     @State private var isChoosingPostPrayer = false
+    /// The always-open door's hub. `-IhsanDebugPresentRemembrance`
+    /// opens it directly for the capture harness.
+    @State private var isRemembrancePresented =
+        DebugLaunch.flag("-IhsanDebugPresentRemembrance")
+    /// What the hub chose, held until the hub has finished dismissing —
+    /// a full-screen reader presented from inside a closing sheet is a
+    /// race, and loses it about half the time.
+    @State private var pendingRemembrance: RemembranceMenu.Entry.Destination?
 
     /// Time the focused-prayer card stays on a marker-tapped prayer
     /// before reverting to the next-upcoming prayer per spec.
@@ -424,6 +432,19 @@ private struct TodayReadyView: View {
                             onDismiss: { dismissAdhkar(offer.category, at: now) }
                         )
                     }
+
+                    // And the door that is always open. The card above
+                    // says "this window is open, once"; this says "any
+                    // set, any time", which is the thing that had no
+                    // way in at all before. Outside the pause branch
+                    // for the same reason the card is.
+                    RemembranceBand(
+                        showsHub: RemembranceMenu.showsHub(
+                            isContentAvailable: AdhkarAvailability.isAvailable
+                        ),
+                        tokens: tokens,
+                        onOpen: { openRemembrance(at: now) }
+                    )
                 }
                 .padding(.bottom, IhsanSpacing.md)
             }
@@ -451,6 +472,18 @@ private struct TodayReadyView: View {
             }
             .sheet(isPresented: $isYesterdaySheetPresented) {
                 yesterdaySheet(at: now)
+            }
+            .sheet(isPresented: $isRemembrancePresented, onDismiss: applyPendingRemembrance) {
+                RemembranceSheet(
+                    entries: RemembranceMenu.entries(
+                        now: now,
+                        windows: adhkarWindows(at: now),
+                        isContentAvailable: AdhkarAvailability.isAvailable
+                    ),
+                    timeZone: snapshot.place.timeZone,
+                    tokens: tokens,
+                    onSelect: { pendingRemembrance = $0 }
+                )
             }
             // Widget taps: the router already switched to this tab;
             // the destination sheet is presented here, through the
@@ -761,6 +794,34 @@ private struct TodayReadyView: View {
         AdhkarAvailability.isAvailable
             && sunnahSettings?.adhkarLayerEnabled == true
             && sunnahSettings?.adhkarPostPrayerEnabled == true
+    }
+
+    // MARK: - The always-open door
+
+    /// Opens the hub, or — under the scholar-review gate, where every
+    /// set is withheld and a hub would hold one row — the instrument
+    /// itself. The band's label already says which will happen.
+    private func openRemembrance(at now: Date) {
+        if RemembranceMenu.showsHub(isContentAvailable: AdhkarAvailability.isAvailable) {
+            isRemembrancePresented = true
+        } else {
+            openFreeTasbih()
+        }
+    }
+
+    /// Runs after the hub has finished dismissing. The reader is a
+    /// full-screen cover and the instrument is presented by the root
+    /// router; either one raised while the sheet is still on its way
+    /// out gets dropped.
+    private func applyPendingRemembrance() {
+        guard let destination = pendingRemembrance else { return }
+        pendingRemembrance = nil
+        switch destination {
+        case .set(let category):
+            adhkarSelection = AdhkarSelection(category: category)
+        case .freeTasbih:
+            openFreeTasbih()
+        }
     }
 
     private func openFreeTasbih() {

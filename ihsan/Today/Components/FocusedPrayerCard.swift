@@ -18,8 +18,12 @@ import SwiftUI
 /// 2. **Active** — the prayer *name* (Latin + Arabic pair) is primary;
 ///    the window is described in small caps inkSecondary
 ///    ("NOW · UNTIL 6:15 AM"). No giant ticking numerals.
-/// 3. **Expanded** — on card tap: jamaʿah toggle, two timing commits,
-///    a quiet MORE OPTIONS link for the long tail (qadā, missed, edit).
+/// 3. **Expanded** — on card tap: the window line, two timing commits
+///    (On Time and Delayed, both in-window states), the jamāʿah chip,
+///    and the ways onward. Swiping the card up opens the full log sheet
+///    for the long tail (qadā, missed, edit); swiping down closes it.
+///    The grabber at the top is what says the card can be dragged, and
+///    the MORE link is the same door for anyone who does not swipe.
 /// 4. **Logged** — the prayer's ornament renders in its logged state
 ///    and the inscription summarises ("JAMĀ'AH · ON TIME · 4:18 PM").
 ///    Tapping the card opens the edit sheet.
@@ -99,6 +103,9 @@ struct FocusedPrayerCard: View {
     @State private var jamaahPending: Bool = false
     @State private var autoCollapseTask: Task<Void, Never>?
     @State private var rawatibRevealed: Bool = false
+    /// Live vertical translation of the expanded card's drag, in
+    /// points. Negative is upward, toward the sheet.
+    @State private var dragOffset: CGFloat = 0
 
     /// Time the user must be idle in the expanded state before the
     /// card auto-collapses without committing. 12 sec per spec.
@@ -106,10 +113,28 @@ struct FocusedPrayerCard: View {
 
     enum Mode { case collapsed, expanded }
 
-    /// Fixed card height — the card never expands upward into the
-    /// celestial scene above when transitioning between prayers or
-    /// modes. All states lay out within this bound.
+    /// The card's resting height, and the one the celestial composition
+    /// above is measured against. Every non-expanded state lays out
+    /// within this bound, so switching prayers never moves the card.
     static let cardHeight: CGFloat = 140
+
+    /// The expanded height. Taller than the resting card on purpose:
+    /// the growth is a direct answer to a tap, animated, and it is what
+    /// buys the commit buttons and the jamāʿah chip room to be read.
+    /// The scene above is still laid out against `cardHeight`, so it
+    /// does not reflow when the card opens — the card simply covers a
+    /// little more sky while it is open.
+    ///
+    /// Sized to the content and no further. The point of the rebuild
+    /// was that the old expanded state was crowded; answering that with
+    /// a card of slack would only have moved the problem, and a void
+    /// above a lone trailing link reads as an unfinished layout.
+    static let expandedCardHeight: CGFloat = 176
+
+    /// How far the card must travel before the gesture commits. Short
+    /// enough to feel willing, long enough that a wobble during a tap
+    /// on ON TIME is not read as a swipe.
+    private static let swipeThreshold: CGFloat = 40
 
     private var isLogged: Bool { currentStatus != nil }
 
@@ -136,13 +161,27 @@ struct FocusedPrayerCard: View {
         )
     }
 
+    /// True when the expanded controls are the ones on screen. Drives
+    /// the height, the grabber, and whether the swipe is listening.
+    private var isExpandedLayout: Bool {
+        !isLogged
+            && !isWindowClosed
+            && mode == .expanded
+            && FocusedCardModel.allowsLogging(phase)
+    }
+
     var body: some View {
         contentForMode
             .padding(14)
             .frame(maxWidth: .infinity)
-            .frame(height: Self.cardHeight)
+            .frame(height: isExpandedLayout ? Self.expandedCardHeight : Self.cardHeight)
             .celestialPanel(tokens: tokens, cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
+            // The card follows the finger a little on the way to its
+            // destination, so the sheet does not arrive out of nowhere.
+            .offset(y: reduceMotion ? 0 : dragOffset)
+            .opacity(dragFade)
+            .gesture(expandGesture, isEnabled: isExpandedLayout)
             .animation(
                 reduceMotion ? nil : .smooth(duration: 0.28),
                 value: mode
@@ -152,6 +191,7 @@ struct FocusedPrayerCard: View {
                 value: isLogged
             )
             .onChange(of: mode) { _, newMode in
+                dragOffset = 0
                 if newMode == .expanded {
                     jamaahPending = isJamaah
                     scheduleAutoCollapse()
@@ -165,11 +205,59 @@ struct FocusedPrayerCard: View {
                 // any in-progress expansion since the controls now
                 // reference a different prayer.
                 rawatibRevealed = false
+                dragOffset = 0
                 if mode == .expanded {
                     mode = .collapsed
                 }
             }
             .accessibilityElement(children: .contain)
+            // Nobody using VoiceOver or Switch Control can swipe this
+            // card, so both destinations are actions as well. The
+            // visible MORE link is the third way in.
+            .accessibilityAction(named: "More options") { onMoreOptions() }
+            .accessibilityAction(named: "Collapse") { mode = .collapsed }
+    }
+
+    // MARK: - The swipe
+
+    /// One vertical axis, two destinations: up opens the full log
+    /// sheet, down closes the card. The grabber at the top of the
+    /// expanded state is what says so.
+    ///
+    /// Threshold-based, not interactive: a modal sheet cannot be
+    /// dragged into place in SwiftUI, so the card tracks the finger and
+    /// the sheet presents on its own animation once the gesture has
+    /// clearly committed.
+    private var expandGesture: some Gesture {
+        DragGesture(minimumDistance: 12)
+            .onChanged { value in
+                // Damped, so the card reads as resisting rather than
+                // sliding away, and the finger never outruns it.
+                dragOffset = value.translation.height * 0.45
+                // A slow, deliberate drag must not be interrupted by
+                // the idle timer firing underneath it.
+                scheduleAutoCollapse()
+            }
+            .onEnded { value in
+                let travel = value.translation.height
+                dragOffset = 0
+                if travel <= -Self.swipeThreshold {
+                    Haptics.impact(.light)
+                    onMoreOptions()
+                    mode = .collapsed
+                } else if travel >= Self.swipeThreshold {
+                    Haptics.impact(.light)
+                    mode = .collapsed
+                }
+            }
+    }
+
+    /// The card dims slightly as it travels — the visual half of "this
+    /// is on its way somewhere", and it caps well short of invisible.
+    private var dragFade: Double {
+        guard !reduceMotion, dragOffset != 0 else { return 1 }
+        let progress = min(1, abs(dragOffset) / Self.swipeThreshold)
+        return 1 - 0.15 * progress
     }
 
     private var isWindowClosed: Bool {
@@ -357,17 +445,36 @@ struct FocusedPrayerCard: View {
 
     // MARK: - Expanded state
 
-    /// Expanded, tightened: name row, jamāʿah toggle, the two commit
-    /// buttons, then a slim footer — rawatib leading, MORE OPTIONS
-    /// trailing. Every region exactly as tall as its content; no
-    /// floating elements, no dead middle.
+    /// Expanded, rebuilt to breathe.
+    ///
+    /// Reading order top to bottom: what prayer and until when, the two
+    /// commits, the one modifier, then the ways onward. Each band does
+    /// one job and is left-aligned to the same rule, which the previous
+    /// version's centred jamāʿah pill broke for no reason.
+    ///
+    /// The window line is the piece that was missing: On Time versus
+    /// Delayed is only a real choice if you can see how much window is
+    /// left.
     @ViewBuilder
     private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(spacing: IhsanSpacing.sm) {
+        VStack(alignment: .leading, spacing: 0) {
+            grabber
+                .padding(.bottom, 6)
+
+            HStack(alignment: .top, spacing: IhsanSpacing.sm) {
                 ornament
-                prayerNameRow
-                Spacer()
+                VStack(alignment: .leading, spacing: 2) {
+                    prayerNameRow
+                    Text(inscription.uppercased())
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .monospacedDigit()
+                        .foregroundStyle(tokens.inkSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.75)
+                        .inkKeyline(tokens)
+                }
+                Spacer(minLength: 0)
                 Button {
                     Haptics.impact(.light)
                     mode = .collapsed
@@ -381,28 +488,32 @@ struct FocusedPrayerCard: View {
                 .accessibilityLabel("Close")
             }
 
-            JamaahToggleControl(isOn: $jamaahPending, tokens: tokens)
-                .frame(maxWidth: .infinity, alignment: .center)
-                .onChange(of: jamaahPending) { _, _ in
-                    scheduleAutoCollapse()
-                }
+            Spacer(minLength: IhsanSpacing.xxs)
 
-            HStack(spacing: 8) {
+            HStack(spacing: IhsanSpacing.sm) {
                 TimingCommitButton(
-                    label: "On Time",
+                    label: PrayerStatus.onTime.displayName,
                     prominent: true,
                     tokens: tokens
                 ) {
                     commit(.onTime)
                 }
                 TimingCommitButton(
-                    label: "Late",
+                    label: PrayerStatus.late.displayName,
                     prominent: false,
                     tokens: tokens
                 ) {
                     commit(.late)
                 }
             }
+
+            JamaahChip(isOn: $jamaahPending, tokens: tokens)
+                .padding(.top, IhsanSpacing.xs + 2)
+                .onChange(of: jamaahPending) { _, _ in
+                    scheduleAutoCollapse()
+                }
+
+            Spacer(minLength: IhsanSpacing.xxs)
 
             HStack(spacing: IhsanSpacing.sm) {
                 if let rawatib, rawatib.hasAnySlot {
@@ -413,17 +524,34 @@ struct FocusedPrayerCard: View {
                     Haptics.impact(.light)
                     onMoreOptions()
                 } label: {
-                    Text("MORE OPTIONS")
-                        .font(IhsanFont.inscription)
-                        .tracking(1.6)
-                        .foregroundStyle(tokens.metal.opacity(0.60))
+                    HStack(spacing: 4) {
+                        Text("MORE")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 8, weight: .semibold))
+                    }
+                    .foregroundStyle(tokens.metal.opacity(0.70))
+                    .padding(.leading, IhsanSpacing.sm)
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("More options")
-                .accessibilityHint("Opens the full prayer log sheet.")
+                .accessibilityHint("Opens the full prayer log sheet. You can also swipe the card up.")
             }
             .frame(height: 18)
         }
+    }
+
+    /// The grabber: the one mark that says this card can be dragged.
+    /// Without it the swipe is a secret, and a secret gesture is not an
+    /// affordance.
+    private var grabber: some View {
+        Capsule()
+            .fill(tokens.metal.opacity(0.45))
+            .frame(width: 34, height: 3.5)
+            .frame(maxWidth: .infinity, alignment: .center)
+            .accessibilityHidden(true)
     }
 
     // MARK: - Sunnah chips
@@ -668,12 +796,18 @@ struct FocusedPrayerCard: View {
     }
 }
 
-// MARK: - Jamaʿah toggle pill
+// MARK: - Jamaʿah chip
 
-/// A horizontal pill that toggles jamaʿah. Off state outlines the
-/// pill in metal; on state fills flat metal with deep ink text —
-/// flat + luminous, no iridescence, no depth.
-private struct JamaahToggleControl: View {
+/// The congregation modifier, in the app's own marker vocabulary: a
+/// hollow ring when off, the gilded ring when on, with its name beside
+/// it. Left-aligned like everything else in the expanded card.
+///
+/// It replaced a centred pill whose entire state was a background fill
+/// — off read as "a button", on read as "a slightly different button",
+/// and neither read as a setting. Filled-versus-hollow is the same
+/// distinction the plate's markers and the nafl chips already make, so
+/// there is nothing new to learn here.
+private struct JamaahChip: View {
     @Binding var isOn: Bool
     let tokens: SkyPaletteTokens
 
@@ -686,40 +820,58 @@ private struct JamaahToggleControl: View {
                 isOn.toggle()
             }
         } label: {
-            Text(IhsanVocabulary.jamaahInscription)
-                .font(IhsanFont.inscription)
-                .tracking(2.0)
-                .foregroundStyle(isOn ? tokens.panelFill : tokens.metal)
-                .padding(.horizontal, 20)
-                .padding(.vertical, 6)
-                .frame(minWidth: 110)
-                .background {
-                    Capsule()
-                        .fill(tokens.metal)
+            HStack(spacing: 7) {
+                ZStack {
+                    Circle()
+                        .fill(tokens.leafGold)
                         .opacity(isOn ? 1 : 0)
-                }
-                .overlay {
-                    Capsule()
+                    Circle()
                         .strokeBorder(
-                            tokens.metal.opacity(isOn ? 0.95 : 0.55),
-                            lineWidth: 1
+                            isOn ? tokens.keyline.opacity(0.85) : tokens.metal.opacity(0.65),
+                            lineWidth: isOn ? 1.2 : 1
                         )
                 }
+                .frame(width: 13, height: 13)
+
+                Text("IN \(IhsanVocabulary.jamaahInscription)")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.7)
+                    .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary)
+            }
+            .padding(.horizontal, 11)
+            .padding(.vertical, 6)
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        tokens.metal.opacity(isOn ? 0.75 : 0.35),
+                        lineWidth: 0.9
+                    )
+            }
+            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("\(IhsanVocabulary.jamaahTitle) toggle")
+        .accessibilityLabel(IhsanVocabulary.inJamaahTitle)
         .accessibilityValue(isOn ? "on" : "off")
+        .accessibilityAddTraits(.isToggle)
         .accessibilityHint("Double-tap to toggle \(IhsanVocabulary.jamaah) selection.")
     }
 }
 
 // MARK: - Timing commit button
 
-/// One of the two pill buttons in the expanded state — labels only,
-/// no glyphs, in the panel language. On the press, On Time takes the
-/// primary gilded fill (leaf bounded by keyline ink); Late fills in
-/// base metal. The fill plays just ahead of the logged transition,
-/// synchronized with the ornament's materialize pour.
+/// One of the two commit buttons in the expanded state — labels only,
+/// no glyphs, in the panel language.
+///
+/// **On Time rests filled**: leaf gold bounded by the keyline, with
+/// keyline ink on top — the same recipe the log sheet's commit bar
+/// uses, so the two surfaces read as one system. Previously both
+/// buttons rested as identical outlined capsules and the `prominent`
+/// flag did not become visible until the finger was already down,
+/// which is exactly too late for a hierarchy to be useful.
+///
+/// Delayed rests as a plain metal outline and fills on press. Its press
+/// fill plays just ahead of the logged transition, synchronised with
+/// the ornament's materialize pour.
 private struct TimingCommitButton: View {
     let label: String
     let prominent: Bool
@@ -734,8 +886,8 @@ private struct TimingCommitButton: View {
             withAnimation(reduceMotion ? nil : .smooth(duration: 0.15)) {
                 isPressing = true
             }
-            // Slight delay so the fill animation is visible before
-            // the card transitions to the logged state.
+            // Slight delay so the press is visible before the card
+            // transitions to the logged state.
             Task { @MainActor in
                 try? await Task.sleep(nanoseconds: 120_000_000)
                 action()
@@ -744,32 +896,35 @@ private struct TimingCommitButton: View {
             Text(label.uppercased())
                 .font(IhsanFont.inscription)
                 .tracking(1.8)
-                .foregroundStyle(pressedForeground)
-                .padding(.vertical, 9)
+                .foregroundStyle(foreground)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity)
                 .background {
                     Capsule()
                         .fill(prominent ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.metal))
-                        .opacity(isPressing ? 1 : 0)
+                        .opacity(prominent || isPressing ? 1 : 0)
                 }
                 .overlay {
                     Capsule()
                         .strokeBorder(
                             prominent
-                                ? tokens.metalHighlight.opacity(0.95)
+                                ? tokens.keyline.opacity(0.55)
                                 : tokens.metal.opacity(0.75),
                             lineWidth: prominent ? 1.1 : 1
                         )
                 }
+                .scaleEffect(isPressing && !reduceMotion ? 0.97 : 1)
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Log as \(label)")
         .accessibilityHint("Double-tap to log as \(label.lowercased()).")
     }
 
-    private var pressedForeground: Color {
-        guard isPressing else { return tokens.ink }
-        return prominent ? tokens.keyline : tokens.panelFill
+    /// Gold demands the keyline on top; the outlined secondary keeps
+    /// plain ink until its own fill arrives beneath it.
+    private var foreground: Color {
+        if prominent { return tokens.keyline }
+        return isPressing ? tokens.panelFill : tokens.ink
     }
 }
 

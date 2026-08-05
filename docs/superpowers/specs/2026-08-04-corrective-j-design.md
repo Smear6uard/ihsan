@@ -27,15 +27,11 @@ invisible is worse than no switch.
 
 - Both chips are deleted from `TrajectoryScreen`, along with
   `naflOverlayToggle` and `dhikrOverlayToggle`.
-- `GestaltGrid` gains a **left legend gutter** — right-aligned
-  inscription labels, one per row:
-  `FAJR · DHUHR · ASR · MAGH · ISHA`, then after the register gap,
-  `NAFL · DHIKR`. The pattern becomes self-describing, which is the job
-  the chips were failing at.
-- Gutter width is `@ScaledMetric` from a 46pt base so it grows with
-  Dynamic Type. `Metrics` receives the reduced width; `annotationRow`
-  is offset by the same gutter so the "you are here" star and the
-  travel plane marks stay under their columns.
+- `GestaltGrid` gains a **key row** beneath the pattern, drawn only when
+  a presence row is: each row's own mark at legible size (11pt) beside
+  its name, `✦ NAFL` and `● DHIKR`. The marks are the same units the
+  rows draw, so the key can never describe something the grid does not
+  show.
 - **Presence rows render when they have data.** `TrajectoryScreen`
   passes `naflDays` whenever `sunnahLayerEnabled` is true and
   `dhikrDays` always. `GestaltGrid` draws each overlay row only if at
@@ -51,6 +47,19 @@ invisible is worse than no switch.
 `.pathDhikrOverlayEnabled` remain in the schema — removing them would
 force a migration for no gain — but nothing reads or writes them. Both
 are marked deprecated in a doc comment.
+
+### Why not a per-row legend gutter
+
+The design started as a left gutter naming all seven rows, and it does
+not survive the densities. At 30D the row pitch is 10pt and at 90D it is
+4pt; an inscription label is about 11pt tall. Labels at those pitches
+overlap each other, and a gutter that works only at 7D is worse than
+none. The naming moved underneath, where it has room at every period.
+
+The five fardh rows keep no labels. They were not what anyone
+misread — the complaint was about the two quiet rows nobody could name
+— and the ornament column headers on the `DailyPracticeGrid` directly
+below already teach the prayer order.
 
 ### Presence logic placement
 
@@ -76,7 +85,7 @@ Hanafi fiqh the distinction that matters is *inside* the window versus
 |---|---|---|---|---|
 | `.onTime` | On Time | ON TIME | PRAYED IN ITS WINDOW | on time |
 | `.late` | **Delayed** | DELAYED | PRAYED **LATE** IN ITS WINDOW | delayed |
-| `.qada` | Qadā | QADĀ | **PRAYED AFTER ITS WINDOW** | as qadā |
+| `.qada` | Qadā | QADĀ | **PRAYED AFTER ITS WINDOW** | qadā |
 | `.missed` | Missed | MISSED | ITS WINDOW PASSED UNPRAYED | missed |
 
 On Time and Delayed are both *in-window*; the single word `LATE`
@@ -99,6 +108,11 @@ complications, `PrayerStatusEntity` (Siri vocabulary),
 
 `PrayerLog.lateBySeconds` keeps its stored name — it now means
 "seconds into the window" and gains a doc comment saying so.
+
+`spokenLabel` returns the bare word with no connective. An earlier draft
+had qadā as "as qadā", which read correctly in the card's VoiceOver
+label and turned every complication count into "1 as qadā". Callers
+supply their own grammar.
 
 ### The availability rule changes with the semantics
 
@@ -135,9 +149,11 @@ pill, two full-width buttons, and a two-control footer into a fixed
 140pt at 7pt spacing. It reads as crowded, and the jamāʿah pill's
 on/off state is genuinely ambiguous.
 
-**Repair.** Collapsed stays 140pt. Expanded animates to **186pt** on an
+**Repair.** Collapsed stays 140pt. Expanded animates to **176pt** on an
 explicit, user-initiated tap — deliberate growth, not the layout jitter
-the fixed height was guarding against.
+the fixed height was guarding against. (First built at 186 and measured
+on the simulator: it left a visible void above the lone trailing MORE
+link. Answering "crowded" with a card of slack only moves the problem.)
 
 ```
 ┌─────────── ━━━━ ────────────────────────┐  ← grabber
@@ -289,3 +305,30 @@ Device-only judgments — animation timing at 120Hz, the swipe threshold
 in the hand, VoiceOver pronunciation of "Delayed", Dynamic Type at
 accessibility sizes on the new legend gutter — are appended to
 `POLISH_FINDINGS.md` rather than asserted.
+
+
+## What changed during implementation
+
+Two things moved after the design was approved, both after seeing the
+result on a simulator:
+
+1. **The Path legend became a key row, not a gutter.** Per-row labels
+   cannot fit at 30D/90D pitches. Recorded above.
+2. **The expanded card is 176pt, not 186.** Measured, then tightened.
+
+`Prayer.inscriptionAbbreviation` was added for the gutter and is now
+unused by any view. It is kept because it is the right primitive if a
+row legend is ever wanted at 7D, and it costs one switch statement.
+
+## Verification performed
+
+- `xcodebuild build` on the `ihsan` scheme: succeeded.
+- `swift test` on IhsanCore (182), IhsanIntents (38), IhsanInsights
+  (12), IhsanFiqhConfig (19): all passed.
+- `ihsanTests`: 207 tests in 34 suites passed, including the three new
+  suites.
+- `ihsanUITests`: `FocusedCardSwipeUITests` (4) and
+  `RemembranceDoorUITests` (3) written for this change, all passing —
+  the swipe and the hub's dismissal handoff are only provable live.
+- Simulator captures of Today, the expanded card, the log sheet, Path,
+  and the hub, reviewed against the four findings.
