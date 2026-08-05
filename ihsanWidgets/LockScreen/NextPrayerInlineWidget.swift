@@ -5,19 +5,19 @@ import WidgetKit
 /// Lock screen inline — a single line above the clock.
 ///
 /// The system allows one line of text and an optional leading image,
-/// and renders both at text scale in the accented mode. At that size an
-/// ornament is indistinguishable from a smudge, so this line is words
-/// and figures only: "Asr · 4:32 PM". Nothing is lost — the shapes do
-/// their work everywhere there is room for them.
+/// and renders both at text scale in the accented mode. At that size
+/// an ornament is indistinguishable from a smudge, so this line is
+/// words and figures only: "Asr · 4:32 PM".
 struct NextPrayerInlineWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
-        if entry.isLocationMissing {
-            Text("Open Ihsan to set location")
-        } else {
-            Text("\(entry.nextPrayer.displayNameEnglish) · \(entry.clockTime(entry.nextPrayerScheduledTime))")
+        switch entry.content {
+        case .live(let day):
+            Text("\(day.nextPrayer.displayNameEnglish) · \(day.clockTime(day.nextPrayerTime))")
                 .font(.system(.body, design: .rounded).monospacedDigit())
+        case .invitation(let invitation):
+            Text("\(invitation.title) \(invitation.line)")
         }
     }
 }
@@ -33,7 +33,7 @@ struct NextPrayerInlineWidget: Widget {
                 }
         }
         .configurationDisplayName("Next Prayer (Inline)")
-        .description("Above the lock screen clock — minimal one-line prayer name and time.")
+        .description("Above the lock screen clock — the next prayer's name and time.")
         .supportedFamilies([.accessoryInline])
     }
 }

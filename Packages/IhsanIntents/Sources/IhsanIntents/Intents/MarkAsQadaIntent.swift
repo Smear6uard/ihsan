@@ -57,6 +57,8 @@ public struct MarkAsQadaIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+
         let prayerName = log.prayer?.displayNameEnglish ?? "Prayer"
         return .result(dialog: IntentDialog("\(prayerName) marked as qada."))
     }

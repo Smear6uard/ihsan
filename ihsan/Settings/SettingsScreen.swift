@@ -124,6 +124,15 @@ struct SettingsScreen: View {
             openDebugRoute()
             #endif
         }
+        // Every settings mutation stamps `modifiedAt`, so this one
+        // observer republishes the widget snapshot for all of them —
+        // calculation method, madhab, high-latitude rule, tuning,
+        // Hijri offset, fasting rhythms. Widgets must never keep
+        // yesterday's madhab while the app shows today's.
+        .onChange(of: settings?.modifiedAt) { previous, current in
+            guard previous != nil, current != nil, previous != current else { return }
+            WidgetSnapshotService.republish(using: modelContext)
+        }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
         }
@@ -402,6 +411,9 @@ struct SettingsScreen: View {
             // schedule does — re-sync it whenever the schedule rebuilds.
             await NightWakeService.shared.refresh(using: modelContext)
         }
+        // Pause and travel transitions change what a widget may show
+        // (a paused day carries no logging surface at all).
+        WidgetSnapshotService.republish(using: modelContext)
     }
 
     private func handleTravelToggle(_ isEnabled: Bool) {

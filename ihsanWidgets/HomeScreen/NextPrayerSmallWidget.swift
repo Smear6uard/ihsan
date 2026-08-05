@@ -21,65 +21,91 @@ struct NextPrayerSmallWidgetView: View {
         let ink = isStandBy ? tokens.standByInk : tokens.ink
         let inkSecondary = isStandBy ? tokens.standByInkSecondary : tokens.inkSecondary
 
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                PrayerMarkerOrnament(
-                    prayer: entry.nextPrayer,
-                    size: 22,
-                    state: entry.currentPrayer == entry.nextPrayer ? .current : .upcoming,
-                    tokens: tokens
+        Group {
+            switch entry.content {
+            case .live(let day):
+                liveBody(day, tokens: tokens, ink: ink, inkSecondary: inkSecondary)
+            case .invitation(let invitation):
+                WidgetInvitationFace(
+                    invitation: invitation, ink: ink, inkSecondary: inkSecondary
                 )
-                Spacer(minLength: IhsanSpacing.xs)
-                Text(entry.cityName.uppercased())
-                    .font(IhsanFont.inscription)
-                    .tracking(0.8)
-                    .foregroundStyle(inkSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-
-            Spacer(minLength: IhsanSpacing.xxs)
-
-            if entry.isLocationMissing {
-                placeholderBody(ink: ink, inkSecondary: inkSecondary)
-            } else {
-                CountdownLabel.Tabular(until: entry.nextPrayerScheduledTime, scale: 1.05)
-                    .foregroundStyle(ink)
-                    .padding(.bottom, IhsanSpacing.xxs)
-
-                Text(entry.nextPrayer.displayNameEnglish)
-                    .font(.system(size: 17, weight: .semibold, design: .serif))
-                    .foregroundStyle(ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-
-                Text(entry.clockTime(entry.nextPrayerScheduledTime))
-                    .font(.system(.footnote, design: .rounded).monospacedDigit())
-                    .foregroundStyle(inkSecondary)
-                    .lineLimit(1)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(WidgetDeeplink.today)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(
-            entry.isLocationMissing
-                ? "Open Ihsan to set your location"
-                : "\(entry.nextPrayer.displayNameEnglish) at \(entry.clockTime(entry.nextPrayerScheduledTime))"
-        )
     }
 
     @ViewBuilder
-    private func placeholderBody(ink: Color, inkSecondary: Color) -> some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-            Text("Open Ihsan")
+    private func liveBody(
+        _ day: PrayerTimelineEntry.LiveDay,
+        tokens: SkyPaletteTokens,
+        ink: Color,
+        inkSecondary: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top) {
+                PrayerMarkerOrnament(
+                    prayer: day.nextPrayer,
+                    size: 22,
+                    state: day.currentPrayer == day.nextPrayer ? .current : .upcoming,
+                    tokens: tokens
+                )
+                Spacer(minLength: IhsanSpacing.xs)
+                if let city = day.cityName {
+                    Text(city.uppercased())
+                        .font(IhsanFont.inscription)
+                        .tracking(0.8)
+                        .foregroundStyle(inkSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                }
+            }
+
+            Spacer(minLength: IhsanSpacing.xxs)
+
+            if let countdown = entry.nextPrayerCountdown {
+                CountdownLabel.Tabular(interval: countdown, scale: 1.05)
+                    .foregroundStyle(ink)
+                    .padding(.bottom, IhsanSpacing.xxs)
+            }
+
+            Text(day.nextPrayer.displayNameEnglish)
                 .font(.system(size: 17, weight: .semibold, design: .serif))
                 .foregroundStyle(ink)
-            Text("to set your location")
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+
+            Text(day.clockTime(day.nextPrayerTime))
+                .font(.system(.footnote, design: .rounded).monospacedDigit())
+                .foregroundStyle(inkSecondary)
+                .lineLimit(1)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(day.nextPrayer.displayNameEnglish) at \(day.clockTime(day.nextPrayerTime))"
+        )
+    }
+}
+
+/// The one invitation face every widget family shares — quiet,
+/// grounded on the same sky, and honest about why there are no times.
+struct WidgetInvitationFace: View {
+    let invitation: PrayerTimelineEntry.Invitation
+    let ink: Color
+    let inkSecondary: Color
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+            Text(invitation.title)
+                .font(.system(size: 17, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
+            Text(invitation.line)
                 .font(IhsanFont.inscription)
                 .tracking(0.6)
                 .foregroundStyle(inkSecondary)
         }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(invitation.title) \(invitation.line)")
     }
 }
 
@@ -110,7 +136,7 @@ struct WidgetGround: View {
         if showsContainer {
             WidgetPalette.homeGround(for: entry)
         } else {
-            WidgetPalette.standByGround(for: entry)
+            WidgetPalette.standByGround()
         }
     }
 }

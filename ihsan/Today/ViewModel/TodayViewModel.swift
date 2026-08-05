@@ -131,6 +131,17 @@ final class TodayViewModel {
             writtenAt: now
         ))
 
+        // The iOS widget spine: two full days, day facts, and a
+        // timeline reload — published beside the legacy one-day cache
+        // (above), which the watch complications still read.
+        WidgetSnapshotService.publish(
+            place: place,
+            provider: prayerTimesProvider,
+            settings: settings,
+            modelContext: modelContext,
+            now: now
+        )
+
         // Secondary pages ride the same solar transition as the plate:
         // publish the day's real events so page chrome resolves through
         // them instead of the clock-anchor approximation.

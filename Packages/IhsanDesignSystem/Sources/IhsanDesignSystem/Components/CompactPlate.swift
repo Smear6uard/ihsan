@@ -129,29 +129,34 @@ public struct CompactPlate: View {
 }
 
 /// Where the arc lies, and where a moment sits on it. One definition,
-/// used by both the stroke and the ornaments, so a marker can never end
-/// up off its own curve.
-struct ArcGeometry: Equatable {
-    let inset: CGFloat
-    let width: CGFloat
-    let rise: CGFloat
-    let baseline: CGFloat
+/// used by the stroke, the ornaments, and any tap target a consumer
+/// lays over them — so a marker can never end up off its own curve
+/// and a button can never end up off its marker.
+public struct ArcGeometry: Equatable, Sendable {
+    public let inset: CGFloat
+    public let width: CGFloat
+    public let rise: CGFloat
+    public let baseline: CGFloat
 
-    init(size: CGSize, ornamentSize: CGFloat) {
+    public init(size: CGSize, ornamentSize: CGFloat) {
         // The first and last ornaments sit at the ends of the arc,
         // which on a widget is exactly where the rounded corner cuts
         // in. The inset and the raised baseline together keep both of
         // them clear of it.
         inset = ornamentSize / 2 + 6
         width = max(size.width - inset * 2, 1)
-        // Shallow on purpose: the ornaments ride the curve's top edge,
-        // so it reads as the sun's path rather than as a bowl.
-        rise = min(size.height * 0.42, width * 0.16)
         baseline = size.height - ornamentSize / 2 - 4
+        // Shallow on purpose: the ornaments ride the curve's top edge,
+        // so it reads as the sun's path rather than as a bowl. And
+        // never taller than the frame allows — in a tight strip (the
+        // nightstand's 34 pt) the peak ornament must stay whole, so
+        // the rise yields before the frame does.
+        let tallestRiseThatFits = baseline - ornamentSize / 2 - 1
+        rise = max(0, min(min(size.height * 0.42, width * 0.16), tallestRiseThatFits))
     }
 
     /// A parabola: both ends on the baseline, peak at t = 0.5.
-    func point(at t: CGFloat) -> CGPoint {
+    public func point(at t: CGFloat) -> CGPoint {
         CGPoint(
             x: inset + width * t,
             y: baseline - rise * (1 - pow(2 * t - 1, 2))

@@ -7,15 +7,14 @@ import WidgetKit
 
 /// Medium (4×2). The day's arc.
 ///
-/// This is the app's signature at widget scale: the five ornaments set
-/// along a shallow arc at their true proportion of the day, gilded
-/// behind you and outlined ahead. The letter row that used to sit under
-/// a row of dots — F D A M I — is gone; a shape that means Maghrib
-/// needs no letter to say so, and the arc carries the day's shape in a
-/// way five evenly spaced dots never could.
-///
-/// Every ornament is a tap target: pressing one logs that prayer
-/// through the same intent every other surface uses.
+/// The five ornaments set along a shallow arc at their true proportion
+/// of the day, gilded behind you and outlined ahead. One prayer is
+/// interactive: the current one, logged On Time through the same
+/// intent every other surface uses. A prayer whose moment has passed
+/// deserves the app's own sheet — its status is a question, and a
+/// widget button that answered it silently would answer it wrong.
+/// During an excused pause the arc shows times and nothing is a
+/// button at all.
 struct PrayerStatusMediumWidgetView: View {
     let entry: PrayerTimelineEntry
 
@@ -27,47 +26,64 @@ struct PrayerStatusMediumWidgetView: View {
         let ink = isStandBy ? tokens.standByInk : tokens.ink
         let inkSecondary = isStandBy ? tokens.standByInkSecondary : tokens.inkSecondary
 
-        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-            header(ink: ink, inkSecondary: inkSecondary)
-
-            if entry.isLocationMissing {
-                Spacer(minLength: 0)
-                Text("Open Ihsan to set your location")
-                    .font(.system(size: 15, weight: .regular, design: .serif))
-                    .foregroundStyle(inkSecondary)
-                Spacer(minLength: 0)
-            } else {
-                ZStack {
-                    WidgetPlate(entry: entry, tokens: tokens, ornamentSize: 22)
-                    tapTargets
-                }
-                .frame(maxHeight: .infinity)
+        Group {
+            switch entry.content {
+            case .live(let day):
+                liveBody(day, tokens: tokens, ink: ink, inkSecondary: inkSecondary)
+            case .invitation(let invitation):
+                WidgetInvitationFace(
+                    invitation: invitation, ink: ink, inkSecondary: inkSecondary
+                )
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .widgetURL(WidgetDeeplink.today)
     }
 
-    private func header(ink: Color, inkSecondary: Color) -> some View {
+    @ViewBuilder
+    private func liveBody(
+        _ day: PrayerTimelineEntry.LiveDay,
+        tokens: SkyPaletteTokens,
+        ink: Color,
+        inkSecondary: Color
+    ) -> some View {
+        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+            header(day, ink: ink, inkSecondary: inkSecondary)
+
+            ZStack {
+                WidgetPlate(day: day, date: entry.date, tokens: tokens, ornamentSize: 22)
+                if !day.isPaused {
+                    currentPrayerTapTarget(day)
+                }
+            }
+            .frame(maxHeight: .infinity)
+        }
+    }
+
+    private func header(
+        _ day: PrayerTimelineEntry.LiveDay, ink: Color, inkSecondary: Color
+    ) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
-            Text(entry.cityName.uppercased())
-                .font(IhsanFont.inscription)
-                .tracking(1.0)
-                .foregroundStyle(inkSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
+            if let city = day.cityName {
+                Text(city.uppercased())
+                    .font(IhsanFont.inscription)
+                    .tracking(1.0)
+                    .foregroundStyle(inkSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+            }
 
             Spacer(minLength: IhsanSpacing.xs)
 
-            if !entry.isLocationMissing {
-                Text(entry.nextPrayer.displayNameEnglish)
-                    .font(.system(size: 15, weight: .semibold, design: .serif))
-                    .foregroundStyle(ink)
-                Text("in")
-                    .font(IhsanFont.inscription)
-                    .tracking(0.8)
-                    .foregroundStyle(inkSecondary)
-                CountdownLabel.Compact(until: entry.nextPrayerScheduledTime)
+            Text(day.nextPrayer.displayNameEnglish)
+                .font(.system(size: 15, weight: .semibold, design: .serif))
+                .foregroundStyle(ink)
+            Text("in")
+                .font(IhsanFont.inscription)
+                .tracking(0.8)
+                .foregroundStyle(inkSecondary)
+            if let countdown = entry.nextPrayerCountdown {
+                CountdownLabel.Compact(interval: countdown)
                     .foregroundStyle(ink)
             }
         }
@@ -75,44 +91,45 @@ struct PrayerStatusMediumWidgetView: View {
         .accessibilityElement(children: .combine)
     }
 
-    /// Invisible buttons over each ornament. Drawing and touch are kept
-    /// apart on purpose: an ornament that had to also be a button would
-    /// have to grow a hit area, and the arc's spacing is information.
-    private var tapTargets: some View {
-        GeometryReader { proxy in
-            let inset: CGFloat = 13
-            let width = max(proxy.size.width - inset * 2, 1)
-            let span = zip(
-                entry.todayPrayerTimes.first?.scheduledTime,
-                entry.todayPrayerTimes.last?.scheduledTime
-            )
-
-            ForEach(entry.todayPrayerTimes) { slot in
-                if let span, span.1 > span.0 {
+    /// One invisible button, over the current prayer's ornament,
+    /// positioned by the same `ArcGeometry` that draws it — the two
+    /// can no longer drift apart.
+    @ViewBuilder
+    private func currentPrayerTapTarget(_ day: PrayerTimelineEntry.LiveDay) -> some View {
+        if let current = day.currentPrayer,
+           let slot = day.slot(for: current),
+           slot.status == nil {
+            GeometryReader { proxy in
+                let arc = ArcGeometry(size: proxy.size, ornamentSize: 22)
+                if let span = arcSpan(day), span.end > span.start {
                     let t = CGFloat(
-                        slot.scheduledTime.timeIntervalSince(span.0)
-                            / span.1.timeIntervalSince(span.0)
+                        slot.scheduledTime.timeIntervalSince(span.start)
+                            / span.end.timeIntervalSince(span.start)
                     )
-                    Button(intent: LogPrayerIntent(prayer: slot.prayer)) {
+                    let point = arc.point(at: min(max(t, 0), 1))
+                    Button(intent: LogPrayerIntent(prayer: current)) {
                         Color.clear
-                            .frame(width: 40, height: proxy.size.height)
+                            .frame(width: 44, height: 44)
                             .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
-                    .position(
-                        x: inset + width * min(max(t, 0), 1),
-                        y: proxy.size.height / 2
-                    )
-                    .accessibilityLabel("Log \(slot.prayer.displayNameEnglish) on time")
+                    .position(point)
+                    .accessibilityLabel("Log \(current.displayNameEnglish) on time")
                 }
             }
         }
     }
-}
 
-private func zip(_ a: Date?, _ b: Date?) -> (Date, Date)? {
-    guard let a, let b else { return nil }
-    return (a, b)
+    private func arcSpan(
+        _ day: PrayerTimelineEntry.LiveDay
+    ) -> (start: Date, end: Date)? {
+        guard
+            let first = day.slots.first?.scheduledTime,
+            let last = day.slots.last?.scheduledTime,
+            last > first
+        else { return nil }
+        return (first, last)
+    }
 }
 
 struct PrayerStatusMediumWidget: Widget {
@@ -126,7 +143,7 @@ struct PrayerStatusMediumWidget: Widget {
                 }
         }
         .configurationDisplayName("Today's Prayers")
-        .description("The day's arc, with every prayer one tap from logged.")
+        .description("The day's arc, with the current prayer one tap from logged.")
         .supportedFamilies([.systemMedium])
     }
 }

@@ -2,7 +2,6 @@ import AppIntents
 import IhsanCore
 import IhsanDesignSystem
 import IhsanIntents
-import SwiftData
 import SwiftUI
 import WidgetKit
 
@@ -18,27 +17,23 @@ struct RepairTimelineEntry: TimelineEntry {
     }
 }
 
-/// Reads the shared store directly, degrading to the placeholder whenever
-/// the container is unavailable — same posture as `WidgetSnapshotLoader`.
-@MainActor
-private struct RepairSnapshotLoader {
-    func entry(at date: Date) -> RepairTimelineEntry {
-        guard let container = try? IhsanModelContainerFactory.makeContainer() else {
-            return .placeholder()
-        }
-        let context = ModelContext(container)
-        let settings = (try? UserSettings.fetchOrCreate(in: context))
-        let ledgers = (try? context.fetch(FetchDescriptor<QadaLedger>())) ?? []
-        return RepairTimelineEntry(
-            date: date,
-            isTracking: settings?.qadaTrackingEnabled ?? false,
-            totalRemaining: ledgers.reduce(0) { $0 + $1.remainingCount }
-        )
-    }
-}
-
+/// Reads the published widget snapshot — the Repair face renders the
+/// qadā count the app last published and never opens the store from a
+/// widget process. The intent funnel mirrors every "+1 made up" back
+/// onto the snapshot, so the count on the lock screen follows the tap.
 struct RepairTimelineProvider: TimelineProvider {
     typealias Entry = RepairTimelineEntry
+
+    private func entry(at date: Date) -> RepairTimelineEntry {
+        guard
+            let snapshot = WidgetSnapshotStore.read(),
+            snapshot.freshness(at: date) == .fresh,
+            let remaining = snapshot.qadaRemaining
+        else {
+            return RepairTimelineEntry(date: date, isTracking: false, totalRemaining: 0)
+        }
+        return RepairTimelineEntry(date: date, isTracking: true, totalRemaining: remaining)
+    }
 
     func placeholder(in context: Context) -> RepairTimelineEntry {
         .placeholder()
@@ -48,33 +43,28 @@ struct RepairTimelineProvider: TimelineProvider {
         in context: Context,
         completion: @escaping @Sendable (RepairTimelineEntry) -> Void
     ) {
-        Task { @MainActor in
-            if context.isPreview {
-                completion(.placeholder())
-                return
-            }
-            completion(RepairSnapshotLoader().entry(at: .now))
+        if context.isPreview {
+            completion(.placeholder())
+            return
         }
+        completion(entry(at: .now))
     }
 
     func getTimeline(
         in context: Context,
         completion: @escaping @Sendable (Timeline<RepairTimelineEntry>) -> Void
     ) {
-        Task { @MainActor in
-            let entry = RepairSnapshotLoader().entry(at: .now)
-            let nextRefresh = Calendar.current.date(byAdding: .hour, value: 6, to: .now) ?? .now
-            completion(Timeline(entries: [entry], policy: .after(nextRefresh)))
-        }
+        let nextRefresh = Calendar.current.date(byAdding: .hour, value: 6, to: .now) ?? .now
+        completion(Timeline(entries: [entry(at: .now)], policy: .after(nextRefresh)))
     }
 }
 
 // MARK: - Lock Screen widget
 
 /// One-tap "+1 made up" from the Lock Screen. The face is the Lawzina
-/// terminal ornament over the quiet remaining count; the whole face is the
-/// button, writing through `LogMakeupPrayerIntent` — the same funnel as
-/// every other surface, so counts reconcile on next app foreground.
+/// terminal ornament over the quiet remaining count; the whole face is
+/// the button, writing through `LogMakeupPrayerIntent` — the same
+/// funnel as every other surface.
 struct RepairMakeupCircularWidgetView: View {
     let entry: RepairTimelineEntry
 
@@ -126,9 +116,9 @@ struct RepairMakeupCircularWidget: Widget {
 
 // MARK: - Control Center control
 
-/// The Control Center "+1 made up" button. Runs the same intent funnel;
-/// the glyph is the app's own qadā mark (the return arrow used across the
-/// design system), not a decorative star.
+/// The Control Center "+1 made up" button. Runs the same intent
+/// funnel; the glyph is the app's own qadā mark (the return arrow used
+/// across the design system), not a decorative star.
 struct RepairMakeupControl: ControlWidget {
     static let kind: String = "RepairMakeupControl"
 

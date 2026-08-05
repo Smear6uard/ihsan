@@ -22,6 +22,11 @@ struct IhsanWatchApp: App {
                 fatalError("Failed to create in-memory ModelContainer on watch: \(error)")
             }
         }
+        // Register with the process-wide holder exactly as the iOS
+        // app does, so a Siri/complication intent on the watch shares
+        // this container instead of lazily creating a second one over
+        // the same store.
+        IhsanSharedModelContainer.shared.register(modelContainer)
     }
 
     var body: some Scene {

@@ -58,6 +58,8 @@ public struct LogMakeupPrayerIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectQadaLedgers(in: context)
+
         return .result(dialog: IntentDialog("\(resolved.displayNameEnglish) made up."))
     }
 }

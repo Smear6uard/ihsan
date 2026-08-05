@@ -61,6 +61,8 @@ public struct LogPrayerIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+
         return .result(dialog: IntentDialog("\(prayer.displayNameEnglish) logged."))
     }
 }

@@ -6,43 +6,52 @@ import WidgetKit
 /// Lock screen circular — five segments around one ornament.
 ///
 /// Each segment is one prayer, filled once that prayer is logged. The
-/// centre carries the current or next prayer's own ornament, so the
-/// glance answers "which prayer, and where am I in the day" without a
-/// figure. It used to read "3/5"; a count out of five is a score, and
-/// this app does not keep score of anyone's worship.
-///
-/// `Gauge` is too coarse for five distinct segments, so the ring is
-/// composed from five arcs.
+/// centre carries the current or next prayer's own ornament. During an
+/// excused pause the segments stand aside entirely — the face shows
+/// the ornament and nothing that reads as an unfilled obligation.
 struct PrayerProgressCircularWidgetView: View {
     let entry: PrayerTimelineEntry
 
     var body: some View {
+        switch entry.content {
+        case .live(let day):
+            liveBody(day)
+        case .invitation:
+            // At circular scale the invitation is the app's mark
+            // alone — a quiet seal, never a fake ring.
+            LockOrnament(prayer: .fajr, size: 20, isEmphasised: false)
+                .widgetAccentable()
+                .accessibilityLabel("Open Ihsan for today's prayer times")
+        }
+    }
+
+    @ViewBuilder
+    private func liveBody(_ day: PrayerTimelineEntry.LiveDay) -> some View {
         ZStack {
-            ForEach(0..<5, id: \.self) { index in
-                let prayer = Prayer.allCases[index]
-                let logged = entry.loggedStatus(for: prayer)
-                let isFilled = logged != nil && logged != .missed
-                Arc(startDegree: degrees(for: index).start,
-                    endDegree: degrees(for: index).end)
-                    .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .butt))
-                    .foregroundStyle(isFilled ? .primary : .tertiary)
+            if !day.isPaused {
+                ForEach(Array(day.slots.enumerated()), id: \.element.id) { index, slot in
+                    let isFilled = slot.status != nil && slot.status != .missed
+                    Arc(startDegree: degrees(for: index).start,
+                        endDegree: degrees(for: index).end)
+                        .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .butt))
+                        .foregroundStyle(isFilled ? AnyShapeStyle(.primary) : AnyShapeStyle(.tertiary))
+                }
             }
 
             LockOrnament(
-                prayer: centrePrayer,
+                prayer: day.currentPrayer ?? day.nextPrayer,
                 size: 17,
-                isEmphasised: entry.currentPrayer != nil
+                isEmphasised: day.currentPrayer != nil
             )
         }
         .padding(2)
         .widgetAccentable()
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(accessibilityLabel)
+        .accessibilityLabel(accessibilityLabel(day))
     }
 
     private func degrees(for index: Int) -> (start: Double, end: Double) {
-        // Five segments around the full circle. 2° gaps for visual breathing
-        // room. Start at -90° (top) and proceed clockwise.
+        // Five segments around the full circle, 2° gaps, from the top.
         let segmentSpan = 360.0 / 5.0
         let gap = 2.0
         let start = -90.0 + Double(index) * segmentSpan + gap / 2.0
@@ -50,17 +59,11 @@ struct PrayerProgressCircularWidgetView: View {
         return (start, end)
     }
 
-    /// The prayer the glance is about: the open one if a window is
-    /// open, otherwise the one being waited for.
-    private var centrePrayer: Prayer {
-        entry.currentPrayer ?? entry.nextPrayer
-    }
-
-    private var accessibilityLabel: String {
-        if let current = entry.currentPrayer {
+    private func accessibilityLabel(_ day: PrayerTimelineEntry.LiveDay) -> String {
+        if let current = day.currentPrayer {
             return "\(current.displayNameEnglish) now"
         }
-        return "\(entry.nextPrayer.displayNameEnglish) at \(entry.clockTime(entry.nextPrayerScheduledTime))"
+        return "\(day.nextPrayer.displayNameEnglish) at \(day.clockTime(day.nextPrayerTime))"
     }
 }
 
