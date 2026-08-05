@@ -867,9 +867,12 @@ struct CelestialPlateScene: View {
 
     /// The moon is a quieter light than the sun: barely there against a
     /// high daytime sky, full strength once the sun is well down.
+    /// Floor lowered 0.28 → 0.12 in corrective I — at 0.28 a daylight
+    /// moon was still present enough to pull the eye off the five
+    /// ornaments, which the discipline gate does not allow.
     private func lunarDaylightPresence(sunAltitudeDegrees: Double) -> Double {
         let t = max(0.0, min(1.0, (6.0 - sunAltitudeDegrees) / 24.0))
-        return 0.28 + 0.72 * t
+        return 0.12 + 0.88 * t
     }
 
     /// One voice leads the sky: when the moon stands inside the sun's

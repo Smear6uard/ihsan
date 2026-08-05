@@ -95,4 +95,47 @@ struct MoonTreatmentTests {
         #expect(lit > dark + 0.10)
         #expect(dark > background.brightness + 0.03)
     }
+
+    /// The daytime moon is a pale ghost, not a coin.
+    ///
+    /// `moonCore`'s lit limb was `mix(ink, metalHighlight, 0.35)`,
+    /// which assumes `ink` is the light pole. True on the jewel
+    /// grounds; false on the day grounds, where ink is #1B2350 — so on
+    /// a near-white sky the moon rendered as a dark slate disc and
+    /// became the single element competing hardest with the five
+    /// ornaments.
+    ///
+    /// Two ways to fail: a dark coin (the defect), or nothing at all
+    /// (the overcorrection). This pins both edges.
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
+    func moonIsAPaleGhostOnTheDayGrounds(state: PaletteState) throws {
+        let tokens = state.tokens
+        let (image, side) = try render(tokens: tokens)
+        let center = side / 2
+        // Sampled by GEOMETRY, not by brightness. The sibling tests
+        // take max/min of the two limbs, which is sound on the jewel
+        // grounds where the lit limb is the brighter one — but that
+        // heuristic inverts here and silently reads the sky as the
+        // moon. `isWaxing: false` lights the LEFT limb; measured on
+        // the unfixed code, left was the slate crescent at 0.339 and
+        // right the earthshine side at 0.958 against a sky of 0.950.
+        let lit = try pixel(image, center - 26, center).brightness
+        let dark = try pixel(image, center + 26, center).brightness
+        let sky = try pixel(image, 4, 4)
+
+        // Not a coin: the lit limb sits within a quarter of the sky's
+        // own brightness, so it reads as pale rather than as an object
+        // punched out of the page.
+        #expect(
+            abs(lit - sky.brightness) < 0.25,
+            Comment(rawValue: "\(state.rawValue) lit limb is \(lit) against a sky of "
+                + "\(sky.brightness) — that is a coin, not a ghost")
+        )
+        // Still a moon: the phase is legible, the lit limb clearly
+        // separated from the earthshine side.
+        #expect(
+            lit - dark > 0.03,
+            Comment(rawValue: "\(state.rawValue) phase has dissolved — lit \(lit), dark \(dark)")
+        )
+    }
 }

@@ -236,14 +236,46 @@ public struct LuminousBody: View {
     /// form, and a defined edge — the hairline limb rim that light
     /// sources are forbidden (the sun has no pixel where it stops;
     /// the moon has exactly one).
+    /// The moon's lit limb, per ground polarity.
+    ///
+    /// On the jewel grounds `ink` IS the light pole (dawn's is
+    /// #EDEFF6), so mixing it toward the metal highlight gives the
+    /// warm near-white a lit limb should be. On the luminous day
+    /// grounds `ink` is the DARK pole and the same formula produced a
+    /// slate coin — measured at 0.34 against a sky of 0.95. There the
+    /// limb is mixed off the sky itself toward the same warm
+    /// highlight: a pale warm near-white, barely separated from the
+    /// field, which is what a daytime moon is.
+    ///
+    /// The day mix is deliberately SMALL and taken off a lifted
+    /// ground. `metalHighlight` is a mid gold, so mixing it heavily
+    /// into a near-white darkens it — at 0.30 the lit limb fell below
+    /// its own earthshine and the phase read inverted. A daytime
+    /// moon's lit limb is the brightest thing on the disc, a shade
+    /// above the sky rather than below it.
+    static func moonLitValue(tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.groundBottomValue.relativeLuminance < 0.5
+            ? .mix(tokens.inkValue, tokens.metalHighlightValue, amount: 0.35)
+            : .mix(
+                tokens.groundTopValue.scalingLightness(by: 1.02),
+                tokens.metalHighlightValue,
+                amount: 0.06
+            )
+    }
+
     private func moonCore(illuminatedFraction: Double, isWaxing: Bool) -> some View {
-        let litColor = SRGBValue.mix(tokens.inkValue, tokens.metalHighlightValue, amount: 0.35).color
-        let earthshine = tokens.groundTopValue.scalingLightness(by: 1.35).color
+        let litColor = Self.moonLitValue(tokens: tokens).color
+        // On the day grounds the earthshine goes one step DOWN rather
+        // than up — the dark limb of a daytime moon is what little the
+        // sky is not.
+        let earthshine = onDarkGround
+            ? tokens.groundTopValue.scalingLightness(by: 1.35).color
+            : tokens.groundTopValue.scalingLightness(by: 0.90).color
         return ZStack {
             // Earthshine: the dark limb barely-there, never bright
             // enough to dissolve the phase.
             Circle()
-                .fill(earthshine.opacity(0.30))
+                .fill(earthshine.opacity(onDarkGround ? 0.30 : 0.55))
             CrescentShape(
                 illuminatedFraction: illuminatedFraction,
                 isWaxing: isWaxing
