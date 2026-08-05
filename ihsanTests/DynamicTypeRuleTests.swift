@@ -15,8 +15,13 @@ import Testing
 @Suite("The Dynamic Type rule")
 struct DynamicTypeRuleTests {
 
+    /// Symlinks resolved on BOTH sides of the prefix strip in
+    /// `relative(_:)` — see the note on `HapticVocabularyTests`. In a
+    /// checkout under a symlinked path the strip never anchors and the
+    /// sweep fails wholesale on mangled `/privateihsan/…` paths.
     private var repoRoot: URL {
         URL(fileURLWithPath: #filePath)
+            .resolvingSymlinksInPath()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
     }
@@ -42,7 +47,8 @@ struct DynamicTypeRuleTests {
     }
 
     private func relative(_ url: URL) -> String {
-        url.path.replacingOccurrences(of: repoRoot.path + "/", with: "")
+        url.resolvingSymlinksInPath().path
+            .replacingOccurrences(of: repoRoot.path + "/", with: "")
     }
 
     @Test("Nothing caps Dynamic Type except the two data matrices")

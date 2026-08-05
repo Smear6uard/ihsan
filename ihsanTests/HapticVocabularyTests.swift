@@ -14,8 +14,19 @@ import Testing
 @Suite("Haptic vocabulary")
 struct HapticVocabularyTests {
 
+    /// Symlinks resolved on BOTH sides of the later prefix strip.
+    /// `#filePath` standardizes a `/private` prefix away while
+    /// `FileManager.enumerator` keeps it, so in any checkout under a
+    /// symlinked path — `/tmp`, which is `/private/tmp`, is the one
+    /// that bites — the strip in `relative(_:)` never anchors and
+    /// every path comes out mangled as `/privateihsan/…`. That matches
+    /// no allowlist entry, so every allowlisted file gets reported and
+    /// the sweep fails wholesale. It passed only because the canonical
+    /// checkout happens to sit on a real path; a CI runner or a
+    /// verification worktree under `/tmp` would have failed it.
     private var repoRoot: URL {
         URL(fileURLWithPath: #filePath)
+            .resolvingSymlinksInPath()
             .deletingLastPathComponent()
             .deletingLastPathComponent()
     }
@@ -78,9 +89,8 @@ struct HapticVocabularyTests {
         }
 
         for case let url as URL in walker where url.pathExtension == "swift" {
-            let relative = url.path.replacingOccurrences(
-                of: repoRoot.path + "/", with: ""
-            )
+            let relative = url.resolvingSymlinksInPath().path
+                .replacingOccurrences(of: repoRoot.path + "/", with: "")
             guard !Self.successAllowlist.contains(relative) else { continue }
 
             let text = (try? String(contentsOf: url, encoding: .utf8)) ?? ""
