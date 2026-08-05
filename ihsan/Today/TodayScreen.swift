@@ -634,6 +634,7 @@ private struct TodayReadyView: View {
             onMoreOptions: {
                 sheetSelection = LogSheetSelection(prayer: prayer)
             },
+            isMoreOptionsPresented: sheetSelection?.prayer == prayer,
             onTasbih: {
                 // The natural post-prayer moment. With the
                 // after-prayer set turned on there are two things a
@@ -776,7 +777,6 @@ private struct TodayReadyView: View {
                 )
             ),
             evening: AdhkarWindowResolver.evening(
-                asr: day.asr.scheduledTime,
                 maghrib: day.maghrib.scheduledTime,
                 isha: day.isha.scheduledTime,
                 extendsAfterMaghrib: TimeInterval(

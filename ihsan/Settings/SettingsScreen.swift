@@ -1124,7 +1124,7 @@ private struct AdhkarSection: View {
                         )
                     }
 
-                    SettingsRow(title: "Evening", subtitle: "ʿAṣr into the early night", glyph: .nightMoon) {
+                    SettingsRow(title: "Evening", subtitle: "Maghrib into the early night", glyph: .nightMoon) {
                         toggle(
                             label: "Evening adhkār",
                             get: { settings.adhkarEveningEnabled },
@@ -1230,7 +1230,7 @@ private struct AdhkarWindowsPicker: View {
                         label: "Extends past Maghrib (min)",
                         value: settings.adhkarEveningExtendsAfterMaghribMinutes,
                         step: 15,
-                        range: 0...180,
+                        range: 15...180,
                         accessibilityLabel: "Minutes after Maghrib the evening window ends"
                     ) {
                         settings.adhkarEveningExtendsAfterMaghribMinutes = $0
@@ -1240,7 +1240,7 @@ private struct AdhkarWindowsPicker: View {
                 .settingsControlInset()
                 .padding(.vertical, IhsanSpacing.xs)
 
-                SettingsDescriptionText("The evening begins at ʿAṣr. Some hold it closes at Maghrib — set this to zero for that — and others that it runs through the early night. It never runs past ʿIshāʾ.")
+                SettingsDescriptionText("The evening offer begins at Maghrib so it follows the visible turn of the day. Choose how long it remains available; it never runs past ʿIshāʾ.")
             }
 
             SettingsSectionCard("Before sleep") {

@@ -377,6 +377,17 @@ struct TrajectoryScreen: View {
         insightText = nil
         isInsightLoading = false
 
+        #if DEBUG
+        // `-IhsanDebugInsight` makes the real presentation surface
+        // inspectable on Simulator, where Foundation Models is
+        // intentionally unavailable. It never bypasses the production
+        // availability or privacy gates.
+        if DebugLaunch.flag("-IhsanDebugInsight") {
+            insightText = "Fajr and Maghrib were the most consistent points in this period, while the middle of the day varied more."
+            return
+        }
+        #endif
+
         guard settings?.aiInsightsEnabled == true,
               InsightAvailability.isAvailable,
               case .ready(let snapshot) = viewModel.state,

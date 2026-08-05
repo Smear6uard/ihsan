@@ -63,14 +63,19 @@ enum RemembranceMenu {
                     title: title(for: .postPrayer)
                 )
             )
-            entries.append(
-                Entry(
-                    destination: .set(.sleep),
-                    title: title(for: .sleep),
-                    window: windows.sleep,
-                    isCurrent: windows.sleep?.contains(now) ?? false
+            // "Before sleep" is itself time-bound. Showing a night
+            // action throughout the afternoon makes the menu contradict
+            // the moment even if its future hours are written beside it.
+            if let sleep = windows.sleep, sleep.contains(now) {
+                entries.append(
+                    Entry(
+                        destination: .set(.sleep),
+                        title: title(for: .sleep),
+                        window: sleep,
+                        isCurrent: true
+                    )
                 )
-            )
+            }
         }
 
         entries.append(

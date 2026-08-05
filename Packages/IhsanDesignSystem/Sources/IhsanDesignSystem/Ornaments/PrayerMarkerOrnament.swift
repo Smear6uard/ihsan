@@ -54,7 +54,7 @@ public struct GildedOrnamentGlyph: View {
         ZStack {
             // Lapis under-layer: the nonzero-winding fill covers the
             // whole silhouette, so wherever the even-odd gold leaves
-            // an interior cutout (the Shamsa's heart, the Lawzina's
+            // an interior cutout (the Khargird star's field, the Lawzina's
             // slit, the night star's field inside its ring), the
             // ultramarine shows through — pigment inside the leaf.
             PrayerOrnamentShape(prayer: prayer, mode: .filled)
@@ -284,7 +284,7 @@ public struct PrayerMarkerOrnament: View {
 /// drawing.
 ///
 /// The fill is even-odd, which is not optional: the night star is a
-/// ring with a star inside it, and the Shamsa has a heart. Filled with
+/// ring with a star inside it, and the Khargird star has a cutout. Filled with
 /// the default winding rule they both become discs.
 public struct OrnamentLinework: View {
     public let prayer: Prayer

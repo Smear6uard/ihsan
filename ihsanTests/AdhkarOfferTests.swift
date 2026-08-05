@@ -19,7 +19,7 @@ struct AdhkarOfferTests {
                 endsAfterSunrise: 90 * 60
             ),
             evening: AdhkarWindowResolver.evening(
-                asr: time(16), maghrib: time(19.5), isha: time(21),
+                maghrib: time(19.5), isha: time(21),
                 extendsAfterMaghrib: 60 * 60
             ),
             sleep: AdhkarWindowResolver.sleep(isha: time(21), nextFajr: time(29))
@@ -82,7 +82,7 @@ struct AdhkarOfferTests {
             layerEnabled: true, morningEnabled: true, eveningEnabled: false, sleepEnabled: false
         )
         #expect(AdhkarOffer.offer(context(at: 6.0, preferences: morningOnly))?.category == .morning)
-        #expect(AdhkarOffer.offer(context(at: 17.0, preferences: morningOnly)) == nil)
+        #expect(AdhkarOffer.offer(context(at: 20.0, preferences: morningOnly)) == nil)
     }
 
     // MARK: - Windows
@@ -91,10 +91,10 @@ struct AdhkarOfferTests {
     func offersFollowTheirWindows() {
         #expect(AdhkarOffer.offer(context(at: 5.5))?.category == .morning)
         #expect(AdhkarOffer.offer(context(at: 7.5))?.category == .morning)
-        // Between mid-morning and Asr the day is offering nothing.
+        // Between mid-morning and Maghrib the day is offering nothing.
         #expect(AdhkarOffer.offer(context(at: 10.0)) == nil)
         #expect(AdhkarOffer.offer(context(at: 14.0)) == nil)
-        #expect(AdhkarOffer.offer(context(at: 17.0))?.category == .evening)
+        #expect(AdhkarOffer.offer(context(at: 16.35)) == nil)
         #expect(AdhkarOffer.offer(context(at: 20.0))?.category == .evening)
     }
 
@@ -140,7 +140,7 @@ struct AdhkarOfferTests {
     @Test("Every set is offered during a pause, not merely some")
     func everySetSurvivesAPause() {
         #expect(AdhkarOffer.offer(context(at: 6.0, isPaused: true))?.category == .morning)
-        #expect(AdhkarOffer.offer(context(at: 17.0, isPaused: true))?.category == .evening)
+        #expect(AdhkarOffer.offer(context(at: 20.0, isPaused: true))?.category == .evening)
         #expect(
             AdhkarOffer.offer(
                 context(at: 22.0, isIshaLogged: true, isPaused: true)
@@ -164,7 +164,7 @@ struct AdhkarOfferTests {
         #expect(AdhkarOffer.offer(context(at: 6.0, dismissed: [.morning])) == nil)
         // …and only that set.
         #expect(
-            AdhkarOffer.offer(context(at: 17.0, dismissed: [.morning]))?.category == .evening
+            AdhkarOffer.offer(context(at: 20.0, dismissed: [.morning]))?.category == .evening
         )
     }
 

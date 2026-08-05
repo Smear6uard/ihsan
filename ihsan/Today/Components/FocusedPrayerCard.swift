@@ -93,6 +93,11 @@ struct FocusedPrayerCard: View {
     /// the expanded state's MORE OPTIONS link.
     let onMoreOptions: () -> Void
 
+    /// Mirrors the parent's sheet selection so the source card can
+    /// hold its upward momentum until the destination has arrived,
+    /// then return to rest only after the sheet is dismissed.
+    var isMoreOptionsPresented: Bool = false
+
     /// Opens the tasbīḥ instrument — the logged card's quiet link,
     /// the natural post-prayer moment. `nil` renders no link.
     var onTasbih: (() -> Void)? = nil
@@ -106,6 +111,10 @@ struct FocusedPrayerCard: View {
     /// Live vertical translation of the expanded card's drag, in
     /// points. Negative is upward, toward the sheet.
     @State private var dragOffset: CGFloat = 0
+    /// True after an upward commit and until the sheet is dismissed.
+    /// This prevents the source card from bouncing back down before
+    /// the native presentation begins its own upward travel.
+    @State private var isHandingOffToSheet = false
 
     /// Time the user must be idle in the expanded state before the
     /// card auto-collapses without committing. 12 sec per spec.
@@ -181,6 +190,10 @@ struct FocusedPrayerCard: View {
             // destination, so the sheet does not arrive out of nowhere.
             .offset(y: reduceMotion ? 0 : dragOffset)
             .opacity(dragFade)
+            .scaleEffect(
+                isHandingOffToSheet && !reduceMotion ? 0.985 : 1,
+                anchor: .bottom
+            )
             .gesture(expandGesture, isEnabled: isExpandedLayout)
             .animation(
                 reduceMotion ? nil : .smooth(duration: 0.28),
@@ -210,11 +223,26 @@ struct FocusedPrayerCard: View {
                     mode = .collapsed
                 }
             }
+            .onChange(of: isMoreOptionsPresented) { _, isPresented in
+                if isPresented {
+                    autoCollapseTask?.cancel()
+                } else if isHandingOffToSheet {
+                    // Return to the expanded source after the native
+                    // sheet has completed its downward dismissal.
+                    // The reverse transition therefore ends where the
+                    // forward transition began, without a hidden reset.
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                        dragOffset = 0
+                        isHandingOffToSheet = false
+                    }
+                    scheduleAutoCollapse()
+                }
+            }
             .accessibilityElement(children: .contain)
             // Nobody using VoiceOver or Switch Control can swipe this
             // card, so both destinations are actions as well. The
             // visible MORE link is the third way in.
-            .accessibilityAction(named: "More options") { onMoreOptions() }
+            .accessibilityAction(named: "More options") { presentMoreOptions() }
             .accessibilityAction(named: "Collapse") { mode = .collapsed }
     }
 
@@ -224,13 +252,13 @@ struct FocusedPrayerCard: View {
     /// sheet, down closes the card. The grabber at the top of the
     /// expanded state is what says so.
     ///
-    /// Threshold-based, not interactive: a modal sheet cannot be
-    /// dragged into place in SwiftUI, so the card tracks the finger and
-    /// the sheet presents on its own animation once the gesture has
-    /// clearly committed.
+    /// Threshold-based with a continuous handoff: the card tracks the
+    /// finger, preserves that upward momentum across the release, and
+    /// lets the native sheet finish the same movement from below.
     private var expandGesture: some Gesture {
         DragGesture(minimumDistance: 12)
             .onChanged { value in
+                guard !isHandingOffToSheet else { return }
                 // Damped, so the card reads as resisting rather than
                 // sliding away, and the finger never outruns it.
                 dragOffset = value.translation.height * 0.45
@@ -240,16 +268,33 @@ struct FocusedPrayerCard: View {
             }
             .onEnded { value in
                 let travel = value.translation.height
-                dragOffset = 0
                 if travel <= -Self.swipeThreshold {
                     Haptics.impact(.light)
-                    onMoreOptions()
-                    mode = .collapsed
+                    presentMoreOptions()
                 } else if travel >= Self.swipeThreshold {
                     Haptics.impact(.light)
                     mode = .collapsed
+                } else {
+                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.20)) {
+                        dragOffset = 0
+                    }
                 }
             }
+    }
+
+    /// Carries the card farther in the direction of the committed
+    /// gesture instead of snapping it back to zero before presentation.
+    /// The offset is deliberately bounded: enough to connect the two
+    /// surfaces, never enough to make the source disappear.
+    private func presentMoreOptions() {
+        autoCollapseTask?.cancel()
+        if isExpandedLayout, !reduceMotion {
+            withAnimation(.smooth(duration: 0.18)) {
+                isHandingOffToSheet = true
+                dragOffset = max(-88, min(-56, dragOffset - 18))
+            }
+        }
+        onMoreOptions()
     }
 
     /// The card dims slightly as it travels — the visual half of "this
@@ -272,7 +317,7 @@ struct FocusedPrayerCard: View {
                 .transition(.opacity)
                 .onTapGesture {
                     Haptics.impact(.light)
-                    onMoreOptions()
+                    presentMoreOptions()
                 }
         } else if isWindowClosed {
             // A passed, unlogged prayer goes straight to the sheet —
@@ -283,7 +328,7 @@ struct FocusedPrayerCard: View {
                 .transition(.opacity)
                 .onTapGesture {
                     Haptics.impact(.light)
-                    onMoreOptions()
+                    presentMoreOptions()
                 }
         } else if mode == .expanded, FocusedCardModel.allowsLogging(phase) {
             expandedContent
@@ -522,7 +567,7 @@ struct FocusedPrayerCard: View {
                 Spacer(minLength: 0)
                 Button {
                     Haptics.impact(.light)
-                    onMoreOptions()
+                    presentMoreOptions()
                 } label: {
                     HStack(spacing: 4) {
                         Text("MORE")

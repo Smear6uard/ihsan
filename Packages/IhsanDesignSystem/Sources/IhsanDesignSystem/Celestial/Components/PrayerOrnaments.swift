@@ -10,8 +10,8 @@ import SwiftUI
 ///
 /// - **Fajr** — a half-sun rising above the horizon with three short
 ///   radiating rays above (dawn).
-/// - **Dhuhr** — an eight-pointed star, the classical Islamic solar
-///   emblem at the zenith.
+/// - **Dhuhr** — a twelve-pointed Khargird tile profile, adapted from
+///   fifteenth-century Timurid architectural geometry.
 /// - **Asr** — a six-petal rosette, geometrically distinct from Dhuhr
 ///   so the eye reads "sun descending, less than zenith".
 /// - **Maghrib** — a half-sun on the horizon with three short rays
@@ -112,7 +112,7 @@ private struct FajrOrnament: View {
     }
 }
 
-// MARK: - Dhuhr — eight-pointed Star of Lakshmi at the zenith
+// MARK: - Dhuhr — twelve-pointed Khargird tile at the zenith
 
 private struct DhuhrOrnament: View {
     let size: CGFloat
@@ -122,11 +122,11 @@ private struct DhuhrOrnament: View {
         Group {
             switch style.mode {
             case .stroked:
-                EightPointedStar()
+                PrayerOrnamentShape(prayer: .dhuhr, mode: .outline)
                     .stroke(style.body, lineWidth: style.lineWidth)
             case .filled:
-                EightPointedStar()
-                    .fill(style.body)
+                PrayerOrnamentShape(prayer: .dhuhr, mode: .filled)
+                    .fill(style.body, style: FillStyle(eoFill: true))
             }
         }
         .frame(width: size, height: size)

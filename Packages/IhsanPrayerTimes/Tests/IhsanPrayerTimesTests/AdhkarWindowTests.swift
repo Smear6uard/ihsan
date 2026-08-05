@@ -11,7 +11,7 @@ struct AdhkarWindowTests {
     }
 
     // A plain mid-latitude day.
-    private let fajr = 5.0, sunrise = 6.5, dhuhr = 12.5, asr = 16.0, maghrib = 19.5, isha = 21.0
+    private let fajr = 5.0, sunrise = 6.5, dhuhr = 12.5, maghrib = 19.5, isha = 21.0
 
     // MARK: - Morning
 
@@ -63,34 +63,32 @@ struct AdhkarWindowTests {
 
     // MARK: - Evening
 
-    @Test("The evening runs from Asr into the early night by default")
-    func eveningSpansAsrPastMaghrib() throws {
+    @Test("The evening runs from Maghrib into the early night by default")
+    func eveningSpansMaghribIntoNight() throws {
         let window = try #require(AdhkarWindowResolver.evening(
-            asr: time(asr), maghrib: time(maghrib), isha: time(isha),
+            maghrib: time(maghrib), isha: time(isha),
             extendsAfterMaghrib: 60 * 60
         ))
-        #expect(window.start == time(asr))
+        #expect(window.start == time(maghrib))
         #expect(window.end == time(maghrib + 1))
+        #expect(!window.contains(time(16.35)))
+        #expect(window.contains(time(maghrib)))
         #expect(window.contains(time(19.9)))
     }
 
-    /// Someone who holds the evening closes at Maghrib sets the offset
-    /// to zero and gets exactly that.
-    @Test("A zero extension closes the evening at Maghrib")
-    func zeroExtensionClosesAtMaghrib() throws {
-        let window = try #require(AdhkarWindowResolver.evening(
-            asr: time(asr), maghrib: time(maghrib), isha: time(isha),
+    @Test("A zero extension yields no fabricated instant-long window")
+    func zeroExtensionYieldsNoWindow() {
+        #expect(AdhkarWindowResolver.evening(
+            maghrib: time(maghrib), isha: time(isha),
             extendsAfterMaghrib: 0
-        ))
-        #expect(window.end == time(maghrib))
-        #expect(!window.contains(time(maghrib)))
+        ) == nil)
     }
 
     /// The evening card and the sleep card must never be open at once.
     @Test("The evening never runs past Isha")
     func eveningIsClampedAtIsha() throws {
         let window = try #require(AdhkarWindowResolver.evening(
-            asr: time(asr), maghrib: time(maghrib), isha: time(isha),
+            maghrib: time(maghrib), isha: time(isha),
             extendsAfterMaghrib: 5 * 3600
         ))
         #expect(window.end == time(isha))
@@ -105,17 +103,14 @@ struct AdhkarWindowTests {
         }
     }
 
-    /// A short summer night where Maghrib and ʿIshāʾ nearly touch: the
-    /// clamp must not invert the window into nothing when the person
-    /// still has an evening to keep.
-    @Test("A short night keeps the evening at least up to Maghrib")
-    func shortNightKeepsTheEvening() throws {
-        let window = try #require(AdhkarWindowResolver.evening(
-            asr: time(asr), maghrib: time(maghrib), isha: time(maghrib - 0.5),
+    /// A malformed high-latitude schedule must not fabricate an
+    /// inverted evening interval.
+    @Test("A schedule with Isha before Maghrib yields no evening window")
+    func invertedNightYieldsNoEvening() {
+        #expect(AdhkarWindowResolver.evening(
+            maghrib: time(maghrib), isha: time(maghrib - 0.5),
             extendsAfterMaghrib: 60 * 60
-        ))
-        #expect(window.start == time(asr))
-        #expect(window.end == time(maghrib))
+        ) == nil)
     }
 
     // MARK: - Sleep

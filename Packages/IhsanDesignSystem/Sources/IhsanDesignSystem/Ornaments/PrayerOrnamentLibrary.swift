@@ -23,10 +23,10 @@ public enum OrnamentRenderMode: Sendable, Equatable {
 ///   flower — six circle-arcs about a center, petals converging at
 ///   the heart. Open linework petals only: no rays, no medallion, no
 ///   enclosing circle. The simplest form; first light.
-/// - **Dhuhr — Shamsa.** Twelve-lobed sun rosette with radiating
-///   rays — the manuscript illuminator's "little sun," the richest
-///   form, for the zenith. The one deliberate manuscript quotation
-///   in the set.
+/// - **Dhuhr — Khargird star.** A crisp twelve-pointed girih tile
+///   profile with a rotated interior field, adapted from the
+///   fifteenth-century geometric tilework of the Ghiyathiyya madrasa
+///   at Khargird. Architectural geometry for the zenith.
 /// - **Asr — Khatam.** Eight-pointed star of two rotated squares.
 ///   Clean, angular, late-afternoon geometry.
 /// - **Maghrib — Lawzina.** A tapered vertical almond with a fine
@@ -50,7 +50,7 @@ public struct PrayerOrnamentShape: Shape {
     public func path(in rect: CGRect) -> Path {
         switch prayer {
         case .fajr: return SixPetalRosette.path(in: rect, mode: mode)
-        case .dhuhr: return Self.shamsa(in: rect, mode: mode)
+        case .dhuhr: return Self.khargirdStar(in: rect, mode: mode)
         case .asr: return Self.khatam(in: rect, mode: mode)
         case .maghrib: return Self.lawzina(in: rect, mode: mode)
         case .isha: return Self.nightStar(in: rect, mode: mode)
@@ -113,80 +113,47 @@ public struct PrayerOrnamentShape: Shape {
         return path
     }
 
-    /// A thin closed spike (for silhouette rays): a sliver triangle
-    /// pointing outward from `fromRadius` to `toRadius` at `degrees`.
-    static func spike(
-        center: CGPoint,
-        fromRadius: CGFloat,
-        toRadius: CGFloat,
-        degrees: Double,
-        halfWidthDegrees: Double
-    ) -> Path {
-        var path = Path()
-        path.move(to: point(around: center, radius: fromRadius, degrees: degrees - halfWidthDegrees))
-        path.addLine(to: point(around: center, radius: toRadius, degrees: degrees))
-        path.addLine(to: point(around: center, radius: fromRadius, degrees: degrees + halfWidthDegrees))
-        path.closeSubpath()
-        return path
-    }
+    // MARK: - Dhuhr: Khargird star (twelve-pointed girih tile)
 
-    // MARK: - Dhuhr: Shamsa (twelve-lobed rosette, radiating rays)
-
-    static func shamsa(in rect: CGRect, mode: OrnamentRenderMode) -> Path {
+    /// A contemporary reduction of a twelve-pointed Timurid tile from
+    /// the Ghiyathiyya madrasa at Khargird (846 AH / 1442–43 CE).
+    /// The broad angular points and rotated inner field retain the
+    /// architectural construction while removing the scallops, rays,
+    /// and central medallion that made the previous mark feel ornate.
+    static func khargirdStar(in rect: CGRect, mode: OrnamentRenderMode) -> Path {
         let center = CGPoint(x: rect.midX, y: rect.midY)
         let side = min(rect.width, rect.height)
-        let cuspRadius = side * 0.285
-        let lobeControlRadius = side * 0.46   // quad control; apex lands ≈ 0.37
-        let rayStart = side * 0.375
-        let rayEnd = side * 0.495
-        let heartRadius = side * 0.085
+        let outerRadius = side * 0.475
+        let outerTrough = side * 0.335
+        let innerRadius = side * 0.255
+        let innerTrough = side * 0.185
 
-        // The scalloped medallion edge: twelve outward lobes drawn
-        // cusp-to-cusp as quadratic arcs.
-        var lobes = Path()
-        let first = point(around: center, radius: cuspRadius, degrees: -90)
-        lobes.move(to: first)
-        for i in 0..<12 {
-            let cuspDegrees = -90.0 + Double(i + 1) * 30.0
-            let controlDegrees = -90.0 + (Double(i) + 0.5) * 30.0
-            lobes.addQuadCurve(
-                to: point(around: center, radius: cuspRadius, degrees: cuspDegrees),
-                control: point(around: center, radius: lobeControlRadius, degrees: controlDegrees)
-            )
-        }
-        lobes.closeSubpath()
+        let tile = starPolygon(
+            center: center,
+            count: 12,
+            outerRadius: outerRadius,
+            innerRadius: outerTrough,
+            startDegrees: -90
+        )
+        let rotatedField = starPolygon(
+            center: center,
+            count: 12,
+            outerRadius: innerRadius,
+            innerRadius: innerTrough,
+            startDegrees: -75
+        )
 
         var path = Path()
-        path.addPath(lobes)
+        path.addPath(tile)
         switch mode {
         case .outline:
-            // Rays at the cusps, alternating long and short, plus the
-            // small heart circle of the medallion.
-            for i in 0..<12 {
-                let degrees = -90.0 + Double(i) * 30.0
-                let end = i.isMultiple(of: 2) ? rayEnd : rayEnd - side * 0.045
-                path.move(to: point(around: center, radius: rayStart, degrees: degrees))
-                path.addLine(to: point(around: center, radius: end, degrees: degrees))
-            }
-            path.addEllipse(in: CGRect(
-                x: center.x - heartRadius, y: center.y - heartRadius,
-                width: heartRadius * 2, height: heartRadius * 2
-            ))
+            // The fifteen-degree rotation creates a restrained girih
+            // counter-rhythm without turning the marker into a rosette.
+            path.addPath(rotatedField)
         case .filled:
-            for i in 0..<12 {
-                let degrees = -90.0 + Double(i) * 30.0
-                let end = i.isMultiple(of: 2) ? rayEnd : rayEnd - side * 0.045
-                path.addPath(spike(
-                    center: center, fromRadius: rayStart - side * 0.02, toRadius: end,
-                    degrees: degrees, halfWidthDegrees: 2.0
-                ))
-            }
-            // Even-odd heart cutout so the medallion keeps its center
-            // at large sizes; it closes up gracefully at 16 pt.
-            path.addEllipse(in: CGRect(
-                x: center.x - heartRadius, y: center.y - heartRadius,
-                width: heartRadius * 2, height: heartRadius * 2
-            ))
+            // Even-odd rendering turns the rotated field into a clean
+            // architectural cutout that remains legible at marker size.
+            path.addPath(rotatedField)
         }
         return path
     }
@@ -318,7 +285,7 @@ public struct PrayerOrnamentShape: Shape {
 ///
 /// Petals only, per the ornament spec: no rays, no lobed medallion,
 /// no enclosing circle — at 16 pt this reads as a flower where the
-/// Dhuhr Shamsa reads as a sun.
+/// Dhuhr Khargird star reads as architectural geometry.
 public struct SixPetalRosette: Shape {
 
     public var mode: OrnamentRenderMode

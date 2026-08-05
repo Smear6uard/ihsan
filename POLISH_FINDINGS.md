@@ -1147,3 +1147,32 @@ system's half of each contract.
   sitting changes, and remains absent when the On-Device Insights
   setting is disabled. Also confirm an unsupported locale or temporarily
   unavailable model leaves no empty card or upgrade state.
+
+## Corrective M — geometric Dhuhr and continuous sheet handoff
+
+- **The upward handoff at 120 Hz.** The focused card now retains its
+  upward offset and slight scale through presentation instead of
+  springing to zero and collapsing before the native sheet rises. On a
+  ProMotion device, confirm that finger release, card continuation, and
+  sheet arrival read as one movement; then drag the sheet down and
+  confirm it returns to the still-expanded source without a late snap.
+  Repeat with Reduce Motion, where the spatial handoff is deliberately
+  removed.
+- **The Khargird Dhuhr mark in every physical size.** The new angular
+  twelve-point tile is geometrically and snapshot tested at 16–44 pt,
+  and its widget references were re-recorded. Confirm its rotated
+  interior field remains legible in gold/ultramarine on the Today arc,
+  focused card, watch, and tinted widget modes—especially on a real
+  always-on display at reduced luminance.
+- **The new insight glass on hardware.** Simulator inspection confirms
+  the narrow-width layout, clear-glass composition, and five-prayer
+  trace. On an Apple Intelligence-capable phone, confirm the loading
+  pulse stays smooth while Foundation Models runs, the generated line
+  never fights the floating tab bar after scrolling, and Reduce
+  Transparency preserves the hierarchy without flattening the trace.
+- **The 4:21 PM remembrance regression in the real timezone.** Source
+  tests pin the exact pre-Maghrib case and the menu now withholds both
+  Evening and Before Sleep until their actual Maghrib and Isha
+  boundaries. Verify on a device whose calculated Maghrib changes
+  across the week that the menu turns at the prayer instant, not at a
+  cached civil-hour bucket.

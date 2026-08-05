@@ -18,7 +18,7 @@ struct RemembranceMenuTests {
                 endsAfterSunrise: 90 * 60
             ),
             evening: AdhkarWindowResolver.evening(
-                asr: time(16), maghrib: time(19.5), isha: time(21),
+                maghrib: time(19.5), isha: time(21),
                 extendsAfterMaghrib: 60 * 60
             ),
             sleep: AdhkarWindowResolver.sleep(isha: time(21), nextFajr: time(29))
@@ -49,19 +49,31 @@ struct RemembranceMenuTests {
 
     @Test
     func eveningShowsEveningButNeverMorning() {
-        let evening = entries(at: 17)
+        let evening = entries(at: 20)
         #expect(evening.contains { $0.destination == .set(.evening) })
         #expect(!evening.contains { $0.destination == .set(.morning) })
     }
 
     @Test
-    func occasionBoundActionsStayAvailable() {
-        for hour in [6.0, 14.0, 17.0, 23.0] {
+    func prayerAndCountingActionsStayAvailable() {
+        for hour in [6.0, 14.0, 16.35, 20.0, 23.0] {
             let destinations = entries(at: hour).map(\.destination)
             #expect(destinations.contains(.set(.postPrayer)))
-            #expect(destinations.contains(.set(.sleep)))
             #expect(destinations.contains(.freeTasbih))
         }
+    }
+
+    @Test("4:21 PM shows no evening or night set before Maghrib")
+    func afternoonDoesNotShowNightActions() {
+        let afternoon = entries(at: 16.35).map(\.destination)
+        #expect(!afternoon.contains(.set(.evening)))
+        #expect(!afternoon.contains(.set(.sleep)))
+    }
+
+    @Test
+    func beforeSleepAppearsOnlyDuringItsNightWindow() {
+        #expect(!entries(at: 16.35).contains { $0.destination == .set(.sleep) })
+        #expect(entries(at: 23).contains { $0.destination == .set(.sleep) })
     }
 
     @Test

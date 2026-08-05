@@ -56,19 +56,20 @@ public enum AdhkarWindowResolver {
         return AdhkarWindow(start: fajr, end: end)
     }
 
-    /// ʿAṣr until Maghrib, optionally into the early night.
+    /// Maghrib into the early night.
     ///
-    /// Clamped at ʿIshāʾ so the evening card and the sleep card can
-    /// never be open at once — two offers competing for the same
-    /// moment is a worse fault than a window ending a little early.
+    /// The product's time-of-day surface follows the visible turn into
+    /// evening, not a coarse afternoon clock bucket. It therefore does
+    /// not expose the evening set at 4 PM simply because ʿAṣr has begun.
+    /// The end is clamped at ʿIshāʾ so the evening and sleep sets never
+    /// compete for the same moment.
     public static func evening(
-        asr: Date,
         maghrib: Date,
         isha: Date,
         extendsAfterMaghrib: TimeInterval
     ) -> AdhkarWindow? {
         let end = min(maghrib.addingTimeInterval(max(0, extendsAfterMaghrib)), isha)
-        return AdhkarWindow(start: asr, end: max(end, maghrib))
+        return AdhkarWindow(start: maghrib, end: end)
     }
 
     /// ʿIshāʾ until the coming Fajr.
