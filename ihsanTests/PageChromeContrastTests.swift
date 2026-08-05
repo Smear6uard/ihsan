@@ -3,7 +3,7 @@ import IhsanDesignSystem
 import Testing
 @testable import ihsan
 
-/// The secondary pages' contrast contract, in all four canonical
+/// The secondary pages' contrast contract, in all six canonical
 /// SkyPhases: ink on the quiet page ground, ink on panels, and every
 /// mark of the Path pattern's dot-state language against the panel
 /// it sits on. Body text targets 7:1; secondary text ≥4.5:1;

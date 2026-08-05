@@ -105,7 +105,7 @@ struct SkyRenderTests {
     /// luminance range steps ~0.0015 a row. The bound is set an order
     /// of magnitude above that: anything larger is a stop boundary
     /// showing through, which is exactly what banding is.
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func dayRampDoesNotBand(state: PaletteState) throws {
         let means = rowMeans(try render(state))
         var maxStep = 0.0
@@ -130,7 +130,7 @@ struct SkyRenderTests {
     /// The sky is a real gradient, not a flat field with a tint at the
     /// top. This is item 1's acceptance, measured: top-to-horizon the
     /// day sky must cover a substantial luminance span.
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func daySkyCoversARealValueSpan(state: PaletteState) throws {
         let render = try render(state)
         let series = column(render, atFraction: 0.08)

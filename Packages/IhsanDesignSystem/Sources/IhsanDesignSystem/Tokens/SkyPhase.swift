@@ -6,7 +6,9 @@ import Foundation
 /// resolves from them. Clock hours are never consulted.
 public struct SolarDayEvents: Sendable, Equatable {
 
-    /// First light — dawn twilight begins here, not at a clock hour.
+    /// Dawn twilight begins here, not at a clock hour. Not to be
+    /// confused with `PaletteState.firstLight`, which is the chapter
+    /// AFTER sunrise — the sun is still below the horizon at fajr.
     public var fajr: Date
     public var sunrise: Date
     public var solarNoon: Date
@@ -28,14 +30,16 @@ public struct SolarDayEvents: Sendable, Equatable {
 ///
 /// ```
 /// 0.000  deep night        (plateau center)
-/// 0.070  fajr              (night → dawn transition center)
-/// 0.125  dawn heart        (plateau center)
-/// 0.180  sunrise           (dawn → morning transition center)
-/// 0.290  mid-morning       (plateau center)
+/// 0.050  fajr              (night → dawn transition center)
+/// 0.105  dawn heart        (plateau center)
+/// 0.160  sunrise           (dawn → first light transition center)
+/// 0.2275 first light       (plateau center)
+/// 0.295  first light ends  (first light → morning transition center)
+/// 0.3475 mid-morning       (plateau center)
 /// 0.400  solar noon        (morning → afternoon transition center)
 /// 0.525  mid-afternoon     (plateau center)
 /// 0.650  maghrib           (afternoon → sunset transition center)
-/// 0.760  sunset heart      (plateau center)
+/// 0.7625 sunset heart      (plateau center)
 /// 0.875  isha              (sunset → night transition center)
 /// ```
 ///
@@ -63,9 +67,16 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
 
     // MARK: - Resolution from solar events
 
-    /// Palette-space positions of the five solar events.
-    static let fajrUnit = 0.070
-    static let sunriseUnit = 0.180
+    /// Palette-space positions of the six anchors. Six states need six
+    /// boundaries; every adjacent pair sits more than
+    /// `2 * atmosphereHalfWidth` apart so no two transition bands
+    /// overlap and every state keeps a genuine plateau.
+    static let fajrUnit = 0.050
+    static let sunriseUnit = 0.160
+    /// The morning's mirror of isha: where the first-light chapter
+    /// hands over to the settled morning. Derived from the schedule,
+    /// not supplied — see `firstLightEnd(for:)`.
+    static let firstLightEndUnit = 0.295
     static let solarNoonUnit = 0.400
     static let maghribUnit = 0.650
     static let ishaUnit = 0.875
@@ -73,10 +84,13 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     /// Chrome fallback for surfaces that have no solar schedule (a
     /// cold launch before any schedule resolves): maps the local
     /// clock onto palette space through fixed anchor hours — 4:45
-    /// fajr, 6:00 sunrise, 13:00 solar noon, 19:00 maghrib, 20:30
-    /// isha. Surfaces that DO know the day's real events must use
-    /// `resolve(at:events:)`; secondary-page chrome rides the real
-    /// events through `IhsanPageChrome.publish(_:)` and falls back
+    /// fajr, 6:00 sunrise, 7:15 first light's end (6:00 plus the 1:15
+    /// dawn these anchors describe — the same mirror
+    /// `firstLightEnd(for:)` derives), 13:00 solar noon, 19:00
+    /// maghrib, 20:30 isha. Surfaces that DO know the day's real
+    /// events must use `resolve(at:events:)`; secondary-page chrome
+    /// rides the real events through
+    /// `IhsanPageChrome.publish(_:)` and falls back
     /// here only before the first schedule arrives. This mapping is
     /// deliberately coarse, and only ever drives ground/panel tints —
     /// never the celestial plate.
@@ -94,6 +108,7 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
             (20.5 * 3600 - 86_400, ishaUnit - 1.0),
             (4.75 * 3600, fajrUnit),
             (6.0 * 3600, sunriseUnit),
+            (7.25 * 3600, firstLightEndUnit),
             (13.0 * 3600, solarNoonUnit),
             (19.0 * 3600, maghribUnit),
             (20.5 * 3600, ishaUnit),
@@ -111,6 +126,24 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
             }
         }
         return SkyPhase(unit: anchors[anchors.count - 1].unit)
+    }
+
+    /// Where the first-light chapter ends.
+    ///
+    /// The evening's sunset chapter is bounded by two real events —
+    /// maghrib and isha. The morning has only one, so the closing
+    /// anchor is derived: FIRST LIGHT LASTS AS LONG AS THE DAWN THAT
+    /// PRECEDED IT. Both spans are governed by the same thing — how
+    /// fast the sun's altitude changes at this latitude and season —
+    /// so the mirror is astronomical, not arbitrary.
+    ///
+    /// Capped at 35% of the way to solar noon so a polar dawn, which
+    /// can run for hours, cannot swallow the morning.
+    static func firstLightEnd(for events: SolarDayEvents) -> Date {
+        let dawnSpan = events.sunrise.timeIntervalSince(events.fajr)
+        let toNoon = events.solarNoon.timeIntervalSince(events.sunrise)
+        let span = min(max(dawnSpan, 0), max(toNoon, 0) * 0.35)
+        return events.sunrise.addingTimeInterval(span)
     }
 
     /// Map a real moment onto palette space using the day's solar
@@ -134,6 +167,7 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
         for (time, unit) in [
             (events.fajr.timeIntervalSinceReferenceDate, fajrUnit),
             (events.sunrise.timeIntervalSinceReferenceDate, sunriseUnit),
+            (firstLightEnd(for: events).timeIntervalSinceReferenceDate, firstLightEndUnit),
             (events.solarNoon.timeIntervalSinceReferenceDate, solarNoonUnit),
             (events.maghrib.timeIntervalSinceReferenceDate, maghribUnit),
             (events.isha.timeIntervalSinceReferenceDate, ishaUnit),
@@ -163,8 +197,9 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     public static func fixed(_ state: PaletteState) -> SkyPhase {
         switch state {
         case .night: return SkyPhase(unit: 0.0)
-        case .dawn: return SkyPhase(unit: 0.125)
-        case .morning: return SkyPhase(unit: 0.29)
+        case .dawn: return SkyPhase(unit: 0.105)
+        case .firstLight: return SkyPhase(unit: 0.2275)
+        case .morning: return SkyPhase(unit: 0.3475)
         case .afternoon: return SkyPhase(unit: 0.525)
         case .sunset: return SkyPhase(unit: 0.7625)
         }
@@ -196,7 +231,8 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
 
     private static let boundaries: [(center: Double, from: PaletteState, to: PaletteState)] = [
         (SkyPhase.fajrUnit, .night, .dawn),
-        (SkyPhase.sunriseUnit, .dawn, .morning),
+        (SkyPhase.sunriseUnit, .dawn, .firstLight),
+        (SkyPhase.firstLightEndUnit, .firstLight, .morning),
         (SkyPhase.solarNoonUnit, .morning, .afternoon),
         (SkyPhase.maghribUnit, .afternoon, .sunset),
         (SkyPhase.ishaUnit, .sunset, .night)
@@ -212,6 +248,7 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
         switch u {
         case ..<Self.fajrUnit: return (.night, .night, 0)
         case ..<Self.sunriseUnit: return (.dawn, .dawn, 0)
+        case ..<Self.firstLightEndUnit: return (.firstLight, .firstLight, 0)
         case ..<Self.solarNoonUnit: return (.morning, .morning, 0)
         case ..<Self.maghribUnit: return (.afternoon, .afternoon, 0)
         case ..<Self.ishaUnit: return (.sunset, .sunset, 0)

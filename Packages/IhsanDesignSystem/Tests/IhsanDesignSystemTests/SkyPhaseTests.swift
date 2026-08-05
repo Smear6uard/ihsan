@@ -82,8 +82,9 @@ struct SkyPhaseTests {
     func plateausHoldSteadyAwayFromTransitions() {
         // Each unit sits well clear of every transition band.
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.01)) == SkyPaletteTokens.night)
-        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.125)) == SkyPaletteTokens.dawn)
-        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.30)) == SkyPaletteTokens.morning)
+        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.105)) == SkyPaletteTokens.dawn)
+        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.2275)) == SkyPaletteTokens.firstLight)
+        #expect(PaletteState.resolved(for: SkyPhase(unit: 0.3475)) == SkyPaletteTokens.morning)
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.55)) == SkyPaletteTokens.afternoon)
         #expect(PaletteState.resolved(for: SkyPhase(unit: 0.80)) == SkyPaletteTokens.sunset)
     }
@@ -264,5 +265,85 @@ struct SkyPhaseTests {
         #expect(abs(at0.red - a.red) < 1.0 / 255.0 && abs(at1.red - b.red) < 1.0 / 255.0)
         #expect(abs(at0.green - a.green) < 1.0 / 255.0 && abs(at1.green - b.green) < 1.0 / 255.0)
         #expect(abs(at0.blue - a.blue) < 1.0 / 255.0 && abs(at1.blue - b.blue) < 1.0 / 255.0)
+    }
+
+    // MARK: - First light
+
+    /// The morning gets a chapter, not just a boundary. The evening
+    /// has both (maghrib the boundary, sunset the state); before this
+    /// the morning's equivalent moment owned no tokens at all.
+    @Test
+    func firstLightHoldsItsOwnPlateau() {
+        let phase = SkyPhase.fixed(.firstLight)
+        let mix = phase.blend
+        #expect(mix.amount == 0, "firstLight's fixed phase is not on a plateau")
+        #expect(mix.from == .firstLight)
+        #expect(PaletteState.resolved(for: phase) == SkyPaletteTokens.firstLight)
+    }
+
+    /// Every transition band must be disjoint, or two boundaries would
+    /// blend at once and a state could lose its plateau entirely.
+    @Test
+    func noTwoTransitionBandsOverlap() {
+        let centres = [
+            SkyPhase.fajrUnit, SkyPhase.sunriseUnit, SkyPhase.firstLightEndUnit,
+            SkyPhase.solarNoonUnit, SkyPhase.maghribUnit, SkyPhase.ishaUnit
+        ]
+        for (a, b) in zip(centres, centres.dropFirst()) {
+            #expect(
+                b - a > 2 * SkyPhase.atmosphereHalfWidth,
+                "boundaries at \(a) and \(b) are closer than a full band apart"
+            )
+        }
+        // The night wraps.
+        #expect(
+            (SkyPhase.fajrUnit + 1.0) - SkyPhase.ishaUnit > 2 * SkyPhase.atmosphereHalfWidth
+        )
+    }
+
+    /// The sixth anchor is DERIVED — `SolarDayEvents` gains no field.
+    /// First light lasts as long as the dawn that preceded it, capped
+    /// so an extreme-latitude dawn cannot swallow the morning.
+    @Test
+    func firstLightEndMirrorsTheDawnSpan() {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        func date(_ h: Int, _ m: Int) -> Date {
+            calendar.date(from: DateComponents(
+                year: 2026, month: 8, day: 2, hour: h, minute: m
+            ))!
+        }
+        let events = SolarDayEvents(
+            fajr: date(4, 14), sunrise: date(5, 45), solarNoon: date(12, 58),
+            maghrib: date(20, 8), isha: date(21, 38)
+        )
+        // 5:45 + (5:45 − 4:14) = 7:16.
+        let expected = date(7, 16)
+        let resolved = SkyPhase.resolve(at: expected, events: events)
+        #expect(
+            abs(resolved.unit - SkyPhase.firstLightEndUnit) < 0.002,
+            "first light ends at \(resolved.unit), expected \(SkyPhase.firstLightEndUnit)"
+        )
+        // 6:15 — the moment this state exists for — is on the plateau.
+        #expect(SkyPhase.resolve(at: date(6, 15), events: events).blend.amount == 0)
+        #expect(SkyPhase.resolve(at: date(6, 15), events: events).blend.from == .firstLight)
+    }
+
+    /// firstLight → morning carries NO polarity flip: both are
+    /// luminous day states and firstLight's figure roles are morning's
+    /// exactly. Only sunrise and maghrib may cross.
+    @Test
+    func onlySunriseAndMaghribCross() {
+        let steps = 4_000
+        for step in 0..<steps {
+            let phase = SkyPhase(unit: Double(step) / Double(steps))
+            guard phase.inkHaloStrength > 0.01 else { continue }
+            let nearSunrise = abs(phase.unit - SkyPhase.sunriseUnit) <= SkyPhase.atmosphereHalfWidth
+            let nearMaghrib = abs(phase.unit - SkyPhase.maghribUnit) <= SkyPhase.atmosphereHalfWidth
+            #expect(
+                nearSunrise || nearMaghrib,
+                "a polarity crossing appeared at phase \(phase.unit)"
+            )
+        }
     }
 }

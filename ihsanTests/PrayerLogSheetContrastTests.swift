@@ -5,7 +5,7 @@ import Testing
 
 /// Corrective G, phase 3 — the sheet's contrast audit, computed from
 /// the exact recipes the tiles render (`PrayerLogSheet`'s static
-/// treatment functions), across all four canonical SkyPhases.
+/// treatment functions), across all six canonical SkyPhases.
 ///
 /// The standard: every timing tile's PRIMARY boundary — the strongest
 /// of its body and its edge — holds WCAG's 3:1 non-text minimum
@@ -106,7 +106,7 @@ struct PrayerLogSheetContrastTests {
     /// Title and inscriptions on the sheet's glass: ink ≥7:1 and
     /// secondary ink ≥4.5:1 against the sheet backing composited over
     /// the darkest thing the glass can sample (the ground plane), in
-    /// all four phases.
+    /// all six phases.
     @Test
     func sheetTitleAndInscriptionsHoldAAOnTheBackedGlass() {
         for state in states {

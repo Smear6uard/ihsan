@@ -1,17 +1,19 @@
 import Synchronization
 import SwiftUI
 
-/// The five canonical palette states of the celestial instrument.
+/// The six canonical palette states of the celestial instrument.
 ///
 /// Palette v2 inverts v1's placement of warmth: the ground is either
 /// jewel-deep (night, dawn, sunset) or luminous cool near-white
-/// (morning, afternoon), and ALL saturation lives in the ink, the
-/// metal, and the glow. No state may read as tan, beige, parchment,
-/// or dusty — the only parchment allowed anywhere is `panelTexture`,
-/// a ≤8%-opacity overlay on panels, never a surface fill.
+/// (first light, morning, afternoon), and ALL saturation lives in the
+/// ink, the metal, and the glow. No state may read as tan, beige,
+/// parchment, or dusty — the only parchment allowed anywhere is
+/// `panelTexture`, a ≤8%-opacity overlay on panels, never a surface
+/// fill.
 public enum PaletteState: String, CaseIterable, Sendable {
     case night
     case dawn
+    case firstLight
     case morning
     case afternoon
     case sunset
@@ -23,6 +25,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
         switch self {
         case .night: return .night
         case .dawn: return .dawn
+        case .firstLight: return .firstLight
         case .morning: return .morning
         case .afternoon: return .afternoon
         case .sunset: return .sunset
@@ -324,7 +327,7 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// dark page needs no help; a full-height sheet is not a bar —
     /// bare material over the night plate read as a flat charcoal
     /// slab. The sheet's backing therefore carries the ground family
-    /// in all four phases: warm near-white on the days, deep
+    /// in all six phases: warm near-white on the days, deep
     /// indigo/plum on the jewel grounds — glass that refracts the sky
     /// it stands in. A backing layer under the platform material,
     /// never a tint of the glass itself.
@@ -453,6 +456,66 @@ extension SkyPaletteTokens {
         positive: SRGBValue(hex: 0x8FBF9F),
         attention: SRGBValue(hex: 0xE59A82),
         inkHalo: SRGBValue(hex: 0x0C112E)
+    )
+
+    /// First light (sunrise → mid-morning). The morning's answer to
+    /// sunset: the evening gets both a boundary and a jewel chapter,
+    /// and until this state existed the morning got only the boundary.
+    /// The measured target was 6:15 AM — a low sun, a deep sky, gold
+    /// on the ground — which used to arrive as a by-product of a
+    /// 97-minute blend and now arrives as a page.
+    ///
+    /// A LUMINOUS DAY STATE, not a jewel one, for two reasons: the
+    /// polarity flip stays at sunrise where the sun actually crests,
+    /// and — because every figure role here is morning's exactly —
+    /// firstLight → morning carries no crossing at all.
+    ///
+    /// What makes it its own page is therefore atmosphere only: the
+    /// deepest and most saturated of the three day zeniths, a warm
+    /// gold horizon wash where morning's is cool blue, the day's
+    /// richest gold, and a warmer ground band. The ground itself stays
+    /// a cool-neutral near-white — palette v2's thesis is that all
+    /// saturation lives in the ink, the metal, and the glow, and
+    /// golden-hour warmth is exactly the pressure that would break it.
+    ///
+    /// The zenith is at a FLOOR, not a taste value, and the floor is
+    /// contrast. A first-light sky wants to be deeper still, but the
+    /// ink pair here is morning's, and morning's secondary ink only
+    /// clears AA against a zenith of relative luminance ≥ 0.472 —
+    /// pinned by `IlluminationTokenTests.textHoldsContrastOnTheZenith`
+    /// and `SkyFieldContrastTests.secondaryInkHoldsAAAcrossTheWholeSky`,
+    /// both of which read the zenith as a text ground because the
+    /// plate's header sits on it. Morning's own zenith already sits
+    /// near that floor, so the DEPTH available to any day state is a
+    /// thin band: this ships at OKLab L 0.786 against morning's 0.796.
+    /// The separation the eye actually reads is chroma and hue —
+    /// C 0.110 against morning's 0.098, and OKLCH hue 249° extending
+    /// the existing 257° → 268° warming progression back one step, so
+    /// the sky warms monotonically from first light to afternoon.
+    /// Going deeper means darkening this state's ink pair, which would
+    /// re-open the firstLight → morning figure crossing the state is
+    /// built to avoid.
+    static let firstLight = SkyPaletteTokens(
+        skyZenith: SRGBValue(hex: 0x80BFFD),
+        groundTop: SRGBValue(hex: 0xF6F6F7),
+        groundBottom: SRGBValue(hex: 0xF2F1F1),
+        groundPlane: SRGBValue(hex: 0xEBDDB8),
+        horizonWash: SRGBValue(hex: 0xF6DDB0),
+        ink: SRGBValue(hex: 0x1B2350),
+        inkSecondary: SRGBValue(hex: 0x3E476B),
+        metal: SRGBValue(hex: 0xA07F45),
+        metalHighlight: SRGBValue(hex: 0xD8B463),
+        leafGold: SRGBValue(hex: 0xC9A048),
+        keyline: SRGBValue(hex: 0x1B2350),
+        lapis: SRGBValue(hex: 0x2A3780),
+        glow: SRGBValue(hex: 0xF0A93C),
+        panelFill: SRGBValue(hex: 0xFBFCFE),
+        panelStroke: SRGBValue(hex: 0xD8C4A0),
+        panelTexture: SRGBValue(hex: 0xD8B463),
+        panelTextureOpacity: 0.05,
+        positive: SRGBValue(hex: 0x2E6B47),
+        attention: SRGBValue(hex: 0xAA3F24),
+        inkHalo: SRGBValue(hex: 0xF7F9FC)
     )
 
     /// Night (isha → fajr). Tinted near-black indigo ground —

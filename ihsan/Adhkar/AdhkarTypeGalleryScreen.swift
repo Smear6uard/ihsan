@@ -6,13 +6,13 @@ import SwiftUI
 /// The Arabic typography gate, on device.
 ///
 /// `-IhsanDebugAdhkarTypeGallery` opens it. The maintainer walks the
-/// five grounds at three Dynamic Type sizes and judges the Arabic at
+/// six grounds at three Dynamic Type sizes and judges the Arabic at
 /// arm's length, the way every other surface here is judged. DEBUG
 /// only — this is a review instrument, not a feature.
 struct AdhkarTypeGalleryScreen: View {
     let onDismiss: () -> Void
 
-    /// `-IhsanDebugAdhkarGround night|dawn|morning|afternoon|sunset`
+    /// `-IhsanDebugAdhkarGround night|dawn|firstLight|morning|afternoon|sunset`
     /// picks the ground so the capture script can take one frame each
     /// without anyone tapping through the page. The TYPE SIZE comes
     /// from the device — pass

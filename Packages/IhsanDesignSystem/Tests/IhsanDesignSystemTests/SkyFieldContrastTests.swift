@@ -107,7 +107,7 @@ struct SkyFieldContrastTests {
     /// users a blank page on the day states. The fallback sits inside
     /// the ramp it averages, and on the day states it carries real
     /// blue rather than collapsing to the near-white horizon.
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func flatSkyFallbackKeepsTheSkyBlue(state: PaletteState) {
         let tokens = state.tokens
         let flat = CelestialSkyView.skyFlatValue(tokens: tokens)
@@ -127,7 +127,7 @@ struct SkyFieldContrastTests {
     /// no local reversal that would read as a band of its own. (The
     /// jewel states are exempt — their horizon wash is deliberately
     /// brighter than the ground beneath it.)
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func dayRampNeverReversesOnItsWayDown(state: PaletteState) {
         let samples = CelestialSkyView.skySamples(tokens: state.tokens)
         for (a, b) in zip(samples, samples.dropFirst()) {

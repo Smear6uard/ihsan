@@ -272,7 +272,7 @@ struct ArabicTypographyTests {
 /// inscription colour — and it measures 3.20:1 on the morning panel
 /// and 2.84:1 on the afternoon one. Beautiful, and unreadable to
 /// anyone who needs contrast. `inkSecondary` is the only secondary
-/// token that holds AA on all five grounds, so it carries every
+/// token that holds AA on all six grounds, so it carries every
 /// quiet line here and `metal` carries none of them.
 @Suite("Adhkar reading registers · contrast")
 struct AdhkarRegisterContrastTests {
@@ -316,7 +316,7 @@ struct AdhkarRegisterContrastTests {
     /// until then it is a mark colour, never a text colour.
     @Test("Metal is not a text colour on the day grounds")
     func metalIsAMarkColourOnly() {
-        let day = [PaletteState.morning, .afternoon]
+        let day = [PaletteState.firstLight, .morning, .afternoon]
         for state in day {
             let tokens = state.tokens
             let ratio = tokens.metalValue.contrastRatio(against: tokens.panelFillValue)

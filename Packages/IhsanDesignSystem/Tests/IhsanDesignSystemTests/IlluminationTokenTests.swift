@@ -63,7 +63,7 @@ struct IlluminationTokenTests {
     /// ceiling either.
     @Test
     func dayZenithsCarryRealBlue() {
-        for state in [PaletteState.morning, .afternoon] {
+        for state in [PaletteState.firstLight, .morning, .afternoon] {
             let zenith = state.tokens.skyZenithValue
             let lab = zenith.oklab
             let chroma = (lab.a * lab.a + lab.b * lab.b).squareRoot()
@@ -83,7 +83,7 @@ struct IlluminationTokenTests {
     /// The zenith is a real value step below the horizon it grades
     /// into — the gradient has somewhere to go. Without this the sky
     /// can satisfy "is blue" while still being flat.
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func dayZenithIsDeeperThanItsHorizon(state: PaletteState) {
         let tokens = state.tokens
         let zenith = tokens.skyZenithValue.oklab.l
@@ -94,21 +94,31 @@ struct IlluminationTokenTests {
         )
     }
 
-    /// Morning is the cooler sky, afternoon the warmer one. In OKLCH
-    /// both sit in the blue quadrant; afternoon's hue is further round
-    /// toward violet, which is the warm direction from blue.
+    /// The day sky warms as the day goes on, and it does so in ONE
+    /// direction. In OKLCH all three day zeniths sit in the blue
+    /// quadrant; each successive one is further round toward violet,
+    /// which is the warm direction from blue.
+    ///
+    /// Corrective I extended this from a pair to a progression. It was
+    /// morning-vs-afternoon while those were the only day states; the
+    /// claim it was really making is that the sky's hue is monotone
+    /// across the day, and a first-light zenith cooler than morning's
+    /// is what makes that claim worth stating rather than asserting a
+    /// single comparison twice.
     @Test
-    func morningZenithIsCoolerThanAfternoon() {
+    func theDayZenithsWarmMonotonically() {
         func hueDegrees(_ value: SRGBValue) -> Double {
             let lab = value.oklab
             return atan2(lab.b, lab.a) * 180 / .pi
         }
-        let morning = hueDegrees(PaletteState.morning.tokens.skyZenithValue)
-        let afternoon = hueDegrees(PaletteState.afternoon.tokens.skyZenithValue)
-        #expect(
-            afternoon - morning >= 5.0,
-            "afternoon zenith (\(afternoon)°) is not warmer than morning's (\(morning)°)"
-        )
+        let hues = [PaletteState.firstLight, .morning, .afternoon]
+            .map { ($0, hueDegrees($0.tokens.skyZenithValue)) }
+        for (earlier, later) in zip(hues, hues.dropFirst()) {
+            #expect(
+                later.1 - earlier.1 >= 5.0,
+                "\(later.0) zenith (\(later.1)°) is not warmer than \(earlier.0)'s (\(earlier.1)°)"
+            )
+        }
     }
 
     /// Lapis is ultramarine in every state: blue-side hue, real

@@ -230,7 +230,7 @@ struct PaletteV2ContrastTests {
     /// b axis (blue↔yellow) of every morning/afternoon ground stop must
     /// stay within a tight band around neutral, and lightness must stay
     /// luminous (≥ 0.93).
-    @Test(arguments: [PaletteState.morning, PaletteState.afternoon])
+    @Test(arguments: [PaletteState.firstLight, PaletteState.morning, PaletteState.afternoon])
     func daytimeGroundsAreLuminousNotBeige(state: PaletteState) {
         for ground in [state.tokens.groundTopValue, state.tokens.groundBottomValue] {
             let lab = ground.oklab

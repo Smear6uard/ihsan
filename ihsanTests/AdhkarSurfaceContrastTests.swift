@@ -4,7 +4,7 @@ import Testing
 @testable import ihsan
 
 /// Contrast for every mark and every line the remembrance surfaces
-/// draw, across all five SkyPhases including dawn.
+/// draw, across all six SkyPhases including dawn and first light.
 ///
 /// Text ≥ 4.5:1, and 7:1 for body reading. Non-text functional marks
 /// ≥ 3:1 by silhouette — a gilded form may earn its edge from the
