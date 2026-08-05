@@ -801,3 +801,22 @@ budget. These need a device:
   the five ornaments. Left alone because retuning the moon is not one
   of corrective H's six items and `MoonTreatmentTests` pins the
   treatment deliberately; it wants its own decision.
+
+## Corrective I — the crossing keyline
+
+- **How long the keyline stays fully drawn.** `inkOutlineStrength`
+  holds at ≥ 0.99 for about **85 minutes a day** — 48 min around
+  sunrise, 37 min around maghrib — computed for Chicago on
+  2026-08-02 (ISNA 15°/15°, CDT: fajr 04:13, sunrise 05:44, maghrib
+  20:08). That span is *correct* by the contract: it is exactly where
+  some ink/ground pair sits under 3:1, and text there would otherwise
+  be illegible. But an hour and a half of visible hard outline is a
+  long time, and whether it reads as engraving or as clutter is a
+  judgement only hardware can settle. Watch the plate's marker labels
+  and the focused card through a full sunrise and a full maghrib.
+  If it reads as clutter, the lever is the multiplier in
+  `SkyPhase.inkOutlineStrength`: the smallest value still satisfying
+  `theOutlineIsFullyDrawnWhereverContrastCollapses` is **1.31**, which
+  would roughly halve the span to ~44 min/day (25 + 19). 3.0 ships
+  because it keeps a 2.3× margin over a palette Task 2 rewrites — the
+  span is the cost of that margin, not an accident.

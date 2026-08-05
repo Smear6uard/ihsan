@@ -254,10 +254,25 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
     /// Deliberately steeper than `inkHaloStrength`: the outline must
     /// already be solid before the ink itself approaches mid-tone, and
     /// may only ramp in the outer margins of the transition band where
-    /// contrast is comfortable without it. `inkHaloStrength` is
-    /// `sin(π · amount)` over the atmosphere band (±0.035); tripling it
-    /// puts full strength across u₀ ± 0.014, which contains the entire
-    /// figure flip at u₀ ± 0.005 with room on both sides.
+    /// contrast is comfortable without it.
+    ///
+    /// The multiplier is not a taste setting — it is pinned by
+    /// `PaletteV2ContrastTests.theOutlineIsFullyDrawnWhereverContrastCollapses`,
+    /// which requires this to be ≥ 0.99 wherever any ink/ground pair
+    /// falls under 3:1. Measured against the current palette, the
+    /// smallest multiplier meeting that is **1.31**; 3.0 keeps a 2.3×
+    /// margin, which the ±0.035 atmosphere band and a palette Task 2
+    /// will rewrite both argue for. Do not lower it to the measured
+    /// minimum: that number is a knife edge against one palette, and the
+    /// test is what has to hold, not the constant.
+    ///
+    /// `inkHaloStrength` is `sin(π · amount)` over the atmosphere band
+    /// (±0.035), smootherstep-eased, so tripling it holds full strength
+    /// across u₀ ± 0.0173 — comfortably containing the entire figure
+    /// flip at u₀ ± 0.005. In wall-clock terms that is ~85 min/day
+    /// (48 at sunrise, 37 at maghrib) for Chicago on 2026-08-02; whether
+    /// that reads as engraving or as clutter is a device check, recorded
+    /// in POLISH_FINDINGS.
     public var inkOutlineStrength: Double {
         min(1.0, inkHaloStrength * 3.0)
     }

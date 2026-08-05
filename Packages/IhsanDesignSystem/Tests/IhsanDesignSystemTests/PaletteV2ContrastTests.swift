@@ -107,6 +107,62 @@ struct PaletteV2ContrastTests {
         #expect(subAAFraction < 0.06, "sub-AA passage covers \(subAAFraction) of the cycle")
     }
 
+    /// The keyline must be FULLY drawn wherever the palette alone leaves
+    /// text under 3:1.
+    ///
+    /// The test above pins the halo; this pins the outline that replaced
+    /// it, and it is the rule the strength curve is tuned against rather
+    /// than a number someone liked. Partial strength is not good enough
+    /// at these phases: the rings are drawn at `inkOutlineStrength`
+    /// opacity, so a half-strength ring is a half-transparent ring that
+    /// composites toward the very ground it is meant to separate the
+    /// glyph from. Below 3:1 the ground has stopped doing any of the
+    /// work, so the ring has to do all of it.
+    ///
+    /// `>= 0.99` rather than `== 1` because the curve reaches full
+    /// strength asymptotically through a `min`, and float equality on a
+    /// `sin` is not a contract worth writing.
+    @Test
+    func theOutlineIsFullyDrawnWhereverContrastCollapses() {
+        let steps = 4_000
+        var worstStrengthWhereNeeded = 1.0
+        var haloThere = 1.0
+        var worstUnit = 0.0
+        var worstRatio = 0.0
+
+        for step in 0..<steps {
+            let phase = SkyPhase(unit: Double(step) / Double(steps))
+            let tokens = PaletteState.resolved(for: phase)
+            let grounds = [
+                tokens.groundTopValue, tokens.groundBottomValue, tokens.panelFillValue
+            ]
+            let inks = [tokens.inkValue, tokens.inkSecondaryValue]
+            let worst = inks
+                .flatMap { ink in grounds.map { ink.contrastRatio(against: $0) } }
+                .min() ?? 0
+
+            guard worst < 3.0 else { continue }
+            if tokens.inkOutlineStrength < worstStrengthWhereNeeded {
+                worstStrengthWhereNeeded = tokens.inkOutlineStrength
+                haloThere = tokens.inkHaloStrength
+                worstUnit = phase.unit
+                worstRatio = worst
+            }
+        }
+
+        // Derived from the raw halo strength, so the message stays true
+        // whatever the multiplier currently is.
+        let required = 0.99 / max(haloThere, .leastNonzeroMagnitude)
+        #expect(
+            worstStrengthWhereNeeded >= 0.99,
+            """
+            an ink/ground pair sits at \(worstRatio):1 at phase \(worstUnit) \
+            while the outline is only \(worstStrengthWhereNeeded) drawn — \
+            the multiplier in SkyPhase.inkOutlineStrength must be at least \(required)
+            """
+        )
+    }
+
     /// The parchment overlay is capped at 8% in every state — parchment
     /// exists only as texture, never as a surface.
     @Test(arguments: PaletteState.allCases)
