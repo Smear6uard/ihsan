@@ -66,6 +66,27 @@ struct GestaltGrid: View {
 
     // MARK: - Grid
 
+    /// Opacity every overlay presence mark draws at. The overlay stays
+    /// quieter than the fardh rows — visible if sought, quiet if not —
+    /// but it has to be VISIBLE when sought, which at the old 0.40 of
+    /// plain metal it was not on the near-white days.
+    static let overlayMarkOpacity: Double = 0.85
+
+    /// The overlay mark's colour, per panel polarity — the same rule
+    /// `GestaltDot.lateOutlineValue` established: plain metal reads on
+    /// a jewel panel (~6:1) and vanishes on a near-white one (~2.6:1),
+    /// so the day states deepen it toward the keyline. Corrective H
+    /// found the same thing for the almucantars: the same alpha buys
+    /// less on a near-white field.
+    static func overlayMarkValue(for tokens: SkyPaletteTokens) -> SRGBValue {
+        tokens.panelFillValue.relativeLuminance < 0.5
+            ? tokens.metalValue
+            : SRGBValue.mix(tokens.metalValue, tokens.keylineValue, amount: 0.45)
+    }
+
+    /// Gap between the five fardh rows and the presence overlays.
+    private static let overlayGap: CGFloat = IhsanSpacing.xs
+
     @ViewBuilder
     private func grid(
         columns: [Column],
@@ -83,6 +104,13 @@ struct GestaltGrid: View {
                         )
                     }
                 }
+            }
+
+            if naflColumns != nil || dhikrColumns != nil {
+                // The overlay rows are a different register from the
+                // five fardh rows — presence, not status. A row at the
+                // grid's own spacing read as a sixth prayer.
+                Color.clear.frame(height: Self.overlayGap)
             }
 
             if let naflColumns, naflColumns.count == columns.count {
@@ -260,7 +288,8 @@ struct GestaltGrid: View {
             + (dhikrDays == nil ? 0 : 1)
         let rows = rowCount * dot + (rowCount - 1) * spacing
         let starSize = max(6, min(10, dot + 4))
-        return rows + IhsanSpacing.sm + starSize
+        let gap = (naflDays == nil && dhikrDays == nil) ? 0 : Self.overlayGap
+        return rows + gap + IhsanSpacing.sm + starSize
     }
 
     // MARK: - Accessibility
@@ -293,9 +322,11 @@ struct GestaltGrid: View {
 // MARK: - Dhikr overlay dot
 
 /// One cell of the optional dhikr row: a small outlined ring — the
-/// tasbīḥ ring at dot scale — where the day (or week) holds a
-/// recorded sitting. Outline only, never a fill: visible if sought,
-/// invisible if not.
+/// One cell of the optional dhikr row: a small filled BEAD where the
+/// day (or week) holds a recorded sitting. A bead, not a ring — the
+/// ring is what an unlogged fardh cell already draws, so an outlined
+/// dhikr mark said "nothing happened here" in the one row where it
+/// means the opposite.
 private struct DhikrOverlayDot: View {
     let present: Bool
     let size: CGFloat
@@ -305,11 +336,11 @@ private struct DhikrOverlayDot: View {
         Group {
             if present {
                 Circle()
-                    .stroke(
-                        tokens.metal.opacity(0.40),
-                        lineWidth: max(0.5, size * 0.14)
+                    .fill(
+                        GestaltGrid.overlayMarkValue(for: tokens).color
+                            .opacity(GestaltGrid.overlayMarkOpacity)
                     )
-                    .padding(size * 0.12)
+                    .padding(size * 0.26)
             } else {
                 Color.clear
             }
@@ -320,10 +351,10 @@ private struct DhikrOverlayDot: View {
 
 // MARK: - Nafl overlay dot
 
-/// One cell of the optional sixth row: a small outlined four-pointed
-/// star where the day (or week) holds any voluntary record, empty space
-/// where it doesn't. Always the quieter state — outline only, never a
-/// fill — so the row is visible if sought and invisible if not.
+/// One cell of the optional sixth row: a small four-pointed star where
+/// the day (or week) holds any voluntary record, empty space where it
+/// doesn't. Filled rather than stroked below 8 pt, where a stroke at
+/// this scale has no line to draw.
 private struct NaflOverlayDot: View {
     let present: Bool
     let size: CGFloat
@@ -332,11 +363,14 @@ private struct NaflOverlayDot: View {
     var body: some View {
         Group {
             if present {
-                FourPointedStar()
-                    .stroke(
-                        tokens.metal.opacity(0.40),
-                        lineWidth: max(0.5, size * 0.14)
-                    )
+                let tint = GestaltGrid.overlayMarkValue(for: tokens).color
+                    .opacity(GestaltGrid.overlayMarkOpacity)
+                if size >= 8 {
+                    FourPointedStar()
+                        .stroke(tint, lineWidth: max(0.9, size * 0.16))
+                } else {
+                    FourPointedStar().fill(tint)
+                }
             } else {
                 Color.clear
             }
@@ -368,6 +402,36 @@ struct GestaltDot: View {
     /// The missed outline — quiet secondary ink, present but subdued.
     static func missedOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
         tokens.inkSecondaryValue
+    }
+
+    /// Below `keylineFloor` the dot drops its keyline — at 3 pt a
+    /// 0.5 pt stroke has no line to draw. That matters, because on the
+    /// near-white day panels a gilded body is only resolvable BECAUSE
+    /// of its dark edge: bare `leafGold` measures ~2.4:1 there, and
+    /// lifted lapis ~2.5:1 on sunset's panel. So where the edge cannot
+    /// be drawn, the body carries the separation itself.
+    ///
+    /// Same rule as `lateOutlineValue` and corrective H's almucantars:
+    /// the same value buys less on a near-white field, so the day
+    /// states deepen toward the keyline. The large-size rendering is
+    /// untouched — there the edge still does the work.
+    static let keylineFloor: CGFloat = 6
+
+    /// The on-time body as drawn when no keyline accompanies it.
+    static func onTimeBodyValue(for tokens: SkyPaletteTokens, size: CGFloat) -> SRGBValue {
+        guard size < keylineFloor else { return tokens.leafGoldValue }
+        return tokens.panelFillValue.relativeLuminance < 0.5
+            ? tokens.leafGoldValue
+            : SRGBValue.mix(tokens.leafGoldValue, tokens.keylineValue, amount: 0.40)
+    }
+
+    /// The qadā body as drawn when no keyline accompanies it.
+    static func qadaBodyValue(for tokens: SkyPaletteTokens, size: CGFloat) -> SRGBValue {
+        let base = qadaBodyValue(for: tokens)
+        guard size < keylineFloor else { return base }
+        return base.contrastRatio(against: tokens.panelFillValue) >= 3.0
+            ? base
+            : SRGBValue.mix(base, tokens.inkValue, amount: 0.35)
     }
 
     /// The late outline — the sheet's rule at dot scale: warm metal on
@@ -422,7 +486,7 @@ struct GestaltDot: View {
                 Circle().fill(tokens.metalHighlight)
             }
         case (.onTime, _):
-            if size >= 6 {
+            if size >= Self.keylineFloor {
                 Circle()
                     .fill(tokens.leafGold)
                     .overlay {
@@ -431,10 +495,10 @@ struct GestaltDot: View {
                         )
                     }
             } else {
-                Circle().fill(tokens.leafGold)
+                Circle().fill(Self.onTimeBodyValue(for: tokens, size: size).color)
             }
         case (.qada, _):
-            if size >= 6 {
+            if size >= Self.keylineFloor {
                 Circle()
                     .fill(Self.qadaBodyValue(for: tokens).color)
                     .overlay {
@@ -443,7 +507,7 @@ struct GestaltDot: View {
                         )
                     }
             } else {
-                Circle().fill(Self.qadaBodyValue(for: tokens).color)
+                Circle().fill(Self.qadaBodyValue(for: tokens, size: size).color)
             }
         case (.late, _):
             Circle()
