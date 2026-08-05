@@ -48,24 +48,27 @@ enum YesterdayAccount {
     /// nothing.
     ///
     /// - Parameters:
-    ///   - now: the screen's clock, so a debug override moves this too.
+    ///   - cycleDate: the prayer cycle in progress. "Yesterday" is the
+    ///     cycle before it — so before dawn the app is still asking
+    ///     about the day before last evening, not about the evening a
+    ///     person is standing in.
     ///   - logs: every prayer log available; only yesterday's matter.
     ///   - pauses: excused pauses, active or ended.
-    ///   - dismissedDayKey: the civil day the person last dismissed the
+    ///   - dismissedDayKey: the cycle the person last dismissed the
     ///     line on, as `civilDayKey` renders it. Empty means never.
     static func offer(
-        now: Date,
+        cycleDate: Date,
         logs: [PrayerLog],
         pauses: [PauseInterval],
         dismissedDayKey: String,
         calendar: Calendar = .current
     ) -> Offer? {
-        let today = calendar.startOfDay(for: now)
+        let today = calendar.startOfDay(for: cycleDate)
         guard let yesterday = calendar.date(byAdding: .day, value: -1, to: today) else {
             return nil
         }
 
-        // Dismissed today: the person has already been asked once.
+        // Dismissed this cycle: the person has already been asked once.
         guard dismissedDayKey != civilDayKey(today, calendar: calendar) else { return nil }
 
         // An excused pause covering any part of yesterday silences this

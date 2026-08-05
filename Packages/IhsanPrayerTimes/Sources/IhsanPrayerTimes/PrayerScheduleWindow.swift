@@ -358,6 +358,21 @@ public struct PrayerScheduleWindow: Sendable, Equatable {
 
     // MARK: - Clock 2
 
+    /// The Maghrib of the civil day containing `instant` — the instant
+    /// clock 2 turns on — when this window covers that day.
+    ///
+    /// Matched by civil day rather than taken from `day`, because a
+    /// screen left open across midnight holds a window whose `day` is
+    /// no longer the one the clock is in. `nil` then, which tabulates
+    /// civilly rather than turning the date on a sunset that already
+    /// happened.
+    public func maghribOfCivilDay(containing instant: Date) -> Date? {
+        let calendar = calendar
+        return [day, yesterday]
+            .first { calendar.isDate($0.date, inSameDayAs: instant) }?
+            .maghrib.scheduledTime
+    }
+
     /// The evening boundaries this window can vouch for — yesterday,
     /// today, and (through tomorrow's Fajr only) nothing further. The
     /// app publishes these so every surface names the same Hijri date.

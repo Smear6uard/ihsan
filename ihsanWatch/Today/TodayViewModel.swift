@@ -75,7 +75,10 @@ final class TodayViewModel {
             highLatitudeRule: settings.highLatitudeRule,
             tuning: settings.calculationTuning
         )
-        let logs = try fetchTodaysLogs(now: now, timeZone: place.timeZone)
+        let logs = try fetchCycleLogs(
+            cycleDate: scheduleWindow.cycle(at: now).date,
+            timeZone: place.timeZone
+        )
         let statuses = Self.statusMap(from: logs)
         let jamaah = Self.jamaahMap(from: logs)
 
@@ -89,25 +92,34 @@ final class TodayViewModel {
         // Refresh the App-Group prayer-times cache every time we
         // recompute. Complications read from this rather than spinning
         // up CoreLocation on a tight 30s timeline-provider budget.
+        HijriDisplay.publish(
+            eveningBoundaries: scheduleWindow.eveningBoundaries,
+            timeZone: place.timeZone
+        )
+
         var placeCalendar = Calendar(identifier: .gregorian)
         placeCalendar.timeZone = place.timeZone
+        func entries(_ day: DayPrayerTimes) -> [PrayerTimesCache.Entry] {
+            day.allFardh.map {
+                PrayerTimesCache.Entry(
+                    prayerRaw: $0.prayer.rawValue,
+                    scheduledTime: $0.scheduledTime
+                )
+            }
+        }
         let cache = PrayerTimesCache(
-            date: placeCalendar.startOfDay(for: now),
+            date: placeCalendar.startOfDay(for: scheduleWindow.day.date),
             timeZoneIdentifier: place.timeZone.identifier,
             cityName: place.cityName,
             qiblaBearingDegrees: QiblaEngine(
                 latitude: place.coordinates.latitude,
                 longitude: place.coordinates.longitude
             ).qiblaBearing,
-            entries: scheduleWindow.day.allFardh.map {
-                PrayerTimesCache.Entry(
-                    prayerRaw: $0.prayer.rawValue,
-                    scheduledTime: $0.scheduledTime
-                )
-            },
+            entries: entries(scheduleWindow.day),
             previousDayIsha: scheduleWindow.yesterdayIsha.scheduledTime,
             sunrise: scheduleWindow.day.sunrise,
             nextDayFajr: scheduleWindow.tomorrowFajr.scheduledTime,
+            previousDayEntries: entries(scheduleWindow.yesterday),
             writtenAt: now
         )
         PrayerTimesCacheStore.write(cache)
@@ -141,14 +153,17 @@ final class TodayViewModel {
         }
     }
 
-    private func fetchTodaysLogs(now: Date, timeZone: TimeZone) throws -> [PrayerLog] {
+    /// The cycle's logs — the same five the watch offers to log, keyed
+    /// by the cycle in progress rather than by the civil day, so before
+    /// dawn the face still shows the evening's own account.
+    private func fetchCycleLogs(cycleDate: Date, timeZone: TimeZone) throws -> [PrayerLog] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let startOfDay = calendar.startOfDay(for: now)
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        let start = cycleDate
+        let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
         let descriptor = FetchDescriptor<PrayerLog>(
             predicate: #Predicate {
-                $0.prayerDate >= startOfDay && $0.prayerDate < endOfDay
+                $0.prayerDate >= start && $0.prayerDate < end
             }
         )
         return try modelContext.fetch(descriptor)

@@ -15,10 +15,10 @@ enum TrajectoryAggregator {
         logs: [PrayerLog],
         pauseIntervals: [PauseInterval],
         travelIntervals: [TravelInterval],
-        now: Date = .now,
+        cycleDate: Date,
         calendar: Calendar = .current
     ) -> [DayCompletion] {
-        let (start, end) = period.window(now: now, calendar: calendar)
+        let (start, end) = period.window(cycleDate: cycleDate, calendar: calendar)
         var days: [DayCompletion] = []
         var cursor = start
 

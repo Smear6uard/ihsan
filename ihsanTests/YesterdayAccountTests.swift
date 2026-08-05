@@ -51,7 +51,7 @@ struct YesterdayAccountTests {
         dismissed: String = ""
     ) -> YesterdayAccount.Offer? {
         YesterdayAccount.offer(
-            now: now,
+            cycleDate: calendar.startOfDay(for: now),
             logs: logs,
             pauses: pauses,
             dismissedDayKey: dismissed,

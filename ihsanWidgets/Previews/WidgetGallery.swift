@@ -39,6 +39,8 @@ private let paused = entry(hour: 15, minute: 10) { snapshot in
         cityName: snapshot.cityName,
         qiblaBearingDegrees: snapshot.qiblaBearingDegrees,
         yesterdayIsha: snapshot.yesterdayIsha,
+        cycleDayStart: snapshot.cycleDayStart,
+        cycleRollsAt: snapshot.cycleRollsAt,
         today: snapshot.today,
         tomorrow: snapshot.tomorrow,
         dayAfterTomorrowFajr: snapshot.dayAfterTomorrowFajr,

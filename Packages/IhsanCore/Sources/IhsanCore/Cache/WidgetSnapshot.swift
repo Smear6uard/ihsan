@@ -23,7 +23,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     /// Bump when the payload shape changes; readers reject foreign
     /// versions and fall back to the missing-snapshot state rather
     /// than guessing at fields.
-    public static let currentSchemaVersion = 2
+    public static let currentSchemaVersion = 3
 
     /// One civil day's resolver boundaries, exactly as the app
     /// calculated them.
@@ -83,8 +83,13 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     /// One civil day's Hijri identity, offset already applied by the
     /// app. Strings are precomputed so an extension never re-derives
     /// an inscription with a different offset than the app displays.
+    ///
+    /// `eveningTurn` is that civil day's Maghrib — the instant the
+    /// Hijri day ends and the NEXT stamp takes over. A widget reads the
+    /// turn; it never derives one.
     public struct HijriStamp: Codable, Sendable, Equatable {
         public let civilDayStart: Date
+        public let eveningTurn: Date
         public let day: Int
         public let monthName: String
         public let year: Int
@@ -95,6 +100,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 
         public init(
             civilDayStart: Date,
+            eveningTurn: Date,
             day: Int,
             monthName: String,
             year: Int,
@@ -102,6 +108,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
             isRamadan: Bool
         ) {
             self.civilDayStart = civilDayStart
+            self.eveningTurn = eveningTurn
             self.day = day
             self.monthName = monthName
             self.year = year
@@ -121,12 +128,19 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     /// so this carries only the fact of the fast.
     public struct FastingStamp: Codable, Sendable, Equatable {
         public let civilDayStart: Date
+        /// This civil day's Maghrib: past it, the fast a face speaks
+        /// about is the next day's, because the intention for it
+        /// belongs to this evening.
+        public let eveningTurn: Date
         /// A fast is recorded for the day (intended or kept).
         public let isFasting: Bool
         public let isRamadan: Bool
 
-        public init(civilDayStart: Date, isFasting: Bool, isRamadan: Bool) {
+        public init(
+            civilDayStart: Date, eveningTurn: Date, isFasting: Bool, isRamadan: Bool
+        ) {
             self.civilDayStart = civilDayStart
+            self.eveningTurn = eveningTurn
             self.isFasting = isFasting
             self.isRamadan = isRamadan
         }
@@ -141,6 +155,14 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
 
     /// The previous day's Isha — today's pre-Fajr window belongs to it.
     public let yesterdayIsha: Date
+
+    /// Clock 1: the prayer cycle whose logs travel in this snapshot,
+    /// and the Fajr at which it rolls. Before dawn that cycle is
+    /// yesterday's, which is why a widget at 1 AM shows the evening's
+    /// own account rather than a blank slate for a day that has not
+    /// begun.
+    public let cycleDayStart: Date
+    public let cycleRollsAt: Date
     public let today: DayTable
     public let tomorrow: DayTable
     /// Fajr of the day after tomorrow — tomorrow's terminal boundary.
@@ -153,7 +175,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public let hijri: [HijriStamp]
     public let fasting: [FastingStamp]
 
-    /// Logged status per prayer raw value, for today's civil day.
+    /// Logged status per prayer raw value, for the cycle above.
     /// Absence means no log exists.
     public let loggedStatusByPrayerRaw: [String: String]
     /// The jamāʿah axis for today's logs, keyed like the statuses.
@@ -177,6 +199,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         cityName: String?,
         qiblaBearingDegrees: Double?,
         yesterdayIsha: Date,
+        cycleDayStart: Date,
+        cycleRollsAt: Date,
         today: DayTable,
         tomorrow: DayTable,
         dayAfterTomorrowFajr: Date,
@@ -196,6 +220,8 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         self.cityName = cityName
         self.qiblaBearingDegrees = qiblaBearingDegrees
         self.yesterdayIsha = yesterdayIsha
+        self.cycleDayStart = cycleDayStart
+        self.cycleRollsAt = cycleRollsAt
         self.today = today
         self.tomorrow = tomorrow
         self.dayAfterTomorrowFajr = dayAfterTomorrowFajr
@@ -265,12 +291,15 @@ public extension WidgetSnapshot {
 
     /// Every instant at which a widget face can change state: prayer
     /// window edges and sunrise for both days, solar midnight and the
-    /// last-third start of both nights, and the Hijri day rollovers
-    /// (civil midnight in the place timezone). Suhoor and iftar are
-    /// Fajr and Maghrib — already here. Sorted, exclusive of `after`,
+    /// last-third start of both nights, and the cycle roll. Suhoor and
+    /// iftar are Fajr and Maghrib — already here, and Maghrib is also
+    /// where the Hijri date turns. Sorted, exclusive of `after`,
     /// strictly before `until`.
+    ///
+    /// Civil midnight used to be in this set, as the Hijri rollover.
+    /// It is not a boundary of anything this app shows.
     func timelineBoundaries(after: Date, until: Date) -> [Date] {
-        var boundaries: Set<Date> = []
+        var boundaries: Set<Date> = [cycleRollsAt]
         for table in [today, tomorrow] {
             boundaries.formUnion([
                 table.fajr, table.sunrise, table.dhuhr,
@@ -280,40 +309,42 @@ public extension WidgetSnapshot {
         for night in [tonight, tomorrowNight] {
             boundaries.formUnion([night.nisfAlLayl, night.lastThirdStart])
         }
-        if let timeZone = TimeZone(identifier: timeZoneIdentifier) {
-            var calendar = Calendar(identifier: .gregorian)
-            calendar.timeZone = timeZone
-            var cursor = calendar.startOfDay(for: after)
-            for _ in 0..<3 {
-                guard let midnight = calendar.date(byAdding: .day, value: 1, to: cursor) else {
-                    break
-                }
-                boundaries.insert(midnight)
-                cursor = midnight
-            }
-        }
         return boundaries.filter { $0 > after && $0 < until }.sorted()
     }
 
-    /// The stamp for the civil day containing `instant`, resolved in
-    /// the place timezone.
+    /// The Hijri identity in force at `instant` — the civil day's own
+    /// stamp until its Maghrib, the next day's after it.
     func hijriStamp(at instant: Date) -> HijriStamp? {
-        stamp(in: hijri, at: instant, dayStart: \.civilDayStart)
+        stamp(in: hijri, at: instant, dayStart: \.civilDayStart, turn: \.eveningTurn)
     }
 
+    /// The fast a face speaks about at `instant`. Past Maghrib that is
+    /// the next daytime's, because the intention for it belongs to
+    /// this evening.
     func fastingStamp(at instant: Date) -> FastingStamp? {
-        stamp(in: fasting, at: instant, dayStart: \.civilDayStart)
+        stamp(in: fasting, at: instant, dayStart: \.civilDayStart, turn: \.eveningTurn)
     }
 
     private func stamp<S>(
-        in stamps: [S], at instant: Date, dayStart: KeyPath<S, Date>
+        in stamps: [S],
+        at instant: Date,
+        dayStart: KeyPath<S, Date>,
+        turn: KeyPath<S, Date>
     ) -> S? {
         guard let timeZone = TimeZone(identifier: timeZoneIdentifier) else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        return stamps.first {
+        guard let index = stamps.firstIndex(where: {
             calendar.isDate($0[keyPath: dayStart], inSameDayAs: instant)
+        }) else { return nil }
+        // Past this day's Maghrib the day that matters is the next one.
+        // Where the snapshot carries no next stamp its own last day is
+        // the best truth it has, and staleness — not a wrong date —
+        // is what ends its run.
+        if instant >= stamps[index][keyPath: turn], stamps.indices.contains(index + 1) {
+            return stamps[index + 1]
         }
+        return stamps[index]
     }
 
     /// The same snapshot with today's logged states replaced — the
@@ -352,6 +383,8 @@ public extension WidgetSnapshot {
             cityName: cityName,
             qiblaBearingDegrees: qiblaBearingDegrees,
             yesterdayIsha: yesterdayIsha,
+            cycleDayStart: cycleDayStart,
+            cycleRollsAt: cycleRollsAt,
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: dayAfterTomorrowFajr,

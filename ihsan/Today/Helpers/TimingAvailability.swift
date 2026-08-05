@@ -3,7 +3,11 @@ import IhsanCore
 import IhsanPrayerTimes
 
 /// The sheet's temporal truth rule: which timing choices can be TRUE
-/// at `now` for the prayer and civil day being logged.
+/// for the prayer and cycle being logged.
+///
+/// "Today" here is the prayer CYCLE in progress, not the civil day: at
+/// 1 AM the cycle is still last evening's, so that evening's Isha is
+/// judged by its live window rather than filed away as a past day.
 ///
 /// The timing axis describes when the prayer was PERFORMED, not when
 /// the log entry is created. Praying within the window and logging
@@ -30,14 +34,14 @@ import IhsanPrayerTimes
 enum TimingAvailability {
 
     static func allowedStatuses(
-        now: Date,
+        cycleDate: Date,
         dayBeingLogged: Date,
         windowState: PrayerWindowState?,
         currentStatus: PrayerStatus?,
         calendar: Calendar = .current
     ) -> Set<PrayerStatus> {
         var allowed = baseStatuses(
-            now: now,
+            cycleDate: cycleDate,
             dayBeingLogged: dayBeingLogged,
             windowState: windowState,
             calendar: calendar
@@ -49,12 +53,12 @@ enum TimingAvailability {
     }
 
     private static func baseStatuses(
-        now: Date,
+        cycleDate: Date,
         dayBeingLogged: Date,
         windowState: PrayerWindowState?,
         calendar: Calendar
     ) -> Set<PrayerStatus> {
-        let today = calendar.startOfDay(for: now)
+        let today = calendar.startOfDay(for: cycleDate)
         let day = calendar.startOfDay(for: dayBeingLogged)
 
         if day < today {
@@ -64,7 +68,7 @@ enum TimingAvailability {
             return []
         }
 
-        // Today. With the schedule known, the window decides; the
+        // The cycle in progress. With the schedule known, the window decides; the
         // ledger surfaces (Path cells) open without a schedule and
         // fall through to the full set — repair is deliberate there,
         // and the Today surfaces remain the schedule's authority.

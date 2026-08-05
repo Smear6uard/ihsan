@@ -28,29 +28,34 @@ enum TrajectoryPeriod: CaseIterable, Identifiable, Hashable, Sendable {
         }
     }
 
-    /// Inclusive `[start, end]` window where `end` is the start of today and
-    /// `start` is `dayCount - 1` days earlier.
+    /// Inclusive `[start, end]` window where `end` is the CYCLE in
+    /// progress and `start` is `dayCount - 1` cycles earlier.
+    ///
+    /// Columns are cycles, not civil days: the rightmost one is the
+    /// day whose Fajr has most recently opened, so at 1 AM the pattern
+    /// still ends on the evening a person is standing in rather than
+    /// sprouting an empty column for a day that has not begun.
     func window(
-        now: Date = .now,
+        cycleDate: Date,
         calendar: Calendar = .current
     ) -> (start: Date, end: Date) {
-        let endOfToday = calendar.startOfDay(for: now)
+        let end = calendar.startOfDay(for: cycleDate)
         guard let start = calendar.date(
             byAdding: .day,
             value: -(dayCount - 1),
-            to: endOfToday
+            to: end
         ) else {
-            return (endOfToday, endOfToday)
+            return (end, end)
         }
-        return (start, endOfToday)
+        return (start, end)
     }
 
     /// "APR 9 – MAY 9, 2026" — small caps, used as the screen subtitle.
     func formattedRange(
-        now: Date = .now,
+        cycleDate: Date,
         calendar: Calendar = .current
     ) -> String {
-        let (start, end) = window(now: now, calendar: calendar)
+        let (start, end) = window(cycleDate: cycleDate, calendar: calendar)
         let monthDay = DateFormatter()
         monthDay.calendar = calendar
         monthDay.dateFormat = "MMM d"

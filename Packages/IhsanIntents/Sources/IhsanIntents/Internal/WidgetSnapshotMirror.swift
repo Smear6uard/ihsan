@@ -22,7 +22,7 @@ import WidgetKit
 @MainActor
 enum WidgetSnapshotMirror {
 
-    /// Mirror today's prayer logs onto the snapshot.
+    /// Mirror the cycle's prayer logs onto the snapshot.
     static func reflectPrayerLogs(in context: ModelContext) {
         defer { requestReload() }
         guard
@@ -32,7 +32,10 @@ enum WidgetSnapshotMirror {
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
-        let dayStart = snapshot.today.civilDayStart
+        // The cycle, not the civil day: a 1 AM log belongs to the
+        // evening's slate, and mirroring it under tomorrow would put
+        // it on a widget row whose prayer has not been called.
+        let dayStart = snapshot.cycleDayStart
         guard let dayEnd = calendar.date(byAdding: .day, value: 1, to: dayStart) else { return }
 
         let descriptor = FetchDescriptor<PrayerLog>(
@@ -72,6 +75,7 @@ enum WidgetSnapshotMirror {
             let hasFast = ((try? context.fetchCount(descriptor)) ?? 0) > 0
             return WidgetSnapshot.FastingStamp(
                 civilDayStart: stamp.civilDayStart,
+                eveningTurn: stamp.eveningTurn,
                 isFasting: hasFast,
                 isRamadan: stamp.isRamadan
             )

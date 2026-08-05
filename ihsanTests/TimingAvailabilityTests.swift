@@ -38,7 +38,7 @@ struct TimingAvailabilityTests {
             state = nil
         }
         return TimingAvailability.allowedStatuses(
-            now: now,
+            cycleDate: now,
             dayBeingLogged: day ?? now,
             windowState: state,
             currentStatus: currentStatus,

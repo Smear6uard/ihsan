@@ -263,27 +263,35 @@ private struct TodayReadyView: View {
         self.viewModel = viewModel
         self.dayAnchor = dayAnchor
 
+        // Every query below keys on the CYCLE — Fajr to next Fajr —
+        // not on the civil day. Before dawn that is still last
+        // evening's cycle, which is what the resolver has always said
+        // and what the record now agrees with.
         let calendar = Calendar.current
-        let startOfDay = calendar.startOfDay(for: dayAnchor)
-        let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay) ?? startOfDay
+        let cycleStart = snapshot.scheduleWindow.cycle(at: dayAnchor).date
+        let cycleEnd = calendar.date(byAdding: .day, value: 1, to: cycleStart) ?? cycleStart
         let predicate = #Predicate<PrayerLog> { log in
-            log.prayerDate >= startOfDay && log.prayerDate < endOfDay
+            log.prayerDate >= cycleStart && log.prayerDate < cycleEnd
         }
         self._todaysLogs = Query(filter: predicate, sort: \PrayerLog.prayerDate)
 
-        let startOfYesterday = calendar.date(byAdding: .day, value: -1, to: startOfDay) ?? startOfDay
+        let previousCycle = calendar.date(byAdding: .day, value: -1, to: cycleStart) ?? cycleStart
         let naflPredicate = #Predicate<NaflLog> { log in
-            log.naflDate >= startOfYesterday && log.naflDate < endOfDay
+            log.naflDate >= previousCycle && log.naflDate < cycleEnd
         }
         self._recentNaflLogs = Query(filter: naflPredicate, sort: \NaflLog.naflDate)
 
+        // Fasting keys the DAYTIME that is fasted, and after Maghrib
+        // the daytime in question is tomorrow's — so the fast query
+        // reaches one day further than the prayer one.
+        let fastEnd = calendar.date(byAdding: .day, value: 2, to: cycleStart) ?? cycleEnd
         let fastPredicate = #Predicate<FastLog> { log in
-            log.fastDate >= startOfDay && log.fastDate < endOfDay
+            log.fastDate >= cycleStart && log.fastDate < fastEnd
         }
         self._todaysFasts = Query(filter: fastPredicate, sort: \FastLog.fastDate)
 
         let yesterdayPredicate = #Predicate<PrayerLog> { log in
-            log.prayerDate >= startOfYesterday && log.prayerDate < startOfDay
+            log.prayerDate >= previousCycle && log.prayerDate < cycleStart
         }
         self._yesterdaysLogs = Query(filter: yesterdayPredicate, sort: \PrayerLog.prayerDate)
     }
@@ -382,7 +390,7 @@ private struct TodayReadyView: View {
                         onYesterdayTap: { isYesterdaySheetPresented = true },
                         onYesterdayDismiss: {
                             yesterdayOfferDismissedDay = YesterdayAccount.civilDayKey(
-                                now, calendar: placeCalendar
+                                cycleDay(at: now), calendar: placeCalendar
                             )
                         }
                     )
@@ -409,7 +417,7 @@ private struct TodayReadyView: View {
                         if let duhaWindow = activeDuhaWindow(at: now) {
                             DuhaQuietCard(
                                 window: duhaWindow,
-                                isLogged: naflLogged(.duha, on: todayDay(at: now)),
+                                isLogged: naflLogged(.duha, on: cycleDay(at: now)),
                                 timeZone: snapshot.place.timeZone,
                                 onToggle: { handleNaflTap(.duha) }
                             )
@@ -647,22 +655,35 @@ private struct TodayReadyView: View {
         settingsRows.first
     }
 
-    private func todayDay(at now: Date) -> Date {
-        Calendar.current.startOfDay(for: now)
+    /// The cycle in progress — the day every record on this screen
+    /// files under, night acts included.
+    ///
+    /// The night-of adjustment that used to live beside this is gone,
+    /// because it was the cycle rule wearing a different name: before
+    /// Fajr, the cycle IS yesterday's, so qiyam at 2 AM and Isha at
+    /// 1 AM now reach the same answer through one function.
+    private func cycleDay(at now: Date) -> Date {
+        snapshot.scheduleWindow.cycle(at: now).date
     }
 
-    /// The civil day tonight's night acts belong to: before today's Fajr
-    /// the night began yesterday evening.
-    private func nightOfDay(at now: Date) -> Date {
-        let today = todayDay(at: now)
-        let resolution = PrayerStateResolver.resolve(
-            prayerTimes: snapshot.scheduleWindow.resolverSchedule,
-            now: now
+    /// The civil day whose daytime the fasting layer is speaking about:
+    /// today until Maghrib, tomorrow after it.
+    private func fastDay(at now: Date) -> Date {
+        HijriConverter.daytimeCivilDay(
+            at: now,
+            maghrib: snapshot.scheduleWindow.maghribOfCivilDay(containing: now),
+            timeZone: snapshot.place.timeZone
         )
-        if resolution.currentPrayer == snapshot.scheduleWindow.yesterdayIsha {
-            return Calendar.current.date(byAdding: .day, value: -1, to: today) ?? today
-        }
-        return today
+    }
+
+    /// The Hijri date in progress, turned at this civil day's Maghrib.
+    private func hijriComponents(at now: Date) -> HijriConverter.Components {
+        HijriConverter.components(
+            for: now,
+            offsetDays: hijriOffsetDays,
+            maghribOfCivilDay: snapshot.scheduleWindow.maghribOfCivilDay(containing: now),
+            timeZone: snapshot.place.timeZone
+        )
     }
 
     private func naflLogged(_ kind: NaflKind, on day: Date) -> Bool {
@@ -682,7 +703,7 @@ private struct TodayReadyView: View {
         let config = settings.rawatibConfig(for: prayer)
         guard config.beforeCount > 0 || config.afterCount > 0 else { return nil }
 
-        let today = todayDay(at: now)
+        let today = cycleDay(at: now)
         return FocusedPrayerCard.RawatibChips(
             beforeCount: config.beforeCount,
             afterCount: config.afterCount,
@@ -705,7 +726,7 @@ private struct TodayReadyView: View {
         let ishaLogged = log(for: .isha) != nil
         guard ishaLogged || now >= night.nisfAlLayl else { return nil }
 
-        let nightDay = nightOfDay(at: now)
+        let nightDay = cycleDay(at: now)
         let witrLogs = recentNaflLogs.filter { $0.kind == .witr }
         return FocusedPrayerCard.NightChips(
             qiyamLogged: naflLogged(.qiyam, on: nightDay),
@@ -839,13 +860,12 @@ private struct TodayReadyView: View {
         adhkarDismissedDay = AdhkarDismissal.encode(dismissed, dayKey: key)
     }
 
+    /// Every voluntary act files under the cycle it was offered in.
+    /// Night kinds needed their own branch only while the day rolled at
+    /// midnight; the cycle already runs through the night, so one
+    /// answer serves all of them.
     private func naflDay(for kind: NaflKind, at now: Date) -> Date {
-        switch kind {
-        case .qiyam, .witr, .tarawih:
-            return nightOfDay(at: now)
-        case .duha, .rawatibBefore, .rawatibAfter:
-            return todayDay(at: now)
-        }
+        cycleDay(at: now)
     }
 
     /// The chip already fired its haptic. Removal and count-free logging
@@ -893,26 +913,62 @@ private struct TodayReadyView: View {
         sunnahSettings?.hijriCalendarOffsetDays ?? 0
     }
 
-    private var todaysFast: FastLog? {
-        todaysFasts.first
+    /// The fast recorded for a given daytime, if any.
+    private func fast(on day: Date) -> FastLog? {
+        todaysFasts.first { placeCalendar.isDate($0.fastDate, inSameDayAs: day) }
     }
 
-    /// The header's quiet line for today: a curated calendar fact
-    /// (dismissible), or — when a rhythm is enabled — the same line
-    /// doubling as a gentle fasting offer.
+    /// The fast the surface is speaking about at `now` — the daytime of
+    /// the Hijri day in progress.
+    private func currentFast(at now: Date) -> FastLog? {
+        fast(on: fastDay(at: now))
+    }
+
+    /// Fajr of the daytime the fasting layer is speaking about.
+    private func fastDayFajr(at now: Date) -> Date {
+        let window = snapshot.scheduleWindow
+        return placeCalendar.isDate(fastDay(at: now), inSameDayAs: window.day.date)
+            ? window.day.fajr.scheduledTime
+            : window.tomorrowFajr.scheduledTime
+    }
+
+    /// Maghrib of the daytime the fasting layer is speaking about —
+    /// iftar, when that daytime arrives.
+    private func fastDayMaghrib(at now: Date) -> Date {
+        let window = snapshot.scheduleWindow
+        let day = fastDay(at: now)
+        if let table = [window.yesterday, window.day]
+            .first(where: { placeCalendar.isDate($0.date, inSameDayAs: day) }) {
+            return table.maghrib.scheduledTime
+        }
+        // The fast belongs to tomorrow's daytime, which the window
+        // brackets only as far as its Fajr. One day on from today's
+        // Maghrib is within a couple of minutes of the real one and is
+        // never the thing a person reads — by the time that iftar
+        // matters, the window has been rebuilt around it.
+        return placeCalendar.date(
+            byAdding: .day, value: 1, to: window.day.maghrib.scheduledTime
+        ) ?? window.day.maghrib.scheduledTime
+    }
+
+    /// The header's quiet line: a curated calendar fact (dismissible),
+    /// or — when a rhythm is enabled — the same line doubling as a
+    /// gentle fasting offer.
+    ///
+    /// Both key on the Hijri day in progress, which begins at Maghrib.
+    /// So a Thursday fast is offered from Wednesday evening, in the
+    /// evening's own register, because that is when the intention for
+    /// it is made.
     private func headerLine(at now: Date) -> FastingDayModel.HeaderLine? {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = snapshot.place.timeZone
-        return FastingDayModel.headerLine(
-            components: HijriConverter.components(
-                for: now, offsetDays: hijriOffsetDays, timeZone: snapshot.place.timeZone
-            ),
-            weekday: calendar.component(.weekday, from: now),
+        FastingDayModel.headerLine(
+            components: hijriComponents(at: now),
+            weekday: placeCalendar.component(.weekday, from: fastDay(at: now)),
+            isEveningBeforeFast: !placeCalendar.isDate(fastDay(at: now), inSameDayAs: now),
             isRamadan: snapshot.isCurrentlyRamadan,
             monThuOfferEnabled: sunnahSettings?.fastingMonThuOfferEnabled ?? false,
             whiteDaysOfferEnabled: sunnahSettings?.fastingWhiteDaysOfferEnabled ?? false,
             isPaused: activePause != nil,
-            hasFastToday: todaysFast != nil,
+            hasFastToday: currentFast(at: now) != nil,
             dismissedForToday: significantDayDismissedDay == civilDayKey(at: now)
         )
     }
@@ -929,7 +985,7 @@ private struct TodayReadyView: View {
     /// suppression rule lives in `YesterdayAccount`; this only asks.
     private func yesterdayOffer(at now: Date) -> YesterdayAccount.Offer? {
         YesterdayAccount.offer(
-            now: now,
+            cycleDate: cycleDay(at: now),
             logs: yesterdaysLogs,
             pauses: pauses,
             dismissedDayKey: yesterdayOfferDismissedDay,
@@ -941,7 +997,7 @@ private struct TodayReadyView: View {
     private func yesterdaySheet(at now: Date) -> some View {
         let calendar = placeCalendar
         let day = calendar.date(
-            byAdding: .day, value: -1, to: calendar.startOfDay(for: now)
+            byAdding: .day, value: -1, to: cycleDay(at: now)
         ) ?? now
         let rows = YesterdayAccount.rows(
             for: day, logs: yesterdaysLogs, calendar: calendar
@@ -1000,9 +1056,14 @@ private struct TodayReadyView: View {
 
     private func headerLineHint(at now: Date) -> String? {
         switch headerLine(at: now) {
-        case .info: return "Dismisses this note for today."
-        case .offer: return "Records a fasting intention for today."
-        case nil: return nil
+        case .info:
+            return "Dismisses this note for today."
+        case .offer:
+            return placeCalendar.isDate(fastDay(at: now), inSameDayAs: now)
+                ? "Records a fasting intention for today."
+                : "Records a fasting intention for tomorrow."
+        case nil:
+            return nil
         }
     }
 
@@ -1011,7 +1072,7 @@ private struct TodayReadyView: View {
         case .info:
             significantDayDismissedDay = civilDayKey(at: now)
         case .offer(_, let kind):
-            recordFast(kind: kind, state: .intended)
+            recordFast(kind: kind, state: .intended, on: fastDay(at: now))
         case nil:
             break
         }
@@ -1019,13 +1080,34 @@ private struct TodayReadyView: View {
 
     /// The quiet fasting inscription joining the focused-card region.
     private func fastingInscription(at now: Date) -> FastingDayModel.Inscription? {
-        FastingDayModel.inscription(
-            state: todaysFast?.state,
+        // A fast intended for the daytime that has just ended still
+        // asks to be confirmed, even though Maghrib has already turned
+        // the Hijri day. The completion belongs to the day it was
+        // kept, so it is resolved before the turn is applied.
+        let endedDaytime = placeCalendar.startOfDay(for: now)
+        if let ending = fast(on: endedDaytime), ending.state == .intended,
+           let table = [snapshot.scheduleWindow.yesterday, snapshot.scheduleWindow.day]
+               .first(where: { placeCalendar.isDate($0.date, inSameDayAs: endedDaytime) }),
+           now >= table.maghrib.scheduledTime {
+            return FastingDayModel.inscription(
+                state: .intended,
+                isRamadan: snapshot.isCurrentlyRamadan,
+                isPaused: activePause != nil,
+                now: now,
+                fajr: table.fajr.scheduledTime,
+                maghrib: table.maghrib.scheduledTime,
+                timeZone: snapshot.place.timeZone
+            )
+        }
+
+        return FastingDayModel.inscription(
+            state: currentFast(at: now)?.state,
             isRamadan: snapshot.isCurrentlyRamadan,
             isPaused: activePause != nil,
+            isEveningBeforeFast: !placeCalendar.isDate(fastDay(at: now), inSameDayAs: now),
             now: now,
-            fajr: snapshot.scheduleWindow.day.fajr.scheduledTime,
-            maghrib: snapshot.scheduleWindow.day.maghrib.scheduledTime,
+            fajr: fastDayFajr(at: now),
+            maghrib: fastDayMaghrib(at: now),
             timeZone: snapshot.place.timeZone
         )
     }
@@ -1044,7 +1126,7 @@ private struct TodayReadyView: View {
                 .accessibilityLabel(text.capitalized)
         case .ramadanOffer(let text):
             Button {
-                recordFast(kind: .ramadan, state: .kept)
+                recordFast(kind: .ramadan, state: .kept, on: fastDay(at: now))
             } label: {
                 fastingLineLabel(text, tokens: tokens, outlined: true)
             }
@@ -1053,7 +1135,11 @@ private struct TodayReadyView: View {
             .accessibilityHint("Records today's Ramadan fast.")
         case .keptCompletion(let text):
             Button {
-                recordFast(kind: todaysFast?.kind ?? .other, state: .kept)
+                // The daytime that has just ended — the one the
+                // intention was made for, even though Maghrib has
+                // already turned the Hijri day.
+                let keptDay = placeCalendar.startOfDay(for: now)
+                recordFast(kind: fast(on: keptDay)?.kind ?? .other, state: .kept, on: keptDay)
             } label: {
                 fastingLineLabel(text, tokens: tokens, outlined: true)
             }
@@ -1087,9 +1173,12 @@ private struct TodayReadyView: View {
 
     /// One funnel, instant feedback: the settle fires before the
     /// intent persists, and the @Query re-render carries the truth.
-    private func recordFast(kind: FastKind, state: FastState) {
+    ///
+    /// `day` is the DAYTIME being recorded, which is not always the
+    /// one the clock is in: an intention made after Maghrib is for
+    /// tomorrow, and a fast confirmed after Maghrib was kept today.
+    private func recordFast(kind: FastKind, state: FastState, on day: Date) {
         Haptics.settle()
-        let day = todayDay(at: nowProvider.now())
         Task {
             _ = try? await LogFastIntent(kind: kind, state: state, fastDate: day).perform()
         }
@@ -1295,8 +1384,8 @@ private struct TodayReadyView: View {
                 // The truth rule: what can be true at this moment for
                 // this prayer today decides which tiles are live.
                 availableStatuses: TimingAvailability.allowedStatuses(
-                    now: now,
-                    dayBeingLogged: now,
+                    cycleDate: cycleDay(at: now),
+                    dayBeingLogged: cycleDay(at: now),
                     windowState: windowState,
                     currentStatus: log?.status
                 ),

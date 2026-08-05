@@ -339,7 +339,7 @@ struct TrajectoryScreen: View {
             currentStatus: selection.currentStatus,
             isJamaah: selection.isJamaah,
             availableStatuses: TimingAvailability.allowedStatuses(
-                now: now,
+                cycleDate: PrayerCycleClock.sharedCycleDate(at: now),
                 dayBeingLogged: selection.day,
                 windowState: nil,
                 currentStatus: selection.currentStatus

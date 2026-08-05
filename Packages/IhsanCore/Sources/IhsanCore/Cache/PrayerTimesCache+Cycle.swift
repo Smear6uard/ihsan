@@ -5,31 +5,57 @@ import Foundation
 public extension PrayerTimesCache {
 
     var fajr: Date? {
-        entries.first { $0.prayerRaw == Prayer.fajr.rawValue }?.scheduledTime
+        Self.time(of: .fajr, in: entries)
     }
 
-    func scheduledTime(for prayer: Prayer) -> Date? {
+    var previousDayFajr: Date? {
+        previousDayEntries.flatMap { Self.time(of: .fajr, in: $0) }
+    }
+
+    private static func time(of prayer: Prayer, in entries: [Entry]) -> Date? {
         entries.first { $0.prayerRaw == prayer.rawValue }?.scheduledTime
     }
 
-    /// The prayer cycle this cache describes, when it contains
-    /// `instant`.
+    /// The prayer cycle containing `instant`, from the two cycles this
+    /// cache spans.
     ///
-    /// A cache entry IS one cycle: it holds a day's five prayers plus
-    /// the Fajr that closes them. So the containment test is the cycle
-    /// itself — `[fajr, nextDayFajr)` — and needs no reasoning about
-    /// which civil day the instant fell on. A cache written yesterday
-    /// still answers correctly at 1 AM, which is precisely the hour the
+    /// A cycle is `[fajr, nextFajr)` — the containment test IS the
+    /// cycle, so it needs no reasoning about which civil day the
+    /// instant fell on. That is why a cache written last night still
+    /// answers correctly at 1 AM, which is exactly the hour the
     /// midnight boundary got wrong.
     func cycle(at instant: Date) -> PrayerCycle? {
-        guard let fajr, let nextDayFajr, instant >= fajr, instant < nextDayFajr else {
-            return nil
-        }
+        guard let fajr else { return nil }
         var calendar = Calendar(identifier: .gregorian)
         if let timeZone = TimeZone(identifier: timeZoneIdentifier) {
             calendar.timeZone = timeZone
         }
-        return PrayerCycle(date: calendar.startOfDay(for: fajr), rollsAt: nextDayFajr)
+
+        if let nextDayFajr, instant >= fajr, instant < nextDayFajr {
+            return PrayerCycle(date: calendar.startOfDay(for: fajr), rollsAt: nextDayFajr)
+        }
+        if let previousDayFajr, instant >= previousDayFajr, instant < fajr {
+            return PrayerCycle(date: calendar.startOfDay(for: previousDayFajr), rollsAt: fajr)
+        }
+        return nil
+    }
+
+    /// The five of the cycle containing `instant`.
+    func cycleEntries(at instant: Date) -> [Entry]? {
+        guard let fajr else { return nil }
+        if let nextDayFajr, instant >= fajr, instant < nextDayFajr {
+            return entries
+        }
+        if let previousDayEntries, let previousDayFajr,
+           instant >= previousDayFajr, instant < fajr {
+            return previousDayEntries
+        }
+        return nil
+    }
+
+    /// When `prayer`'s window opened in the cycle containing `instant`.
+    func scheduledTime(for prayer: Prayer, at instant: Date) -> Date? {
+        cycleEntries(at: instant).flatMap { Self.time(of: prayer, in: $0) }
     }
 }
 
@@ -54,9 +80,9 @@ public extension PrayerCycleClock {
     /// no cached schedule covers it.
     ///
     /// The fallback is reached only before a device has ever resolved a
-    /// schedule, or when a cache has gone stale by more than a day. It
-    /// is the old behaviour, kept as a floor rather than as a rule: a
-    /// record has to land on some day, and inventing a Fajr would be
+    /// schedule, or when a cache has gone stale by more than a cycle.
+    /// It is the old behaviour, kept as a floor rather than as a rule:
+    /// a record has to land on some day, and inventing a Fajr would be
     /// worse than naming the civil one.
     static func sharedCycleDate(
         at instant: Date,

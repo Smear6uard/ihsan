@@ -36,6 +36,15 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
     public let previousDayIsha: Date?
     public let sunrise: Date?
     public let nextDayFajr: Date?
+    /// The previous day's five, so the cache spans two whole prayer
+    /// cycles rather than one day plus its edges.
+    ///
+    /// Before dawn the cycle in progress is the previous day's, and a
+    /// record written then has to name that day AND be measured against
+    /// that day's window. Coordinates are never persisted, so a caller
+    /// with no place in hand has only this cache to ask — and asking it
+    /// about yesterday used to get today's answer.
+    public let previousDayEntries: [Entry]?
     public let writtenAt: Date
 
     public init(
@@ -47,6 +56,7 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
         previousDayIsha: Date? = nil,
         sunrise: Date? = nil,
         nextDayFajr: Date?,
+        previousDayEntries: [Entry]? = nil,
         writtenAt: Date = .now
     ) {
         self.date = date
@@ -57,6 +67,7 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
         self.previousDayIsha = previousDayIsha
         self.sunrise = sunrise
         self.nextDayFajr = nextDayFajr
+        self.previousDayEntries = previousDayEntries
         self.writtenAt = writtenAt
     }
 }

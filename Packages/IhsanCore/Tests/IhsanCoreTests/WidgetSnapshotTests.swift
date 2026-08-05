@@ -66,6 +66,8 @@ struct WidgetSnapshotTests {
             cityName: "Chicago",
             qiblaBearingDegrees: 48.5,
             yesterdayIsha: at(day: 29, 21, 44),
+            cycleDayStart: today.civilDayStart,
+            cycleRollsAt: tomorrow.fajr,
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: dayAfterFajr,
@@ -74,6 +76,7 @@ struct WidgetSnapshotTests {
             hijri: [
                 WidgetSnapshot.HijriStamp(
                     civilDayStart: today.civilDayStart,
+                    eveningTurn: today.maghrib,
                     day: 13,
                     monthName: "Safar",
                     year: 1448,
@@ -82,6 +85,7 @@ struct WidgetSnapshotTests {
                 ),
                 WidgetSnapshot.HijriStamp(
                     civilDayStart: tomorrow.civilDayStart,
+                    eveningTurn: tomorrow.maghrib,
                     day: 14,
                     monthName: "Safar",
                     year: 1448,
@@ -91,10 +95,12 @@ struct WidgetSnapshotTests {
             ],
             fasting: [
                 WidgetSnapshot.FastingStamp(
-                    civilDayStart: today.civilDayStart, isFasting: true, isRamadan: false
+                    civilDayStart: today.civilDayStart, eveningTurn: today.maghrib,
+                    isFasting: true, isRamadan: false
                 ),
                 WidgetSnapshot.FastingStamp(
-                    civilDayStart: tomorrow.civilDayStart, isFasting: false, isRamadan: false
+                    civilDayStart: tomorrow.civilDayStart, eveningTurn: tomorrow.maghrib,
+                    isFasting: false, isRamadan: false
                 ),
             ],
             loggedStatusByPrayerRaw: loggedStatusByPrayerRaw,
@@ -176,13 +182,33 @@ struct WidgetSnapshotTests {
         #expect(snapshot.night(containing: Self.at(day: 31, 21, 0)) == snapshot.tomorrowNight)
     }
 
+    /// Clock 2 on a widget face: the Hijri date and the fasting fact
+    /// both turn at Maghrib, and neither notices midnight.
     @Test
-    func stampsResolveByCivilDayInPlaceTimeZone() {
+    func stampsTurnAtMaghribNotMidnight() {
         let snapshot = Self.makeSnapshot()
-        #expect(snapshot.hijriStamp(at: Self.at(day: 30, 23, 59))?.day == 13)
+        let maghrib = snapshot.today.maghrib
+
+        #expect(snapshot.hijriStamp(at: maghrib.addingTimeInterval(-60))?.day == 13)
+        #expect(snapshot.hijriStamp(at: maghrib)?.day == 14)
+        // Midnight passes and nothing happens — the turn was hours ago.
+        #expect(snapshot.hijriStamp(at: Self.at(day: 30, 23, 59))?.day == 14)
         #expect(snapshot.hijriStamp(at: Self.at(day: 31, 0, 1))?.day == 14)
+
         #expect(snapshot.fastingStamp(at: Self.at(day: 30, 12, 0))?.isFasting == true)
-        #expect(snapshot.fastingStamp(at: Self.at(day: 31, 12, 0))?.isFasting == false)
+        // Past iftar the fact a face speaks about is tomorrow's fast,
+        // because the intention for it belongs to this evening.
+        #expect(snapshot.fastingStamp(at: maghrib)?.isFasting == false)
+    }
+
+    /// The last day a snapshot carries has nothing to turn into; it
+    /// keeps its own stamp and lets staleness end its run rather than
+    /// naming a date it cannot know.
+    @Test
+    func theLastStampHoldsRatherThanGuessing() {
+        let snapshot = Self.makeSnapshot()
+        let lastEvening = snapshot.tomorrow.maghrib.addingTimeInterval(60)
+        #expect(snapshot.hijriStamp(at: lastEvening)?.day == 14)
     }
 
     // MARK: - Store
@@ -217,6 +243,8 @@ struct WidgetSnapshotTests {
             cityName: snapshot.cityName,
             qiblaBearingDegrees: snapshot.qiblaBearingDegrees,
             yesterdayIsha: snapshot.yesterdayIsha,
+            cycleDayStart: snapshot.cycleDayStart,
+            cycleRollsAt: snapshot.cycleRollsAt,
             today: snapshot.today,
             tomorrow: snapshot.tomorrow,
             dayAfterTomorrowFajr: snapshot.dayAfterTomorrowFajr,
@@ -316,8 +344,10 @@ extension WidgetSnapshotTests {
         // Tonight's divisions.
         #expect(boundaries.contains(snapshot.tonight.nisfAlLayl))
         #expect(boundaries.contains(snapshot.tonight.lastThirdStart))
-        // The rollover into day two, and day two entire.
-        #expect(boundaries.contains(Self.at(day: 31, 0, 0)))
+        // The cycle roll, and day two entire. Civil midnight is NOT
+        // here: it is not a boundary of anything this app shows.
+        #expect(boundaries.contains(snapshot.cycleRollsAt))
+        #expect(!boundaries.contains(Self.at(day: 31, 0, 0)))
         #expect(boundaries.contains(snapshot.tomorrow.fajr))
         #expect(boundaries.contains(snapshot.tomorrow.isha))
         #expect(boundaries.contains(snapshot.tomorrowNight.nisfAlLayl))

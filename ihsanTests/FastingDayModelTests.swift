@@ -23,6 +23,7 @@ struct FastingDayModelTests {
     private func line(
         components: HijriConverter.Components,
         weekday: Int = 3,
+        evening: Bool = false,
         isRamadan: Bool = false,
         monThu: Bool = false,
         whiteDays: Bool = false,
@@ -33,6 +34,7 @@ struct FastingDayModelTests {
         FastingDayModel.headerLine(
             components: components,
             weekday: weekday,
+            isEveningBeforeFast: evening,
             isRamadan: isRamadan,
             monThuOfferEnabled: monThu,
             whiteDaysOfferEnabled: whiteDays,
@@ -61,6 +63,26 @@ struct FastingDayModelTests {
         #expect(line(components: plainDay(), weekday: 3, monThu: true) == nil)
         // Toggle off: no offer, and a plain day has no info either.
         #expect(line(components: plainDay(), weekday: 2) == nil)
+    }
+
+    /// Clock 2: the Hijri day begins at Maghrib, so a Thursday fast is
+    /// offered from Wednesday evening — in the evening's own register,
+    /// because that is when the intention for it is made.
+    @Test
+    func theEveningBeforeOffersTheComingFast() {
+        #expect(
+            line(components: plainDay(), weekday: 5, evening: true, monThu: true)
+                == .offer(text: "TOMORROW'S FAST · THURSDAY", kind: .monThu)
+        )
+        #expect(
+            line(components: whiteDay(), evening: true, whiteDays: true)
+                == .offer(text: "TOMORROW'S FAST · WHITE DAY", kind: .whiteDay)
+        )
+        // And from Fajr onward the day-of wording returns.
+        #expect(
+            line(components: plainDay(), weekday: 5, monThu: true)
+                == .offer(text: "THURSDAY · FAST?", kind: .monThu)
+        )
     }
 
     // MARK: - Excused pause offers nothing
@@ -105,10 +127,12 @@ struct FastingDayModelTests {
         state: FastState?,
         isRamadan: Bool = false,
         isPaused: Bool = false,
+        evening: Bool = false,
         now: Date
     ) -> FastingDayModel.Inscription? {
         FastingDayModel.inscription(
             state: state, isRamadan: isRamadan, isPaused: isPaused,
+            isEveningBeforeFast: evening,
             now: now, fajr: fajr, maghrib: maghrib, timeZone: timeZone
         )
     }
@@ -142,6 +166,16 @@ struct FastingDayModelTests {
             Issue.record("expected the Ramadan offer"); return
         }
         #expect(text.hasPrefix("FASTING TODAY?"))
+
+        // From Maghrib the Ramadan day in progress is tomorrow's, and
+        // the offer says so rather than calling it today's.
+        let evening = inscription(
+            state: nil, isRamadan: true, evening: true, now: fajr.addingTimeInterval(-3600)
+        )
+        guard case .ramadanOffer(let eveningText) = evening else {
+            Issue.record("expected the Ramadan offer"); return
+        }
+        #expect(eveningText.hasPrefix("FASTING TOMORROW?"))
 
         // Paused days offer no fasting prompts.
         #expect(inscription(state: nil, isRamadan: true, isPaused: true, now: fajr) == nil)

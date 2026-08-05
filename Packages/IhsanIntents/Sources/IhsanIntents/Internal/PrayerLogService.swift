@@ -208,7 +208,7 @@ internal struct PrayerLogService: Sendable {
 
         if let cache = PrayerTimesCacheStore.read(),
            let cycle = cache.cycle(at: now),
-           let scheduledTime = cache.scheduledTime(for: prayer) {
+           let scheduledTime = cache.scheduledTime(for: prayer, at: now) {
             return CycleAttribution(cycleDate: cycle.date, scheduledTime: scheduledTime)
         }
 

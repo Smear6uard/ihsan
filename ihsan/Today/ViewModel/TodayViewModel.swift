@@ -106,28 +106,45 @@ final class TodayViewModel {
             night: relevantNight(now: now, place: place, settings: settings)
         ))
 
+        // Clock 2's boundaries, published before anything formats a
+        // Hijri date: the day turns at Maghrib, and every surface reads
+        // the turn from here rather than deriving one of its own.
+        HijriDisplay.publish(
+            eveningBoundaries: scheduleWindow.eveningBoundaries,
+            timeZone: place.timeZone
+        )
+
         // Publish the exact resolver table for widgets/watch
         // complications. Extensions never recalculate with a second
         // timezone or settings path, and coordinates remain transient.
+        //
+        // Yesterday's five travel with it. Before dawn the cycle in
+        // progress is yesterday's, and the surfaces that log without a
+        // place — which is most of them — have only this cache to
+        // resolve it from.
         var placeCalendar = Calendar(identifier: .gregorian)
         placeCalendar.timeZone = place.timeZone
+        func entries(_ day: DayPrayerTimes) -> [PrayerTimesCache.Entry] {
+            day.allFardh.map {
+                PrayerTimesCache.Entry(
+                    prayerRaw: $0.prayer.rawValue,
+                    scheduledTime: $0.scheduledTime
+                )
+            }
+        }
         PrayerTimesCacheStore.write(PrayerTimesCache(
-            date: placeCalendar.startOfDay(for: now),
+            date: placeCalendar.startOfDay(for: scheduleWindow.day.date),
             timeZoneIdentifier: place.timeZone.identifier,
             cityName: place.cityName,
             qiblaBearingDegrees: QiblaEngine(
                 latitude: place.coordinates.latitude,
                 longitude: place.coordinates.longitude
             ).qiblaBearing,
-            entries: scheduleWindow.day.allFardh.map {
-                PrayerTimesCache.Entry(
-                    prayerRaw: $0.prayer.rawValue,
-                    scheduledTime: $0.scheduledTime
-                )
-            },
+            entries: entries(scheduleWindow.day),
             previousDayIsha: scheduleWindow.yesterdayIsha.scheduledTime,
             sunrise: scheduleWindow.day.sunrise,
             nextDayFajr: scheduleWindow.tomorrowFajr.scheduledTime,
+            previousDayEntries: entries(scheduleWindow.yesterday),
             writtenAt: now
         ))
 

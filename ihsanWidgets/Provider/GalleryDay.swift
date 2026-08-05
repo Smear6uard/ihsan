@@ -57,6 +57,8 @@ enum GalleryDay {
             cityName: "Madinah",
             qiblaBearingDegrees: 176,
             yesterdayIsha: at(-1, 21, 44),
+            cycleDayStart: today.civilDayStart,
+            cycleRollsAt: tomorrow.fajr,
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: dayAfterFajr,
@@ -65,6 +67,7 @@ enum GalleryDay {
             hijri: [
                 WidgetSnapshot.HijriStamp(
                     civilDayStart: today.civilDayStart,
+                    eveningTurn: today.maghrib,
                     day: 13,
                     monthName: "Safar",
                     year: 1448,
@@ -73,6 +76,7 @@ enum GalleryDay {
                 ),
                 WidgetSnapshot.HijriStamp(
                     civilDayStart: tomorrow.civilDayStart,
+                    eveningTurn: tomorrow.maghrib,
                     day: 14,
                     monthName: "Safar",
                     year: 1448,
@@ -82,10 +86,12 @@ enum GalleryDay {
             ],
             fasting: [
                 WidgetSnapshot.FastingStamp(
-                    civilDayStart: today.civilDayStart, isFasting: false, isRamadan: false
+                    civilDayStart: today.civilDayStart, eveningTurn: today.maghrib,
+                    isFasting: false, isRamadan: false
                 ),
                 WidgetSnapshot.FastingStamp(
-                    civilDayStart: tomorrow.civilDayStart, isFasting: false, isRamadan: false
+                    civilDayStart: tomorrow.civilDayStart, eveningTurn: tomorrow.maghrib,
+                    isFasting: false, isRamadan: false
                 ),
             ],
             loggedStatusByPrayerRaw: [

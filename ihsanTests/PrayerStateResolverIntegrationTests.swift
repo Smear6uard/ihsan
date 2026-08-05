@@ -37,7 +37,7 @@ struct PrayerStateResolverIntegrationTests {
                 isLogged: false
             ),
             availableStatuses: TimingAvailability.allowedStatuses(
-                now: now,
+                cycleDate: now,
                 dayBeingLogged: now,
                 windowState: windowState,
                 currentStatus: nil,

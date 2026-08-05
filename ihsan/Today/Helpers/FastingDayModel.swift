@@ -22,9 +22,21 @@ enum FastingDayModel {
     /// Resolve the header line. Offers require the matching rhythm
     /// toggle, no fast recorded yet, and — always — no excused pause:
     /// paused days offer no fasting prompts and record nothing.
+    ///
+    /// - Parameters:
+    ///   - components: the Hijri day in progress, which began at
+    ///     Maghrib.
+    ///   - weekday: the weekday of the DAYTIME being offered — after
+    ///     Maghrib on a Wednesday that is Thursday.
+    ///   - isEveningBeforeFast: Maghrib has turned the Hijri day, so
+    ///     the daytime being offered is tomorrow's and the line says
+    ///     so. Deliberately not "before Fajr": at 3 AM the fast ahead
+    ///     is today's by every clock a person uses, and calling it
+    ///     tomorrow's would be the app being clever at their expense.
     static func headerLine(
         components: HijriConverter.Components,
         weekday: Int,
+        isEveningBeforeFast: Bool,
         isRamadan: Bool,
         monThuOfferEnabled: Bool,
         whiteDaysOfferEnabled: Bool,
@@ -41,15 +53,15 @@ enum FastingDayModel {
         if !isPaused, !hasFastToday {
             if whiteDaysOfferEnabled, significance == .whiteDay {
                 return .offer(
-                    text: "White day · Fast?".uppercased(),
+                    text: offerText("White day", isEveningBeforeFast: isEveningBeforeFast),
                     kind: .whiteDay
                 )
             }
-            if monThuOfferEnabled, weekday == 2 {
-                return .offer(text: "Monday · Fast?".uppercased(), kind: .monThu)
-            }
-            if monThuOfferEnabled, weekday == 5 {
-                return .offer(text: "Thursday · Fast?".uppercased(), kind: .monThu)
+            if monThuOfferEnabled, let name = weekdayName(weekday) {
+                return .offer(
+                    text: offerText(name, isEveningBeforeFast: isEveningBeforeFast),
+                    kind: .monThu
+                )
             }
         }
 
@@ -57,6 +69,24 @@ enum FastingDayModel {
             return .info(significance.inscription(for: components).uppercased())
         }
         return nil
+    }
+
+    /// Monday and Thursday are the only two the rhythm names.
+    private static func weekdayName(_ weekday: Int) -> String? {
+        switch weekday {
+        case 2: return "Monday"
+        case 5: return "Thursday"
+        default: return nil
+        }
+    }
+
+    /// The offer's two registers. At night the fast being intended is
+    /// tomorrow's and the line says so; from Fajr onward it is the day
+    /// underway.
+    private static func offerText(_ subject: String, isEveningBeforeFast: Bool) -> String {
+        isEveningBeforeFast
+            ? "Tomorrow's fast · \(subject)".uppercased()
+            : "\(subject) · Fast?".uppercased()
     }
 
     // MARK: - The fasting inscription
@@ -83,6 +113,7 @@ enum FastingDayModel {
         state: FastState?,
         isRamadan: Bool,
         isPaused: Bool,
+        isEveningBeforeFast: Bool = false,
         now: Date,
         fajr: Date,
         maghrib: Date,
@@ -91,6 +122,7 @@ enum FastingDayModel {
         let timeline = now < fajr
             ? "Suhoor ends \(PlateTimeFormat.time(fajr, in: timeZone))"
             : "Iftar \(PlateTimeFormat.time(maghrib, in: timeZone))"
+        let subject = isEveningBeforeFast ? "Fasting tomorrow?" : "Fasting today?"
 
         if let state {
             if state == .intended, now >= maghrib {
@@ -103,12 +135,9 @@ enum FastingDayModel {
         // and offers the day's fast — except on excused-pause days,
         // which offer nothing.
         guard isRamadan, !isPaused else { return nil }
-        if now < fajr {
-            return .ramadanOffer("Fasting today? · \(timeline)".uppercased())
-        }
         if now < maghrib {
-            return .ramadanOffer("Fasting today? · \(timeline)".uppercased())
+            return .ramadanOffer("\(subject) · \(timeline)".uppercased())
         }
-        return .ramadanOffer("Fasting today? · Ramadan".uppercased())
+        return .ramadanOffer("\(subject) · Ramadan".uppercased())
     }
 }

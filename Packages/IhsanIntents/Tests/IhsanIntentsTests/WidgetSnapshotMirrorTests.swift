@@ -53,6 +53,8 @@ final class WidgetSnapshotMirrorTests: XCTestCase {
             cityName: "Test",
             qiblaBearingDegrees: nil,
             yesterdayIsha: at(-1, 21, 44),
+            cycleDayStart: dayStart,
+            cycleRollsAt: tomorrow.fajr,
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: at(2, 4, 12),

@@ -48,7 +48,7 @@ final class TrajectoryViewModel {
             logs: cachedLogs,
             pauseIntervals: cachedPauses,
             travelIntervals: cachedTravels,
-            now: nowProvider.now()
+            cycleDate: PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
         )
 
         let qadaLogs = cachedLogs.filter { $0.status == .qada }

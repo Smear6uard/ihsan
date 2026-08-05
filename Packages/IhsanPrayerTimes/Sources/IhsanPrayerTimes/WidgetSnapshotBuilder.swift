@@ -50,10 +50,13 @@ public enum WidgetSnapshotBuilder {
         )
     }
 
-    /// The two civil days a snapshot built at `now` will carry, so the
+    /// The civil days a snapshot built at `now` will carry, so the
     /// caller can assemble Hijri/fasting facts for exactly those days.
-    /// "Today" is the day whose prayer bracket contains `now` — before
-    /// Fajr that is still yesterday's table, matching the app.
+    /// "Today" is the civil day whose prayer table brackets `now`.
+    ///
+    /// Three days, not two: the Hijri date and the fasting fact both
+    /// turn at Maghrib, so an evening late in the snapshot's run needs
+    /// the day after tomorrow to have something to turn INTO.
     public static func coveredDays(
         at now: Date,
         provider: any PrayerTimesProviding,
@@ -63,7 +66,7 @@ public enum WidgetSnapshotBuilder {
         madhab: MadhabChoice,
         highLatitudeRule: HighLatitudeRule,
         tuning: CalculationTuning = .standard
-    ) throws -> (today: Date, tomorrow: Date) {
+    ) throws -> (today: Date, tomorrow: Date, dayAfterTomorrow: Date) {
         let window = try provider.scheduleWindow(
             for: now,
             coordinates: coordinates,
@@ -76,12 +79,15 @@ public enum WidgetSnapshotBuilder {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
         let today = calendar.startOfDay(for: window.day.date)
-        guard let tomorrow = calendar.date(byAdding: .day, value: 1, to: today) else {
+        guard
+            let tomorrow = calendar.date(byAdding: .day, value: 1, to: today),
+            let dayAfterTomorrow = calendar.date(byAdding: .day, value: 2, to: today)
+        else {
             throw PrayerTimesError.invalidDate(
-                "Could not advance \(today) by one day in \(timeZone.identifier)."
+                "Could not advance \(today) in \(timeZone.identifier)."
             )
         }
-        return (today, tomorrow)
+        return (today, tomorrow, dayAfterTomorrow)
     }
 
     public static func build(
@@ -151,12 +157,16 @@ public enum WidgetSnapshotBuilder {
             )
         }
 
+        let cycle = window.cycle(at: now)
+
         return WidgetSnapshot(
             writtenAt: writtenAt ?? now,
             timeZoneIdentifier: timeZone.identifier,
             cityName: cityName,
             qiblaBearingDegrees: qiblaBearingDegrees,
             yesterdayIsha: window.yesterdayIsha.scheduledTime,
+            cycleDayStart: cycle.date,
+            cycleRollsAt: cycle.rollsAt,
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: dayAfterFajr,

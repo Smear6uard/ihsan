@@ -31,7 +31,7 @@ struct PauseExclusionTests {
             logs: [],
             pauseIntervals: [pause],
             travelIntervals: [],
-            now: now,
+            cycleDate: now,
             calendar: utc
         )
         let aggregate = TrajectoryAggregator.aggregate(days: days, qadaLogs: [])
@@ -60,7 +60,7 @@ struct PauseExclusionTests {
             logs: [],
             pauseIntervals: [pause],
             travelIntervals: [],
-            now: now,
+            cycleDate: now,
             calendar: utc
         )
 
@@ -100,7 +100,7 @@ struct PauseExclusionTests {
             logs: [log],
             pauseIntervals: [pause],
             travelIntervals: [],
-            now: now,
+            cycleDate: now,
             calendar: utc
         )
         let aggregate = TrajectoryAggregator.aggregate(days: days, qadaLogs: [])
