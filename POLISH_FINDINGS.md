@@ -843,21 +843,40 @@ budget. These need a device:
   companion to the English rather than a differently-weighted one.
 - **Numeric transitions on the focused card.** `.contentTransition(.numericText())`
   on the `.upcoming` time and inscription now sits outside
-  `.inkKeyline(…)`; inside, it would have run on both of the modifier's
-  copies. Confirm the minute rollover still animates as one numeral
-  during a crossing, with no doubled or ghosted digit.
-- **Baseline alignment of the prayer-name row.** Fixing the translucent
-  Arabic name meant keylining the two `Text`s in `prayerNameRow`
-  individually rather than keylining the enclosing `HStack`, so during a
-  crossing that `HStack(alignment: .firstTextBaseline)` is aligning two
-  `ZStack`s instead of two `Text`s. On every plateau the modifier is a
-  pass-through and the layout is bit-identical to before, so this can
-  only show up mid-crossing. Confirm the English and Arabic names still
-  sit on one baseline through a sunrise and a maghrib; if the Arabic
-  drifts vertically, the fix is an explicit `alignmentGuide` rather than
-  reverting — the opacity change it enables is the more important half.
+  `.inkKeyline(…)`. Correcting an earlier claim here: this is
+  **cosmetic, not a fix** — `contentTransition` is an environment value,
+  so it reaches both of the keyline's copies wherever it is applied.
+  Still worth a look during a crossing: confirm the minute rollover
+  animates as one numeral, with no doubled or ghosted digit, since the
+  glyph genuinely is drawn twice while the outline is up.
+- **Baseline alignment — FIXED in source, no longer a device check.**
+  Keylining the two `Text`s of `prayerNameRow` individually (needed for
+  the opacity fix) briefly meant `HStack(alignment: .firstTextBaseline)`
+  was aligning two `ZStack`s mid-crossing. That would have been a *step*,
+  not a drift — the modifier is gated on `strength`, so any mismatch
+  appears and vanishes abruptly, three times per crossing on the hero
+  row. `InkKeyline` now composes its two copies with `.background`
+  instead of a `ZStack`, so the near copy stays the layout-defining view
+  and its alignment guides propagate normally. Verified: the plateau
+  render is bit-identical to bare text and the crossing still draws its
+  rings. Noted here only so nobody "simplifies" the modifier back to a
+  `ZStack` — the `alignmentGuide` remedy this entry used to suggest
+  would NOT have worked, since a call-site guide just re-queries the
+  `ZStack`'s own baseline.
 
 ### Found, not fixed — corrective I
+
+- **Tripwire for Task 2: `inkHaloLightValue` has very little headroom.**
+  `CrossingLegibilityRenderTests.theAchievableBoundHoldsAtEveryPhase`
+  holds the outline's achievable separation to a floor of 4.40, and the
+  shipped ring pair actually reaches only **4.458** — about **1.3–1.7%**
+  of margin. The quantity it is most sensitive to is
+  `inkHaloLightValue` (the far ring); the near ring is already near-black
+  and has room to spare. Task 2 rewrites the unit table and inserts a
+  sixth state, so if that token moves in either direction this is the
+  test that will notice. **A failure there is a real signal about the
+  palette, not noise to tune away** — the correct response is to look at
+  what happened to the far pole, not to lower the floor.
 
 - **Text on panels drops below 3:1, with no mechanism to catch it.**
   Sweeping 4,000 phases, `ink` or `inkSecondary` against `panelFill`

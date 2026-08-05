@@ -38,7 +38,7 @@ import Testing
 /// The passage is brief and unavoidable while the ink flips polarity
 /// continuously — the same intermediate-value argument that makes the
 /// keyline necessary also caps it. So: `>= 4.5` is asserted at the
-/// contract's phases, while `thePolesStaySeparatedAtEveryPhase` pins
+/// contract's phases, while `theAchievableBoundHoldsAtEveryPhase` pins
 /// the weaker promise that holds everywhere. Read a passing suite as
 /// "4.5:1 wherever it is reachable, and the most the tokens allow
 /// where it is not" — not as a floor under every instant of the day.
@@ -449,22 +449,36 @@ struct CrossingLegibilityRenderTests {
     /// provably out of reach mid-crossing and asserting it densely would
     /// be asserting something no implementation can satisfy.
     ///
-    /// Only where the outline is fully drawn. At the band's fringes the
-    /// figure blend has not started, so `resolved` collapses both halo
-    /// poles onto one value and the "far" ring is not light at all — but
-    /// the outline is barely inked there and the palette still has its
-    /// own contrast, which
+    /// Checked only where the outline is fully drawn. At the band's
+    /// fringes the figure blend has not started, so `resolved` collapses
+    /// both halo poles onto one value and the "far" ring is not light at
+    /// all — but the outline is barely inked there, and the palette
+    /// still carries its own contrast. The two halves interlock at a
+    /// STEPPED floor, which is the thing to understand before touching
+    /// either: 4.40 here, wherever the ring is doing the work, and 3.0
+    /// everywhere else, enforced by
     /// `PaletteV2ContrastTests.theOutlineIsFullyDrawnWhereverContrastCollapses`
-    /// is what lines the two conditions up.
+    /// — which is what guarantees the outline is *already* full wherever
+    /// the palette drops under 3:1. Both tests sweep the same 4,000-point
+    /// grid, so no phase falls between them.
+    ///
+    /// Headroom is thin and worth knowing: 4.40 sits only ~1.3–1.7%
+    /// under the 4.458 wall the shipped pair actually reaches. The
+    /// quantity it is most sensitive to is `inkHaloLightValue`. If Task 2
+    /// moves that token in either direction, this is the test that will
+    /// say so — treat a failure here as a real signal about the palette,
+    /// not as noise to be tuned away.
     @Test
     func theAchievableBoundHoldsAtEveryPhase() {
         var worst = Double.infinity
         var worstUnit = 0.0
+        var checked = 0
         let samples = 4_000
         for step in 0..<samples {
             let phase = SkyPhase(unit: Double(step) / Double(samples))
             let tokens = PaletteState.resolved(for: phase)
             guard tokens.inkOutlineStrength >= 0.99 else { continue }
+            checked += 1
             let near = InkKeyline(tokens: tokens).nearRingValue.relativeLuminance
             let far = tokens.inkHaloLightValue.relativeLuminance
             for ink in [tokens.inkValue, tokens.inkSecondaryValue] {
@@ -476,6 +490,12 @@ struct CrossingLegibilityRenderTests {
                 if bound < worst { worst = bound; worstUnit = phase.unit }
             }
         }
+        // Without this the sweep passes by examining nothing, the moment
+        // a palette edit stops the outline ever reaching full strength.
+        #expect(
+            checked > 0,
+            "no phase reached full outline strength — this test examined nothing"
+        )
         #expect(
             worst >= Self.achievableFloor,
             Comment(rawValue: "at phase \(worstUnit) the best any two-tone outline "

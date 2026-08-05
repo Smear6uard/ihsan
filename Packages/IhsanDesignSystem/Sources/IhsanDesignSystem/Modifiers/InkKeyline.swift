@@ -143,7 +143,24 @@ public struct InkKeyline: ViewModifier {
             // light pole alone.) Stacking separate copies is what
             // actually puts the poles in DIFFERENT PIXELS, which is the
             // entire mechanism.
-            ZStack {
+            //
+            // `.background`, NOT a `ZStack` of two siblings. Both put
+            // the far copy behind the near one with identical geometry,
+            // but only this keeps the NEAR copy the layout-defining
+            // view, so its alignment guides — `.firstTextBaseline` above
+            // all — propagate to the caller unchanged. A `ZStack` would
+            // hand the caller the stack's own guides instead, and since
+            // this whole branch is gated on `strength`, the mismatch
+            // would appear and vanish ABRUPTLY at engage and disengage:
+            // a visible jump on any row aligning keylined text against
+            // anything else, three times per crossing. Do not "simplify"
+            // this back to a `ZStack`.
+            Self.dilate(
+                content,
+                color: nearRingValue.color.opacity(strength),
+                offset: Self.nearOffset
+            )
+            .background {
                 Self.dilate(
                     content,
                     color: tokens.inkHaloLightValue.color.opacity(strength),
@@ -154,11 +171,6 @@ public struct InkKeyline: ViewModifier {
                 // content's accessibility element appears twice at any
                 // call site that does not establish its own container.
                 .accessibilityHidden(true)
-                Self.dilate(
-                    content,
-                    color: nearRingValue.color.opacity(strength),
-                    offset: Self.nearOffset
-                )
             }
         }
     }

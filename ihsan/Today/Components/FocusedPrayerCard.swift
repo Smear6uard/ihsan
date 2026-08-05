@@ -276,8 +276,11 @@ struct FocusedPrayerCard: View {
                     .fontWeight(.light)
                     .foregroundStyle(tokens.ink)
                     .inkKeyline(tokens)
-                    // Outside the keyline: inside, the transition would
-                    // run on both of the modifier's copies of the glyph.
+                    // Position here is cosmetic: `contentTransition` is
+                    // an environment value, so it reaches both of the
+                    // keyline's copies of the glyph either side of the
+                    // modifier. Kept next to it only so the two numeric
+                    // fields below read the same way.
                     .contentTransition(.numericText())
                 Text(inscription.uppercased())
                     .font(IhsanFont.inscription)
