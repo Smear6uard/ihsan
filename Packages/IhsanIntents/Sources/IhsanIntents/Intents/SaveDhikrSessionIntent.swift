@@ -63,7 +63,7 @@ public struct SaveDhikrSessionIntent: AppIntent {
         let clock = NowProvider.active
 
         let session = DhikrSession(
-            sessionDate: sessionDate ?? Calendar.current.startOfDay(for: clock.now()),
+            sessionDate: sessionDate ?? PrayerCycleClock.sharedCycleDate(at: clock.now()),
             count: count,
             phrase: phrase,
             customPhrase: phrase == .custom ? customPhrase : nil,

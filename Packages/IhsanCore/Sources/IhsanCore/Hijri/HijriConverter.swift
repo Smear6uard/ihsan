@@ -11,6 +11,14 @@ import Foundation
 /// adjustment means the user's community is one day AHEAD of the
 /// tabulation (their month began a day earlier), so today reads one
 /// Hijri day later.
+///
+/// Clock 2 lives here: **the Hijri day begins at Maghrib**, not at
+/// midnight. Given the Maghrib of the civil day an instant falls in,
+/// every conversion below anchors on the next civil day once that
+/// Maghrib has passed — so the evening of the 13th already reads as
+/// the 14th, a white day announces itself the night it starts, and the
+/// niyyah for tomorrow's fast is offered inside the Hijri day it
+/// belongs to. The moonsighting adjustment applies on top, unchanged.
 public enum HijriConverter {
 
     /// The user-adjustable range of the moonsighting offset.
@@ -58,19 +66,84 @@ public enum HijriConverter {
         return calendar
     }
 
-    /// The Hijri date of `date` with the adjustment applied.
+    /// The civil day whose tabulated Hijri date applies at `instant`.
+    ///
+    /// At or past that day's Maghrib the Hijri day has already turned,
+    /// so the anchor moves forward one civil day. An unknown Maghrib
+    /// (`nil`) leaves the instant where it is — which is the right
+    /// answer for the case that produces it, a historical date passed
+    /// as a day start.
+    static func eveningAnchor(
+        _ instant: Date,
+        maghrib: Date?,
+        timeZone: TimeZone
+    ) -> Date {
+        guard let maghrib, instant >= maghrib else { return instant }
+        return gregorian(timeZone: timeZone)
+            .date(byAdding: .day, value: 1, to: instant) ?? instant
+    }
+
+    /// The civil day whose DAYTIME belongs to the Hijri day in
+    /// progress at `instant` — the day a fast intended now would
+    /// actually be kept.
+    ///
+    /// Before Maghrib that is today; at or after it, tomorrow. This is
+    /// the whole of "the night precedes the daytime" in one call, and
+    /// it is why a Wednesday-evening niyyah files under Thursday.
+    public static func daytimeCivilDay(
+        at instant: Date,
+        maghrib: Date?,
+        timeZone: TimeZone = .current
+    ) -> Date {
+        gregorian(timeZone: timeZone).startOfDay(
+            for: eveningAnchor(instant, maghrib: maghrib, timeZone: timeZone)
+        )
+    }
+
+    /// The civil day whose daytime belongs to the Hijri day in
+    /// progress, using the Maghrib the process has published.
+    public static func daytimeCivilDay(
+        at instant: Date,
+        timeZone: TimeZone = .current
+    ) -> Date {
+        daytimeCivilDay(
+            at: instant,
+            maghrib: HijriDisplay.maghrib(forCivilDayOf: instant),
+            timeZone: timeZone
+        )
+    }
+
+    /// The Hijri date at `date`, with the adjustment applied and the
+    /// Hijri day turned at `maghrib` — the civil day's sunset.
+    public static func components(
+        for date: Date,
+        offsetDays: Int,
+        maghribOfCivilDay maghrib: Date?,
+        timeZone: TimeZone = .current
+    ) -> Components {
+        let clamped = max(offsetRange.lowerBound, min(offsetRange.upperBound, offsetDays))
+        let civil = gregorian(timeZone: timeZone)
+        let anchored = eveningAnchor(date, maghrib: maghrib, timeZone: timeZone)
+        let shifted = civil.date(byAdding: .day, value: clamped, to: anchored) ?? anchored
+        let parts = ummAlQura(timeZone: timeZone).dateComponents(
+            [.year, .month, .day], from: shifted
+        )
+        return Components(year: parts.year ?? 0, month: parts.month ?? 0, day: parts.day ?? 0)
+    }
+
+    /// The Hijri date of `date`, turning at the Maghrib the process has
+    /// published for that civil day.
     public static func components(
         for date: Date,
         offsetDays: Int,
         timeZone: TimeZone = .current
     ) -> Components {
-        let clamped = max(offsetRange.lowerBound, min(offsetRange.upperBound, offsetDays))
-        let civil = gregorian(timeZone: timeZone)
-        let shifted = civil.date(byAdding: .day, value: clamped, to: date) ?? date
-        let parts = ummAlQura(timeZone: timeZone).dateComponents(
-            [.year, .month, .day], from: shifted
+        components(
+            for: date,
+            offsetDays: offsetDays,
+            maghribOfCivilDay: HijriDisplay.maghrib(forCivilDayOf: date),
+            timeZone: timeZone
         )
-        return Components(year: parts.year ?? 0, month: parts.month ?? 0, day: parts.day ?? 0)
     }
 
     /// "Safar 14, 1448 AH" — the one display form.
@@ -79,8 +152,12 @@ public enum HijriConverter {
         offsetDays: Int,
         timeZone: TimeZone = .current
     ) -> String {
-        let parts = components(for: date, offsetDays: offsetDays, timeZone: timeZone)
-        return "\(parts.monthName) \(parts.day), \(parts.year) AH"
+        string(for: components(for: date, offsetDays: offsetDays, timeZone: timeZone))
+    }
+
+    /// The display form for an already-resolved date.
+    public static func string(for parts: Components) -> String {
+        "\(parts.monthName) \(parts.day), \(parts.year) AH"
     }
 
     /// Every day of the Hijri month containing `date` (adjustment
@@ -95,7 +172,16 @@ public enum HijriConverter {
         let hijri = ummAlQura(timeZone: timeZone)
         let civil = gregorian(timeZone: timeZone)
 
-        let shiftedToday = civil.date(byAdding: .day, value: clamped, to: date) ?? date
+        // The sheet opens on the month containing the Hijri day the
+        // user is IN, so it turns with the evening like every other
+        // surface — on the last night of a month, the sheet is already
+        // the next month's.
+        let anchored = eveningAnchor(
+            date,
+            maghrib: HijriDisplay.maghrib(forCivilDayOf: date),
+            timeZone: timeZone
+        )
+        let shiftedToday = civil.date(byAdding: .day, value: clamped, to: anchored) ?? anchored
         let monthParts = hijri.dateComponents([.year, .month], from: shiftedToday)
         guard
             let year = monthParts.year, let month = monthParts.month,

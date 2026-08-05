@@ -24,7 +24,9 @@ public struct LogFastIntent: AppIntent {
     @Parameter(title: "State")
     public var stateKey: String
 
-    /// The civil day of the fast. Defaults to today.
+    /// The civil day whose DAYTIME is fasted. Defaults to the daytime
+    /// of the Hijri day in progress — so an intention recorded after
+    /// Maghrib files under tomorrow, which is the day it will be kept.
     @Parameter(title: "Day")
     public var fastDate: Date?
 
@@ -58,7 +60,7 @@ public struct LogFastIntent: AppIntent {
         let log = try FastLogService().recordFast(
             kind: kind,
             state: state,
-            fastDate: fastDate ?? Calendar.current.startOfDay(for: NowProvider.active.now()),
+            fastDate: fastDate ?? HijriConverter.daytimeCivilDay(at: NowProvider.active.now()),
             sourceSurface: .app,
             in: context
         )

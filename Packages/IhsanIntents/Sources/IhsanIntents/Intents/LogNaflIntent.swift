@@ -20,7 +20,10 @@ public struct LogNaflIntent: AppIntent {
     @Parameter(title: "Kind")
     public var kindKey: String
 
-    /// The civil day (night-of day for qiyam and witr). Defaults to today.
+    /// The prayer cycle this act belongs to. Defaults to the cycle in
+    /// progress, which is what makes qiyam and witr file under the
+    /// night they were offered in rather than under the morning the
+    /// clock had reached.
     @Parameter(title: "Day")
     public var naflDate: Date?
 
@@ -58,7 +61,7 @@ public struct LogNaflIntent: AppIntent {
 
         let log = try NaflLogService().toggleNafl(
             kind: kind,
-            naflDate: naflDate ?? Calendar.current.startOfDay(for: .now),
+            naflDate: naflDate ?? PrayerCycleClock.sharedCycleDate(at: .now),
             rakahCount: rakahCount,
             sourceSurface: .app,
             in: context

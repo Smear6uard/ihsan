@@ -278,19 +278,97 @@ public enum PrayerResolverDiagnostics {
 /// Three consecutive days' worth of schedule — enough to resolve any
 /// instant of the middle day, including yesterday's Isha before dawn
 /// and tomorrow's Fajr after Isha.
+///
+/// Yesterday arrives whole rather than as its Isha alone. The builder
+/// always computed the full table and threw the rest away; keeping it
+/// is what lets a pre-dawn log of ANY prayer resolve against the
+/// window it actually belongs to — the cycle before this one — instead
+/// of against a window that has not opened yet.
 public struct PrayerScheduleWindow: Sendable, Equatable {
-    public let yesterdayIsha: PrayerTime
+    public let yesterday: DayPrayerTimes
     public let day: DayPrayerTimes
     public let tomorrowFajr: PrayerTime
 
-    public init(yesterdayIsha: PrayerTime, day: DayPrayerTimes, tomorrowFajr: PrayerTime) {
-        self.yesterdayIsha = yesterdayIsha
+    public init(yesterday: DayPrayerTimes, day: DayPrayerTimes, tomorrowFajr: PrayerTime) {
+        self.yesterday = yesterday
         self.day = day
         self.tomorrowFajr = tomorrowFajr
     }
 
+    /// The previous day's Isha — the window that owns the hours before
+    /// dawn.
+    public var yesterdayIsha: PrayerTime { yesterday.isha }
+
     public var resolverSchedule: PrayerStateSchedule {
         PrayerStateSchedule(self)
+    }
+
+    private var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        if let timeZone = TimeZone(identifier: day.timeZoneIdentifier) {
+            calendar.timeZone = timeZone
+        }
+        return calendar
+    }
+
+    // MARK: - Clock 1
+
+    /// The prayer cycle containing `instant` — the tracking day, which
+    /// rolls at Fajr and knows nothing about midnight.
+    public func cycle(at instant: Date) -> PrayerCycle {
+        PrayerCycleClock.cycle(
+            at: instant,
+            civilDayFajr: day.fajr.scheduledTime,
+            nextDayFajr: tomorrowFajr.scheduledTime,
+            calendar: calendar
+        )
+    }
+
+    /// The day table belonging to the cycle containing `instant`:
+    /// before this civil day's Fajr, that is yesterday's table.
+    public func cycleDayTimes(at instant: Date) -> DayPrayerTimes {
+        instant < day.fajr.scheduledTime ? yesterday : day
+    }
+
+    /// The half-open window `[start, end)` of `prayer` inside the cycle
+    /// containing `instant`. Isha's end is the Fajr that closes the
+    /// cycle — which is where the midnight boundary was wrong.
+    public func window(of prayer: Prayer, inCycleAt instant: Date) -> (start: Date, end: Date) {
+        let table = cycleDayTimes(at: instant)
+        let cycleEndFajr = instant < day.fajr.scheduledTime
+            ? day.fajr.scheduledTime
+            : tomorrowFajr.scheduledTime
+        let start = table.time(for: prayer)
+        let end: Date
+        switch prayer {
+        case .fajr:    end = table.sunrise
+        case .dhuhr:   end = table.asr.scheduledTime
+        case .asr:     end = table.maghrib.scheduledTime
+        case .maghrib: end = table.isha.scheduledTime
+        case .isha:    end = cycleEndFajr
+        }
+        return (start, end)
+    }
+
+    /// The scheduled instant of `prayer` inside the cycle containing
+    /// `instant`.
+    public func scheduledTime(of prayer: Prayer, inCycleAt instant: Date) -> Date {
+        cycleDayTimes(at: instant).time(for: prayer)
+    }
+
+    // MARK: - Clock 2
+
+    /// The evening boundaries this window can vouch for — yesterday,
+    /// today, and (through tomorrow's Fajr only) nothing further. The
+    /// app publishes these so every surface names the same Hijri date.
+    public var eveningBoundaries: [HijriDisplay.EveningBoundary] {
+        let calendar = calendar
+        return [yesterday, day].map {
+            HijriDisplay.EveningBoundary(
+                civilDayStart: calendar.startOfDay(for: $0.date),
+                maghrib: $0.maghrib.scheduledTime
+            )
+        }
     }
 }
 
@@ -339,7 +417,7 @@ public extension PrayerTimesProviding {
                 continue
             }
             return PrayerScheduleWindow(
-                yesterdayIsha: yesterday.isha,
+                yesterday: yesterday,
                 day: day,
                 tomorrowFajr: tomorrowFajr
             )

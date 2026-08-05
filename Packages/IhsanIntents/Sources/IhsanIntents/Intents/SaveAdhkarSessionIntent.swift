@@ -63,7 +63,7 @@ public struct SaveAdhkarSessionIntent: AppIntent {
         let clock = NowProvider.active
 
         context.insert(AdhkarSession(
-            sessionDate: sessionDate ?? Calendar.current.startOfDay(for: clock.now()),
+            sessionDate: sessionDate ?? PrayerCycleClock.sharedCycleDate(at: clock.now()),
             category: category,
             completedItemCount: completedItemCount,
             startedAt: clock.now(),
