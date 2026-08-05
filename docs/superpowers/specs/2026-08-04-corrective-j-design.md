@@ -327,8 +327,41 @@ row legend is ever wanted at 7D, and it costs one switch statement.
   (12), IhsanFiqhConfig (19): all passed.
 - `ihsanTests`: 207 tests in 34 suites passed, including the three new
   suites.
+- `ihsanWidgets`, `ihsanWatch` (which builds and embeds
+  `ihsanWatchWidgets`): all build. The standalone `ihsanWatchWidgets`
+  scheme cannot resolve a destination in this environment because it
+  carries a visionOS entry and visionOS 26.5 is not installed —
+  pre-existing, unrelated.
 - `ihsanUITests`: `FocusedCardSwipeUITests` (4) and
   `RemembranceDoorUITests` (3) written for this change, all passing —
   the swipe and the hub's dismissal handoff are only provable live.
+- Full `ihsanUITests` run baselined against `b0f2c99` in a worktree.
+  Nine tests fail on that commit and the same nine fail here
+  (`AdhanSoundDelivery`, `Onboarding`, `PrayerLogCommit` ×2,
+  `RetroactiveLog` `testLoggingAPassedPrayerFromThePlate`,
+  `YesterdayAccount` ×4). The comparison caught one genuine regression:
+  a UI test still looking for the tile label `Qadā, made up later`,
+  which the caption rename had moved to `Qadā, prayed after its
+  window`. Fixed, and the class then matched the baseline exactly.
+
+### A note on the simulator, for whoever runs this next
+
+Erasing the simulator resets its TCC grant, and roughly a third of
+`ihsanUITests` then fails for no reason but the location dialog —
+including tests that handle it, which time out waiting on springboard.
+Pre-granting fixes it:
+
+    xcrun simctl privacy <udid> grant location-always com.sameerstudios.ihsan
+
+With the grant in place the full suite lands on 11 failures rather than
+9: the extra two are `AdhkarSetUITests
+.testRemembranceIsOfferedDuringAnExcusedPause` and
+`AdhkarVoiceOverWalkUITests.testTheOfferCardSpeaksItsWindow`. Both look
+alarming next to this change, because both search for the adhkār offer
+card and this change adds a band directly beneath it. Both were run on
+`b0f2c99` against the same simulator: they fail there too, and the
+baseline fails five tests across those two classes where this branch
+fails two. Environment, not regression — but worth re-checking on a warm
+simulator before trusting either number.
 - Simulator captures of Today, the expanded card, the log sheet, Path,
   and the hub, reviewed against the four findings.

@@ -143,7 +143,7 @@ final class RetroactiveLogUITests: XCTestCase {
         // all four tiles are live.
         let commit = app.buttons["Log Dhuhr"]
         XCTAssertTrue(commit.waitForExistence(timeout: 5))
-        let qadaTile = app.buttons["Qadā, made up later"]
+        let qadaTile = app.buttons["Qadā, prayed after its window"]
         XCTAssertTrue(qadaTile.isEnabled, "A past day offers all four states.")
         XCTAssertTrue(app.buttons["On Time, prayed in its window"].isEnabled)
 
