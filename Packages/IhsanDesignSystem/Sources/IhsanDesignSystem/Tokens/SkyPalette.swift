@@ -429,33 +429,44 @@ public enum IhsanPageChrome {
 extension SkyPaletteTokens {
 
     /// Dawn (fajr → sunrise). Twilight as its own state, not a blend
-    /// artifact: deep indigo lightening toward the horizon, the last
-    /// stars still out, the sun below the chord with only its growing
-    /// glow. One family step lighter than night so the passage reads
-    /// as first light on the same page — the polarity flip to the
-    /// luminous morning ground happens at sunrise, as it does in the
-    /// sky.
+    /// artifact — and after corrective I, a genuinely different page
+    /// from the two states it sits between. Night is near-black
+    /// indigo; sunset is plum-vermillion; dawn is LAPIS-VIOLET, the
+    /// brightest jewel ground after sunset, lightening toward a
+    /// horizon that carries the first warmth without ever entering
+    /// sunset's vermillion. Dawn and dusk share their optics; they
+    /// must not share a page.
+    ///
+    /// It used to sit 1.33× night's luminance on `skyZenith` and
+    /// 1.30× on `groundPlane` — inside the noise — so 5:00 AM read as
+    /// late night with a warm band. `inkSecondary`, `positive` and
+    /// `attention` lift with the ground: each was under 5.5:1 against
+    /// the old one and would have dropped below AA against this one.
+    ///
+    /// The last stars are still out, the sun is below the chord with
+    /// only its growing glow, and the polarity flip to the luminous
+    /// first-light ground happens at sunrise, as it does in the sky.
     static let dawn = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0x0C1132),
-        groundTop: SRGBValue(hex: 0x121838),
-        groundBottom: SRGBValue(hex: 0x232C5A),
-        groundPlane: SRGBValue(hex: 0x0C112E),
-        horizonWash: SRGBValue(hex: 0x3E3C6E),
+        skyZenith: SRGBValue(hex: 0x131A45),
+        groundTop: SRGBValue(hex: 0x1B2456),
+        groundBottom: SRGBValue(hex: 0x2F3670),
+        groundPlane: SRGBValue(hex: 0x12173C),
+        horizonWash: SRGBValue(hex: 0x6A5590),
         ink: SRGBValue(hex: 0xEDEFF6),
-        inkSecondary: SRGBValue(hex: 0xAEB4CB),
+        inkSecondary: SRGBValue(hex: 0xB6BCD2),
         metal: SRGBValue(hex: 0xC9A96A),
         metalHighlight: SRGBValue(hex: 0xE8D5A3),
         leafGold: SRGBValue(hex: 0xD2AC5C),
         keyline: SRGBValue(hex: 0x10163A),
         lapis: SRGBValue(hex: 0x3B4685),
         glow: SRGBValue(hex: 0xF3C77F),
-        panelFill: SRGBValue(hex: 0x1B2350),
-        panelStroke: SRGBValue(hex: 0x655C58),
+        panelFill: SRGBValue(hex: 0x232C63),
+        panelStroke: SRGBValue(hex: 0x6E645F),
         panelTexture: SRGBValue(hex: 0xE8D5A3),
         panelTextureOpacity: 0.04,
-        positive: SRGBValue(hex: 0x8FBF9F),
-        attention: SRGBValue(hex: 0xE59A82),
-        inkHalo: SRGBValue(hex: 0x0C112E)
+        positive: SRGBValue(hex: 0x9BC7A9),
+        attention: SRGBValue(hex: 0xEBA98F),
+        inkHalo: SRGBValue(hex: 0x12173C)
     )
 
     /// First light (sunrise → mid-morning). The morning's answer to

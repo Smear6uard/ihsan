@@ -241,7 +241,50 @@ struct PaletteV2ContrastTests {
 
     /// Jewel grounds must actually be jewel — chromatic, not gray, and
     /// deep, with the night ground never approaching pure black.
-    @Test(arguments: [PaletteState.night, PaletteState.sunset])
+    /// Dawn must be its own page, not night with a warm horizon.
+    ///
+    /// Before corrective I, dawn sat 1.30× night on `groundTop` and
+    /// 1.38× on `groundPlane` — inside the noise. At 5:00 AM the plate
+    /// read as late night. Night is near-black indigo and sunset is
+    /// plum-vermillion; dawn is lapis-violet, and has to be measurably
+    /// distinct from BOTH.
+    @Test
+    func dawnSeparatesFromNight() {
+        let night = PaletteState.night.tokens
+        let dawn = PaletteState.dawn.tokens
+        let pairs: [(String, SRGBValue, SRGBValue, Double)] = [
+            ("skyZenith", night.skyZenithValue, dawn.skyZenithValue, 2.0),
+            ("groundTop", night.groundTopValue, dawn.groundTopValue, 2.2),
+            ("groundBottom", night.groundBottomValue, dawn.groundBottomValue, 3.0),
+            ("groundPlane", night.groundPlaneValue, dawn.groundPlaneValue, 1.8),
+            ("horizonWash", night.horizonWashValue, dawn.horizonWashValue, 3.0)
+        ]
+        for (name, nightValue, dawnValue, factor) in pairs {
+            let ratio = dawnValue.relativeLuminance / max(nightValue.relativeLuminance, 1e-6)
+            #expect(
+                ratio >= factor,
+                Comment(rawValue: "dawn.\(name) is only \(String(format: "%.2f", ratio))× night's — "
+                    + "needs at least \(factor)× to read as its own state")
+            )
+        }
+    }
+
+    /// And dawn must be more chromatic than night, so the separation
+    /// is a change of colour and not just of brightness.
+    @Test
+    func dawnIsMoreChromaticThanNight() {
+        func chroma(_ value: SRGBValue) -> Double {
+            let lab = value.oklab
+            return (lab.a * lab.a + lab.b * lab.b).squareRoot()
+        }
+        #expect(
+            chroma(PaletteState.dawn.tokens.groundBottomValue)
+                > chroma(PaletteState.night.tokens.groundBottomValue),
+            "dawn's ground is no more chromatic than night's"
+        )
+    }
+
+    @Test(arguments: [PaletteState.night, PaletteState.dawn, PaletteState.sunset])
     func jewelGroundsAreDeepAndChromatic(state: PaletteState) {
         for ground in [state.tokens.groundTopValue, state.tokens.groundBottomValue] {
             let lab = ground.oklab
