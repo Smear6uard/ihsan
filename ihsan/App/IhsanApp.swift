@@ -333,9 +333,14 @@ private struct RootGate: View {
                           let prayer = Prayer(rawValue: String(parts[0])),
                           let status = PrayerStatus(rawValue: String(parts[1]))
                     else { continue }
+                    // Offsets count CYCLES, not civil days, so a
+                    // staged screenshot at 1 AM seeds the evenings a
+                    // person would actually see on the pattern.
                     let dayOffset = parts.count >= 3 ? Int(parts[2]) ?? 0 : 0
                     let date: Date? = dayOffset == 0 ? nil : Calendar.current.date(
-                        byAdding: .day, value: dayOffset, to: NowProvider.active.now()
+                        byAdding: .day,
+                        value: dayOffset,
+                        to: PrayerCycleClock.sharedCycleDate(at: NowProvider.active.now())
                     )
                     _ = try? await LogPrayerWithStatusIntent(
                         prayer: prayer, status: status, date: date

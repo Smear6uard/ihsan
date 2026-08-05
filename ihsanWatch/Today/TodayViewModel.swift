@@ -82,6 +82,13 @@ final class TodayViewModel {
         let statuses = Self.statusMap(from: logs)
         let jamaah = Self.jamaahMap(from: logs)
 
+        // Clock 2's boundaries first: a face that renders before the
+        // turn is published would print the un-turned date.
+        HijriDisplay.publish(
+            eveningBoundaries: scheduleWindow.eveningBoundaries,
+            timeZone: place.timeZone
+        )
+
         state = .ready(.init(
             place: place,
             scheduleWindow: scheduleWindow,
@@ -92,10 +99,6 @@ final class TodayViewModel {
         // Refresh the App-Group prayer-times cache every time we
         // recompute. Complications read from this rather than spinning
         // up CoreLocation on a tight 30s timeline-provider budget.
-        HijriDisplay.publish(
-            eveningBoundaries: scheduleWindow.eveningBoundaries,
-            timeZone: place.timeZone
-        )
 
         var placeCalendar = Calendar(identifier: .gregorian)
         placeCalendar.timeZone = place.timeZone

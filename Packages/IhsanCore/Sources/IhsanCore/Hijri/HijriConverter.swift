@@ -108,7 +108,7 @@ public enum HijriConverter {
     ) -> Date {
         daytimeCivilDay(
             at: instant,
-            maghrib: HijriDisplay.maghrib(forCivilDayOf: instant),
+            maghrib: HijriDisplay.maghrib(forCivilDayOf: instant, in: timeZone),
             timeZone: timeZone
         )
     }
@@ -141,7 +141,7 @@ public enum HijriConverter {
         components(
             for: date,
             offsetDays: offsetDays,
-            maghribOfCivilDay: HijriDisplay.maghrib(forCivilDayOf: date),
+            maghribOfCivilDay: HijriDisplay.maghrib(forCivilDayOf: date, in: timeZone),
             timeZone: timeZone
         )
     }
@@ -178,7 +178,7 @@ public enum HijriConverter {
         // the next month's.
         let anchored = eveningAnchor(
             date,
-            maghrib: HijriDisplay.maghrib(forCivilDayOf: date),
+            maghrib: HijriDisplay.maghrib(forCivilDayOf: date, in: timeZone),
             timeZone: timeZone
         )
         let shiftedToday = civil.date(byAdding: .day, value: clamped, to: anchored) ?? anchored

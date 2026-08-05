@@ -65,10 +65,24 @@ public enum HijriDisplay {
         }
     }
 
+    /// The place's timezone, as published beside the boundaries. Every
+    /// surface that formats "the Hijri date now" should resolve it in
+    /// this zone: the turn is a fact about where the sun set, not
+    /// about where the device thinks it is.
+    public static var timeZone: TimeZone? {
+        facts.withLock { $0.timeZoneIdentifier }.flatMap(TimeZone.init(identifier:))
+    }
+
     /// The Maghrib of the civil day containing `date`, when it is
     /// known. `nil` means no boundary was published for that day and
     /// the caller tabulates civilly.
-    public static func maghrib(forCivilDayOf date: Date) -> Date? {
+    ///
+    /// `zone` must agree with the published one. A turn decided in one
+    /// timezone and tabulated in another lands a day out — the anchor
+    /// steps forward from an evening the second calendar has already
+    /// counted — so a disagreement declines to turn rather than
+    /// guessing.
+    public static func maghrib(forCivilDayOf date: Date, in zone: TimeZone? = nil) -> Date? {
         let (boundaries, timeZoneIdentifier) = facts.withLock {
             ($0.eveningBoundaries, $0.timeZoneIdentifier)
         }
@@ -77,6 +91,9 @@ public enum HijriDisplay {
             let identifier = timeZoneIdentifier,
             let timeZone = TimeZone(identifier: identifier)
         else { return nil }
+        if let zone, zone.secondsFromGMT(for: date) != timeZone.secondsFromGMT(for: date) {
+            return nil
+        }
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone

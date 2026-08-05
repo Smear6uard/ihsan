@@ -96,24 +96,33 @@ final class TodayViewModel {
             tuning: settings.calculationTuning
         )
 
-        state = .ready(.init(
-            place: place,
-            scheduleWindow: scheduleWindow,
-            ramadanContext: RamadanContext(
-                at: now,
-                calendar: hijriCalendar,
-                offsetDays: settings.hijriCalendarOffsetDays
-            ),
-            night: relevantNight(now: now, place: place, settings: settings)
-        ))
-
-        // Clock 2's boundaries, published before anything formats a
-        // Hijri date: the day turns at Maghrib, and every surface reads
-        // the turn from here rather than deriving one of its own.
+        // Clock 2's boundaries, published BEFORE the state that causes
+        // the header to render: the day turns at Maghrib, every
+        // surface reads the turn from here, and a surface that renders
+        // first would print the un-turned date and correct itself a
+        // tick later, in front of the user.
         HijriDisplay.publish(
             eveningBoundaries: scheduleWindow.eveningBoundaries,
             timeZone: place.timeZone
         )
+
+        state = .ready(.init(
+            place: place,
+            scheduleWindow: scheduleWindow,
+            // Recognition resolves in the PLACE's calendar, like the
+            // header does, so the month and the date it prints can
+            // never turn on different evenings.
+            ramadanContext: RamadanContext(
+                at: now,
+                calendar: {
+                    var calendar = hijriCalendar
+                    calendar.timeZone = place.timeZone
+                    return calendar
+                }(),
+                offsetDays: settings.hijriCalendarOffsetDays
+            ),
+            night: relevantNight(now: now, place: place, settings: settings)
+        ))
 
         // The one-shot repair of records filed under the midnight
         // rule. It runs here and nowhere else, because here is the

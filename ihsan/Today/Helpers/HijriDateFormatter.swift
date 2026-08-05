@@ -6,9 +6,14 @@ import IhsanCore
 /// moonsighting adjustment applied — every surface that names a
 /// Hijri date reads the same mapping.
 enum HijriDateFormatter {
+    /// Resolved in the PLACE's timezone, published beside the evening
+    /// boundaries. The Hijri day turns where the sun set, and a device
+    /// carried across a timezone must not turn it somewhere else.
     static func string(from date: Date) -> String {
         HijriConverter.string(
-            for: date, offsetDays: HijriDisplay.offsetDays
+            for: date,
+            offsetDays: HijriDisplay.offsetDays,
+            timeZone: HijriDisplay.timeZone ?? .current
         )
     }
 }
