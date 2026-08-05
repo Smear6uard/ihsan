@@ -857,26 +857,53 @@ budget. These need a device:
   appears and vanishes abruptly, three times per crossing on the hero
   row. `InkKeyline` now composes its two copies with `.background`
   instead of a `ZStack`, so the near copy stays the layout-defining view
-  and its alignment guides propagate normally. Verified: the plateau
-  render is bit-identical to bare text and the crossing still draws its
-  rings. Noted here only so nobody "simplifies" the modifier back to a
-  `ZStack` — the `alignmentGuide` remedy this entry used to suggest
-  would NOT have worked, since a call-site guide just re-queries the
-  `ZStack`'s own baseline.
+  and its alignment guides propagate normally.
+
+  Be precise about what is and isn't established. The fix rests on
+  `.background` being layout-neutral by documented semantics — firmer
+  ground than the `ZStack` question ever was. It does **not** rest on the
+  render checks I first cited: comparing the plateau render to bare text
+  is a tautology, because at `strength <= 0.001` the modifier returns its
+  content and the rewritten branch never executes at all; and "the
+  crossing render still differs" would pass identically under a `ZStack`,
+  since it only shows that rings are drawn. Neither involves a
+  baseline-aligned container, which is the property at issue. What the
+  suite does pin is the far ring's geometry and contrast — the full
+  render sweep (60 phases × 2 inks × 3 heights), the band-equivalence
+  test and the canary all pass unchanged.
+
+  So one device line remains, and it is the only one: **glance at the
+  prayer-name row through a crossing** and confirm the English and Arabic
+  sit on one baseline as the outline engages and disengages. Nothing in
+  the suite pins that. And do not "simplify" the modifier back to a
+  `ZStack` — note that the `alignmentGuide` remedy this entry used to
+  suggest would NOT have worked, since a call-site guide just re-queries
+  the `ZStack`'s own baseline.
 
 ### Found, not fixed — corrective I
 
-- **Tripwire for Task 2: `inkHaloLightValue` has very little headroom.**
-  `CrossingLegibilityRenderTests.theAchievableBoundHoldsAtEveryPhase`
-  holds the outline's achievable separation to a floor of 4.40, and the
-  shipped ring pair actually reaches only **4.458** — about **1.3–1.7%**
-  of margin. The quantity it is most sensitive to is
-  `inkHaloLightValue` (the far ring); the near ring is already near-black
-  and has room to spare. Task 2 rewrites the unit table and inserts a
-  sixth state, so if that token moves in either direction this is the
-  test that will notice. **A failure there is a real signal about the
-  palette, not noise to tune away** — the correct response is to look at
-  what happened to the far pole, not to lower the floor.
+- **Tripwire for Task 2: `inkHaloLightValue` is the only lever on a very
+  thin margin.** `CrossingLegibilityRenderTests.theAchievableBoundHoldsAtEveryPhase`
+  holds the outline's achievable separation to a floor of **4.40**.
+  Two anchors sit above it, and the distance differs a lot:
+  - **4.4785** — what the sweep measures over the ink path the palette
+    really takes. The floor is 1.8% under this.
+  - **4.4058** — `√((far + 0.05) / (near + 0.05))`, the worst the ring
+    pair could give for *any* ink luminance. The floor is only **0.13%**
+    under this, and the gap between the two anchors is luck: today's ink
+    path does not quite reach the crossover value. A palette that moves
+    the ink path can close it without touching either ring.
+
+  **`inkHaloLightValue` is the only palette lever here.** The near ring
+  is not a palette quantity at all — `InkKeyline.nearCeiling` pins it at
+  L = 0.0010, structurally out of the palette's reach — so it cannot
+  drift and cannot be blamed. Measured: darkening `inkHaloLightValue` by
+  **1.85%** lands the bound exactly on 4.40; 3% puts it at 4.3509.
+  Task 2 rewrites the unit table and inserts a sixth state, so if that
+  token moves this is the test that notices. **A failure there is a real
+  signal about the far pole, not noise to tune away** — the correct
+  response is to look at what happened to `inkHaloLightValue`, not to
+  lower the floor.
 
 - **Text on panels drops below 3:1, with no mechanism to catch it.**
   Sweeping 4,000 phases, `ink` or `inkSecondary` against `panelFill`

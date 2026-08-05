@@ -462,11 +462,23 @@ struct CrossingLegibilityRenderTests {
     /// the palette drops under 3:1. Both tests sweep the same 4,000-point
     /// grid, so no phase falls between them.
     ///
-    /// Headroom is thin and worth knowing: 4.40 sits only ~1.3–1.7%
-    /// under the 4.458 wall the shipped pair actually reaches. The
-    /// quantity it is most sensitive to is `inkHaloLightValue`. If Task 2
-    /// moves that token in either direction, this is the test that will
-    /// say so — treat a failure here as a real signal about the palette,
+    /// Headroom is thin, and thinner against one anchor than the other.
+    /// Two numbers matter:
+    ///
+    /// - **4.4785** — what this sweep actually measures, over the ink
+    ///   path the palette really takes. The 4.40 floor sits 1.8% under it.
+    /// - **4.4058** — `√((far + 0.05) / (near + 0.05))`, the worst the
+    ///   ring pair could give for ANY ink luminance. The floor sits only
+    ///   **0.13%** under that. The gap between the two is luck: the ink
+    ///   path does not quite land on the crossover value.
+    ///
+    /// The only palette lever on either is **`inkHaloLightValue`**. The
+    /// near ring is not a palette quantity at all — it is pinned by
+    /// `InkKeyline.nearCeiling` at L = 0.0010, structurally out of the
+    /// palette's reach. Measured: darkening `inkHaloLightValue` by
+    /// **1.85%** lands the bound exactly on 4.40, and 3% puts it at
+    /// 4.3509. So if Task 2 moves that token this is the test that says
+    /// so — treat a failure here as a real signal about the far pole,
     /// not as noise to be tuned away.
     @Test
     func theAchievableBoundHoldsAtEveryPhase() {
@@ -517,7 +529,8 @@ struct CrossingLegibilityRenderTests {
     /// lightens the near ring, without meeting the arithmetic.
     ///
     /// Sampled at the phases the contract measures, deliberately — this
-    /// is the NARROWER of the two expectations. `thePolesStaySeparated`
+    /// is the NARROWER of the two expectations.
+    /// `theAchievableBoundHoldsAtEveryPhase`
     /// carries the one that holds everywhere. Between these samples the
     /// ink passes continuously through L ≈ 0.171–0.179, where the bound
     /// falls to ~4.48:1 for ANY ring pair, pure black and pure white
