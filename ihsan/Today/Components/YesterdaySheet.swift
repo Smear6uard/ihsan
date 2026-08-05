@@ -229,10 +229,10 @@ struct YesterdaySheet: View {
             // Yesterday is past: every timing is a true thing someone
             // could say about it, so all four are live.
             FlowRow(spacing: IhsanSpacing.xs) {
-                timingChip(.onTime, "On Time", for: row, jamaah: jamaah)
-                timingChip(.late, "Late", for: row, jamaah: jamaah)
-                timingChip(.qada, "Qadā", for: row, jamaah: jamaah)
-                timingChip(.missed, "Missed", for: row, jamaah: jamaah)
+                timingChip(.onTime, for: row, jamaah: jamaah)
+                timingChip(.late, for: row, jamaah: jamaah)
+                timingChip(.qada, for: row, jamaah: jamaah)
+                timingChip(.missed, for: row, jamaah: jamaah)
             }
         }
         .padding(.horizontal, IhsanSpacing.md)
@@ -242,10 +242,10 @@ struct YesterdaySheet: View {
 
     private func timingChip(
         _ status: PrayerStatus,
-        _ title: String,
         for row: (prayer: Prayer, log: PrayerLog?),
         jamaah: Bool
     ) -> some View {
+        let title = status.displayName
         let selected = row.log?.status == status
         return Button {
             Haptics.settle()
@@ -300,25 +300,15 @@ struct YesterdaySheet: View {
         for row: (prayer: Prayer, log: PrayerLog?)
     ) -> String {
         guard let status = row.log?.status else { return "NOT LOGGED" }
-        let base: String
-        switch status {
-        case .onTime: base = "ON TIME"
-        case .late: base = "LATE"
-        case .qada: base = "MADE UP"
-        case .missed: base = "MISSED"
-        }
-        return row.log?.withJamaah == true ? "\(base) · JAMĀʿAH" : base
+        let base = status.inscription
+        return row.log?.withJamaah == true
+            ? "\(base) · \(IhsanVocabulary.jamaahInscription)"
+            : base
     }
 
     private func spokenState(for row: (prayer: Prayer, log: PrayerLog?)) -> String {
         guard let status = row.log?.status else { return "not logged" }
-        let base: String
-        switch status {
-        case .onTime: base = "on time"
-        case .late: base = "late"
-        case .qada: base = "made up"
-        case .missed: base = "missed"
-        }
+        let base = status.spokenLabel
         return row.log?.withJamaah == true ? "\(base), in congregation" : base
     }
 }

@@ -83,7 +83,7 @@ struct PrayerStateResolverIntegrationTests {
             #expect(atStart.resolution.currentPrayer == prayerTime)
             #expect(atStart.cardPhase == .active(until: end))
             #expect(atStart.markerIsCurrent)
-            #expect(atStart.availableStatuses == [.onTime])
+            #expect(atStart.availableStatuses == [.onTime, .late])
 
             let beforeEnd = try uiState(
                 prayerTime: prayerTime,
@@ -145,7 +145,7 @@ struct PrayerStateResolverIntegrationTests {
         #expect(state.resolution.currentPrayer == schedule.fajr)
         #expect(state.cardPhase == .active(until: schedule.sunrise))
         #expect(state.markerIsCurrent)
-        #expect(state.availableStatuses == [.onTime])
+        #expect(state.availableStatuses == [.onTime, .late])
     }
 
     // MARK: - Countdown instant arithmetic

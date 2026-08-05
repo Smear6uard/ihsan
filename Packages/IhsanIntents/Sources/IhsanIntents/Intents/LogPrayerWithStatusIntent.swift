@@ -71,13 +71,11 @@ public struct LogPrayerWithStatusIntent: AppIntent {
         let dialogText: String = {
             switch status {
             case .onTime:
-                return "\(prayer.displayNameEnglish) logged on time."
-            case .late:
-                return "\(prayer.displayNameEnglish) logged as late."
+                return "\(prayer.displayNameEnglish) logged \(status.spokenLabel)."
+            case .late, .qada:
+                return "\(prayer.displayNameEnglish) logged as \(status.spokenLabel)."
             case .missed:
-                return "\(prayer.displayNameEnglish) marked as missed."
-            case .qada:
-                return "\(prayer.displayNameEnglish) logged as qada."
+                return "\(prayer.displayNameEnglish) marked as \(status.spokenLabel)."
             }
         }()
 

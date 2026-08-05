@@ -24,7 +24,10 @@ public enum InsightPromptBuilder {
     ) -> String {
         let byPrayerLines = normalizedByPrayerStats(from: summary)
             .map { stat in
-                "- \(stat.prayer.displayNameEnglish): expected \(stat.expected), logged \(stat.logged), onTime \(stat.onTime), late \(stat.late), missed \(stat.missed), jamaah \(stat.jamaah)"
+                // "delayed", not "late": the model writes the summary a
+                // person reads, and the app calls this state Delayed —
+                // prayed inside its window, but late in it.
+                "- \(stat.prayer.displayNameEnglish): expected \(stat.expected), logged \(stat.logged), onTime \(stat.onTime), delayed \(stat.late), missed \(stat.missed), jamaah \(stat.jamaah)"
             }
             .joined(separator: "\n")
 
@@ -42,7 +45,7 @@ public enum InsightPromptBuilder {
         - expectedPrayerCount: \(summary.expectedPrayerCount)
         - loggedPrayerCount: \(summary.loggedPrayerCount)
         - onTimeCount: \(summary.onTimeCount)
-        - lateCount: \(summary.lateCount)
+        - delayedCount: \(summary.lateCount)
         - missedCount: \(summary.missedCount)
         - qadaLoggedCount: \(summary.qadaLoggedCount)
         - jamaahCount: \(summary.jamaahCount)

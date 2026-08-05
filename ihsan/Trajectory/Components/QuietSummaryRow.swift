@@ -8,9 +8,11 @@ import IhsanDesignSystem
 /// pattern; this row's job is just to *count*, quietly, in the
 /// manuscript palette's inscriptional small caps.
 ///
-///     ON TIME: 47   JAMAʿAH: 13   LATE: 5   MISSED: 2   QADĀ: 3
+///     ON TIME: 47   JAMĀʿAH: 13   DELAYED: 5   MISSED: 2   QADĀ: 3
 ///
-/// One line if it fits, two if not (handled by `QuietRowLayout` below).
+/// One line if it fits, otherwise as few as it needs — and `QuietRowLayout`
+/// spreads the stats evenly across those rows rather than packing the
+/// first one full and leaving a single orphan below it.
 struct QuietSummaryRow: View {
     let aggregate: TrajectoryAggregate
     let tokens: SkyPaletteTokens
@@ -41,29 +43,35 @@ struct QuietSummaryRow: View {
 
     private var entries: [(label: String, count: Int)] {
         [
-            ("ON TIME", aggregate.onTimeCount),
+            (PrayerStatus.onTime.inscription, aggregate.onTimeCount),
             (IhsanVocabulary.jamaahInscription, aggregate.jamaahCount),
-            ("LATE",    aggregate.lateCount),
-            ("MISSED",  aggregate.missedCount),
-            ("QADĀ",    aggregate.qadaCount)
+            (PrayerStatus.late.inscription, aggregate.lateCount),
+            (PrayerStatus.missed.inscription, aggregate.missedCount),
+            (PrayerStatus.qada.inscription, aggregate.qadaCount)
         ]
     }
 
     private var accessibilityLabel: String {
-        "On time: \(aggregate.onTimeCount). "
+        "\(PrayerStatus.onTime.displayName): \(aggregate.onTimeCount). "
         + "\(IhsanVocabulary.jamaahTitle): \(aggregate.jamaahCount). "
-        + "Late: \(aggregate.lateCount). "
-        + "Missed: \(aggregate.missedCount). "
-        + "Qadā: \(aggregate.qadaCount)."
+        + "\(PrayerStatus.late.displayName): \(aggregate.lateCount). "
+        + "\(PrayerStatus.missed.displayName): \(aggregate.missedCount). "
+        + "\(PrayerStatus.qada.displayName): \(aggregate.qadaCount)."
     }
 }
 
 /// Flow layout that places its children on as few rows as needed,
-/// distributing them evenly within each row. Used by `QuietSummaryRow`
-/// so the five inscription stats land on one line on wide screens and
-/// reflow to two lines on narrow ones without any explicit breakpoint
-/// logic.
-private struct QuietRowLayout: Layout {
+/// then spreads them evenly ACROSS those rows. Used by
+/// `QuietSummaryRow` so the five inscription stats land on one line on
+/// wide screens and reflow to two on narrow ones without any explicit
+/// breakpoint logic.
+///
+/// The two-step matters. A plain greedy fill packs row one until the
+/// next item will not fit and drops the remainder below, which for five
+/// stats on an iPhone means four across the top and a single stranded
+/// `QADĀ: 0` underneath — it reads as a mistake rather than a line.
+/// Finding the row count greedily and *then* balancing gives 3 + 2.
+struct QuietRowLayout: Layout {
     let spacing: CGFloat
     let rowSpacing: CGFloat
 
@@ -112,23 +120,85 @@ private struct QuietRowLayout: Layout {
     }
 
     private func computeRows(width: CGFloat, subviews: Subviews) -> [Row] {
-        var rows: [Row] = [Row()]
-        var current = 0
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        guard !sizes.isEmpty else { return [] }
+
+        let rowCount = Self.minimumRowCount(width: width, sizes: sizes, spacing: spacing)
+        let split = Self.balancedSplit(
+            width: width, sizes: sizes, spacing: spacing, rowCount: rowCount
+        )
+
+        return split.map { indices in
+            var row = Row()
+            for i in indices {
+                row.indices.append(i)
+                row.sizes.append(sizes[i])
+                row.maxHeight = max(row.maxHeight, sizes[i].height)
+            }
+            return row
+        }
+    }
+
+    /// How few rows the items can possibly occupy, found the ordinary
+    /// greedy way. This is only the *count*; which item lands where is
+    /// decided afterwards.
+    static func minimumRowCount(
+        width: CGFloat, sizes: [CGSize], spacing: CGFloat
+    ) -> Int {
+        var rows = 1
         var consumed: CGFloat = 0
-        for (i, sub) in subviews.enumerated() {
-            let size = sub.sizeThatFits(.unspecified)
+        for size in sizes {
             let prospective = consumed == 0 ? size.width : consumed + spacing + size.width
-            if prospective > width && !rows[current].indices.isEmpty {
-                rows.append(Row())
-                current += 1
+            if prospective > width && consumed > 0 {
+                rows += 1
                 consumed = size.width
             } else {
                 consumed = prospective
             }
-            rows[current].indices.append(i)
-            rows[current].sizes.append(size)
-            rows[current].maxHeight = max(rows[current].maxHeight, size.height)
         }
+        return rows
+    }
+
+    /// Distributes the items across exactly `rowCount` rows as evenly as
+    /// their widths allow, preserving order.
+    ///
+    /// Even means by count, not by pixels: the stats are short and of
+    /// similar length, and an equal number per row is what reads as
+    /// deliberate. A row that would overflow takes fewer items — never
+    /// more — so balancing can lengthen a line but can never break one.
+    static func balancedSplit(
+        width: CGFloat, sizes: [CGSize], spacing: CGFloat, rowCount: Int
+    ) -> [[Int]] {
+        guard rowCount > 1 else { return [Array(sizes.indices)] }
+
+        var rows: [[Int]] = []
+        var remaining = Array(sizes.indices)
+
+        for row in 0..<rowCount {
+            let rowsLeft = rowCount - row
+            // Ceiling division, so any remainder lands on the earlier
+            // rows: five items over two rows reads 3 + 2, not 2 + 3.
+            let target = (remaining.count + rowsLeft - 1) / rowsLeft
+            var taken: [Int] = []
+            var consumed: CGFloat = 0
+            for index in remaining.prefix(target) {
+                let w = sizes[index].width
+                let prospective = taken.isEmpty ? w : consumed + spacing + w
+                if prospective > width && !taken.isEmpty { break }
+                taken.append(index)
+                consumed = prospective
+            }
+            // Defensive: a single item wider than the row still has to
+            // be placed, or the loop cannot make progress.
+            if taken.isEmpty, let first = remaining.first { taken = [first] }
+            rows.append(taken)
+            remaining.removeFirst(taken.count)
+            if remaining.isEmpty { break }
+        }
+
+        // Anything left over (only reachable when the widths defeated
+        // the even split) trails on its own line rather than vanishing.
+        if !remaining.isEmpty { rows.append(remaining) }
         return rows
     }
 }

@@ -160,11 +160,11 @@ final class YesterdayAccountUITests: XCTestCase {
         let fajr = app.descendants(matching: .any)["yesterday-row-fajr"]
         fajr.tap()
         Thread.sleep(forTimeInterval: 0.8)
-        let late = app.buttons["Fajr, Late"]
+        let late = app.buttons["Fajr, Delayed"]
         XCTAssertTrue(late.waitForExistence(timeout: 4), "A logged row must still open.")
         late.tap()
         Thread.sleep(forTimeInterval: 1.2)
-        XCTAssertEqual(fajr.value as? String, "late")
+        XCTAssertEqual(fajr.value as? String, "delayed")
         capture(app, named: "p65-09-still-editable")
     }
 

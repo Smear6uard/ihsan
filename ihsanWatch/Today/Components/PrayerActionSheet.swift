@@ -111,11 +111,6 @@ struct PrayerActionSheet: View {
     }
 
     private func label(_ status: PrayerStatus) -> String {
-        switch status {
-        case .onTime: "On time"
-        case .late: "Late"
-        case .missed: "Missed"
-        case .qada: "Qada"
-        }
+        status.displayName
     }
 }

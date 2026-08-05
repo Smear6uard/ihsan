@@ -241,15 +241,6 @@ struct TrajectoryScreen: View {
 
         case .ready(let snapshot):
             VStack(spacing: IhsanSpacing.lg) {
-                HStack(spacing: IhsanSpacing.sm) {
-                    Spacer()
-                    if settings?.sunnahLayerEnabled == true {
-                        naflOverlayToggle(tokens: tokens)
-                    }
-                    dhikrOverlayToggle(tokens: tokens)
-                }
-                .padding(.horizontal, IhsanSpacing.md)
-
                 gestaltPanel(snapshot: snapshot, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
@@ -296,25 +287,33 @@ struct TrajectoryScreen: View {
         .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
 
-    // MARK: - Nafl overlay
+    // MARK: - Presence overlays
+    //
+    // There is no switch for these, and there was one until it was
+    // taken out. Two chips sat above the panel toggling `Set<Date>?`
+    // into and out of the grid; with no nafl or dhikr recorded — which
+    // is every new account, and most accounts — pressing either one
+    // changed nothing anybody could see. A control that cannot
+    // demonstrate its own effect teaches nothing and asks the user to
+    // trust that something happened.
+    //
+    // The rows now follow the data: the screen hands over what it has,
+    // `GestaltGrid` draws a row only when that row has marks in it, and
+    // a key underneath names each one.
 
-    /// Days with any voluntary record, when the overlay is on. Presence
-    /// only — the overlay never carries a count or a share.
+    /// Days with any voluntary record. Presence only — the overlay
+    /// never carries a count or a share. `nil` while the sunnah layer
+    /// is off, because nothing in the app records nafl until it is on.
     private var overlayNaflDays: Set<Date>? {
-        guard let settings,
-              settings.sunnahLayerEnabled,
-              settings.pathNaflOverlayEnabled
-        else { return nil }
+        guard settings?.sunnahLayerEnabled == true else { return nil }
         let calendar = Calendar.current
         return Set(naflLogs.map { calendar.startOfDay(for: $0.naflDate) })
     }
 
-    // MARK: - Dhikr overlay
-
-    /// Days with a recorded tasbīḥ sitting, when the overlay is on.
-    /// Presence only — factual, no goal, no figure.
+    /// Days with a recorded tasbīḥ sitting. Presence only — factual, no
+    /// goal, no figure. The tasbīḥ instrument needs no opt-in, so this
+    /// is never gated.
     private var overlayDhikrDays: Set<Date>? {
-        guard settings?.pathDhikrOverlayEnabled == true else { return nil }
         let calendar = Calendar.current
         return Set(dhikrSessions.map { calendar.startOfDay(for: $0.sessionDate) })
     }
@@ -371,68 +370,6 @@ struct TrajectoryScreen: View {
         }
     }
 
-    /// The quiet in-Path switch for the overlay: a small outlined chip,
-    /// filled while the sixth row shows. Visible only when the sunnah
-    /// layer itself is on.
-    private func naflOverlayToggle(tokens: SkyPaletteTokens) -> some View {
-        let isOn = settings?.pathNaflOverlayEnabled == true
-        return Button {
-            Haptics.impact(.light)
-            settings?.pathNaflOverlayEnabled.toggle()
-            settings?.modifiedAt = .now
-        } label: {
-            HStack(spacing: 5) {
-                FourPointedStar()
-                    .stroke(tokens.metal.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
-                    .frame(width: 9, height: 9)
-                Text("NAFL")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.6)
-                    .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary.opacity(0.8))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .overlay {
-                Capsule()
-                    .strokeBorder(tokens.metal.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Voluntary prayer overlay")
-        .accessibilityValue(isOn ? "on" : "off")
-        .accessibilityHint("Adds a quieter sixth row to the pattern.")
-    }
-
-    /// The quiet in-Path switch for the dhikr presence — off by
-    /// default, factual presence only, exactly like the nafl overlay.
-    private func dhikrOverlayToggle(tokens: SkyPaletteTokens) -> some View {
-        let isOn = settings?.pathDhikrOverlayEnabled == true
-        return Button {
-            Haptics.impact(.light)
-            settings?.pathDhikrOverlayEnabled.toggle()
-            settings?.modifiedAt = .now
-        } label: {
-            HStack(spacing: 5) {
-                Circle()
-                    .stroke(tokens.metal.opacity(isOn ? 0.9 : 0.5), lineWidth: 0.9)
-                    .frame(width: 8, height: 8)
-                Text("DHIKR")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.6)
-                    .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary.opacity(0.8))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 4)
-            .overlay {
-                Capsule()
-                    .strokeBorder(tokens.metal.opacity(isOn ? 0.6 : 0.3), lineWidth: 0.8)
-            }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Dhikr overlay")
-        .accessibilityValue(isOn ? "on" : "off")
-        .accessibilityHint("Adds a quieter row marking days with recorded dhikr.")
-    }
 }
 
 /// Identifies the grid cell whose log sheet is presented.

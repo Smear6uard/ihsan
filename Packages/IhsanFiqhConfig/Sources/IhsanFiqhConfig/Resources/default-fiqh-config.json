@@ -133,7 +133,7 @@
   ],
   "framing": {
     "onTimeLabel": "On Time",
-    "lateLabel": "Late",
+    "lateLabel": "Delayed",
     "missedLabel": "Missed",
     "qadaLabel": "Qada",
     "pauseModeTitle": "Pause",

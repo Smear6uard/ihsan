@@ -37,6 +37,25 @@ public enum Prayer: String, Codable, CaseIterable, Sendable {
         }
     }
 
+    /// The short small-caps form for a legend gutter, where five names
+    /// have to stack in one narrow column without setting the column's
+    /// width by the longest of them. Only Maghrib is actually clipped;
+    /// the rest are their whole names.
+    public var inscriptionAbbreviation: String {
+        switch self {
+        case .fajr:
+            "FAJR"
+        case .dhuhr:
+            "DHUHR"
+        case .asr:
+            "ASR"
+        case .maghrib:
+            "MAGH"
+        case .isha:
+            "ISHA"
+        }
+    }
+
     public var defaultRakatCount: Int {
         switch self {
         case .fajr:

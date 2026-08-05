@@ -37,6 +37,41 @@ enum GestaltAggregation {
         }
     }
 
+    /// Per-column presence of some record, aligned 1:1 with the fardh
+    /// columns the same period produces.
+    ///
+    /// Lives here rather than inside the view because the answer decides
+    /// whether a row is drawn at all: an overlay with nothing in it is
+    /// not a quiet row, it is a row of blanks, and the panel should not
+    /// reserve space for one. `hasAnyPresence` is that question, asked
+    /// where a test can reach it.
+    static func presenceColumns(
+        days: [DayCompletion],
+        period: TrajectoryPeriod,
+        daysWithRecord: Set<Date>
+    ) -> [Bool] {
+        switch period {
+        case .year:
+            return yearWeekDayGroups(days: days).map { week in
+                week.contains { daysWithRecord.contains($0.date) }
+            }
+        default:
+            return days.map { daysWithRecord.contains($0.date) }
+        }
+    }
+
+    /// Whether a presence overlay has anything to show in this window.
+    static func hasAnyPresence(
+        days: [DayCompletion],
+        period: TrajectoryPeriod,
+        daysWithRecord: Set<Date>?
+    ) -> Bool {
+        guard let daysWithRecord, !daysWithRecord.isEmpty else { return false }
+        return presenceColumns(
+            days: days, period: period, daysWithRecord: daysWithRecord
+        ).contains(true)
+    }
+
     /// The modal `PrayerCompletion` for the given prayer across the
     /// provided days. Ties resolve toward the better outcome (jamaʿah →
     /// on-time → qadā → late → missed → unlogged) so an inconsistent

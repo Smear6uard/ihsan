@@ -15,6 +15,11 @@ public final class PrayerLog {
     public var prayedAt: Date?
     public var loggedAt: Date = Date.distantPast
     public var statusRaw: String = PrayerStatus.missed.rawValue
+    /// How far into the window a `.late` — that is, Delayed — prayer
+    /// was offered, in seconds from its scheduled start. The stored
+    /// name predates the rename and stays put: renaming it would cost a
+    /// migration over every historical row to buy a nicer identifier.
+    /// Nil for retroactive logs, whose start time is not recoverable.
     public var lateBySeconds: Int?
     public var withJamaah: Bool = false
     public var jamaahLocationRaw: String?

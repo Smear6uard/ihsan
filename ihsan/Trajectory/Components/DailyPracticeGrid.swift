@@ -144,10 +144,9 @@ struct DailyPracticeGrid: View {
         } else {
             switch completion.status {
             case .onTime: statusText = completion.withJamaah
-                ? "on time, in \(IhsanVocabulary.jamaah)" : "on time"
-            case .late: statusText = "late"
-            case .missed: statusText = "missed"
-            case .qada: statusText = "qadā"
+                ? "\(PrayerStatus.onTime.spokenLabel), in \(IhsanVocabulary.jamaah)"
+                : PrayerStatus.onTime.spokenLabel
+            case .some(let status): statusText = status.spokenLabel
             case nil: statusText = "not logged"
             }
         }

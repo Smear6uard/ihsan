@@ -67,7 +67,7 @@ struct TimingAvailabilityTests {
             if now < scheduled {
                 expected = []
             } else if now < windowEnd {
-                expected = [.onTime]
+                expected = [.onTime, .late]
             } else {
                 expected = [.onTime, .late, .qada, .missed]
             }
@@ -75,10 +75,24 @@ struct TimingAvailabilityTests {
         }
     }
 
+    /// Delayed describes a prayer offered INSIDE its window, late in
+    /// it — so it is live for as long as the window is. Only qadā and
+    /// missed have to wait for the window to close.
     @Test
-    func openWindowOffersOnTimeAlone() {
+    func openWindowOffersOnTimeAndDelayed() {
         let now = scheduled.addingTimeInterval(60)
-        #expect(allowed(now: now, scheduledTime: scheduled, windowEndTime: windowEnd) == [.onTime])
+        #expect(
+            allowed(now: now, scheduledTime: scheduled, windowEndTime: windowEnd)
+                == [.onTime, .late]
+        )
+    }
+
+    @Test
+    func openWindowWithholdsQadaAndMissed() {
+        let now = scheduled.addingTimeInterval(60)
+        let result = allowed(now: now, scheduledTime: scheduled, windowEndTime: windowEnd)
+        #expect(!result.contains(.qada))
+        #expect(!result.contains(.missed))
     }
 
     /// A prayer performed in its window and logged after it must never
@@ -96,7 +110,10 @@ struct TimingAvailabilityTests {
     func boundaryInstantsTurnAtomically() {
         // The exact opening instant is in-window; the exact end
         // instant is past-window — same convention as the card model.
-        #expect(allowed(now: scheduled, scheduledTime: scheduled, windowEndTime: windowEnd) == [.onTime])
+        #expect(
+            allowed(now: scheduled, scheduledTime: scheduled, windowEndTime: windowEnd)
+                == [.onTime, .late]
+        )
         #expect(
             allowed(now: windowEnd, scheduledTime: scheduled, windowEndTime: windowEnd)
                 == [.onTime, .late, .qada, .missed]

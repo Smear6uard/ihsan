@@ -124,15 +124,20 @@ public final class UserSettings {
     public var rawatibConfigJSON: String = UserSettings.defaultRawatibConfigJSON
     public var duhaSunriseOffsetMinutes: Int = 20
     public var duhaDhuhrMarginMinutes: Int = 15
-    /// Optional nafl overlay on the Path dot rows — visible if sought.
+    /// Vestigial. The Path's nafl overlay is no longer a preference:
+    /// the row is drawn when the window holds a voluntary record and
+    /// not otherwise. Kept in the schema because deleting a stored
+    /// property costs a migration over every row to remove a boolean
+    /// nothing reads. Do not re-wire a control to it — the control this
+    /// replaced could be toggled without changing a visible pixel.
     public var pathNaflOverlayEnabled: Bool = false
     /// Voluntary fasting rhythms — gentle intentions, OFF by default.
     /// When enabled, the significant-day line doubles as a quiet
     /// offer; never a notification by default.
     public var fastingMonThuOfferEnabled: Bool = false
     public var fastingWhiteDaysOfferEnabled: Bool = false
-    /// Optional dhikr presence on the Path — off by default, factual
-    /// counts only, exactly like the nafl overlay.
+    /// Vestigial, for the same reason as `pathNaflOverlayEnabled`: the
+    /// dhikr presence row now follows the data.
     public var pathDhikrOverlayEnabled: Bool = false
     /// The gentle wake for the last third of the night. Strictly opt-in.
     public var nightWakeEnabled: Bool = false

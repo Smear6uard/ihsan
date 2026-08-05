@@ -10,9 +10,11 @@ import IhsanPrayerTimes
 /// afterward is the most common usage pattern and must never be
 /// blocked.
 ///
-/// - Live window open → only **On Time** (Late / Qadā / Missed
-///   describe a window that has passed, which cannot yet be true —
-///   rendered quiet and disabled, visible for learnability).
+/// - Live window open → **On Time and Delayed**. Both describe a
+///   prayer offered *inside* its window, and both can be true right
+///   now — someone praying Isha at 3 a.m. is delayed, not qāḍī. Qadā
+///   and Missed describe a window that has passed, which cannot yet be
+///   true; they render quiet and disabled, visible for learnability.
 /// - Window ended, today or any past day → **all four**. "On time"
 ///   remains true of a prayer performed inside the window and logged
 ///   after it; memory, not the clock, is the authority once the
@@ -73,7 +75,11 @@ enum TimingAvailability {
         case .upcoming:
             return []
         case .current:
-            return [.onTime]
+            // Delayed is an in-window state, so it is live the moment
+            // the window is. This is also what makes the focused card
+            // and this sheet agree: the card has always offered a
+            // Delayed commit while the window is open.
+            return [.onTime, .late]
         case .closed:
             return [.onTime, .late, .qada, .missed]
         }

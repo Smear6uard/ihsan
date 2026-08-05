@@ -302,12 +302,7 @@ struct TodayView: View {
     }
 
     private func label(_ status: PrayerStatus) -> String {
-        switch status {
-        case .onTime: "on time"
-        case .late: "late"
-        case .missed: "missed"
-        case .qada: "qada"
-        }
+        status.spokenLabel
     }
 
     private func captionAccessibility(snapshot: TodayState.Snapshot) -> String {

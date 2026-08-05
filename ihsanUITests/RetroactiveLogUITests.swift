@@ -105,7 +105,7 @@ final class RetroactiveLogUITests: XCTestCase {
         XCTAssertTrue(onTimeTile.waitForExistence(timeout: 5))
         XCTAssertTrue(onTimeTile.isEnabled, "A closed window must keep On Time available.")
 
-        let lateTile = app.buttons["Late, prayed after its window"]
+        let lateTile = app.buttons["Delayed, prayed late in its window"]
         XCTAssertTrue(lateTile.isEnabled)
         lateTile.tap()
 
@@ -115,7 +115,7 @@ final class RetroactiveLogUITests: XCTestCase {
 
         XCTAssertTrue(commit.waitForNonExistence(timeout: 5))
         XCTAssertTrue(
-            element(in: app, labelBeginning: "Dhuhr prayer, logged, late")
+            element(in: app, labelBeginning: "Dhuhr prayer, logged, delayed")
                 .waitForExistence(timeout: 5),
             "The card must reflect the retro log."
         )
@@ -168,7 +168,7 @@ final class RetroactiveLogUITests: XCTestCase {
 
         app.tabBars.buttons["Path"].tap()
 
-        let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), late"]
+        let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"]
         XCTAssertTrue(cell.waitForExistence(timeout: 10))
         scrollTo(cell, in: app)
         cell.tap()

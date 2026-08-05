@@ -13,7 +13,7 @@ import IhsanDesignSystem
 ///   keyline.
 /// - **Jamāʿah** — the gilded form ringed in the bright metal: the
 ///   congregation distinguishes itself by a halo, not a new hue.
-/// - **Late** — the warm metal outline, hollow centre.
+/// - **Delayed** — the warm metal outline, hollow centre.
 /// - **Missed** — the quiet passed form: a secondary-ink outline,
 ///   present but subdued. Never vermillion; the record does not
 ///   scold.
@@ -27,17 +27,29 @@ import IhsanDesignSystem
 ///
 /// Five rows, Fajr at top through Isha at bottom. 7D/30D/90D give a
 /// column per day; YEAR gives a column per week (modal status).
+///
+/// Beneath the fardh rows, and only when there is something in them,
+/// sit the presence overlays — nafl and dhikr — with a key underneath
+/// naming each by the mark it draws. Nothing switches them on: they
+/// follow the data, because the switches that used to govern them could
+/// be flipped without changing a single pixel.
 struct GestaltGrid: View {
     let days: [DayCompletion]
     let period: TrajectoryPeriod
     /// Resolved page tokens — the grid never picks its own colors.
     let tokens: SkyPaletteTokens
-    /// Days carrying any voluntary record. Non-nil only when the user
-    /// turned the Path overlay on; it adds a sixth, quieter row beneath
-    /// the five fardh rows — presence only, no denominator, no figure.
+    /// Days carrying any voluntary record. Non-nil when the sunnah
+    /// layer is on; it adds a sixth, quieter row beneath the five fardh
+    /// rows — presence only, no denominator, no figure.
+    ///
+    /// The row appears only if at least one day in the window actually
+    /// carries a record. There is no switch for it and there should not
+    /// be: the control this replaced could be toggled all day without
+    /// changing a pixel, because an overlay of nothing looks exactly
+    /// like no overlay.
     var naflDays: Set<Date>? = nil
-    /// Days carrying a recorded tasbīḥ sitting. Non-nil only when the
-    /// dhikr overlay is on — the same quiet presence-only register.
+    /// Days carrying a recorded tasbīḥ sitting — same quiet
+    /// presence-only register, same appears-only-with-data rule.
     var dhikrDays: Set<Date>? = nil
 
     /// One rendered column: the five-prayer slate plus the day-level
@@ -49,19 +61,71 @@ struct GestaltGrid: View {
     }
 
     var body: some View {
-        GeometryReader { proxy in
-            let metrics = Metrics(period: period, availableWidth: proxy.size.width)
-            let columns = self.columns
+        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+            GeometryReader { proxy in
+                let metrics = Metrics(period: period, availableWidth: proxy.size.width)
+                let columns = self.columns
 
-            VStack(spacing: IhsanSpacing.sm) {
-                grid(columns: columns, metrics: metrics)
-                annotationRow(columns: columns, metrics: metrics)
+                VStack(spacing: IhsanSpacing.sm) {
+                    grid(columns: columns, metrics: metrics)
+                    annotationRow(columns: columns, metrics: metrics)
+                }
+                .frame(maxWidth: .infinity)
             }
-            .frame(maxWidth: .infinity)
+            .frame(height: patternHeight)
+
+            // The key, drawn only when there is a presence row to
+            // explain. This is the repair: the rows themselves are
+            // deliberately quiet, and a quiet mark nobody can name is
+            // just noise. A row-by-row gutter cannot work here — at 90D
+            // the rows are 4pt apart and a label is eleven — so the
+            // naming goes underneath, where it has room.
+            if showsNaflRow || showsDhikrRow {
+                keyRow
+            }
         }
-        .frame(height: gridHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    // MARK: - Key
+
+    /// Each presence row's own mark at legible size, beside its name.
+    /// The marks are the same units the rows draw, not approximations
+    /// of them, so the key can never describe something the grid does
+    /// not show.
+    private var keyRow: some View {
+        HStack(spacing: IhsanSpacing.md) {
+            if showsNaflRow {
+                keyEntry("NAFL") {
+                    NaflOverlayDot(present: true, size: Self.keyMarkSize, tokens: tokens)
+                }
+            }
+            if showsDhikrRow {
+                keyEntry("DHIKR") {
+                    DhikrOverlayDot(present: true, size: Self.keyMarkSize, tokens: tokens)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    /// Mark size in the key. Larger than any period's dot on purpose —
+    /// the key is read once, up close, and the pattern is read at arm's
+    /// length.
+    private static let keyMarkSize: CGFloat = 11
+
+    private func keyEntry<Mark: View>(
+        _ name: String, @ViewBuilder mark: () -> Mark
+    ) -> some View {
+        HStack(spacing: 5) {
+            mark()
+            Text(name)
+                .font(IhsanFont.inscription)
+                .tracking(1.3)
+                .foregroundStyle(tokens.inkSecondary)
+        }
+        .fixedSize()
     }
 
     // MARK: - Grid
@@ -106,14 +170,14 @@ struct GestaltGrid: View {
                 }
             }
 
-            if naflColumns != nil || dhikrColumns != nil {
+            if showsNaflRow || showsDhikrRow {
                 // The overlay rows are a different register from the
                 // five fardh rows — presence, not status. A row at the
                 // grid's own spacing read as a sixth prayer.
                 Color.clear.frame(height: Self.overlayGap)
             }
 
-            if let naflColumns, naflColumns.count == columns.count {
+            if showsNaflRow, let naflColumns, naflColumns.count == columns.count {
                 HStack(spacing: metrics.spacing) {
                     ForEach(0..<naflColumns.count, id: \.self) { col in
                         NaflOverlayDot(
@@ -125,7 +189,7 @@ struct GestaltGrid: View {
                 }
             }
 
-            if let dhikrColumns, dhikrColumns.count == columns.count {
+            if showsDhikrRow, let dhikrColumns, dhikrColumns.count == columns.count {
                 HStack(spacing: metrics.spacing) {
                     ForEach(0..<dhikrColumns.count, id: \.self) { col in
                         DhikrOverlayDot(
@@ -139,26 +203,41 @@ struct GestaltGrid: View {
         }
     }
 
+    // MARK: - Which overlay rows are drawn
+    //
+    // A row appears when it has something in it, and never otherwise.
+    // This is what replaced the two chips above the panel: they could
+    // be toggled all day without changing a pixel, because a presence
+    // overlay with no presences is indistinguishable from no overlay.
+    // The data decides now, so the answer is always visible.
+
+    private var showsNaflRow: Bool {
+        GestaltAggregation.hasAnyPresence(
+            days: days, period: period, daysWithRecord: naflDays
+        )
+    }
+
+    private var showsDhikrRow: Bool {
+        GestaltAggregation.hasAnyPresence(
+            days: days, period: period, daysWithRecord: dhikrDays
+        )
+    }
+
     /// Per-column presence of any voluntary record, aligned 1:1 with the
     /// fardh columns.
     private var naflColumns: [Bool]? {
-        guard let naflDays else { return nil }
-        return presenceColumns(for: naflDays)
+        naflDays.map {
+            GestaltAggregation.presenceColumns(
+                days: days, period: period, daysWithRecord: $0
+            )
+        }
     }
 
     private var dhikrColumns: [Bool]? {
-        guard let dhikrDays else { return nil }
-        return presenceColumns(for: dhikrDays)
-    }
-
-    private func presenceColumns(for daysWithRecord: Set<Date>) -> [Bool] {
-        switch period {
-        case .year:
-            return GestaltAggregation.yearWeekDayGroups(days: days).map { week in
-                week.contains { daysWithRecord.contains($0.date) }
-            }
-        default:
-            return days.map { daysWithRecord.contains($0.date) }
+        dhikrDays.map {
+            GestaltAggregation.presenceColumns(
+                days: days, period: period, daysWithRecord: $0
+            )
         }
     }
 
@@ -270,11 +349,14 @@ struct GestaltGrid: View {
         }
     }
 
-    /// The grid needs a stable height for the parent's VStack layout; the
-    /// inner GeometryReader recomputes spacing per device, but height
-    /// barely varies across the supported widths so we pin to the spec
-    /// dot size + the annotation block.
-    private var gridHeight: CGFloat {
+    /// The pattern block needs a stable height for the parent's VStack
+    /// layout; the inner GeometryReader recomputes spacing per device,
+    /// but height barely varies across the supported widths so we pin to
+    /// the spec dot size + the annotation block.
+    ///
+    /// Counts only the rows that will actually be drawn — a panel that
+    /// reserves space for an empty overlay is a panel with a hole in it.
+    private var patternHeight: CGFloat {
         let dot: CGFloat
         let spacing: CGFloat
         switch period {
@@ -283,12 +365,11 @@ struct GestaltGrid: View {
         case .ninetyDays: dot = 3;  spacing = 1.0
         case .year:       dot = 5;  spacing = 1.5
         }
-        let rowCount: CGFloat = 5
-            + (naflDays == nil ? 0 : 1)
-            + (dhikrDays == nil ? 0 : 1)
+        let overlayRows = (showsNaflRow ? 1 : 0) + (showsDhikrRow ? 1 : 0)
+        let rowCount = CGFloat(5 + overlayRows)
         let rows = rowCount * dot + (rowCount - 1) * spacing
         let starSize = max(6, min(10, dot + 4))
-        let gap = (naflDays == nil && dhikrDays == nil) ? 0 : Self.overlayGap
+        let gap = overlayRows == 0 ? 0 : Self.overlayGap
         return rows + gap + IhsanSpacing.sm + starSize
     }
 
@@ -309,11 +390,11 @@ struct GestaltGrid: View {
         if days.contains(where: \.isTraveling) {
             label += " Traveling days carry a small plane mark."
         }
-        if naflDays != nil {
-            label += " A quieter sixth row marks days with voluntary prayer."
+        if showsNaflRow {
+            label += " A quieter sixth row, keyed NAFL, marks days with voluntary prayer."
         }
-        if dhikrDays != nil {
-            label += " A quieter row marks days with recorded dhikr."
+        if showsDhikrRow {
+            label += " A quieter row, keyed DHIKR, marks days with recorded dhikr."
         }
         return label
     }

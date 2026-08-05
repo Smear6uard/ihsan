@@ -773,15 +773,6 @@ private struct TimingCommitButton: View {
     }
 }
 
-// MARK: - PrayerStatus spoken label
-
-private extension PrayerStatus {
-    var spokenLabel: String {
-        switch self {
-        case .onTime: return "on time"
-        case .late: return "late"
-        case .qada: return "as qadā"
-        case .missed: return "missed"
-        }
-    }
-}
+// The spoken labels now come from `PrayerStatus`'s own vocabulary in
+// IhsanCore, so the card, the sheet, the Path counts, and Siri all say
+// the same word.

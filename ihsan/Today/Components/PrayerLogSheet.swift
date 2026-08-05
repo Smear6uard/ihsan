@@ -7,12 +7,17 @@ import SwiftUI
 ///
 /// Structure mirrors the data: **jamāʿah is a toggle** (the
 /// congregation axis) presented distinctly above the **timing
-/// choice** (one exclusive selection — On Time / Late / Qadā /
+/// choice** (one exclusive selection — On Time / Delayed / Qadā /
 /// Missed). The ornament states ARE the iconography: each timing
 /// tile shows this prayer's own ornament in exactly the state that
 /// choice would produce on the plate — gilded for On Time, the warm
-/// outline for Late, the lapis pigment for Qadā, the quiet passed
+/// outline for Delayed, the lapis pigment for Qadā, the quiet passed
 /// state for Missed. The sheet teaches the plate's language.
+///
+/// Every name and caption comes from `PrayerStatus`'s vocabulary, so
+/// the sheet cannot phrase the timing axis differently from the card,
+/// the Path counts, or Siri. On Time and Delayed both describe a
+/// prayer offered INSIDE its window; qadā is the one offered after.
 ///
 /// Times format through `PlateTimeFormat` in the **place's**
 /// timezone — the sheet can never again disagree with the plate
@@ -263,11 +268,15 @@ struct PrayerLogSheet: View {
             GridItem(.flexible(), spacing: IhsanSpacing.sm),
             GridItem(.flexible(), spacing: IhsanSpacing.sm),
         ]
+        // Names and captions come from `PrayerStatus`'s own vocabulary
+        // — the sheet does not get to phrase the timing axis itself.
+        // On Time and Delayed are both INSIDE the window; qadā is the
+        // one that happens after it.
         return LazyVGrid(columns: columns, spacing: IhsanSpacing.sm) {
-            timingTile(.onTime, title: "On Time", caption: "PRAYED IN ITS WINDOW")
-            timingTile(.late, title: "Late", caption: "PRAYED AFTER ITS WINDOW")
-            timingTile(.qada, title: "Qadā", caption: "MADE UP LATER")
-            timingTile(.missed, title: "Missed", caption: "ITS WINDOW PASSED UNPRAYED")
+            timingTile(.onTime)
+            timingTile(.late)
+            timingTile(.qada)
+            timingTile(.missed)
         }
     }
 
@@ -279,9 +288,9 @@ struct PrayerLogSheet: View {
     /// 1.86).
     static let unavailableTileOpacity: Double = 0.5
 
-    private func timingTile(
-        _ timing: PrayerStatus, title: String, caption: String
-    ) -> some View {
+    private func timingTile(_ timing: PrayerStatus) -> some View {
+        let title = timing.displayName
+        let caption = timing.caption
         let selected = selectedTiming == timing
         let available = availableStatuses.contains(timing)
         return Button {
@@ -357,9 +366,10 @@ struct PrayerLogSheet: View {
         tokens.metalValue
     }
 
-    /// The late outline: warm metal on jewel grounds; on the
+    /// The delayed outline: warm metal on jewel grounds; on the
     /// near-white days plain metal falls under 3:1, so it deepens
-    /// toward the keyline — still bronze, never gray.
+    /// toward the keyline — still bronze, never gray. (Named for the
+    /// `.late` case it draws, whose stored name predates the rename.)
     static func lateOutlineValue(for tokens: SkyPaletteTokens) -> SRGBValue {
         tokens.groundBottomValue.relativeLuminance < 0.5
             ? tokens.metalValue

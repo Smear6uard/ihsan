@@ -19,19 +19,11 @@ public struct PrayerStatusEntity: AppEntity, Identifiable, Sendable {
             return DisplayRepresentation(title: "Unknown")
         }
 
-        let title: String
-        switch status {
-        case .onTime:
-            title = "On Time"
-        case .late:
-            title = "Late"
-        case .missed:
-            title = "Missed"
-        case .qada:
-            title = "Qada"
-        }
-
-        return DisplayRepresentation(title: LocalizedStringResource(stringLiteral: title))
+        // Siri says the same words the screens do — the entity reads
+        // `PrayerStatus`'s vocabulary rather than keeping its own copy.
+        return DisplayRepresentation(
+            title: LocalizedStringResource(stringLiteral: status.displayName)
+        )
     }
 
     public init(id: String) {
