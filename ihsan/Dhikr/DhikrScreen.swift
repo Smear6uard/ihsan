@@ -35,20 +35,34 @@ struct DhikrScreen: View {
     @State private var isEditingCustomPhrase = false
     @State private var customDraft = ""
 
-    private static let cycleLength = 33
+    /// The phrase the sitting opened on. Fixed at the first tap so
+    /// swiping mid-sitting cannot retroactively change what the
+    /// sequence is.
+    @State private var sittingHead: DhikrPhrase?
 
     private var phrase: DhikrPhrase {
         DhikrPhrase(rawValue: storedPhraseRaw) ?? .subhanallah
     }
 
+    private var sequence: TasbihSequence {
+        TasbihSequence(head: sittingHead ?? phrase)
+    }
+
+    /// The phrase being recited right now — the sitting's own
+    /// sequence position while it walks the three, the stored phrase
+    /// otherwise.
+    private var activePhrase: DhikrPhrase {
+        totalCount == 0 ? phrase : sequence.phrase(atTotalCount: totalCount)
+    }
+
     /// Marks gilded in the current cycle: 1…33, holding at 33 the
     /// moment a cycle completes.
     private var filledMarks: Int {
-        totalCount == 0 ? 0 : ((totalCount - 1) % Self.cycleLength) + 1
+        sequence.markInCycle(atTotalCount: totalCount)
     }
 
     private var completedCycles: Int {
-        totalCount / Self.cycleLength
+        sequence.completedCycles(atTotalCount: totalCount)
     }
 
     var body: some View {
@@ -88,9 +102,12 @@ struct DhikrScreen: View {
     // MARK: - Counting
 
     private func count() {
+        if sittingHead == nil { sittingHead = phrase }
+        let before = activePhrase
         totalCount += 1
         let position = filledMarks
-        if position == Self.cycleLength {
+        let after = activePhrase
+        if position == TasbihSequence.cycleLength {
             // The boundary is a worship commit, and wears the same
             // settle every other commit wears.
             Haptics.settle()
@@ -101,27 +118,56 @@ struct DhikrScreen: View {
             Haptics.impact(.light)
         }
         // Spoken waypoints only — the per-tap haptic carries the
-        // rhythm (see the type comment).
-        if position == 11 || position == 22 || position == Self.cycleLength {
-            var announcement = AttributedString("\(position)")
-            announcement.accessibilitySpeechAnnouncementPriority = .high
-            AccessibilityNotification.Announcement(announcement).post()
+        // rhythm (see the type comment). A phrase HANDOVER is the one
+        // thing a haptic cannot carry, so it is spoken by name. It
+        // fires on the tap that lands ON 34/67 — the first mark of the
+        // new third, by which point the 33rd has been recited.
+        if before != after {
+            announce(after.displayTransliteration)
+        } else if position == 11 || position == 22 || position == TasbihSequence.cycleLength {
+            announce("\(position)")
         }
     }
 
+    private func announce(_ text: String) {
+        var announcement = AttributedString(text)
+        announcement.accessibilitySpeechAnnouncementPriority = .high
+        AccessibilityNotification.Announcement(announcement).post()
+    }
+
     private func finish() {
-        let count = totalCount
-        let phrase = phrase
+        let total = totalCount
+        let sitting = sequence
         let custom = storedCustomPhrase
-        if count > 0 {
+        if total > 0 {
             let day = Calendar.current.startOfDay(for: nowProvider.now())
+            // A walked sitting recorded as one row would name only the
+            // phrase it ended on. One row per third says what was
+            // actually recited; a single-phrase sitting is one row, as
+            // before.
+            var records: [(DhikrPhrase, Int)] = []
+            if sitting.walksTheSequence {
+                var remaining = total
+                for phrase in TasbihSequence.phrases where remaining > 0 {
+                    let count = min(remaining, TasbihSequence.cycleLength)
+                    records.append((phrase, count))
+                    remaining -= count
+                }
+                if remaining > 0, let last = TasbihSequence.phrases.last {
+                    records.append((last, remaining))
+                }
+            } else {
+                records.append((sitting.head, total))
+            }
             Task {
-                _ = try? await SaveDhikrSessionIntent(
-                    count: count,
-                    phrase: phrase,
-                    customPhrase: phrase == .custom && !custom.isEmpty ? custom : nil,
-                    sessionDate: day
-                ).perform()
+                for (phrase, count) in records {
+                    _ = try? await SaveDhikrSessionIntent(
+                        count: count,
+                        phrase: phrase,
+                        customPhrase: phrase == .custom && !custom.isEmpty ? custom : nil,
+                        sessionDate: day
+                    ).perform()
+                }
             }
         }
         onDismiss()
@@ -156,8 +202,15 @@ struct DhikrScreen: View {
 
     private func phraseRow(tokens: SkyPaletteTokens) -> some View {
         TabView(selection: Binding(
-            get: { phrase },
-            set: { storedPhraseRaw = $0.rawValue }
+            get: { activePhrase },
+            set: { candidate in
+                // Swiping mid-sitting pins a phrase: the sequence
+                // stops walking and the counter carries on where the
+                // person put it. Swiping back to Subḥānallāh resumes
+                // the walk from wherever the count already is.
+                storedPhraseRaw = candidate.rawValue
+                sittingHead = candidate
+            }
         )) {
             ForEach(DhikrPhrase.allCases, id: \.self) { candidate in
                 VStack(spacing: 4) {
@@ -194,19 +247,22 @@ struct DhikrScreen: View {
         .tabViewStyle(.page(indexDisplayMode: .never))
         .frame(height: 72)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Phrase: \(labelText(for: phrase))")
+        .accessibilityLabel("Phrase: \(labelText(for: activePhrase))")
         .accessibilityHint("Swipe up or down to change the phrase.")
         .accessibilityAdjustableAction { direction in
             let all = DhikrPhrase.allCases
-            guard let index = all.firstIndex(of: phrase) else { return }
+            guard let index = all.firstIndex(of: activePhrase) else { return }
+            let next: DhikrPhrase
             switch direction {
             case .increment:
-                storedPhraseRaw = all[min(index + 1, all.count - 1)].rawValue
+                next = all[min(index + 1, all.count - 1)]
             case .decrement:
-                storedPhraseRaw = all[max(index - 1, 0)].rawValue
+                next = all[max(index - 1, 0)]
             @unknown default:
-                break
+                return
             }
+            storedPhraseRaw = next.rawValue
+            sittingHead = next
         }
     }
 
@@ -225,7 +281,7 @@ struct DhikrScreen: View {
         // and the guided sets can never drift into two different
         // objects.
         RemembranceRing(
-            count: Self.cycleLength,
+            count: TasbihSequence.cycleLength,
             filled: filledMarks,
             tokens: tokens,
             reduceMotion: reduceMotion
@@ -236,7 +292,17 @@ struct DhikrScreen: View {
                     .monospacedDigit()
                     .foregroundStyle(tokens.ink)
                     .contentTransition(.numericText())
-                if totalCount > Self.cycleLength {
+                if sequence.isComplete(atTotalCount: totalCount) {
+                    // The three thirds are done. The hundredth that
+                    // completes them is a full narrated supplication
+                    // whose copy in this repo sits behind the
+                    // scholar-review gate, so the instrument marks the
+                    // arrival rather than printing unreviewed text.
+                    Text("COMPLETE")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                        .foregroundStyle(tokens.metal)
+                } else if totalCount > TasbihSequence.cycleLength {
                     Text("TOTAL \(totalCount)")
                         .font(IhsanFont.inscription)
                         .tracking(1.6)
@@ -250,7 +316,7 @@ struct DhikrScreen: View {
         .accessibilityElement(children: .ignore)
         .accessibilityIdentifier("dhikr.counter")
         .accessibilityLabel("Tasbīḥ counter")
-        .accessibilityValue("\(filledMarks) of \(Self.cycleLength)\(completedCycles > 0 ? ", \(completedCycles) cycles complete, total \(totalCount)" : "")")
+        .accessibilityValue("\(filledMarks) of \(TasbihSequence.cycleLength)\(completedCycles > 0 ? ", \(completedCycles) cycles complete, total \(totalCount)" : "")")
         .accessibilityHint("Double-tap anywhere to count.")
         .accessibilityAction {
             count()
