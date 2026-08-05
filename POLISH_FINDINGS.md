@@ -849,6 +849,34 @@ budget. These need a device:
   Still worth a look during a crossing: confirm the minute rollover
   animates as one numeral, with no doubled or ghosted digit, since the
   glyph genuinely is drawn twice while the outline is up.
+- **Baseline alignment — RESOLVED, and the original worry was
+  overstated.** Keylining the two `Text`s of `prayerNameRow` individually
+  (needed for the opacity fix) meant `HStack(alignment: .firstTextBaseline)`
+  was aligning two composed subtrees mid-crossing, and I flagged that as
+  a possible abrupt jump. **Measurement says it was not happening.**
+  `CrossingLegibilityRenderTests.keylinedTextKeepsItsBaselineInAnAlignedRow`
+  now renders a baseline-aligned row at an active crossing phase and
+  compares the small glyph's rows against the same row with bare text —
+  and the original `ZStack` composition passes it just as the current
+  `.background` one does. The test is not toothless: a deliberate 4 pt
+  inset inside the modifier moves the glyph from rows 158…175 to
+  152…175 and fails it.
+
+  So: no device check remains here, and the `.background` composition is
+  kept as defence-in-depth — layout-neutral by documented semantics
+  rather than by luck — not as the repair of an observed defect. Note
+  also that the `alignmentGuide` remedy an earlier version of this entry
+  suggested would not have worked anyway: a call-site guide just
+  re-queries the container's own baseline.
+
+- **Numeric transitions on the focused card.** `.contentTransition(.numericText())`
+  on the `.upcoming` time and inscription now sits outside
+  `.inkKeyline(…)`. Correcting an earlier claim here: this is
+  **cosmetic, not a fix** — `contentTransition` is an environment value,
+  so it reaches both of the keyline's copies wherever it is applied.
+  Still worth a look during a crossing: confirm the minute rollover
+  animates as one numeral, with no doubled or ghosted digit, since the
+  glyph genuinely is drawn twice while the outline is up.
 - **Baseline alignment — FIXED in source, no longer a device check.**
   Keylining the two `Text`s of `prayerNameRow` individually (needed for
   the opacity fix) briefly meant `HStack(alignment: .firstTextBaseline)`

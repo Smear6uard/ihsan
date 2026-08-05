@@ -146,15 +146,21 @@ public struct InkKeyline: ViewModifier {
             //
             // `.background`, NOT a `ZStack` of two siblings. Both put
             // the far copy behind the near one with identical geometry,
-            // but only this keeps the NEAR copy the layout-defining
-            // view, so its alignment guides — `.firstTextBaseline` above
-            // all — propagate to the caller unchanged. A `ZStack` would
-            // hand the caller the stack's own guides instead, and since
-            // this whole branch is gated on `strength`, the mismatch
-            // would appear and vanish ABRUPTLY at engage and disengage:
-            // a visible jump on any row aligning keylined text against
-            // anything else, three times per crossing. Do not "simplify"
-            // this back to a `ZStack`.
+            // but this keeps the NEAR copy the layout-defining view, so
+            // its alignment guides — `.firstTextBaseline` above all —
+            // reach the caller by documented semantics rather than by
+            // luck. It matters because the branch is gated on
+            // `strength`: a layout difference here would appear and
+            // vanish abruptly at engage and disengage, three times per
+            // crossing, on any row aligning keylined text against
+            // anything else.
+            //
+            // Honest footnote: a `ZStack` was measured to pass
+            // `keylinedTextKeepsItsBaselineInAnAlignedRow` as well, so
+            // this is defence-in-depth rather than a bug that was
+            // observed. Still prefer it — and that test will catch any
+            // composition here that is not layout-neutral, whichever
+            // container it uses.
             Self.dilate(
                 content,
                 color: nearRingValue.color.opacity(strength),

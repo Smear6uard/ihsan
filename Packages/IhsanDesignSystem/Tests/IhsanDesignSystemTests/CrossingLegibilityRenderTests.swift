@@ -431,6 +431,104 @@ struct CrossingLegibilityRenderTests {
         }
     }
 
+    /// Keylined text keeps its baseline inside a baseline-aligned row.
+    ///
+    /// The modifier draws two copies of its content, so it must not
+    /// disturb the layout of the one that matters: `.background` leaves
+    /// the near copy the layout-defining view, and its alignment guides
+    /// reach the caller unchanged. That matters because the branch is
+    /// gated on `strength` — any layout difference would not be a drift
+    /// the eye forgives, but something that appears and vanishes
+    /// ABRUPTLY as the outline engages, on rows like the focused card's
+    /// prayer name, three times per crossing.
+    ///
+    /// **Measured, so the record is straight: a `ZStack` composition
+    /// passes this too.** The concern that prompted the `.background`
+    /// rewrite — that a `ZStack` would substitute its own baseline — is
+    /// not observable for this content shape. `.background` is kept
+    /// because it is layout-neutral by *documented* semantics where the
+    /// `ZStack` merely happened to behave, but the change is
+    /// defence-in-depth, not a bug fix, and this test is not evidence
+    /// for it.
+    ///
+    /// What the test does earn: it is sensitive to a real shift. A
+    /// deliberate 4 pt inset inside the modifier moves the glyph from
+    /// rows 158…175 to 152…175 and fails it. So layout neutrality — the
+    /// property the composition rests on — is now pinned by measurement
+    /// instead of by argument, which is the standard this whole task
+    /// exists to enforce.
+    ///
+    /// Measured at a phase where the modifier is genuinely active —
+    /// comparing at a plateau would prove nothing, since `body` returns
+    /// its content untouched there and the branch under test never
+    /// executes. The small text is drawn in a marker red absent from
+    /// both rings, so what is compared is the GLYPH's rows and not the
+    /// bounding box, which the rings legitimately enlarge.
+    @Test
+    func keylinedTextKeepsItsBaselineInAnAlignedRow() throws {
+        let tokens = PaletteState.resolved(for: SkyPhase(unit: 0.65))
+        try #require(
+            tokens.inkOutlineStrength >= 0.99,
+            "the modifier must be active here or this measures nothing"
+        )
+
+        func glyphRows(keylined: Bool) throws -> (first: Int, last: Int) {
+            let raster = try rasterize(Self.baselineRow(tokens: tokens, keylined: keylined))
+            var first = Int.max, last = -1
+            for y in 0..<raster.height {
+                for x in 0..<raster.width {
+                    let o = (y * raster.width + x) * 4
+                    let r = Double(raster.pixels[o]) / 255
+                    let g = Double(raster.pixels[o + 1]) / 255
+                    let b = Double(raster.pixels[o + 2]) / 255
+                    guard r > 0.5, g < 0.3, b < 0.3 else { continue }
+                    first = min(first, y)
+                    last = max(last, y)
+                    break
+                }
+            }
+            return (first, last)
+        }
+
+        let bare = try glyphRows(keylined: false)
+        let keylined = try glyphRows(keylined: true)
+
+        try #require(bare.last >= bare.first, "marker glyph not found in the bare row")
+        try #require(keylined.last >= keylined.first, "marker glyph not found in the keylined row")
+        #expect(
+            keylined.first == bare.first && keylined.last == bare.last,
+            Comment(rawValue: "the keylined glyph occupies rows "
+                + "\(keylined.first)…\(keylined.last) where the bare one occupies "
+                + "\(bare.first)…\(bare.last) — the modifier is no longer "
+                + "layout-neutral, so its alignment guides are being substituted "
+                + "(has it been changed back to a ZStack?)")
+        )
+    }
+
+    /// A baseline-aligned row: a large label and a small one that may or
+    /// may not be keylined. The small one is marker red so its glyph can
+    /// be told apart from the rings around it.
+    private static func baselineRow(
+        tokens: SkyPaletteTokens, keylined: Bool
+    ) -> some View {
+        let small = Text("5:45")
+            .font(Self.labelFont)
+            .foregroundStyle(Color(red: 1, green: 0, blue: 0))
+        return ZStack {
+            Color.black
+            HStack(alignment: .firstTextBaseline, spacing: 4) {
+                Text("FAJR")
+                    .font(.system(size: 28, weight: .bold))
+                    .foregroundStyle(Color.white)
+                if keylined {
+                    AnyView(small.inkKeyline(tokens))
+                } else {
+                    AnyView(small)
+                }
+            }
+        }
+    }
+
     /// The separation the outline can achieve never falls under the
     /// forced wall — checked densely, at every phase, not on a grid.
     ///
@@ -471,6 +569,13 @@ struct CrossingLegibilityRenderTests {
     ///   ring pair could give for ANY ink luminance. The floor sits only
     ///   **0.13%** under that. The gap between the two is luck: the ink
     ///   path does not quite land on the crossover value.
+    ///
+    /// That second figure is **state-dependent**, which is worth saying
+    /// because it is the kind of thing two careful readers derive
+    /// differently and both come out right: `inkHaloLightValue` varies
+    /// by state, so the crossover bound does too. 4.4058 is the WORST
+    /// state (far L = 0.9399); a lighter state gives a higher, real, but
+    /// non-binding figure — L = 0.9636 yields 4.4581. Quote the worst.
     ///
     /// The only palette lever on either is **`inkHaloLightValue`**. The
     /// near ring is not a palette quantity at all — it is pinned by
