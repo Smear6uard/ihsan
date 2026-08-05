@@ -37,7 +37,18 @@ import SwiftUI
 /// luminous rule holds.
 ///
 /// Free on a plateau: at strength 0 the content passes through
-/// untouched, which is 99% of the day.
+/// untouched. That is **86.65%** of the cycle — not the 99% this
+/// comment used to claim. Measured over 4,000 phases, the modifier is
+/// ACTIVE (content duplicated, eight `radius: 0` shadows drawn) for
+/// **13.35%**, the ring is at half strength or more for 8.55%, and it
+/// is fully drawn for 6.95%. In wall-clock terms for Chicago on
+/// 2026-08-02 that is roughly **2.7 hours a day** live, 85 minutes of
+/// it fully drawn.
+///
+/// Worth stating plainly because the old figure was what licensed not
+/// worrying about two real costs: `content` is rendered twice here, and
+/// no performance test exercises this modifier at all. Those costs run
+/// for hours a day, not minutes.
 ///
 /// Reduce Motion / Reduce Transparency need no branch — nothing here
 /// moves and nothing here is a gradient.

@@ -122,6 +122,25 @@ struct PaletteV2ContrastTests {
     /// `>= 0.99` rather than `== 1` because the curve reaches full
     /// strength asymptotically through a `min`, and float equality on a
     /// `sin` is not a contract worth writing.
+    ///
+    /// The grounds are the two SKY grounds only, deliberately —
+    /// `panelFill` is not a trigger here even though the sibling test
+    /// above includes it. Text on a panel never receives the keyline
+    /// (the sky-vs-panel rule; it is why 26 `.shadow` sites in
+    /// `ihsan/Repair/**` were left alone), so raising the multiplier
+    /// cannot help one pixel of it and a failure naming a panel pair
+    /// would send the reader after a fix that does not exist. Worse, it
+    /// could make this test structurally unsatisfiable: the remedy is
+    /// gated on `inkHaloStrength`, which is identically zero on every
+    /// plateau and keyed to `groundBottomValue`'s polarity, whereas
+    /// `panelFill` blends on the figure band — the two share no
+    /// structural relationship, so a panel dip on a plateau could not be
+    /// answered by any multiplier. Ground pairs at least move with the
+    /// quantity that gates the remedy.
+    ///
+    /// Panel text under 3:1 is a real gap — 23 phases of the cycle show
+    /// it — but it needs its own contract naming its own remedy, and it
+    /// is recorded in `POLISH_FINDINGS.md` rather than smuggled in here.
     @Test
     func theOutlineIsFullyDrawnWhereverContrastCollapses() {
         let steps = 4_000
@@ -133,9 +152,7 @@ struct PaletteV2ContrastTests {
         for step in 0..<steps {
             let phase = SkyPhase(unit: Double(step) / Double(steps))
             let tokens = PaletteState.resolved(for: phase)
-            let grounds = [
-                tokens.groundTopValue, tokens.groundBottomValue, tokens.panelFillValue
-            ]
+            let grounds = [tokens.groundTopValue, tokens.groundBottomValue]
             let inks = [tokens.inkValue, tokens.inkSecondaryValue]
             let worst = inks
                 .flatMap { ink in grounds.map { ink.contrastRatio(against: $0) } }
@@ -148,6 +165,21 @@ struct PaletteV2ContrastTests {
                 worstUnit = phase.unit
                 worstRatio = worst
             }
+        }
+
+        // A dip where the halo is identically zero cannot be answered by
+        // any multiplier — `inkOutlineStrength` is `min(1, halo × k)`.
+        // Say so, rather than printing a `required` of ~4.9e307 and
+        // sending the reader to tune a constant that cannot help.
+        if worstStrengthWhereNeeded < 0.99 && haloThere == 0 {
+            Issue.record("""
+                an ink/ground pair sits at \(worstRatio):1 at phase \(worstUnit), \
+                where inkHaloStrength is 0 — no multiplier in \
+                SkyPhase.inkOutlineStrength can raise the outline there. \
+                The palette itself has to change, or this pair needs a \
+                different remedy.
+                """)
+            return
         }
 
         // Derived from the raw halo strength, so the message stays true

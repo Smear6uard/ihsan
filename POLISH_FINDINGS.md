@@ -821,6 +821,15 @@ budget. These need a device:
   because it keeps a 2.3× margin over a palette Task 2 rewrites — the
   span is the cost of that margin, not an accident.
 
+  Judge the cost against the right duration: fully drawn is 85 min, but
+  the modifier is **live for ~2.7 h/day** (13.35% of the cycle; ring at
+  half strength or more for 8.55%, untouched 86.65%). Over that whole
+  window the text is rendered twice and eight `radius: 0` shadow layers
+  are drawn per label, and no performance test exercises it — so the
+  question is not only whether the outline looks right at its peak but
+  whether the plate stays smooth across the ramp. Watch for dropped
+  frames on the marker labels through a full sunrise, not just at it.
+
 - **Translucent text under the keyline.** The modifier draws its content
   twice, once per ring, so `.opacity(…)` on a `foregroundStyle` would
   composite with itself *and* take a near-black wash from the upper
@@ -847,3 +856,23 @@ budget. These need a device:
   sit on one baseline through a sunrise and a maghrib; if the Arabic
   drifts vertically, the fix is an explicit `alignmentGuide` rather than
   reverting — the opacity change it enables is the more important half.
+
+### Found, not fixed — corrective I
+
+- **Text on panels drops below 3:1, with no mechanism to catch it.**
+  Sweeping 4,000 phases, `ink` or `inkSecondary` against `panelFill`
+  falls under 3:1 at **23 phases** of the cycle. The crossing keyline is
+  not the remedy and cannot become one: it is applied only to text
+  standing on the sky or the ground, which is why the 26
+  `.shadow(color: tokens.inkHalo, radius: 2)` sites in `ihsan/Repair/**`
+  were deliberately left alone. `panelFill` was removed from
+  `theOutlineIsFullyDrawnWhereverContrastCollapses`'s trigger set for
+  that reason — a failure naming a panel pair would point at a constant
+  that cannot help it.
+  **This is a gap, not a non-issue.** At present nothing in the app
+  guarantees panel text stays legible at those phases. It wants its own
+  contract with its own remedy — most likely a panel-side treatment or a
+  `panelFill`/ink pairing that never crosses — and that is a decision
+  beyond corrective I. Worth noting the dip is currently masked: at
+  every one of those 23 phases a ground pair is *also* under 3:1, so no
+  phase is panel-only today. A palette change could separate them.
