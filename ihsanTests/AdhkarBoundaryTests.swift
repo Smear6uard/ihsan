@@ -127,7 +127,13 @@ struct AdhkarBoundaryTests {
         let walker = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil)
         let matches = (walker?.compactMap { $0 as? URL } ?? [])
             .filter { $0.lastPathComponent == "adhkar-content.json" }
-            .filter { !$0.path.contains("/.build/") }
+            // Build output is not a source of Arabic — it is a copy of
+            // the one source. SwiftPM writes `.build/`; an xcodebuild
+            // run against a package (a watchOS build will do it) writes
+            // `build/`, and that copy used to fail this test with a
+            // second "content file" nobody had written.
+            .filter { !$0.pathComponents.contains(".build") }
+            .filter { !$0.pathComponents.contains("build") }
         #expect(matches.count == 1, "found \(matches.count) content files: \(matches.map(\.path))")
     }
 
