@@ -489,8 +489,7 @@ struct CelestialPlateScene: View {
             .foregroundStyle(tokens.inkSecondary.opacity(0.9))
             .lineLimit(1)
             .fixedSize()
-            .shadow(color: tokens.inkHaloDark, radius: 1)
-            .shadow(color: tokens.inkHaloLight, radius: 2.5)
+            .inkKeyline(tokens)
             .frame(width: label.width, height: label.height, alignment: .leading)
             .position(x: label.midX, y: label.midY)
             .allowsHitTesting(false)
@@ -726,7 +725,7 @@ struct CelestialPlateScene: View {
             .textCase(.uppercase)
             .tracking(1.4)
             .foregroundStyle(tokens.inkSecondary)
-            .shadow(color: tokens.inkHalo, radius: 2)
+            .inkKeyline(tokens)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
@@ -970,9 +969,7 @@ struct CelestialPlateScene: View {
                 .tracking(0.9)
                 .foregroundStyle(tokens.inkSecondary)
         }
-        .shadow(color: tokens.inkHaloDark, radius: 1)
-        .shadow(color: tokens.inkHaloLight, radius: 2.5)
-        .shadow(color: tokens.inkHaloLight, radius: 6)
+        .inkKeyline(tokens)
         .allowsHitTesting(false)
         .accessibilityHidden(true)
     }

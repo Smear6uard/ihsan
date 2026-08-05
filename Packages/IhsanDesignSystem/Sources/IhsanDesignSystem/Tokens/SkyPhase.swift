@@ -249,6 +249,19 @@ public struct SkyPhase: Sendable, Equatable, Hashable {
         return sin(.pi * mix.amount)
     }
 
+    /// How strongly the legibility KEYLINE draws right now, `0...1`.
+    ///
+    /// Deliberately steeper than `inkHaloStrength`: the outline must
+    /// already be solid before the ink itself approaches mid-tone, and
+    /// may only ramp in the outer margins of the transition band where
+    /// contrast is comfortable without it. `inkHaloStrength` is
+    /// `sin(π · amount)` over the atmosphere band (±0.035); tripling it
+    /// puts full strength across u₀ ± 0.014, which contains the entire
+    /// figure flip at u₀ ± 0.005 with room on both sides.
+    public var inkOutlineStrength: Double {
+        min(1.0, inkHaloStrength * 3.0)
+    }
+
     /// The perceptually dominant state at this phase.
     public var dominantState: PaletteState {
         let mix = blend

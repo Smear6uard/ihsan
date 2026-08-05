@@ -72,7 +72,6 @@ struct TodayHeader: View {
     var body: some View {
         let foreground = tokens.ink
         let foregroundSecondary = tokens.inkSecondary
-        let shadowColor = legibilityShadowColor()
         let nextInscription = nextPrayerInscription
 
         HStack(alignment: .top, spacing: IhsanSpacing.md) {
@@ -87,12 +86,11 @@ struct TodayHeader: View {
                             .foregroundStyle(foreground)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
-                            .shadow(color: shadowColor, radius: 2, x: 0, y: 0.5)
+                            .inkKeyline(tokens)
 
                         inscriptionLine(
                             nextInscription: nextInscription,
-                            foreground: foregroundSecondary,
-                            shadowColor: shadowColor
+                            foreground: foregroundSecondary
                         )
                     }
                     .contentShape(Rectangle())
@@ -119,7 +117,7 @@ struct TodayHeader: View {
                                 .foregroundStyle(foregroundSecondary)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.7)
-                                .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
+                                .inkKeyline(tokens)
                         }
                         .contentShape(Rectangle())
                     }
@@ -131,8 +129,7 @@ struct TodayHeader: View {
                 if let yesterdayInscription {
                     yesterdayLine(
                         inscription: yesterdayInscription,
-                        foreground: foregroundSecondary,
-                        shadowColor: shadowColor
+                        foreground: foregroundSecondary
                     )
                 }
             }
@@ -154,8 +151,7 @@ struct TodayHeader: View {
     @ViewBuilder
     private func yesterdayLine(
         inscription: String,
-        foreground: Color,
-        shadowColor: Color
+        foreground: Color
     ) -> some View {
         HStack(spacing: 6) {
             Button {
@@ -172,7 +168,7 @@ struct TodayHeader: View {
                         .foregroundStyle(foreground)
                         .lineLimit(1)
                         .minimumScaleFactor(0.7)
-                        .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
+                        .inkKeyline(tokens)
                 }
                 .contentShape(Rectangle())
             }
@@ -203,8 +199,7 @@ struct TodayHeader: View {
     @ViewBuilder
     private func inscriptionLine(
         nextInscription: String?,
-        foreground: Color,
-        shadowColor: Color
+        foreground: Color
     ) -> some View {
         let hijri = HijriDateFormatter.string(from: now)
         let combined: String = {
@@ -220,7 +215,7 @@ struct TodayHeader: View {
             .foregroundStyle(foreground)
             .lineLimit(2)
             .minimumScaleFactor(0.7)
-            .shadow(color: shadowColor, radius: 1.5, x: 0, y: 0.5)
+            .inkKeyline(tokens)
     }
 
     /// "NEXT: DHUHR 12:50 PM" — the moment's next prayer, formatted by
@@ -230,12 +225,6 @@ struct TodayHeader: View {
         let time = PlateTimeFormat.time(resolution.nextPrayer.scheduledTime, in: timeZone).uppercased()
         let name = resolution.nextPrayer.prayer.displayNameEnglish.uppercased()
         return "NEXT: \(name) \(time)"
-    }
-
-    private func legibilityShadowColor() -> Color {
-        tokens.inkValue.relativeLuminance < 0.5
-            ? .white.opacity(0.42)
-            : .black.opacity(0.48)
     }
 
     private func accessibilityLabel(nextInscription: String?) -> String {

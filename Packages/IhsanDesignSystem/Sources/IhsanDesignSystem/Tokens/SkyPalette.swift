@@ -67,6 +67,7 @@ public enum PaletteState: String, CaseIterable, Sendable {
             inkHalo: .mix(f0.inkHaloValue, f1.inkHaloValue, amount: fig.amount)
         )
         tokens.inkHaloStrength = phase.inkHaloStrength
+        tokens.inkOutlineStrength = phase.inkOutlineStrength
         // Keep the two halo poles un-blended through a crossing:
         // darker and lighter of the crossing states' halo tints. On a
         // plateau (fig.from == fig.to) both poles collapse to the
@@ -182,6 +183,11 @@ public struct SkyPaletteTokens: Sendable, Equatable {
     /// every canonical state; nonzero only inside polarity-crossing
     /// transitions.
     public var inkHaloStrength: Double = 0
+
+    /// How strongly the legibility keyline draws right now, `0...1`.
+    /// Zero for every canonical state; nonzero only inside
+    /// polarity-crossing transitions. See `SkyPhase.inkOutlineStrength`.
+    public var inkOutlineStrength: Double = 0
 
     /// The two halo poles, preserved un-blended through a transition.
     /// Blending the halo colors would produce a mid-tone exactly when

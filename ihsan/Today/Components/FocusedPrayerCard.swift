@@ -276,8 +276,7 @@ struct FocusedPrayerCard: View {
                     .fontWeight(.light)
                     .foregroundStyle(tokens.ink)
                     .contentTransition(.numericText())
-                    .shadow(color: tokens.inkHaloDark, radius: 1)
-                    .shadow(color: tokens.inkHaloLight, radius: 3)
+                    .inkKeyline(tokens)
                 Text(inscription.uppercased())
                     .font(IhsanFont.inscription)
                     .monospacedDigit()
@@ -286,7 +285,7 @@ struct FocusedPrayerCard: View {
                     .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                    .shadow(color: tokens.inkHalo, radius: 1.5)
+                    .inkKeyline(tokens)
             }
         case .windowClosed:
             // The passed prayer still asks to be recorded: the
@@ -300,8 +299,7 @@ struct FocusedPrayerCard: View {
                     .foregroundStyle(tokens.inkSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
-                    .shadow(color: tokens.inkHaloDark, radius: 1)
-                    .shadow(color: tokens.inkHaloLight, radius: 3)
+                    .inkKeyline(tokens)
                 Text("LOG")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
@@ -322,8 +320,7 @@ struct FocusedPrayerCard: View {
                 .foregroundStyle(tokens.inkSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-                .shadow(color: tokens.inkHaloDark, radius: 1)
-                .shadow(color: tokens.inkHaloLight, radius: 3)
+                .inkKeyline(tokens)
         }
     }
 
@@ -578,8 +575,7 @@ struct FocusedPrayerCard: View {
                             .foregroundStyle(tokens.inkSecondary)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
-                            .shadow(color: tokens.inkHaloDark, radius: 1)
-                            .shadow(color: tokens.inkHaloLight, radius: 3)
+                            .inkKeyline(tokens)
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -637,9 +633,7 @@ struct FocusedPrayerCard: View {
                 .font(IhsanFont.bodyArabic)
                 .foregroundStyle(tokens.ink.opacity(0.72))
         }
-        .shadow(color: tokens.inkHaloDark, radius: 1)
-        .shadow(color: tokens.inkHaloLight, radius: 2.5)
-        .shadow(color: tokens.inkHaloLight, radius: 6)
+        .inkKeyline(tokens)
     }
 
     // MARK: - State transitions

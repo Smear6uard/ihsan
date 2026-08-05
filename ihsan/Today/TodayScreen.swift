@@ -989,8 +989,7 @@ private struct TodayReadyView: View {
             .foregroundStyle(tokens.inkSecondary)
             .lineLimit(1)
             .minimumScaleFactor(0.8)
-            .shadow(color: tokens.inkHaloDark, radius: 1)
-            .shadow(color: tokens.inkHaloLight, radius: 3)
+            .inkKeyline(tokens)
             .padding(.horizontal, outlined ? 12 : 0)
             .padding(.vertical, outlined ? 4 : 0)
             .overlay {
