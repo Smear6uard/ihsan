@@ -6,12 +6,14 @@ import SwiftUI
 /// The widget faces, at their real sizes, inside the app.
 ///
 /// A widget is drawn by WidgetKit on a home screen, which no test
-/// harness can arrange reliably — so the parts that carry the design
-/// (the ground, the arc, the ornament states, the register) are
-/// rendered here at the exact point sizes iOS gives each family. What
-/// this proves is the drawing; what it cannot prove is WidgetKit's own
-/// container, which the Xcode previews in `ihsanWidgets/Previews`
-/// cover.
+/// harness can arrange reliably — so the faces themselves (which live
+/// in IhsanDesignSystem and are exactly what the extension renders)
+/// are shown here at the point sizes iOS gives each family, on the
+/// same grounds. It used to re-draw approximations of the faces by
+/// hand; approximations drift, and a review of a drifted copy proves
+/// nothing. What this proves on a device is the drawing; the
+/// WidgetKit container, tinted mode, and StandBy are verified on the
+/// home and lock screens themselves.
 ///
 /// Reached with `-IhsanDebugWidgetGallery`. DEBUG only.
 struct WidgetFaceGallery: View {
@@ -19,40 +21,101 @@ struct WidgetFaceGallery: View {
     private static let small = CGSize(width: 170, height: 170)
     private static let medium = CGSize(width: 364, height: 170)
     private static let large = CGSize(width: 364, height: 382)
+    private static let circular = CGSize(width: 72, height: 72)
+    private static let rectangular = CGSize(width: 172, height: 76)
 
     @State private var isNight = true
-
-    private var moment: Date { isNight ? Self.nightMoment : Self.dawnMoment }
-    private var tokens: SkyPaletteTokens {
-        PaletteState.resolved(for: SkyPhase.resolve(at: moment, events: Self.events))
-    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
                 Picker("Moment", selection: $isNight) {
                     Text("Night").tag(true)
-                    Text("Dawn").tag(false)
+                    Text("Afternoon").tag(false)
                 }
                 .pickerStyle(.segmented)
                 .accessibilityIdentifier("gallery-moment")
 
-                label("Small")
-                face(size: Self.small) { smallFace }
+                label("Small · Next Prayer")
+                homeFace(size: Self.small) {
+                    NextPrayerFace(model: model, tokens: tokens)
+                }
 
-                label("Medium")
-                face(size: Self.medium) { mediumFace }
+                label("Small · Hijri Day")
+                homeFace(size: Self.small) {
+                    if let hijri = model.hijri {
+                        HijriDayFace(hijri: hijri, tokens: tokens)
+                    }
+                }
 
-                label("Large")
-                face(size: Self.large) { largeFace }
+                label("Medium · The Day Strip")
+                homeFace(size: Self.medium) {
+                    DayStripFace(model: model, tokens: tokens)
+                }
 
-                label("Nightstand (StandBy)")
-                face(size: Self.small, ground: Self.standByGround) { standByFace }
+                label("Medium · fasting")
+                homeFace(size: Self.medium) {
+                    DayStripFace(model: fastingModel, tokens: tokens)
+                }
+
+                label("Large · The Plate")
+                homeFace(size: Self.large) {
+                    PlateFace(model: model, tokens: tokens)
+                }
 
                 label("Lock screen")
-                HStack(spacing: IhsanSpacing.md) {
-                    lockFace
-                    rectangularFace
+                HStack(alignment: .top, spacing: IhsanSpacing.md) {
+                    accessory(size: Self.circular) {
+                        AccessoryNextPrayerFace(
+                            prayer: model.nextPrayer,
+                            time: model.nextTime,
+                            timeZoneIdentifier: model.timeZoneIdentifier,
+                            isCurrent: false
+                        )
+                    }
+                    accessory(size: Self.circular) {
+                        AccessoryWindowGaugeFace(
+                            prayer: model.currentPrayer ?? model.nextPrayer,
+                            window: model.currentWindow,
+                            isCurrent: model.currentPrayer != nil
+                        )
+                    }
+                    accessory(size: Self.circular) {
+                        AccessoryFastingGaugeFace(
+                            fasting: canonicalFasting,
+                            date: model.date
+                        )
+                    }
+                }
+                accessory(size: Self.rectangular) {
+                    AccessoryNowNextFace(
+                        current: model.currentPrayer,
+                        next: model.nextPrayer,
+                        nextTime: model.nextTime,
+                        timeZoneIdentifier: model.timeZoneIdentifier
+                    )
+                }
+                accessory(size: Self.rectangular) {
+                    AccessoryDayRowFace(
+                        slots: model.slots,
+                        timeZoneIdentifier: model.timeZoneIdentifier
+                    )
+                }
+                if let night = model.night {
+                    accessory(size: Self.rectangular) {
+                        AccessoryNightFace(
+                            night: night,
+                            date: model.date,
+                            timeZoneIdentifier: model.timeZoneIdentifier
+                        )
+                    }
+                }
+                accessory(size: Self.rectangular) {
+                    AccessoryFastingRectFace(
+                        fasting: canonicalFasting,
+                        date: model.date,
+                        timeZoneIdentifier: model.timeZoneIdentifier
+                    )
                 }
             }
             .padding(IhsanSpacing.md)
@@ -61,281 +124,134 @@ struct WidgetFaceGallery: View {
         .accessibilityIdentifier("widget-face-gallery")
     }
 
-    // MARK: - Faces
-
-    private var smallFace: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top) {
-                PrayerMarkerOrnament(prayer: .isha, size: 22, state: .upcoming, tokens: tokens)
-                Spacer(minLength: IhsanSpacing.xs)
-                Text("CHICAGO")
-                    .font(IhsanFont.inscription).tracking(0.8)
-                    .foregroundStyle(tokens.inkSecondary)
-            }
-            Spacer(minLength: IhsanSpacing.xxs)
-            Text("0:03")
-                .font(.system(size: 28, weight: .regular, design: .rounded).monospacedDigit())
-                .foregroundStyle(tokens.ink)
-                .padding(.bottom, IhsanSpacing.xxs)
-            Text("Isha")
-                .font(.system(size: 17, weight: .semibold, design: .serif))
-                .foregroundStyle(tokens.ink)
-            Text("9:43 PM")
-                .font(.system(.footnote, design: .rounded).monospacedDigit())
-                .foregroundStyle(tokens.inkSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var mediumFace: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-            HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
-                Text("CHICAGO")
-                    .font(IhsanFont.inscription).tracking(1.0)
-                    .foregroundStyle(tokens.inkSecondary)
-                Spacer(minLength: IhsanSpacing.xs)
-                Text("Isha").font(.system(size: 15, weight: .semibold, design: .serif))
-                    .foregroundStyle(tokens.ink)
-                Text("in").font(IhsanFont.inscription).tracking(0.8)
-                    .foregroundStyle(tokens.inkSecondary)
-                Text("0:03")
-                    .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
-                    .foregroundStyle(tokens.ink)
-            }
-            CompactPlate(model: Self.model(at: moment), tokens: tokens, ornamentSize: 22)
-                .frame(maxHeight: .infinity)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var largeFace: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
-                Text("CHICAGO")
-                    .font(IhsanFont.inscription).tracking(1.2)
-                    .foregroundStyle(tokens.inkSecondary)
-                Text("0:03")
-                    .font(.system(size: 40, weight: .thin, design: .rounded).monospacedDigit())
-                    .foregroundStyle(tokens.ink)
-                HStack(spacing: IhsanSpacing.xs) {
-                    Text("UNTIL").font(IhsanFont.inscription).tracking(1.0)
-                        .foregroundStyle(tokens.inkSecondary)
-                    Text("Isha").font(.system(size: 17, weight: .semibold, design: .serif))
-                        .foregroundStyle(tokens.ink)
-                    Text("العشاء").font(.system(size: 17))
-                        .foregroundStyle(tokens.inkSecondary)
-                }
-            }
-            CompactPlate(model: Self.model(at: moment), tokens: tokens, ornamentSize: 20)
-                .frame(height: 54)
-            Rectangle().fill(tokens.panelStroke.opacity(0.6)).frame(height: 0.5)
-            ForEach(Self.model(at: moment).marks, id: \.prayer) { mark in
-                HStack(spacing: IhsanSpacing.md) {
-                    PrayerMarkerOrnament(
-                        prayer: mark.prayer, size: 18, state: mark.state, tokens: tokens
-                    )
-                    .frame(width: 22)
-                    Text(mark.prayer.displayNameEnglish)
-                        .font(.system(size: 16, weight: .regular, design: .serif))
-                        .foregroundStyle(tokens.ink)
-                    Spacer(minLength: IhsanSpacing.xs)
-                    if mark.state == .logged {
-                        Text("ON TIME").font(IhsanFont.inscription).tracking(1.0)
-                            .foregroundStyle(tokens.leafGold)
-                    }
-                    Text(Self.clock(mark.time))
-                        .font(.system(.subheadline, design: .rounded).monospacedDigit())
-                        .foregroundStyle(tokens.inkSecondary)
-                        .frame(minWidth: 62, alignment: .trailing)
-                }
-                .padding(.horizontal, IhsanSpacing.xs)
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-    }
-
-    private var standByFace: some View {
-        let ink = tokens.standByInk
-        let inkSecondary = tokens.standByInkSecondary
-        return VStack(alignment: .leading, spacing: 0) {
-            Text("Isha")
-                .font(.system(size: 24, weight: .regular, design: .serif))
-                .foregroundStyle(ink)
-            Text("9:43 PM")
-                .font(.system(size: 30, weight: .light, design: .rounded).monospacedDigit())
-                .foregroundStyle(ink)
-            Text("NEXT · NOW IN MAGHRIB")
-                .font(IhsanFont.inscription).tracking(1.4)
-                .foregroundStyle(inkSecondary)
-                .lineLimit(1).minimumScaleFactor(0.7)
-            Spacer(minLength: IhsanSpacing.xs)
-            CompactPlate(
-                model: Self.model(at: moment),
-                tokens: PaletteState.night.tokens,
-                ornamentSize: 17
-            )
-            .frame(height: 34)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-    }
-
-    private var lockFace: some View {
-        ZStack {
-            ForEach(0..<5, id: \.self) { index in
-                LockRingSegment(index: index)
-                    .stroke(style: StrokeStyle(lineWidth: 3, lineCap: .butt))
-                    .foregroundStyle(index < 4 ? Color.white : Color.white.opacity(0.3))
-            }
-            OrnamentLinework(prayer: .isha, size: 17, isEmphasised: true)
-        }
-        .frame(width: 72, height: 72)
-        .padding(6)
-        .background(Circle().fill(.black.opacity(0.35)))
-    }
-
-    private var rectangularFace: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            HStack(spacing: 5) {
-                OrnamentLinework(prayer: .isha, size: 13, isEmphasised: true)
-                Text("Isha").font(.system(size: 14, weight: .semibold, design: .serif))
-                Text("in").font(.system(size: 12)).foregroundStyle(.white.opacity(0.7))
-                Text("0:03")
-                    .font(.system(size: 14, weight: .semibold, design: .rounded).monospacedDigit())
-            }
-            Text("9:43 PM")
-                .font(.system(size: 12, design: .rounded).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .foregroundStyle(.white)
-        .padding(8)
-        .frame(width: 160, height: 72, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 12).fill(.black.opacity(0.35)))
-    }
-
-    // MARK: - Chrome
+    // MARK: - Scaffolding
 
     private func label(_ text: String) -> some View {
         Text(text.uppercased())
             .font(IhsanFont.inscription)
-            .tracking(1.4)
+            .tracking(1.2)
             .foregroundStyle(IhsanPageChrome.tokens(at: NowProvider.active.now()).inkSecondary)
     }
 
-    private func face<Content: View>(
-        size: CGSize,
-        ground: AnyView? = nil,
-        @ViewBuilder content: () -> Content
+    private func homeFace(
+        size: CGSize, @ViewBuilder content: () -> some View
     ) -> some View {
-        content()
-            .padding(16)
-            .frame(width: size.width, height: size.height)
-            .background {
-                if let ground {
-                    ground
-                } else {
-                    Self.homeGround(tokens: tokens)
-                }
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        ZStack {
+            WidgetSkyGround(tokens: tokens)
+            content().padding(16)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 24))
     }
 
-    private static func homeGround(tokens: SkyPaletteTokens) -> some View {
-        LinearGradient(
-            colors: [
-                tokens.groundTopValue.scaled(0.90).color,
-                tokens.groundBottomValue.scaled(0.84).color
-            ],
-            startPoint: .top, endPoint: .bottom
-        )
+    private func accessory(
+        size: CGSize, @ViewBuilder content: () -> some View
+    ) -> some View {
+        ZStack {
+            Color(white: 0.1)
+            content().foregroundStyle(.white).padding(6)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(
+            cornerRadius: size.width == size.height ? size.width / 2 : 16
+        ))
+        .environment(\.colorScheme, .dark)
     }
 
-    private static var standByGround: AnyView {
-        let tokens = PaletteState.night.tokens
-        return AnyView(
-            LinearGradient(
-                colors: [
-                    tokens.groundTopValue.scaled(0.55).color,
-                    tokens.groundBottomValue.scaled(0.45).color
-                ],
-                startPoint: .top, endPoint: .bottom
-            )
-        )
-    }
-
-    // MARK: - The day being drawn
+    // MARK: - The canonical day
 
     private static let zone = TimeZone(identifier: "America/Chicago")!
 
     private static func at(_ hour: Int, _ minute: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = zone
-        return calendar.date(
-            from: DateComponents(
-                year: 2026, month: 7, day: 30, hour: hour, minute: minute
-            )
-        ) ?? .now
+        let day = calendar.date(from: DateComponents(year: 2026, month: 7, day: 30))!
+        return calendar.date(byAdding: DateComponents(hour: hour, minute: minute), to: day)!
     }
 
-    private static let nightMoment = at(21, 40)
-    private static let dawnMoment = at(4, 35)
+    private var moment: Date { isNight ? Self.at(23, 15) : Self.at(15, 10) }
+
+    private var tokens: SkyPaletteTokens {
+        PaletteState.resolved(for: SkyPhase.resolve(at: moment, events: Self.events))
+    }
 
     private static let events = SolarDayEvents(
-        fajr: at(4, 10), sunrise: at(5, 42), solarNoon: at(12, 58),
-        maghrib: at(20, 11), isha: at(21, 43)
+        fajr: at(4, 10),
+        sunrise: at(5, 42),
+        solarNoon: at(12, 58),
+        maghrib: at(20, 11),
+        isha: at(21, 43)
     )
 
-    private static func model(at moment: Date) -> CompactPlate.Model {
+    private var canonicalFasting: WidgetFastingModel {
+        WidgetFastingModel(
+            suhoorEnds: Self.at(4, 10), iftar: Self.at(20, 11), isRamadan: true
+        )
+    }
+
+    private var model: WidgetDayModel {
+        let date = moment
         let times: [(Prayer, Date)] = [
-            (.fajr, at(4, 10)), (.dhuhr, at(12, 58)), (.asr, at(16, 53)),
-            (.maghrib, at(20, 11)), (.isha, at(21, 43))
+            (.fajr, Self.at(4, 10)), (.dhuhr, Self.at(12, 58)), (.asr, Self.at(16, 53)),
+            (.maghrib, Self.at(20, 11)), (.isha, Self.at(21, 43)),
         ]
-        let current = times.last { $0.1 <= moment }?.0
-        return CompactPlate.Model(
-            marks: times.map { prayer, time in
-                let state: PrayerMarkerState
-                if prayer == current {
-                    state = .current
-                } else if time <= moment {
-                    state = .logged
-                } else {
-                    state = .upcoming
+        let slots = times.map { prayer, time in
+            let state: PrayerMarkerState
+            if isNight {
+                state = prayer == .isha ? .current : .logged
+            } else {
+                switch prayer {
+                case .fajr, .dhuhr: state = .logged
+                default: state = .upcoming
                 }
-                return CompactPlate.Model.Mark(prayer: prayer, time: time, state: state)
-            },
-            sunrise: at(5, 42)
+            }
+            return WidgetDayModel.Slot(prayer: prayer, time: time, state: state)
+        }
+        let next: (Prayer, Date) = isNight ? (.fajr, Self.at(28, 11)) : (.asr, Self.at(16, 53))
+        return WidgetDayModel(
+            date: date,
+            slots: slots,
+            nextPrayer: next.0,
+            nextTime: next.1,
+            countdown: WidgetTimerInterval.countdown(from: date, to: next.1),
+            currentPrayer: isNight ? .isha : .dhuhr,
+            currentWindow: isNight
+                ? Self.at(21, 43)...Self.at(28, 11)
+                : Self.at(12, 58)...Self.at(16, 53),
+            sunrise: Self.at(5, 42),
+            cityName: "Madinah",
+            timeZoneIdentifier: Self.zone.identifier,
+            isPaused: false,
+            hijri: WidgetHijriModel(
+                day: 13, monthName: "Safar", year: 1448,
+                significantLine: "White day · Safar 13", isRamadan: false
+            ),
+            fasting: nil,
+            night: WidgetNightModel(
+                start: Self.at(20, 11), end: Self.at(28, 11),
+                nisfAlLayl: Self.at(24, 11), lastThirdStart: Self.at(25, 31)
+            )
         )
     }
 
-    private static func clock(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = zone
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        return formatter.string(from: date)
-    }
-}
-
-private struct LockRingSegment: Shape {
-    let index: Int
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let span = 360.0 / 5.0
-        let start = -90.0 + Double(index) * span + 1
-        path.addArc(
-            center: CGPoint(x: rect.midX, y: rect.midY),
-            radius: min(rect.width, rect.height) / 2 - 2,
-            startAngle: .degrees(start),
-            endAngle: .degrees(start + span - 2),
-            clockwise: false
+    private var fastingModel: WidgetDayModel {
+        let base = model
+        return WidgetDayModel(
+            date: base.date,
+            slots: base.slots,
+            nextPrayer: base.nextPrayer,
+            nextTime: base.nextTime,
+            countdown: base.countdown,
+            currentPrayer: base.currentPrayer,
+            currentWindow: base.currentWindow,
+            sunrise: base.sunrise,
+            cityName: base.cityName,
+            timeZoneIdentifier: base.timeZoneIdentifier,
+            isPaused: false,
+            hijri: base.hijri,
+            fasting: canonicalFasting,
+            night: base.night
         )
-        return path
-    }
-}
-
-private extension SRGBValue {
-    func scaled(_ k: Double) -> SRGBValue {
-        SRGBValue(red: red * k, green: green * k, blue: blue * k)
     }
 }
 #endif

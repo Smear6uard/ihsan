@@ -452,6 +452,28 @@ private struct TodayReadyView: View {
             .sheet(isPresented: $isYesterdaySheetPresented) {
                 yesterdaySheet(at: now)
             }
+            // Widget taps: the router already switched to this tab;
+            // the destination sheet is presented here, through the
+            // same states every other entry path uses.
+            .onReceive(
+                NotificationCenter.default.publisher(
+                    for: WidgetDeeplinkRouter.notificationName
+                )
+            ) { notification in
+                guard let destination = notification.userInfo?[
+                    WidgetDeeplinkRouter.destinationKey
+                ] as? WidgetDeeplinkRouter.Destination else { return }
+                switch destination {
+                case .today:
+                    break
+                case .qibla:
+                    isCelestialReferencePresented = true
+                case .hijri:
+                    isHijriSheetPresented = true
+                case .logSheet(let prayer):
+                    sheetSelection = LogSheetSelection(prayer: prayer)
+                }
+            }
             // The reading surface rides over everything, like the
             // tasbīḥ instrument it grew out of.
             .fullScreenCover(item: $adhkarSelection) { selection in
@@ -1252,6 +1274,9 @@ private struct TodayReadyView: View {
             try? await NotificationScheduler.shared.rebuildSchedule()
             await NightWakeService.shared.refresh(using: modelContext)
         }
+        // Widgets honor the pause the moment it begins or ends —
+        // a paused day shows times and no logging surface.
+        WidgetSnapshotService.republish(using: modelContext)
     }
 
 }

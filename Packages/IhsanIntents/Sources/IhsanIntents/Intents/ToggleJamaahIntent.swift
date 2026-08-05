@@ -55,6 +55,8 @@ public struct ToggleJamaahIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+
         let dialog = log.withJamaah
             ? "\(prayer.displayNameEnglish) marked as jamāʿah."
             : "\(prayer.displayNameEnglish) jamāʿah cleared."

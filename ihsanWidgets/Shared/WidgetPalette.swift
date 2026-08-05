@@ -7,17 +7,16 @@ import WidgetKit
 /// The widget's ground, resolved from the same solar events the plate
 /// rides.
 ///
-/// The app publishes its day's events into `IhsanPageChrome`, but a
-/// widget is a separate process and sees none of that. It has something
-/// better: the exact resolver table the app wrote to the App Group. So
-/// the events are rebuilt from the entry, and every widget's ground
-/// moves through dawn, morning, afternoon, sunset, and night on the
-/// real sun rather than on a clock approximation.
+/// A live entry rebuilds the day's events from the published snapshot,
+/// so every widget's ground moves through dawn, morning, afternoon,
+/// sunset, and night on the real sun. The invitation state has no
+/// events to ride and takes the clock approximation — it shows no
+/// times, only a ground.
 enum WidgetPalette {
 
-    static func events(for entry: PrayerTimelineEntry) -> SolarDayEvents? {
+    static func events(for day: PrayerTimelineEntry.LiveDay) -> SolarDayEvents? {
         func time(_ prayer: Prayer) -> Date? {
-            entry.todayPrayerTimes.first { $0.prayer == prayer }?.scheduledTime
+            day.slots.first { $0.prayer == prayer }?.scheduledTime
         }
         guard
             let fajr = time(.fajr),
@@ -27,11 +26,11 @@ enum WidgetPalette {
         else { return nil }
 
         // Dhuhr is the app's stand-in for solar noon everywhere else;
-        // using anything different here would put the widget's ground a
-        // few minutes out of step with the plate's.
+        // using anything different here would put the widget's ground
+        // a few minutes out of step with the plate's.
         return SolarDayEvents(
             fajr: fajr,
-            sunrise: entry.sunrise,
+            sunrise: day.sunrise,
             solarNoon: dhuhr,
             maghrib: maghrib,
             isha: isha
@@ -39,10 +38,11 @@ enum WidgetPalette {
     }
 
     static func phase(for entry: PrayerTimelineEntry) -> SkyPhase {
-        guard let events = events(for: entry) else {
+        guard let day = entry.liveDay, let events = events(for: day) else {
             return SkyPhase.approximate(
                 at: entry.date,
-                timeZone: TimeZone(identifier: entry.timeZoneIdentifier) ?? .current
+                timeZone: entry.liveDay
+                    .flatMap { TimeZone(identifier: $0.timeZoneIdentifier) } ?? .current
             )
         }
         return SkyPhase.resolve(at: entry.date, events: events)
@@ -54,9 +54,10 @@ enum WidgetPalette {
 
     /// The ground a home-screen widget sits on.
     ///
-    /// Widgets are read at arm's length against arbitrary wallpaper, so
-    /// this is a touch deeper than the app's own page — a widget that
-    /// matched the app exactly would wash out on a bright home screen.
+    /// Widgets are read at arm's length against arbitrary wallpaper,
+    /// so this is a touch deeper than the app's own page — a widget
+    /// that matched the app exactly would wash out on a bright home
+    /// screen.
     static func homeGround(for entry: PrayerTimelineEntry) -> some View {
         let tokens = tokens(for: entry)
         return LinearGradient(
@@ -72,7 +73,7 @@ enum WidgetPalette {
     /// The nightstand ground: the night end of the same ramp, dimmer
     /// still, and never allowed to drift toward day. StandBy is looked
     /// at from a dark room in the small hours.
-    static func standByGround(for entry: PrayerTimelineEntry) -> some View {
+    static func standByGround() -> some View {
         let tokens = PaletteState.night.tokens
         return LinearGradient(
             colors: [

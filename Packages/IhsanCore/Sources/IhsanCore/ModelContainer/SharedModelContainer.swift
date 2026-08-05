@@ -35,10 +35,21 @@ public final class IhsanSharedModelContainer: Sendable {
     /// The registered container, or — in processes that never
     /// register (extensions) — a lazily created shared-store
     /// container, cached for the life of the process.
+    ///
+    /// The extension fallback opens WITHOUT CloudKit mirroring: the
+    /// host app's container is already the store's one mirroring
+    /// instance, and a second mirror in a widget or Siri process is
+    /// the cross-process edition of the CoreData 134422 failure this
+    /// type exists to prevent. Extension writes land in the shared
+    /// SQLite file and the app's own mirror syncs them on its next
+    /// launch or remote-change wake.
     public func container() throws -> ModelContainer {
         try state.withLock { current in
             if let current { return current }
-            let created = try IhsanModelContainerFactory.makeContainer(inMemory: false)
+            let created = try IhsanModelContainerFactory.makeContainer(
+                inMemory: false,
+                cloudSync: false
+            )
             current = created
             return created
         }

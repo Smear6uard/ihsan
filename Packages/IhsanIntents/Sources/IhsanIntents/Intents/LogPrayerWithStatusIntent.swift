@@ -66,6 +66,8 @@ public struct LogPrayerWithStatusIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+
         let dialogText: String = {
             switch status {
             case .onTime:

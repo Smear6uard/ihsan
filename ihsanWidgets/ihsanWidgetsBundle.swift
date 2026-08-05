@@ -9,14 +9,21 @@ struct IhsanWidgetsBundle: WidgetBundle {
     var body: some Widget {
         // Home screen
         NextPrayerSmallWidget()
+        HijriDayWidget()
         PrayerStatusMediumWidget()
         PrayerOverviewLargeWidget()
         // StandBy
         StandByPlateWidget()
         // Lock screen
-        NextPrayerRectangularWidget()
-        PrayerProgressCircularWidget()
         NextPrayerInlineWidget()
+        NextPrayerCircularWidget()
+        WindowGaugeCircularWidget()
+        NextPrayerRectangularWidget()
+        NowNextRectangularWidget()
+        DayRowRectangularWidget()
+        NightRectangularWidget()
+        FastingCircularWidget()
+        FastingRectangularWidget()
         RepairMakeupCircularWidget()
         // Control Center
         RepairMakeupControl()

@@ -7,40 +7,27 @@ import SwiftUI
 /// The drawing itself is `CompactPlate` in the design system, so the
 /// widget, the nightstand face, and the app's own gallery all render
 /// one arc rather than three that drift. This is only the translation
-/// from a timeline entry into what that component needs.
+/// from a live entry into what that component needs.
 struct WidgetPlate: View {
-    let entry: PrayerTimelineEntry
+    let day: PrayerTimelineEntry.LiveDay
+    let date: Date
     let tokens: SkyPaletteTokens
     var ornamentSize: CGFloat = 18
 
     var body: some View {
         CompactPlate(
-            model: entry.compactPlateModel,
+            model: CompactPlate.Model(
+                marks: day.slots.map { slot in
+                    CompactPlate.Model.Mark(
+                        prayer: slot.prayer,
+                        time: slot.scheduledTime,
+                        state: day.markerState(for: slot, at: date)
+                    )
+                },
+                sunrise: day.sunrise
+            ),
             tokens: tokens,
             ornamentSize: ornamentSize
         )
-    }
-}
-
-extension PrayerTimelineEntry {
-    var compactPlateModel: CompactPlate.Model {
-        CompactPlate.Model(
-            marks: todayPrayerTimes.map { slot in
-                CompactPlate.Model.Mark(
-                    prayer: slot.prayer,
-                    time: slot.scheduledTime,
-                    state: markerState(for: slot)
-                )
-            },
-            sunrise: sunrise
-        )
-    }
-
-    func markerState(for slot: PrayerSlot) -> PrayerMarkerState {
-        if currentPrayer == slot.prayer { return .current }
-        if let status = loggedStatus(for: slot.prayer), status != .missed {
-            return .logged
-        }
-        return slot.scheduledTime <= date ? .passedUnlogged : .upcoming
     }
 }

@@ -63,6 +63,8 @@ public struct LogFastIntent: AppIntent {
             in: context
         )
 
+        WidgetSnapshotMirror.reflectFastLogs(in: context)
+
         let dialog: String
         if let log {
             dialog = log.state == .intended

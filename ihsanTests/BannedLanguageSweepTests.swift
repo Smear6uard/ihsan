@@ -47,6 +47,27 @@ struct BannedLanguageSweepTests {
         "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/Components/AdhkarSequenceBand.swift",
         "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/Components/RemembranceRing.swift",
         "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/Components/ArabicScriptText.swift",
+        // The widget family — every face and every gallery string.
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/WidgetFaces/NextPrayerFace.swift",
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/WidgetFaces/HijriDayFace.swift",
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/WidgetFaces/DayStripFace.swift",
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/WidgetFaces/PlateFace.swift",
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/WidgetFaces/AccessoryFaces.swift",
+        "ihsanWidgets/HomeScreen/NextPrayerSmallWidget.swift",
+        "ihsanWidgets/HomeScreen/HijriDayWidget.swift",
+        "ihsanWidgets/HomeScreen/PrayerStatusMediumWidget.swift",
+        "ihsanWidgets/HomeScreen/PrayerOverviewLargeWidget.swift",
+        "ihsanWidgets/HomeScreen/StandByPlateWidget.swift",
+        "ihsanWidgets/LockScreen/NextPrayerInlineWidget.swift",
+        "ihsanWidgets/LockScreen/PrayerProgressCircularWidget.swift",
+        "ihsanWidgets/LockScreen/WindowGaugeCircularWidget.swift",
+        "ihsanWidgets/LockScreen/NextPrayerRectangularWidget.swift",
+        "ihsanWidgets/LockScreen/NowNextRectangularWidget.swift",
+        "ihsanWidgets/LockScreen/DayRowRectangularWidget.swift",
+        "ihsanWidgets/LockScreen/NightRectangularWidget.swift",
+        "ihsanWidgets/LockScreen/FastingWidgets.swift",
+        "ihsanWidgets/Repair/RepairMakeupWidgets.swift",
+        "ihsanWidgets/Provider/PrayerTimelineEntry.swift",
     ]
 
     private var repoRoot: URL {
