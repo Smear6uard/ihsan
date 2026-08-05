@@ -21,6 +21,27 @@ import Testing
 ///
 /// A glyph may be any value at all — light, mid, or dark. What it may
 /// never be is surrounded, out to 2 pt, by values close to its own.
+///
+/// ## One qualification, and it is forced
+///
+/// That contract holds at every phase these tests sample, but it is NOT
+/// unconditional, and the shortfall is not an implementation gap.
+/// Mid-crossing the ink's luminance sweeps continuously through
+/// L ≈ 0.171–0.179, and at that value a two-tone outline cannot reach
+/// 4.5:1 no matter what the two rings are: a glyph is served by
+/// whichever ring it is further from, and this is where those two are
+/// equally close. The best any pair can do is
+/// `√((far + 0.05) / (near + 0.05))`, which even for pure black against
+/// pure white is √21 ≈ 4.583:1 — and antialiasing then takes ~11% of
+/// it. The shipped pair bottoms out near 4.48:1 there.
+///
+/// The passage is brief and unavoidable while the ink flips polarity
+/// continuously — the same intermediate-value argument that makes the
+/// keyline necessary also caps it. So: `>= 4.5` is asserted at the
+/// contract's phases, while `thePolesStaySeparatedAtEveryPhase` pins
+/// the weaker promise that holds everywhere. Read a passing suite as
+/// "4.5:1 wherever it is reachable, and the most the tokens allow
+/// where it is not" — not as a floor under every instant of the day.
 @MainActor
 struct CrossingLegibilityRenderTests {
 
@@ -28,6 +49,17 @@ struct CrossingLegibilityRenderTests {
     private static let side: CGFloat = 96
     private static let bandLimit = 6          // px; 6 / scale = 2 pt
     private static let sample = "FAJR 5:45"
+
+    /// The floor the achievable bound is held to everywhere, as opposed
+    /// to the 4.5 asserted at the contract's phases.
+    ///
+    /// Mid-crossing the ink sweeps through the geometric mean of the two
+    /// rings, and there no pair reaches 4.5 — √21 ≈ 4.583 caps even pure
+    /// black against pure white, and the shipped pair bottoms at ~4.478.
+    /// 4.40 sits under that by more than palette drift should move it,
+    /// and far above the ~3.96 an undeepened `keylineValue` would give,
+    /// which is the regression this exists to catch.
+    private static let achievableFloor = 4.40
 
     // MARK: - Rasterising
 
@@ -156,9 +188,19 @@ struct CrossingLegibilityRenderTests {
     /// holes in A, R, 4) and gaps between letters drag down a band that
     /// was locally perfect. That diluted the reading by ~47% at the
     /// worst crossing phase — it measured 1.97:1 where the tokens
-    /// permitted 3.76:1. Per-pixel best-of-neighbourhood is both truer
-    /// to the sentence and STRICTER: one abandoned stem pixel fails it,
-    /// where a mean could bury that pixel under its neighbours.
+    /// permitted 3.76:1.
+    ///
+    /// The trade is not strictly one-directional, and it is worth being
+    /// honest about which way each half moves. Over CORE pixels this is
+    /// stricter — a min, not a mean, so one abandoned stem pixel fails
+    /// where a mean would bury it under its neighbours. Over BAND pixels
+    /// it is more permissive — it accepts the single best pixel anywhere
+    /// in the 13×13 window, where the ring-mean needed a whole ring to
+    /// average well. That second half is why the same phase reads 3.76:1
+    /// here and 1.97:1 under the old formulation. Both changes are
+    /// deliberate: a reader needs SOME high-contrast neighbour near
+    /// EVERY stem pixel, which is a min over stems and a max over
+    /// neighbours.
     private func bestAdjacentContrast(
         raster: Raster, coverage: [Double]
     ) -> Double {
@@ -210,6 +252,18 @@ struct CrossingLegibilityRenderTests {
     /// sweep computes every band in one O(pixels × bandLimit) pass
     /// instead of rescanning a (2d+1)² neighbourhood per pixel per
     /// distance, which is what `bandsReference` does.
+    ///
+    /// Be clear about how much this decomposition currently earns:
+    /// nothing, for the metric. `bestAdjacentContrast` scans a ±bandLimit
+    /// window around a CORE pixel, and a core pixel is itself marked, so
+    /// every unmarked pixel it can reach is automatically within
+    /// Chebyshev `bandLimit` of a marked one. Over that window
+    /// `isBand[j]` is therefore true exactly when `coverage[j] <= 0.05`,
+    /// and substituting the latter would give bit-identical results. The
+    /// decomposition and its reference are retained deliberately — they
+    /// pin the band DEFINITION, which is a frozen contract term, against
+    /// a future metric that reads bands by distance. They do not
+    /// currently guard any measured number.
     private func bands(raster: Raster, coverage: [Double]) -> [[Int]] {
         let w = raster.width, h = raster.height
         // Chebyshev distance to the nearest marked pixel. `bandLimit + 1`
@@ -247,13 +301,24 @@ struct CrossingLegibilityRenderTests {
     /// The plan's original O(pixels × distance²) formulation, retained
     /// deliberately.
     ///
-    /// `bands` replaced plan-specified code for speed (the rescan costs
-    /// ~8 s per render, which put the suite at 58 minutes). Because the
-    /// replacement was ours and not the plan's,
+    /// `bands` replaced plan-specified code, so
     /// `theSweepComputesTheSameBandsAsTheReference` pins the two
     /// together permanently — one reference run is the standing price of
-    /// proving the fast path still computes the plan's numbers, and of
-    /// stopping it from silently drifting.
+    /// stopping our replacement from silently drifting from the plan's
+    /// definition.
+    ///
+    /// What that pair does and does not buy, precisely: it guards the
+    /// band DEFINITION, not the measurement. See `bands` — over the
+    /// window `bestAdjacentContrast` actually scans, band membership is
+    /// equivalent to `coverage <= 0.05`, so neither formulation can move
+    /// a measured number today. The value here is that the frozen
+    /// definition stays honest for whatever reads it next.
+    ///
+    /// Nor is this pair where the speed came from: the suite went from
+    /// 58 minutes to 13.6 s, and almost all of that was dropping the
+    /// ring-mean formulation, which called the O(pixels × distance²)
+    /// scan once per ring per render. The sweep is the tidier way to
+    /// compute the same sets, not the reason they became cheap.
     private func bandsReference(raster: Raster, coverage: [Double]) -> [[Int]] {
         let w = raster.width, h = raster.height
         let marked = Set((0..<coverage.count).filter { coverage[$0] > 0.05 })
@@ -334,8 +399,15 @@ struct CrossingLegibilityRenderTests {
                     + "reference has \(reference[distance].count) px")
             )
         }
-        // A band structure worth comparing — not two empty sets.
-        #expect(!fast[0].isEmpty)
+        // A band structure worth comparing — every distance non-empty,
+        // so no band's equality can hold vacuously.
+        for (distance, band) in fast.enumerated() {
+            #expect(
+                !band.isEmpty,
+                Comment(rawValue: "band at distance \(distance + 1) is empty — "
+                    + "its set equality above proves nothing")
+            )
+        }
     }
 
     @Test(arguments: [false, true])
@@ -359,6 +431,59 @@ struct CrossingLegibilityRenderTests {
         }
     }
 
+    /// The separation the outline can achieve never falls under the
+    /// forced wall — checked densely, at every phase, not on a grid.
+    ///
+    /// This is the grid-independent half of the legibility contract.
+    /// `theTokensCanReachTheThreshold` and
+    /// `glyphsStaySeparatedThroughEveryCrossing` both sample
+    /// `crossingPhases()`, which is *derived* from the live palette — so
+    /// a palette edit re-derives the grid and moves what those tests
+    /// look at. This one sweeps 4,000 phases and never consults the grid.
+    ///
+    /// The quantity is the bound from §`theTokensCanReachTheThreshold`:
+    /// a glyph is served by whichever ring it is further from, so the
+    /// best available is `max(contrast(ink, near), contrast(ink, far))`,
+    /// computed from the tokens at that phase. The floor it is held to
+    /// is `achievableFloor` — the √21 wall, not 4.5, because 4.5 is
+    /// provably out of reach mid-crossing and asserting it densely would
+    /// be asserting something no implementation can satisfy.
+    ///
+    /// Only where the outline is fully drawn. At the band's fringes the
+    /// figure blend has not started, so `resolved` collapses both halo
+    /// poles onto one value and the "far" ring is not light at all — but
+    /// the outline is barely inked there and the palette still has its
+    /// own contrast, which
+    /// `PaletteV2ContrastTests.theOutlineIsFullyDrawnWhereverContrastCollapses`
+    /// is what lines the two conditions up.
+    @Test
+    func theAchievableBoundHoldsAtEveryPhase() {
+        var worst = Double.infinity
+        var worstUnit = 0.0
+        let samples = 4_000
+        for step in 0..<samples {
+            let phase = SkyPhase(unit: Double(step) / Double(samples))
+            let tokens = PaletteState.resolved(for: phase)
+            guard tokens.inkOutlineStrength >= 0.99 else { continue }
+            let near = InkKeyline(tokens: tokens).nearRingValue.relativeLuminance
+            let far = tokens.inkHaloLightValue.relativeLuminance
+            for ink in [tokens.inkValue, tokens.inkSecondaryValue] {
+                let l = ink.relativeLuminance
+                func ratio(_ a: Double, _ b: Double) -> Double {
+                    (max(a, b) + 0.05) / (min(a, b) + 0.05)
+                }
+                let bound = max(ratio(l, near), ratio(l, far))
+                if bound < worst { worst = bound; worstUnit = phase.unit }
+            }
+        }
+        #expect(
+            worst >= Self.achievableFloor,
+            Comment(rawValue: "at phase \(worstUnit) the best any two-tone outline "
+                + "could reach is \(String(format: "%.3f", worst)):1, under the "
+                + "\(Self.achievableFloor) floor — the near ring has been lightened")
+        )
+    }
+
     /// The 4.5 threshold has to be arithmetically reachable, and only
     /// the near ring's darkness makes it so.
     ///
@@ -371,15 +496,15 @@ struct CrossingLegibilityRenderTests {
     /// pins the ceiling above the bar so nobody raises the bar, or
     /// lightens the near ring, without meeting the arithmetic.
     ///
-    /// Sampled at the phases the contract measures, deliberately.
-    /// Between them the ink passes continuously through L ≈ 0.171–0.179,
-    /// and there the bound falls to ~4.48:1 — for ANY ring pair, pure
-    /// black and pure white included, whose best is √21 ≈ 4.583:1 before
-    /// antialiasing. That passage is unavoidable while the ink flips
-    /// polarity continuously, so asserting 4.5 across a dense sweep
-    /// would be asserting something no implementation can satisfy. What
-    /// is pinned here is what the contract actually requires; the wall
-    /// itself is recorded so it is not rediscovered as a bug.
+    /// Sampled at the phases the contract measures, deliberately — this
+    /// is the NARROWER of the two expectations. `thePolesStaySeparated`
+    /// carries the one that holds everywhere. Between these samples the
+    /// ink passes continuously through L ≈ 0.171–0.179, where the bound
+    /// falls to ~4.48:1 for ANY ring pair, pure black and pure white
+    /// included (best √21 ≈ 4.583:1, before antialiasing). That passage
+    /// is unavoidable while the ink flips polarity continuously, so
+    /// asserting 4.5 across a dense sweep would be asserting something
+    /// no implementation can satisfy.
     @Test
     func theTokensCanReachTheThreshold() {
         var worstCeiling = Double.infinity

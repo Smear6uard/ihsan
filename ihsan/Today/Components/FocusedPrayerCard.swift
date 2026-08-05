@@ -275,17 +275,19 @@ struct FocusedPrayerCard: View {
                     .font(.system(.title, design: .monospaced).monospacedDigit())
                     .fontWeight(.light)
                     .foregroundStyle(tokens.ink)
-                    .contentTransition(.numericText())
                     .inkKeyline(tokens)
+                    // Outside the keyline: inside, the transition would
+                    // run on both of the modifier's copies of the glyph.
+                    .contentTransition(.numericText())
                 Text(inscription.uppercased())
                     .font(IhsanFont.inscription)
                     .monospacedDigit()
                     .tracking(1.4)
                     .foregroundStyle(tokens.inkSecondary)
-                    .contentTransition(.numericText())
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
                     .inkKeyline(tokens)
+                    .contentTransition(.numericText())
             }
         case .windowClosed:
             // The passed prayer still asks to be recorded: the
@@ -629,11 +631,18 @@ struct FocusedPrayerCard: View {
             Text(prayer.displayNameEnglish)
                 .font(IhsanFont.heroPrayerName)
                 .foregroundStyle(tokens.ink)
+                .inkKeyline(tokens)
+            // Keylined on its own so the 0.72 can sit OUTSIDE the
+            // modifier: it draws its content twice, so a translucent
+            // foreground composites with itself and takes a near-black
+            // wash from the upper copy's ring. Fading the finished mark
+            // — glyph and rings together — is what was meant anyway.
             Text(prayer.displayNameArabic)
                 .font(IhsanFont.bodyArabic)
-                .foregroundStyle(tokens.ink.opacity(0.72))
+                .foregroundStyle(tokens.ink)
+                .inkKeyline(tokens)
+                .opacity(0.72)
         }
-        .inkKeyline(tokens)
     }
 
     // MARK: - State transitions

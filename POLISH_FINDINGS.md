@@ -820,3 +820,30 @@ budget. These need a device:
   would roughly halve the span to ~44 min/day (25 + 19). 3.0 ships
   because it keeps a 2.3× margin over a palette Task 2 rewrites — the
   span is the cost of that margin, not an accident.
+
+- **Translucent text under the keyline.** The modifier draws its content
+  twice, once per ring, so `.opacity(…)` on a `foregroundStyle` would
+  composite with itself *and* take a near-black wash from the upper
+  copy's ring. Two sites carried translucent ink and have been changed
+  to fade the finished mark instead — the plate's `SUNRISE ·` inscription
+  (was `inkSecondary.opacity(0.9)`) and the focused card's Arabic prayer
+  name (was `ink.opacity(0.72)`, the worse of the two: ~28% of its area
+  would have taken the wash). Both now apply `.opacity(…)` outside
+  `.inkKeyline(…)`. Source-only reasoning; confirm on device through a
+  sunrise and a maghrib that the Arabic name still reads as a quieter
+  companion to the English rather than a differently-weighted one.
+- **Numeric transitions on the focused card.** `.contentTransition(.numericText())`
+  on the `.upcoming` time and inscription now sits outside
+  `.inkKeyline(…)`; inside, it would have run on both of the modifier's
+  copies. Confirm the minute rollover still animates as one numeral
+  during a crossing, with no doubled or ghosted digit.
+- **Baseline alignment of the prayer-name row.** Fixing the translucent
+  Arabic name meant keylining the two `Text`s in `prayerNameRow`
+  individually rather than keylining the enclosing `HStack`, so during a
+  crossing that `HStack(alignment: .firstTextBaseline)` is aligning two
+  `ZStack`s instead of two `Text`s. On every plateau the modifier is a
+  pass-through and the layout is bit-identical to before, so this can
+  only show up mid-crossing. Confirm the English and Arabic names still
+  sit on one baseline through a sunrise and a maghrib; if the Arabic
+  drifts vertically, the fix is an explicit `alignmentGuide` rather than
+  reverting — the opacity change it enables is the more important half.

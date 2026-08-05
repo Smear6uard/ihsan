@@ -21,7 +21,7 @@ import SwiftUI
 /// |----------------|--------------|-------------|
 /// | light (jewel)  | ~15:1        | merges      |
 /// | mid (crossing) | ~5.2:1       | 3.8:1       |
-/// | dark (day)     | ~1.2:1       | ~15:1       |
+/// | dark (day)     | ~1.36:1      | ~15:1       |
 ///
 /// Only the near ring's own darkness makes the middle row work, and it
 /// is the row the whole treatment exists for: at the crossing the ink
@@ -138,6 +138,11 @@ public struct InkKeyline: ViewModifier {
                     color: tokens.inkHaloLightValue.color.opacity(strength),
                     offset: Self.farOffset
                 )
+                // The far copy is scaffolding for the ring only — the
+                // near copy carries the readable glyph. Without this the
+                // content's accessibility element appears twice at any
+                // call site that does not establish its own container.
+                .accessibilityHidden(true)
                 Self.dilate(
                     content,
                     color: nearRingValue.color.opacity(strength),
@@ -167,6 +172,14 @@ public extension View {
     /// crossings. No-op on every palette plateau. Apply to any text
     /// that stands on the sky or the ground — never to text on a
     /// panel, which has its own fill.
+    ///
+    /// Fading the text? Put `.opacity(…)` OUTSIDE this modifier, not on
+    /// the `foregroundStyle`. Through a crossing the content is drawn
+    /// twice — once per ring — so a translucent foreground composites
+    /// with itself (0.72 becomes 0.92) and, worse, the near ring of the
+    /// upper copy washes near-black through the lower copy's glyph.
+    /// Outside, the glyph and both rings fade together as one mark,
+    /// which is what "fading the text" should mean anyway.
     func inkKeyline(_ tokens: SkyPaletteTokens) -> some View {
         modifier(InkKeyline(tokens: tokens))
     }

@@ -486,10 +486,15 @@ struct CelestialPlateScene: View {
         Text("SUNRISE · \(Self.timeString(solarEvents.sunrise, in: timeZone).uppercased())")
             .font(Self.labelFont)
             .tracking(1.2)
-            .foregroundStyle(tokens.inkSecondary.opacity(0.9))
+            .foregroundStyle(tokens.inkSecondary)
             .lineLimit(1)
             .fixedSize()
             .inkKeyline(tokens)
+            // Outside the keyline: the modifier draws its content twice,
+            // so a translucent foreground would composite with itself and
+            // take a near-black wash from the upper copy's ring. Here the
+            // inscription and its rings fade together.
+            .opacity(0.9)
             .frame(width: label.width, height: label.height, alignment: .leading)
             .position(x: label.midX, y: label.midY)
             .allowsHitTesting(false)
