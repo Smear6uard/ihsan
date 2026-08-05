@@ -292,3 +292,55 @@ extension WidgetSnapshotTests {
         #expect(snapshot.relevantNight(at: Self.at(day: 31, 22, 0)) == snapshot.tomorrowNight)
     }
 }
+
+// MARK: - Timeline boundaries
+
+extension WidgetSnapshotTests {
+    /// The task's boundary roster, enumerated and held: every window
+    /// edge, sunrise, solar midnight, last-third start, and Hijri
+    /// rollover inside the asked range — sorted, exclusive of the
+    /// start, strictly before the end. Suhoor and iftar are Fajr and
+    /// Maghrib, already members.
+    @Test
+    func timelineBoundariesCarryTheFullRoster() {
+        let snapshot = Self.makeSnapshot()
+        let after = Self.at(day: 30, 5, 0)
+        let until = snapshot.dayAfterTomorrowFajr
+        let boundaries = snapshot.timelineBoundaries(after: after, until: until)
+
+        // Day one after 5:00: sunrise, dhuhr, asr, maghrib, isha.
+        #expect(boundaries.contains(snapshot.today.sunrise))
+        #expect(boundaries.contains(snapshot.today.dhuhr))
+        #expect(boundaries.contains(snapshot.today.maghrib))
+        #expect(boundaries.contains(snapshot.today.isha))
+        // Tonight's divisions.
+        #expect(boundaries.contains(snapshot.tonight.nisfAlLayl))
+        #expect(boundaries.contains(snapshot.tonight.lastThirdStart))
+        // The rollover into day two, and day two entire.
+        #expect(boundaries.contains(Self.at(day: 31, 0, 0)))
+        #expect(boundaries.contains(snapshot.tomorrow.fajr))
+        #expect(boundaries.contains(snapshot.tomorrow.isha))
+        #expect(boundaries.contains(snapshot.tomorrowNight.nisfAlLayl))
+        #expect(boundaries.contains(snapshot.tomorrowNight.lastThirdStart))
+
+        // Exclusive bounds and order.
+        #expect(!boundaries.contains(snapshot.today.fajr))       // before `after`
+        #expect(!boundaries.contains(until))                     // the terminal
+        #expect(boundaries == boundaries.sorted())
+        #expect(Set(boundaries).count == boundaries.count)
+    }
+
+    @Test
+    func timelineBoundariesRespectTheRange() {
+        let snapshot = Self.makeSnapshot()
+        let after = Self.at(day: 30, 21, 0)
+        let until = Self.at(day: 31, 6, 0)
+        let boundaries = snapshot.timelineBoundaries(after: after, until: until)
+        #expect(boundaries.allSatisfy { $0 > after && $0 < until })
+        // Isha tonight, the night divisions, midnight, tomorrow Fajr
+        // and sunrise all fall inside.
+        #expect(boundaries.contains(snapshot.today.isha))
+        #expect(boundaries.contains(snapshot.tomorrow.fajr))
+        #expect(!boundaries.contains(snapshot.today.dhuhr))
+    }
+}

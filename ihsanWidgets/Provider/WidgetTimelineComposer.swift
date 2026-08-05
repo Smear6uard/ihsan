@@ -143,29 +143,17 @@ struct WidgetTimelineComposer {
             snapshot.writtenAt.addingTimeInterval(WidgetSnapshot.maximumAge)
         )
 
-        var boundaries: Set<Date> = []
-        for table in [snapshot.today, snapshot.tomorrow] {
-            boundaries.formUnion([
-                table.fajr, table.sunrise, table.dhuhr,
-                table.asr, table.maghrib, table.isha,
-            ])
-        }
-        for night in [snapshot.tonight, snapshot.tomorrowNight] {
-            boundaries.formUnion([night.nisfAlLayl, night.lastThirdStart])
-        }
-        boundaries.formUnion(hijriRollovers(after: now, until: truthEnds))
-
-        // Sky keyframes between the boundaries, so the ground drifts
-        // rather than jump-cuts.
+        // The state boundaries are the snapshot's own (tested in
+        // IhsanCore); the composer adds only the sky keyframes, so
+        // the ground drifts rather than jump-cuts.
+        var boundaries = Set(snapshot.timelineBoundaries(after: now, until: truthEnds))
         var keyframe = now.addingTimeInterval(Self.skyKeyframeInterval)
         while keyframe < truthEnds {
             boundaries.insert(keyframe)
             keyframe = keyframe.addingTimeInterval(Self.skyKeyframeInterval)
         }
 
-        let instants = [now] + boundaries
-            .filter { $0 > now && $0 < truthEnds }
-            .sorted()
+        let instants = [now] + boundaries.sorted()
 
         var entries = instants.map(entry(at:))
         // The terminal invitation: whatever happens to every reload
@@ -176,25 +164,5 @@ struct WidgetTimelineComposer {
         ))
 
         return Timeline(entries: entries, policy: .after(truthEnds))
-    }
-
-    /// Civil midnights in the place timezone — the Hijri layer's day
-    /// boundary in this app.
-    private func hijriRollovers(after now: Date, until end: Date) -> [Date] {
-        guard
-            let snapshot,
-            let timeZone = TimeZone(identifier: snapshot.timeZoneIdentifier)
-        else { return [] }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-
-        var rollovers: [Date] = []
-        var cursor = calendar.startOfDay(for: now)
-        for _ in 0..<3 {
-            guard let next = calendar.date(byAdding: .day, value: 1, to: cursor) else { break }
-            if next > now && next < end { rollovers.append(next) }
-            cursor = next
-        }
-        return rollovers
     }
 }

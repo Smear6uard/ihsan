@@ -263,6 +263,38 @@ public extension WidgetSnapshot {
         return nil
     }
 
+    /// Every instant at which a widget face can change state: prayer
+    /// window edges and sunrise for both days, solar midnight and the
+    /// last-third start of both nights, and the Hijri day rollovers
+    /// (civil midnight in the place timezone). Suhoor and iftar are
+    /// Fajr and Maghrib — already here. Sorted, exclusive of `after`,
+    /// strictly before `until`.
+    func timelineBoundaries(after: Date, until: Date) -> [Date] {
+        var boundaries: Set<Date> = []
+        for table in [today, tomorrow] {
+            boundaries.formUnion([
+                table.fajr, table.sunrise, table.dhuhr,
+                table.asr, table.maghrib, table.isha,
+            ])
+        }
+        for night in [tonight, tomorrowNight] {
+            boundaries.formUnion([night.nisfAlLayl, night.lastThirdStart])
+        }
+        if let timeZone = TimeZone(identifier: timeZoneIdentifier) {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            var cursor = calendar.startOfDay(for: after)
+            for _ in 0..<3 {
+                guard let midnight = calendar.date(byAdding: .day, value: 1, to: cursor) else {
+                    break
+                }
+                boundaries.insert(midnight)
+                cursor = midnight
+            }
+        }
+        return boundaries.filter { $0 > after && $0 < until }.sorted()
+    }
+
     /// The stamp for the civil day containing `instant`, resolved in
     /// the place timezone.
     func hijriStamp(at instant: Date) -> HijriStamp? {

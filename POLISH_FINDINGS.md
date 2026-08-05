@@ -801,3 +801,40 @@ budget. These need a device:
   the five ornaments. Left alone because retuning the moon is not one
   of corrective H's six items and `MoonTreatmentTests` pins the
   treatment deliberately; it wants its own decision.
+
+## Widgets v2 rebuild (feat/widgets-v2)
+
+Device-only verification the rebuild could not perform from a
+simulator-and-host environment. The drawings themselves are pinned by
+render tests (`docs/widgets/GALLERY.md`); these items verify the
+system's half of each contract.
+
+- **Tinted and clear rendering modes on device.** Every home widget
+  declares its accent hierarchy (ornaments and primary figures in the
+  accent group, grounds cleared); the committed accented renders show
+  what the system receives, not what it produces. Place each home
+  widget in tinted and in clear mode and confirm ornament states stay
+  distinguishable and the wallpaper tint carries the accent group.
+- **Accessories on a real photo wallpaper.** The busy-ground pins
+  approximate the worst case; confirm the day row and both circulars
+  on an actual busy photo lock screen, and that the ornament linework
+  reads at 16–24 pt in the true vibrant material.
+- **StandBy, including night mode.** The nightstand ground pins to
+  the deepened night ramp and StandBy is no longer conflated with
+  clear mode, but Night Mode's red shift and `isLuminanceReduced`
+  behavior need a physical device on a charger after midnight.
+- **The interactive log button.** The intent round-trip is pinned in
+  `WidgetSnapshotMirrorTests`; on device, confirm the medium strip's
+  current-prayer tap logs, re-renders within a beat, and lands in the
+  app's Today card as logged.
+- **Deep links from every widget.** Router parsing is pinned; confirm
+  cold-launch taps (app not running) reach the qibla sheet, the Hijri
+  sheet, and a passed prayer's log sheet.
+- **The watch.** watchOS could not be built in this environment
+  (platform not installed). The watch app now registers its shared
+  ModelContainer like the iOS app does — build `ihsanWatch`, confirm
+  it compiles and complications still render from the legacy cache.
+- **Widget memory on device.** Host render cost is measured (plate
+  5.6 ms avg, strip 4.0 ms avg at 2×); WidgetKit's ~30 MB extension
+  ceiling can only be observed in Instruments with the extension
+  attached.

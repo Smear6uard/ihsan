@@ -461,3 +461,102 @@ extension WidgetFaceSnapshotTests {
         )
     }
 }
+
+// MARK: - Remaining gallery states
+
+extension WidgetFaceSnapshotTests {
+    @Test
+    func dayStripFaceNight() throws {
+        let tokens = SkyPaletteTokens.night
+        try pin(
+            onGround(
+                DayStripFace(model: nightDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 158)
+            ),
+            size: CGSize(width: 338, height: 158),
+            named: "day-strip-face-night"
+        )
+    }
+
+    @Test
+    func plateFaceFasting() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        let base = afternoonDay()
+        let day = afternoonDay(fasting: WidgetFastingModel(
+            suhoorEnds: base.sunrise.addingTimeInterval(-5_520),
+            iftar: base.slots[3].time,
+            isRamadan: true
+        ))
+        try pin(
+            onGround(
+                PlateFace(model: day, tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 354)
+            ),
+            size: CGSize(width: 338, height: 354),
+            named: "plate-face-fasting"
+        )
+    }
+
+    /// The paused strip: times whole, no status inscriptions, every
+    /// mark in the neutral outline it wears ahead of time.
+    @Test
+    func dayStripFacePaused() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        let base = afternoonDay(paused: true)
+        let neutralized = WidgetDayModel(
+            date: base.date,
+            slots: base.slots.map {
+                WidgetDayModel.Slot(
+                    prayer: $0.prayer,
+                    time: $0.time,
+                    state: $0.state == .passedUnlogged ? .upcoming : $0.state
+                )
+            },
+            nextPrayer: base.nextPrayer,
+            nextTime: base.nextTime,
+            countdown: base.countdown,
+            currentPrayer: base.currentPrayer,
+            currentWindow: base.currentWindow,
+            sunrise: base.sunrise,
+            cityName: base.cityName,
+            timeZoneIdentifier: base.timeZoneIdentifier,
+            isPaused: true,
+            hijri: base.hijri,
+            fasting: nil,
+            night: base.night
+        )
+        try pin(
+            onGround(
+                DayStripFace(model: neutralized, tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 158)
+            ),
+            size: CGSize(width: 338, height: 158),
+            named: "day-strip-face-paused"
+        )
+    }
+
+    /// The no-blank-state guarantee, screenshotted: the invitation on
+    /// the day's sky.
+    @Test
+    func invitationFace() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        let invitation = VStack(alignment: .leading, spacing: 8) {
+            Text("Open Ihsan")
+                .font(.system(size: 17, weight: .semibold, design: .serif))
+                .foregroundStyle(tokens.ink)
+            Text("to refresh today's times")
+                .font(IhsanFont.inscription)
+                .tracking(0.6)
+                .foregroundStyle(tokens.inkSecondary)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        try pin(
+            onGround(invitation, tokens: tokens, size: CGSize(width: 158, height: 158)),
+            size: CGSize(width: 158, height: 158),
+            named: "invitation-face"
+        )
+    }
+}
