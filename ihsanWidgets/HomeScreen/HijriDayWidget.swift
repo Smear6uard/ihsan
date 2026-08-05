@@ -3,10 +3,9 @@ import IhsanDesignSystem
 import SwiftUI
 import WidgetKit
 
-/// Large (4×4). The plate, miniature — the hero of the family. The
-/// real sky, the day's arc with the sun or moon standing over it, and
-/// the focused next-prayer block beneath the horizon filament.
-struct PrayerOverviewLargeWidgetView: View {
+/// Small (2×2). The Hijri day as an inscription plate, with the
+/// significant-day line when the calendar carries one.
+struct HijriDayWidgetView: View {
     let entry: PrayerTimelineEntry
 
     @Environment(\.showsWidgetContainerBackground) private var showsContainer
@@ -19,40 +18,49 @@ struct PrayerOverviewLargeWidgetView: View {
         let tokens = WidgetPalette.tokens(for: entry)
 
         Group {
-            switch entry.content {
-            case .live(let day):
-                PlateFace(
-                    model: day.faceModel(at: entry.date),
+            if case .live(let day) = entry.content,
+               let hijri = day.faceModel(at: entry.date).hijri {
+                HijriDayFace(
+                    hijri: hijri,
                     tokens: tokens,
                     mode: placement.faceMode,
                     usesStandByInk: placement.isStandBy
                 )
-            case .invitation(let invitation):
+            } else {
+                // Missing snapshot or a snapshot without Hijri facts —
+                // the invitation, never a guessed date.
                 WidgetInvitationFace(
-                    invitation: invitation,
+                    invitation: .init(reason: invitationReason),
                     ink: placement.isStandBy ? tokens.standByInk : tokens.ink,
                     inkSecondary: placement.isStandBy
                         ? tokens.standByInkSecondary : tokens.inkSecondary
                 )
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .widgetURL(WidgetDeeplink.today)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .widgetURL(WidgetDeeplink.hijri)
+    }
+
+    private var invitationReason: PrayerTimelineEntry.Invitation.Reason {
+        if case .invitation(let invitation) = entry.content {
+            return invitation.reason
+        }
+        return .stale
     }
 }
 
-struct PrayerOverviewLargeWidget: Widget {
-    static let kind: String = "PrayerOverviewLargeWidget"
+struct HijriDayWidget: Widget {
+    static let kind: String = "HijriDayWidget"
 
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: Self.kind, provider: PrayerTimelineProvider()) { entry in
-            PrayerOverviewLargeWidgetView(entry: entry)
+            HijriDayWidgetView(entry: entry)
                 .containerBackground(for: .widget) {
                     WidgetGround(entry: entry)
                 }
         }
-        .configurationDisplayName("The Plate")
-        .description("The day's sky and arc, and the next prayer beneath the horizon.")
-        .supportedFamilies([.systemLarge])
+        .configurationDisplayName("Hijri Day")
+        .description("Today's Hijri date, and the days worth knowing.")
+        .supportedFamilies([.systemSmall])
     }
 }

@@ -39,6 +39,9 @@ let package = Package(
         .testTarget(
             name: "IhsanDesignSystemTests",
             dependencies: ["IhsanDesignSystem", "IhsanCore"],
+            // Reference images for the widget-face pinning harness;
+            // read via #filePath, not bundled.
+            exclude: ["__Snapshots__"],
             swiftSettings: [
                 .swiftLanguageMode(.v6)
             ]

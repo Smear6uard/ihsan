@@ -72,6 +72,12 @@ private let paused = entry(hour: 15, minute: 10) { snapshot in
     invitation
 }
 
+#Preview("Hijri day", as: .systemSmall) {
+    HijriDayWidget()
+} timeline: {
+    afternoon
+}
+
 #Preview("Medium · afternoon", as: .systemMedium) {
     PrayerStatusMediumWidget()
 } timeline: {

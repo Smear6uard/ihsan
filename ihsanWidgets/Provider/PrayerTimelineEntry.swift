@@ -15,6 +15,9 @@ import WidgetKit
 struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
     let date: Date
     let content: Content
+    /// Set by the configurable provider when the user pinned the
+    /// small widget to one prayer; nil follows the day.
+    var fixedPrayer: Prayer? = nil
 
     enum Content: Sendable, Equatable {
         case live(LiveDay)
@@ -44,6 +47,10 @@ struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
         /// logging surface of any kind.
         let isPaused: Bool
         let qadaRemaining: Int?
+        /// The next occurrence of each prayer at or after `date`,
+        /// resolved across both snapshot days — the fixed-prayer
+        /// widget configuration reads this instead of re-deriving.
+        let nextOccurrenceByPrayerRaw: [String: Date]
 
         struct PrayerSlot: Sendable, Equatable, Identifiable {
             let prayer: Prayer

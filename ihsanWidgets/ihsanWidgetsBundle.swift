@@ -9,6 +9,7 @@ struct IhsanWidgetsBundle: WidgetBundle {
     var body: some Widget {
         // Home screen
         NextPrayerSmallWidget()
+        HijriDayWidget()
         PrayerStatusMediumWidget()
         PrayerOverviewLargeWidget()
         // StandBy

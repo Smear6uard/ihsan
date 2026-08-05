@@ -84,6 +84,15 @@ struct WidgetTimelineComposer {
             )
         }
 
+        var nextOccurrences: [String: Date] = [:]
+        for prayer in Prayer.allCases {
+            let candidates = [
+                time(of: prayer, in: snapshot.today),
+                time(of: prayer, in: snapshot.tomorrow),
+            ]
+            nextOccurrences[prayer.rawValue] = candidates.first { $0 >= instant }
+        }
+
         return PrayerTimelineEntry(
             date: instant,
             content: .live(PrayerTimelineEntry.LiveDay(
@@ -100,9 +109,20 @@ struct WidgetTimelineComposer {
                 hijri: snapshot.hijriStamp(at: instant),
                 fasting: snapshot.fastingStamp(at: instant),
                 isPaused: snapshot.isPaused,
-                qadaRemaining: snapshot.qadaRemaining
+                qadaRemaining: snapshot.qadaRemaining,
+                nextOccurrenceByPrayerRaw: nextOccurrences
             ))
         )
+    }
+
+    private func time(of prayer: Prayer, in table: WidgetSnapshot.DayTable) -> Date {
+        switch prayer {
+        case .fajr: table.fajr
+        case .dhuhr: table.dhuhr
+        case .asr: table.asr
+        case .maghrib: table.maghrib
+        case .isha: table.isha
+        }
     }
 
     // MARK: - Timeline

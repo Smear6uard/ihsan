@@ -174,3 +174,290 @@ struct WidgetFaceSnapshotTests {
         )
     }
 }
+
+// MARK: - Home face fixtures and pins
+
+extension WidgetFaceSnapshotTests {
+
+    /// The canonical day as a face model, mid-afternoon: Asr current,
+    /// two logged, two ahead.
+    private func afternoonDay(
+        paused: Bool = false,
+        fasting: WidgetFastingModel? = nil
+    ) -> WidgetDayModel {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        let day = calendar.date(from: DateComponents(year: 2026, month: 7, day: 30))!
+        func at(_ hour: Int, _ minute: Int) -> Date {
+            calendar.date(byAdding: DateComponents(hour: hour, minute: minute), to: day)!
+        }
+        let date = at(15, 10)
+        return WidgetDayModel(
+            date: date,
+            slots: [
+                .init(prayer: .fajr, time: at(4, 10), state: .logged),
+                .init(prayer: .dhuhr, time: at(12, 58), state: .logged),
+                .init(prayer: .asr, time: at(16, 53), state: .upcoming),
+                .init(prayer: .maghrib, time: at(20, 11), state: .upcoming),
+                .init(prayer: .isha, time: at(21, 43), state: .upcoming),
+            ],
+            nextPrayer: .asr,
+            nextTime: at(16, 53),
+            countdown: date...at(16, 53),
+            currentPrayer: .dhuhr,
+            currentWindow: at(12, 58)...at(16, 53),
+            sunrise: at(5, 42),
+            cityName: "Madinah",
+            timeZoneIdentifier: "America/Chicago",
+            isPaused: paused,
+            hijri: WidgetHijriModel(
+                day: 13, monthName: "Safar", year: 1448,
+                significantLine: "White day · Safar 13", isRamadan: false
+            ),
+            fasting: fasting,
+            night: WidgetNightModel(
+                start: at(20, 11), end: at(28, 11),
+                nisfAlLayl: at(24, 11), lastThirdStart: at(25, 31)
+            )
+        )
+    }
+
+    /// Late night: Isha current and logged day behind.
+    private func nightDay() -> WidgetDayModel {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        let day = calendar.date(from: DateComponents(year: 2026, month: 7, day: 30))!
+        func at(_ hour: Int, _ minute: Int) -> Date {
+            calendar.date(byAdding: DateComponents(hour: hour, minute: minute), to: day)!
+        }
+        let date = at(23, 15)
+        return WidgetDayModel(
+            date: date,
+            slots: [
+                .init(prayer: .fajr, time: at(4, 10), state: .logged),
+                .init(prayer: .dhuhr, time: at(12, 58), state: .logged),
+                .init(prayer: .asr, time: at(16, 53), state: .logged),
+                .init(prayer: .maghrib, time: at(20, 11), state: .logged),
+                .init(prayer: .isha, time: at(21, 43), state: .current),
+            ],
+            nextPrayer: .fajr,
+            nextTime: at(28, 11),
+            countdown: date...at(28, 11),
+            currentPrayer: .isha,
+            currentWindow: at(21, 43)...at(28, 11),
+            sunrise: at(5, 42),
+            cityName: "Madinah",
+            timeZoneIdentifier: "America/Chicago",
+            isPaused: false,
+            hijri: WidgetHijriModel(
+                day: 13, monthName: "Safar", year: 1448,
+                significantLine: nil, isRamadan: false
+            ),
+            fasting: nil,
+            night: WidgetNightModel(
+                start: at(20, 11), end: at(28, 11),
+                nisfAlLayl: at(24, 11), lastThirdStart: at(25, 31)
+            )
+        )
+    }
+
+    private func onGround(
+        _ face: some View, tokens: SkyPaletteTokens, size: CGSize
+    ) -> some View {
+        ZStack {
+            WidgetSkyGround(tokens: tokens)
+            face.padding(14)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+    }
+
+    @Test
+    func nextPrayerFaceSmallAfternoon() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        try pin(
+            onGround(
+                NextPrayerFace(model: afternoonDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 158, height: 158)
+            ),
+            size: CGSize(width: 158, height: 158),
+            named: "next-prayer-face-afternoon"
+        )
+    }
+
+    @Test
+    func nextPrayerFaceSmallNight() throws {
+        let tokens = SkyPaletteTokens.night
+        try pin(
+            onGround(
+                NextPrayerFace(model: nightDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 158, height: 158)
+            ),
+            size: CGSize(width: 158, height: 158),
+            named: "next-prayer-face-night"
+        )
+    }
+
+    @Test
+    func hijriDayFaceAfternoon() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        let hijri = WidgetHijriModel(
+            day: 13, monthName: "Safar", year: 1448,
+            significantLine: "White day · Safar 13", isRamadan: false
+        )
+        try pin(
+            onGround(
+                HijriDayFace(hijri: hijri, tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 158, height: 158)
+            ),
+            size: CGSize(width: 158, height: 158),
+            named: "hijri-day-face-afternoon"
+        )
+    }
+
+    @Test
+    func dayStripFaceAfternoon() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        try pin(
+            onGround(
+                DayStripFace(model: afternoonDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 158)
+            ),
+            size: CGSize(width: 338, height: 158),
+            named: "day-strip-face-afternoon"
+        )
+    }
+
+    @Test
+    func dayStripFaceFasting() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        let day = afternoonDay(fasting: WidgetFastingModel(
+            suhoorEnds: afternoonDay().sunrise.addingTimeInterval(-5_520),
+            iftar: afternoonDay().slots[3].time,
+            isRamadan: true
+        ))
+        try pin(
+            onGround(
+                DayStripFace(model: day, tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 158)
+            ),
+            size: CGSize(width: 338, height: 158),
+            named: "day-strip-face-fasting"
+        )
+    }
+
+    @Test
+    func plateFaceAfternoon() throws {
+        let tokens = SkyPaletteTokens.afternoon
+        try pin(
+            onGround(
+                PlateFace(model: afternoonDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 354)
+            ),
+            size: CGSize(width: 338, height: 354),
+            named: "plate-face-afternoon"
+        )
+    }
+
+    @Test
+    func plateFaceNight() throws {
+        let tokens = SkyPaletteTokens.night
+        try pin(
+            onGround(
+                PlateFace(model: nightDay(), tokens: tokens),
+                tokens: tokens,
+                size: CGSize(width: 338, height: 354)
+            ),
+            size: CGSize(width: 338, height: 354),
+            named: "plate-face-night"
+        )
+    }
+}
+
+// MARK: - Accented (tinted/clear) hierarchy pins
+
+extension WidgetFaceSnapshotTests {
+    /// Accented faces render on the system's material, not our sky;
+    /// the pin stands them on neutral slate so the chosen hierarchy —
+    /// ornaments and primary figures forward, secondary text behind,
+    /// no painted ground — is what regresses, not a wallpaper.
+    private func onSlate(_ face: some View, size: CGSize) -> some View {
+        ZStack {
+            Color(red: 0.16, green: 0.16, blue: 0.18)
+            face.padding(14)
+        }
+        .frame(width: size.width, height: size.height)
+        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .environment(\.colorScheme, .dark)
+    }
+
+    @Test
+    func nextPrayerFaceAccented() throws {
+        try pin(
+            onSlate(
+                NextPrayerFace(
+                    model: afternoonDay(),
+                    tokens: .afternoon,
+                    mode: .accented
+                ),
+                size: CGSize(width: 158, height: 158)
+            ),
+            size: CGSize(width: 158, height: 158),
+            named: "next-prayer-face-accented"
+        )
+    }
+
+    @Test
+    func dayStripFaceAccented() throws {
+        try pin(
+            onSlate(
+                DayStripFace(
+                    model: afternoonDay(),
+                    tokens: .afternoon,
+                    mode: .accented
+                ),
+                size: CGSize(width: 338, height: 158)
+            ),
+            size: CGSize(width: 338, height: 158),
+            named: "day-strip-face-accented"
+        )
+    }
+
+    @Test
+    func plateFaceAccented() throws {
+        try pin(
+            onSlate(
+                PlateFace(
+                    model: afternoonDay(),
+                    tokens: .afternoon,
+                    mode: .accented
+                ),
+                size: CGSize(width: 338, height: 354)
+            ),
+            size: CGSize(width: 338, height: 354),
+            named: "plate-face-accented"
+        )
+    }
+
+    @Test
+    func hijriDayFaceAccented() throws {
+        let hijri = WidgetHijriModel(
+            day: 13, monthName: "Safar", year: 1448,
+            significantLine: "White day · Safar 13", isRamadan: false
+        )
+        try pin(
+            onSlate(
+                HijriDayFace(hijri: hijri, tokens: .afternoon, mode: .accented),
+                size: CGSize(width: 158, height: 158)
+            ),
+            size: CGSize(width: 158, height: 158),
+            named: "hijri-day-face-accented"
+        )
+    }
+}
