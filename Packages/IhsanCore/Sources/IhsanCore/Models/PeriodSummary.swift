@@ -125,7 +125,9 @@ public final class PeriodSummary {
     }
 
     private static func encodeByPrayer(_ byPrayer: [ByPrayerStat]) -> String {
-        guard let data = try? JSONEncoder().encode(byPrayer),
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.sortedKeys]
+        guard let data = try? encoder.encode(byPrayer),
               let json = String(data: data, encoding: .utf8)
         else {
             return "[]"

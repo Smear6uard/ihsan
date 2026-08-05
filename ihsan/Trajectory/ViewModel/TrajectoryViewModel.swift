@@ -53,9 +53,29 @@ final class TrajectoryViewModel {
             cycleDate: PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
         )
 
-        let qadaLogs = cachedLogs.filter { $0.status == .qada }
+        // Qada belongs to the selected Path window, not the account's
+        // lifetime total. Keep the same half-open cycle bounds used to
+        // build the day rows so the summary and the grid cannot drift.
+        let qadaLogs = Self.qadaLogs(in: days, from: cachedLogs)
         let aggregate = TrajectoryAggregator.aggregate(days: days, qadaLogs: qadaLogs)
 
         state = .ready(.init(period: period, days: days, aggregate: aggregate))
+    }
+
+    static func qadaLogs(
+        in days: [DayCompletion],
+        from logs: [PrayerLog],
+        calendar: Calendar = .current
+    ) -> [PrayerLog] {
+        guard let firstDay = days.first?.date,
+              let lastDay = days.last?.date,
+              let end = calendar.date(byAdding: .day, value: 1, to: lastDay)
+        else { return [] }
+
+        return logs.filter {
+            $0.status == .qada
+                && $0.prayerDate >= firstDay
+                && $0.prayerDate < end
+        }
     }
 }

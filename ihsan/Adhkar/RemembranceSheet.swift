@@ -3,20 +3,12 @@ import IhsanDesignSystem
 import IhsanPrayerTimes
 import SwiftUI
 
-/// The hub the band opens: every remembrance set, plus the instrument,
-/// in the day's own order.
-///
-/// Each set that has a window today inscribes it, so the sheet keeps
-/// teaching when a set belongs — and the one whose window is open right
-/// now is marked. What it does not do is *gate* on any of that. Every
-/// row is live at every hour. See `RemembranceMenu` for why.
+/// One time-aware remembrance set, followed by the quiet actions that
+/// belong to an occasion rather than a clock.
 struct RemembranceSheet: View {
     let entries: [RemembranceMenu.Entry]
     let timeZone: TimeZone
     let tokens: SkyPaletteTokens
-    /// Records the chosen destination and closes. The caller applies it
-    /// after dismissal — a full-screen reader presented from inside a
-    /// dismissing sheet is a race.
     let onSelect: (RemembranceMenu.Entry.Destination) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -24,22 +16,20 @@ struct RemembranceSheet: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 header
 
-                ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
-                    // The instrument is a different kind of thing from a
-                    // set — nothing to read, only counting — so a rule
-                    // separates it rather than a heading nobody needs.
-                    if entry.destination == .freeTasbih, index > 0 {
-                        OrnamentalDivider(tint: tokens.metal, opacity: 0.4)
-                            .padding(.horizontal, IhsanSpacing.md)
-                            .padding(.vertical, IhsanSpacing.sm)
-                    }
-                    row(entry)
+                if let featured = entries.first(where: \.isFeatured) {
+                    featuredRow(featured)
+                        .padding(.horizontal, IhsanSpacing.md)
+                }
+
+                let supporting = entries.filter { !$0.isFeatured }
+                if !supporting.isEmpty {
+                    supportingRows(supporting)
                 }
             }
-            .padding(.bottom, IhsanSpacing.md)
+            .padding(.bottom, IhsanSpacing.lg)
             .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
                 contentHeight = height
             }
@@ -48,7 +38,7 @@ struct RemembranceSheet: View {
         .background { tokens.sheetBacking.ignoresSafeArea() }
         .presentationDetents([.height(contentHeight > 0 ? contentHeight + 12 : 420)])
         .presentationDragIndicator(.visible)
-        .presentationBackground(.thinMaterial)
+        .presentationBackground(.ultraThinMaterial)
     }
 
     private var header: some View {
@@ -57,21 +47,107 @@ struct RemembranceSheet: View {
                 .font(IhsanFont.inscription)
                 .tracking(2.4)
                 .foregroundStyle(tokens.inkSecondary)
-            Text("Any set, any time")
+            Text(headerSubtitle)
                 .font(IhsanFont.bodyEnglish)
                 .foregroundStyle(tokens.ink.opacity(0.75))
         }
         .frame(maxWidth: .infinity)
         .padding(.top, IhsanSpacing.lg)
-        .padding(.bottom, IhsanSpacing.md)
+        .padding(.bottom, IhsanSpacing.sm)
         .accessibilityElement(children: .combine)
+    }
+
+    private var headerSubtitle: String {
+        if entries.contains(where: \.isFeatured) {
+            return "For this moment"
+        }
+        if entries.contains(where: { $0.destination == .set(.sleep) && $0.isCurrent }) {
+            return "For the quiet of night"
+        }
+        return "For prayer and quiet counting"
+    }
+
+    private func supportingRows(_ supporting: [RemembranceMenu.Entry]) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("ALSO AVAILABLE")
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(tokens.inkSecondary)
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.bottom, IhsanSpacing.sm)
+
+            VStack(spacing: 0) {
+                ForEach(Array(supporting.enumerated()), id: \.element.id) { index, entry in
+                    row(entry)
+                    if index < supporting.count - 1 {
+                        Rectangle()
+                            .fill(tokens.panelStroke.opacity(0.6))
+                            .frame(height: IhsanSpacing.hairline)
+                            .padding(.leading, IhsanSpacing.xxl)
+                    }
+                }
+            }
+            .ihsanGlass(
+                in: RoundedRectangle(
+                    cornerRadius: IhsanSpacing.cardRadius,
+                    style: .continuous
+                ),
+                intensity: .subtle,
+                isClear: true
+            )
+            .padding(.horizontal, IhsanSpacing.md)
+        }
+    }
+
+    private func featuredRow(_ entry: RemembranceMenu.Entry) -> some View {
+        Button {
+            select(entry)
+        } label: {
+            HStack(spacing: IhsanSpacing.md) {
+                SequenceMark(state: .current, tokens: tokens)
+
+                VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                    Text("NOW")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.8)
+                        .foregroundStyle(tokens.metal)
+                    Text(entry.title)
+                        .font(IhsanFont.heroPrayerName)
+                        .foregroundStyle(tokens.ink)
+                    if let inscription = windowInscription(entry, showsNow: false) {
+                        Text(inscription)
+                            .font(IhsanFont.inscription)
+                            .tracking(1.2)
+                            .monospacedDigit()
+                            .foregroundStyle(tokens.inkSecondary)
+                    }
+                }
+
+                Spacer(minLength: IhsanSpacing.sm)
+
+                Image(systemName: "arrow.up.right")
+                    .font(IhsanFont.bodyEnglishBold)
+                    .foregroundStyle(tokens.metal)
+            }
+            .padding(IhsanSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .ihsanGlass(
+            in: RoundedRectangle(cornerRadius: IhsanSpacing.cardRadius, style: .continuous),
+            intensity: .hero,
+            isActive: true,
+            isInteractive: true,
+            isClear: true
+        )
+        .accessibilityLabel(spokenLabel(entry))
+        .accessibilityHint("Double-tap to begin.")
     }
 
     private func row(_ entry: RemembranceMenu.Entry) -> some View {
         Button {
-            Haptics.impact(.soft)
-            onSelect(entry.destination)
-            dismiss()
+            select(entry)
         } label: {
             HStack(spacing: IhsanSpacing.sm) {
                 SequenceMark(
@@ -95,32 +171,35 @@ struct RemembranceSheet: View {
                         .foregroundStyle(tokens.inkSecondary)
                         .lineLimit(1)
                 }
+
+                Image(systemName: "chevron.right")
+                    .font(IhsanFont.inscription)
+                    .foregroundStyle(tokens.inkSecondary)
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 11)
+            .padding(.horizontal, IhsanSpacing.md)
+            .padding(.vertical, IhsanSpacing.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .celestialPanel(
-            tokens: tokens,
-            cornerRadius: IhsanSpacing.smallCardRadius,
-            isActive: entry.isCurrent
-        )
-        .padding(.horizontal, IhsanSpacing.md)
-        .padding(.vertical, 3)
         .accessibilityLabel(spokenLabel(entry))
         .accessibilityHint("Double-tap to begin.")
     }
 
-    /// "NOW" beats a clock range for the set whose window is open: the
-    /// row is already marked, and repeating the hours the person is
-    /// currently inside says nothing.
-    private func windowInscription(_ entry: RemembranceMenu.Entry) -> String? {
+    private func select(_ entry: RemembranceMenu.Entry) {
+        Haptics.impact(.soft)
+        onSelect(entry.destination)
+        dismiss()
+    }
+
+    private func windowInscription(
+        _ entry: RemembranceMenu.Entry,
+        showsNow: Bool = true
+    ) -> String? {
         guard let window = entry.window else { return nil }
-        if entry.isCurrent { return "NOW" }
+        if entry.isCurrent, showsNow { return "NOW" }
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.timeZone = timeZone
-        return "\(window.start.formatted(style)) – \(window.end.formatted(style))"
+        return "\(window.start.formatted(style)) - \(window.end.formatted(style))"
             .uppercased()
     }
 

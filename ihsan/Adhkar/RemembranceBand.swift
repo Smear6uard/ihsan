@@ -7,12 +7,12 @@ import SwiftUI
 /// A slim band beneath the focused card, in `AdhkarQuietCard`'s shape
 /// because it is a near relation — but a different thing. The offer
 /// card says *this window is open, once, and you may put it away*. The
-/// band says *any set, any time*, and never goes away.
+/// band says *remembrance for this moment*, and never goes away.
 ///
 /// It exists because remembrance used to be reachable only through that
-/// offer card. A person who wanted the evening adhkār at midnight, or
-/// the morning set in the afternoon, or the tasbīḥ instrument at any
-/// hour without first logging a prayer, had no way in.
+/// offer card. The hub keeps the relevant time-bound set and the
+/// occasion-bound actions in one stable door without presenting a
+/// catalogue.
 ///
 /// It sits outside the pause branch on Today, for the reason written
 /// down in `AdhkarOffer.pauseSuppresses`: a pause suspends salah and

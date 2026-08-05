@@ -6,10 +6,10 @@ import SwiftUI
 /// The log sheet, rebuilt on the two-axis model.
 ///
 /// Structure mirrors the data: **jamāʿah is a toggle** (the
-/// congregation axis) presented distinctly above the **timing
+/// congregation axis) presented distinctly beneath the **timing
 /// choice** (one exclusive selection — On Time / Delayed / Qadā /
 /// Missed). The ornament states ARE the iconography: each timing
-/// tile shows this prayer's own ornament in exactly the state that
+/// row shows this prayer's own ornament in exactly the state that
 /// choice would produce on the plate — gilded for On Time, the warm
 /// outline for Delayed, the lapis pigment for Qadā, the quiet passed
 /// state for Missed. The sheet teaches the plate's language.
@@ -39,7 +39,7 @@ struct PrayerLogSheet: View {
     let isJamaah: Bool
     var isPaused: Bool = false
     /// The timing choices that can be true at this moment for this
-    /// prayer and day — `TimingAvailability`'s answer. Tiles outside
+    /// prayer and day — `TimingAvailability`'s answer. Rows outside
     /// the set render quiet and disabled: visible for learnability,
     /// not selectable.
     let availableStatuses: Set<PrayerStatus>
@@ -57,15 +57,10 @@ struct PrayerLogSheet: View {
     let onCancel: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selectedTiming: PrayerStatus?
     @State private var jamaahOn: Bool
-    /// Measured natural height of the sheet's content — the medium
-    /// detent is sized to exactly this, so there is no dead zone
-    /// between the tiles and the commit button and nothing below the
-    /// footer. At accessibility type sizes the measurement exceeds
-    /// the screen, the detent clamps, and the scroll view takes over.
-    @State private var contentHeight: CGFloat = 0
 
     init(
         prayer: Prayer,
@@ -112,34 +107,29 @@ struct PrayerLogSheet: View {
     }
 
     var body: some View {
-        // One still composition, top to bottom, with no dead zone:
-        // the commit bar rides directly below the tiles, the footer
-        // directly below it. Scrolls only when it must (accessibility
-        // type sizes make the content taller than the screen).
-        ScrollView {
-            VStack(spacing: 0) {
-                header
-                    .padding(.top, IhsanSpacing.lg)
+        GlassEffectContainer(spacing: IhsanSpacing.md) {
+            ScrollView {
+                VStack(spacing: IhsanSpacing.lg) {
+                    header
 
-                jamaahRow
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.top, IhsanSpacing.lg)
+                    timingGrid
 
-                timingGrid
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.top, IhsanSpacing.md)
+                    if selectedTiming != .missed {
+                        jamaahRow
+                            .transition(
+                                reduceMotion
+                                    ? .identity
+                                    : .opacity.combined(with: .move(edge: .top))
+                            )
+                    }
 
-                commitBar
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.top, IhsanSpacing.md)
+                    commitBar
 
-                footer
-                    .padding(.horizontal, IhsanSpacing.lg)
-                    .padding(.top, IhsanSpacing.xs)
-                    .padding(.bottom, IhsanSpacing.sm)
-            }
-            .onGeometryChange(for: CGFloat.self, of: { $0.size.height }) { height in
-                contentHeight = height
+                    footer
+                }
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.top, IhsanSpacing.md)
+                .padding(.bottom, IhsanSpacing.lg)
             }
         }
         .scrollBounceBehavior(.basedOnSize)
@@ -149,13 +139,15 @@ struct PrayerLogSheet: View {
             // Never a gray scrim, never a flat charcoal slab.
             tokens.sheetBacking.ignoresSafeArea()
         }
-        // A medium detent sized to the content itself. No .large:
-        // the sheet holds exactly header + toggle + tiles + commit +
-        // footer, and nothing here justifies a taller pull.
-        .presentationDetents([.height(contentHeight > 0 ? contentHeight + 12 : 560)])
+        .presentationDetents([.fraction(0.82), .large])
+        .presentationContentInteraction(.scrolls)
         .presentationDragIndicator(.visible)
-        .presentationBackground(.thinMaterial)
+        .presentationBackground(.ultraThinMaterial)
         .accessibilityElement(children: .contain)
+        .animation(
+            reduceMotion ? nil : .snappy(duration: 0.30, extraBounce: 0.05),
+            value: selectedTiming
+        )
     }
 
     // MARK: - Header
@@ -197,86 +189,134 @@ struct PrayerLogSheet: View {
     }
 
     private var header: some View {
-        VStack(spacing: IhsanSpacing.xs) {
-            Text("LOG PRAYER")
-                .font(IhsanFont.inscription)
-                .tracking(2.4)
-                .foregroundStyle(tokens.inkSecondary)
+        HStack(spacing: IhsanSpacing.md) {
+            GildedOrnamentGlyph(prayer: prayer, size: IhsanSpacing.xl, tokens: tokens)
+                .frame(width: IhsanSpacing.xxl, height: IhsanSpacing.xxl)
+                .ihsanGlass(in: Circle(), intensity: .subtle, isClear: true)
 
-            HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
-                Text(prayer.displayNameEnglish)
-                    .font(IhsanFont.heroPrayerName)
-                    .foregroundStyle(tokens.ink)
-                Text(prayer.displayNameArabic)
-                    .font(IhsanFont.bodyArabic)
-                    .foregroundStyle(tokens.ink.opacity(0.72))
+            VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                Text("LOG PRAYER")
+                    .font(IhsanFont.inscription)
+                    .tracking(2.2)
+                    .foregroundStyle(tokens.inkSecondary)
+
+                HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+                    Text(prayer.displayNameEnglish)
+                        .font(IhsanFont.heroPrayerName)
+                        .foregroundStyle(tokens.ink)
+                    Text(prayer.displayNameArabic)
+                        .font(IhsanFont.bodyArabic)
+                        .foregroundStyle(tokens.ink.opacity(0.72))
+                }
+
+                Text(timeRangeInscription)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.4)
+                    .monospacedDigit()
+                    .foregroundStyle(tokens.inkSecondary)
             }
-            .padding(.top, IhsanSpacing.xxs)
 
-            Text(timeRangeInscription)
-                .font(IhsanFont.inscription)
-                .tracking(1.6)
-                .monospacedDigit()
-                .foregroundStyle(tokens.inkSecondary)
-                .padding(.top, IhsanSpacing.xxs)
+            Spacer(minLength: IhsanSpacing.xs)
+
+            Button {
+                Haptics.impact(.light)
+                onCancel()
+                dismiss()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(IhsanFont.inscription)
+                    .frame(width: IhsanSpacing.xxl, height: IhsanSpacing.xxl)
+                    .contentShape(Circle())
+            }
+            .buttonStyle(PrayerSheetPressStyle())
+            .ihsanGlass(
+                in: Circle(),
+                intensity: .subtle,
+                isInteractive: true,
+                isClear: true
+            )
+            .foregroundStyle(tokens.inkSecondary)
+            .accessibilityLabel("Close")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.horizontal, IhsanSpacing.lg)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
     }
 
     // MARK: - The congregation axis
 
     /// Jamāʿah is orthogonal to timing, and the layout says so: one
-    /// toggle, its own panel, above the timing choice — never a
+    /// toggle, its own panel, beneath the timing choice — never a
     /// sibling of it. Missed prayers can't have been in congregation.
     private var jamaahRow: some View {
         let disabled = selectedTiming == .missed
-        return HStack(spacing: IhsanSpacing.md) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(IhsanVocabulary.inJamaahTitle)
-                    .font(IhsanFont.rowPrayerName)
-                    .foregroundStyle(tokens.ink.opacity(disabled ? 0.4 : 1))
-                Text("PRAYED IN CONGREGATION")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.4)
-                    .foregroundStyle(tokens.inkSecondary.opacity(disabled ? 0.5 : 1))
+        return Toggle(isOn: $jamaahOn) {
+            HStack(spacing: IhsanSpacing.md) {
+                Image(systemName: "person.2")
+                    .font(IhsanFont.bodyEnglishBold)
+                    .foregroundStyle(tokens.metal)
+                    .frame(width: IhsanSpacing.xl)
+
+                VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
+                    Text(IhsanVocabulary.inJamaahTitle)
+                        .font(IhsanFont.bodyEnglishBold)
+                        .foregroundStyle(tokens.ink.opacity(disabled ? 0.4 : 1))
+                    Text("PRAYED IN CONGREGATION")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .foregroundStyle(tokens.inkSecondary.opacity(disabled ? 0.5 : 1))
+                }
             }
-            Spacer()
-            Toggle("", isOn: $jamaahOn)
-                .labelsHidden()
-                .tint(tokens.leafGold)
-                .disabled(disabled)
         }
+        .toggleStyle(.switch)
+        .tint(tokens.leafGold)
+        .disabled(disabled)
         .padding(.horizontal, IhsanSpacing.md)
-        .padding(.vertical, IhsanSpacing.sm + 2)
-        .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: jamaahOn && !disabled)
+        .padding(.vertical, IhsanSpacing.md)
+        .ihsanGlass(
+            in: RoundedRectangle(cornerRadius: IhsanSpacing.cardRadius, style: .continuous),
+            intensity: .regular,
+            isActive: jamaahOn && !disabled,
+            isInteractive: !disabled,
+            isClear: true
+        )
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("\(IhsanVocabulary.inJamaahTitle), prayed in congregation")
         .accessibilityValue(disabled ? "unavailable for missed" : (jamaahOn ? "on" : "off"))
-        .accessibilityAddTraits(.isToggle)
-        .onTapGesture {
-            guard !disabled else { return }
+        .onChange(of: jamaahOn) {
             Haptics.impact(.light)
-            jamaahOn.toggle()
         }
     }
 
     // MARK: - The timing axis
 
+    private static let timingChoices: [PrayerStatus] = [
+        .onTime, .late, .qada, .missed
+    ]
+
     private var timingGrid: some View {
-        let columns = [
-            GridItem(.flexible(), spacing: IhsanSpacing.sm),
-            GridItem(.flexible(), spacing: IhsanSpacing.sm),
-        ]
-        // Names and captions come from `PrayerStatus`'s own vocabulary
-        // — the sheet does not get to phrase the timing axis itself.
-        // On Time and Delayed are both INSIDE the window; qadā is the
-        // one that happens after it.
-        return LazyVGrid(columns: columns, spacing: IhsanSpacing.sm) {
-            timingTile(.onTime)
-            timingTile(.late)
-            timingTile(.qada)
-            timingTile(.missed)
+        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+            Text("WHEN IT WAS PRAYED")
+                .font(IhsanFont.inscription)
+                .tracking(1.8)
+                .foregroundStyle(tokens.inkSecondary)
+                .padding(.leading, IhsanSpacing.xs)
+
+            VStack(spacing: 0) {
+                ForEach(Array(Self.timingChoices.enumerated()), id: \.element) { index, timing in
+                    timingTile(timing)
+                    if index < Self.timingChoices.count - 1 {
+                        Rectangle()
+                            .fill(tokens.panelStroke.opacity(0.55))
+                            .frame(height: IhsanSpacing.hairline)
+                            .padding(.leading, IhsanSpacing.xxl + IhsanSpacing.lg)
+                    }
+                }
+            }
+            .ihsanGlass(
+                in: RoundedRectangle(cornerRadius: IhsanSpacing.cardRadius, style: .continuous),
+                intensity: .regular,
+                isClear: true
+            )
         }
     }
 
@@ -295,49 +335,54 @@ struct PrayerLogSheet: View {
         let available = availableStatuses.contains(timing)
         return Button {
             Haptics.impact(.light)
-            selectedTiming = timing
-            if timing == .missed { jamaahOn = false }
+            withAnimation(reduceMotion ? nil : .snappy(duration: 0.28, extraBounce: 0.06)) {
+                selectedTiming = timing
+                if timing == .missed { jamaahOn = false }
+            }
         } label: {
-            VStack(spacing: IhsanSpacing.xs + 2) {
+            HStack(spacing: IhsanSpacing.md) {
                 tileOrnament(for: timing)
-                    .frame(width: 30, height: 30)
-                Text(title)
-                    .font(IhsanFont.rowPrayerName)
-                    .fontWeight(selected ? .semibold : .regular)
-                    .foregroundStyle(tokens.ink)
-                Text(caption)
-                    .font(IhsanFont.inscription)
-                    .tracking(1.1)
-                    .foregroundStyle(tokens.inkSecondary)
-                    .multilineTextAlignment(.center)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.8)
+                    .frame(width: IhsanSpacing.xl, height: IhsanSpacing.xl)
+
+                VStack(alignment: .leading, spacing: IhsanSpacing.xxs) {
+                    Text(title)
+                        .font(selected ? IhsanFont.bodyEnglishBold : IhsanFont.bodyEnglish)
+                        .foregroundStyle(tokens.ink)
+                    Text(caption)
+                        .font(IhsanFont.inscription)
+                        .tracking(1.0)
+                        .foregroundStyle(tokens.inkSecondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer(minLength: IhsanSpacing.sm)
+
+                Image(systemName: selected ? "checkmark.circle.fill" : "circle")
+                    .font(IhsanFont.bodyEnglishBold)
+                    .foregroundStyle(selected ? tokens.metal : tokens.inkSecondary.opacity(0.55))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, IhsanSpacing.md)
-            .padding(.horizontal, IhsanSpacing.xs)
+            .padding(.horizontal, IhsanSpacing.md)
+            .background {
+                if selected {
+                    RoundedRectangle(
+                        cornerRadius: IhsanSpacing.smallCardRadius,
+                        style: .continuous
+                    )
+                    .fill(tokens.leafGold.opacity(0.10))
+                    .padding(IhsanSpacing.xs)
+                }
+            }
             .contentShape(Rectangle())
             // The whole face quiets together — ornament, title, and
             // caption stay legible as one muted unit, teaching what
             // the state means even while it cannot be chosen.
             .opacity(available ? 1 : Self.unavailableTileOpacity)
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PrayerSheetPressStyle())
         .disabled(!available)
-        .celestialPanel(tokens: tokens, cornerRadius: 16, isActive: selected)
-        .overlay {
-            // Selection is form + weight, never hue alone: the chosen
-            // tile takes the illuminated double rule — a heavier gold
-            // border with an inset hairline echo — and its title turns
-            // semibold above.
-            if selected {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .strokeBorder(tokens.leafGold.opacity(0.90), lineWidth: 1.6)
-                RoundedRectangle(cornerRadius: 12.5, style: .continuous)
-                    .strokeBorder(tokens.metal.opacity(0.55), lineWidth: 0.75)
-                    .padding(3.5)
-            }
-        }
         .accessibilityLabel("\(title), \(caption.lowercased())")
         .accessibilityValue(available ? "" : "not available now")
         .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -421,26 +466,28 @@ struct PrayerLogSheet: View {
             onCommit(timing, jamaahOn)
             dismiss()
         } label: {
-            Text(Self.commitTitle(prayer: prayer, isEditing: currentStatus != nil).uppercased())
-                .font(IhsanFont.inscription)
-                .tracking(2.2)
-                .foregroundStyle(commitEnabled ? tokens.keyline : tokens.inkSecondary.opacity(0.5))
+            HStack(spacing: IhsanSpacing.sm) {
+                Text(Self.commitTitle(prayer: prayer, isEditing: currentStatus != nil))
+                    .font(IhsanFont.bodyEnglishBold)
+
+                Image(systemName: "arrow.right")
+                    .font(IhsanFont.inscription)
+            }
+                .foregroundStyle(commitEnabled ? tokens.ink : tokens.inkSecondary.opacity(0.55))
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, IhsanSpacing.sm + 4)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(commitEnabled ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.panelFill.opacity(0.6)))
-                }
-                .overlay {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(
-                            commitEnabled ? tokens.keyline.opacity(0.55) : tokens.panelStroke.opacity(0.6),
-                            lineWidth: 0.8
-                        )
-                }
+                .padding(.vertical, IhsanSpacing.md)
+                .contentShape(Capsule(style: .continuous))
         }
-        .buttonStyle(.plain)
+        .buttonStyle(PrayerSheetPressStyle())
         .disabled(!commitEnabled)
+        .ihsanGlass(
+            in: Capsule(style: .continuous),
+            intensity: commitEnabled ? .hero : .subtle,
+            isActive: commitEnabled,
+            isInteractive: commitEnabled,
+            isClear: true
+        )
+        .opacity(commitEnabled ? 1 : 0.72)
         .accessibilityLabel(Self.commitTitle(prayer: prayer, isEditing: currentStatus != nil))
         .accessibilityHint(commitEnabled ? "" : "Choose a timing first.")
     }
@@ -450,23 +497,8 @@ struct PrayerLogSheet: View {
     // MARK: - Footer
 
     private var footer: some View {
-        HStack(spacing: IhsanSpacing.md) {
-            Button {
-                Haptics.impact(.light)
-                onCancel()
-                dismiss()
-            } label: {
-                Text("CANCEL")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.8)
-                    .foregroundStyle(tokens.inkSecondary)
-                    .padding(.vertical, IhsanSpacing.sm)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Cancel")
-
-            Spacer()
-
+        HStack {
+            Spacer(minLength: 0)
             // The excused-pause droplet, with its quiet name. One tap
             // begins a pause, the same control ends it. Ihsan does
             // not ask why. A pause is a statement about NOW — the
@@ -487,9 +519,27 @@ struct PrayerLogSheet: View {
                     .foregroundStyle(tokens.inkSecondary)
                     .padding(.vertical, IhsanSpacing.sm)
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(PrayerSheetPressStyle())
                 .accessibilityLabel(isPaused ? "End the pause" : "Begin a pause")
             }
+            Spacer(minLength: 0)
         }
+    }
+}
+
+/// A restrained press response for controls already carrying native
+/// Liquid Glass. Transform and opacity keep the interaction on the
+/// compositor and avoid the abrupt flash of the legacy sheet.
+private struct PrayerSheetPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.985 : 1)
+            .opacity(configuration.isPressed ? 0.82 : 1)
+            .animation(
+                reduceMotion ? nil : .snappy(duration: 0.18, extraBounce: 0.04),
+                value: configuration.isPressed
+            )
     }
 }

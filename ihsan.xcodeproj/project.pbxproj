@@ -33,6 +33,7 @@
 		6B00000000000000000B0005 /* IhsanIntents in Frameworks */ = {isa = PBXBuildFile; productRef = 6B00000000000000000C0005 /* IhsanIntents */; };
 		7C00000000000000000D0001 /* ihsanWatch.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = 5A00000000000000000A0002 /* ihsanWatch.app */; platformFilter = ios; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		7C00000000000000000E0001 /* ihsanWatchWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 6B00000000000000000A0002 /* ihsanWatchWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		9A00000000000000000B0001 /* IhsanInsights in Frameworks */ = {isa = PBXBuildFile; productRef = 9A00000000000000000C0001 /* IhsanInsights */; };
 		ADC19F43D9CC99D8E04A514D /* ihsanWidgets/LiveActivities/PrayerActivityAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = AC1C02685A2B52C41F7FC2B4 /* ihsanWidgets/LiveActivities/PrayerActivityAttributes.swift */; };
 		E1861EED40D9A99C7BFE9DB2 /* ActivityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = B251AD43FD8E68139A77692A /* ActivityKit.framework */; };
 /* End PBXBuildFile section */
@@ -210,6 +211,7 @@
 				428FEED62FAF30000097E665 /* IhsanDesignSystem in Frameworks */,
 				428FEEE02FAF30000097E665 /* IhsanFiqhConfig in Frameworks */,
 				4F4A1C2044EF273BD83594AD /* IhsanNotifications in Frameworks */,
+				9A00000000000000000B0001 /* IhsanInsights in Frameworks */,
 				E1861EED40D9A99C7BFE9DB2 /* ActivityKit.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -335,6 +337,7 @@
 				428FEED72FAF30000097E665 /* IhsanDesignSystem */,
 				428FEEE12FAF30000097E665 /* IhsanFiqhConfig */,
 				013613F2DD60853016B1DAFC /* IhsanNotifications */,
+				9A00000000000000000C0001 /* IhsanInsights */,
 			);
 			productName = ihsan;
 			productReference = 428FEE9D2FAF234A0097E665 /* ihsan.app */;
@@ -523,6 +526,7 @@
 				428FEED82FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanDesignSystem" */,
 				428FEEE22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanFiqhConfig" */,
 				30F1FBBCA800318839855141 /* XCLocalSwiftPackageReference "Packages/IhsanNotifications" */,
+				9A00000000000000000D0001 /* XCLocalSwiftPackageReference "Packages/IhsanInsights" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 428FEE9E2FAF234A0097E665 /* Products */;
@@ -1261,6 +1265,10 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = Packages/IhsanFiqhConfig;
 		};
+		9A00000000000000000D0001 /* XCLocalSwiftPackageReference "Packages/IhsanInsights" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/IhsanInsights;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1373,6 +1381,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 428FEED22FAF30000097E665 /* XCLocalSwiftPackageReference "Packages/IhsanIntents" */;
 			productName = IhsanIntents;
+		};
+		9A00000000000000000C0001 /* IhsanInsights */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9A00000000000000000D0001 /* XCLocalSwiftPackageReference "Packages/IhsanInsights" */;
+			productName = IhsanInsights;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

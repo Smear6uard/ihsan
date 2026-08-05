@@ -1125,3 +1125,25 @@ system's half of each contract.
   match what the person would recognise — and that any
   `cycleDuplicate` flag Path shows is genuinely two records of one
   prayer rather than an artefact.
+
+## Corrective L — contextual remembrance and on-device insight
+
+- **The prayer log sheet's glass in the hand.** The timing choices are
+  now one continuous Liquid Glass group, the commit surface is
+  interactive glass, and the congregation axis is one native toggle
+  target. Confirm the tall-to-large drag, pressed response, and
+  material separation on an iPhone in all four sky phases. Repeat with
+  Reduce Motion and Reduce Transparency enabled.
+- **The time-aware remembrance menu at its boundaries.** Open the menu
+  just before and after the morning and evening window boundaries and
+  confirm only the currently valid time-bound set appears. At night,
+  confirm Before Sleep remains a supporting occasion rather than
+  competing with a featured clock-bound set.
+- **Foundation Models on an Apple Intelligence-capable device.** The app
+  and package compile against the system framework, availability and
+  locale are gated, and tests pin filtering, retry, fallback, caching,
+  and raw-log exclusion. On hardware with the model available, confirm
+  a 7D and 30D Path insight appears, updates after a log or tasbīḥ
+  sitting changes, and remains absent when the On-Device Insights
+  setting is disabled. Also confirm an unsupported locale or temporarily
+  unavailable model leaves no empty card or upgrade state.

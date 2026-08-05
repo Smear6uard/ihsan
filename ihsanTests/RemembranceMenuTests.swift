@@ -4,7 +4,6 @@ import IhsanPrayerTimes
 import Testing
 @testable import ihsan
 
-/// The rules for the always-open door to remembrance.
 @Suite("Remembrance menu")
 struct RemembranceMenuTests {
 
@@ -32,28 +31,37 @@ struct RemembranceMenuTests {
         )
     }
 
-    // MARK: - The rule the hub exists for
+    // MARK: - Time-aware catalogue
 
-    /// Every set is reachable at every hour. The per-window toggles
-    /// govern whether the app *offers* a set unprompted; they were never
-    /// meant to govern whether someone who goes looking can find one.
     @Test
-    func everySetIsListedOutsideItsWindow() {
-        // 2pm: no remembrance window is open at all.
+    func middayDoesNotShowEitherTimeBoundSet() {
         let midAfternoon = entries(at: 14)
-        for category in RemembranceMenu.setOrder {
-            #expect(
-                midAfternoon.contains { $0.destination == .set(category) },
-                "\(category) must be reachable outside its window"
-            )
-        }
+        #expect(!midAfternoon.contains { $0.destination == .set(.morning) })
+        #expect(!midAfternoon.contains { $0.destination == .set(.evening) })
     }
 
     @Test
-    func theListDoesNotChangeWithTheHour() {
-        let morning = entries(at: 6).map(\.id)
-        let night = entries(at: 23).map(\.id)
-        #expect(morning == night)
+    func morningShowsMorningButNeverEvening() {
+        let morning = entries(at: 6)
+        #expect(morning.contains { $0.destination == .set(.morning) })
+        #expect(!morning.contains { $0.destination == .set(.evening) })
+    }
+
+    @Test
+    func eveningShowsEveningButNeverMorning() {
+        let evening = entries(at: 17)
+        #expect(evening.contains { $0.destination == .set(.evening) })
+        #expect(!evening.contains { $0.destination == .set(.morning) })
+    }
+
+    @Test
+    func occasionBoundActionsStayAvailable() {
+        for hour in [6.0, 14.0, 17.0, 23.0] {
+            let destinations = entries(at: hour).map(\.destination)
+            #expect(destinations.contains(.set(.postPrayer)))
+            #expect(destinations.contains(.set(.sleep)))
+            #expect(destinations.contains(.freeTasbih))
+        }
     }
 
     @Test
@@ -61,39 +69,35 @@ struct RemembranceMenuTests {
         #expect(entries(at: 6).last?.destination == .freeTasbih)
     }
 
-    @Test
-    func setsAreListedInTheDaysOwnOrder() {
-        let sets = entries(at: 14).compactMap { entry -> AdhkarCategory? in
-            if case .set(let category) = entry.destination { return category }
-            return nil
-        }
-        #expect(sets == [.morning, .evening, .postPrayer, .sleep])
-    }
-
-    // MARK: - Windows are shown, not enforced
+    // MARK: - Emphasis
 
     @Test
-    func aSetInsideItsWindowIsMarkedCurrent() {
-        let duringMorning = entries(at: 7)
+    func theCurrentTimeSetIsTheOnlyFeaturedEntry() {
+        let duringMorning = entries(at: 6)
         let morning = duringMorning.first { $0.destination == .set(.morning) }
         #expect(morning?.isCurrent == true)
-
-        let evening = duringMorning.first { $0.destination == .set(.evening) }
-        #expect(evening?.isCurrent == false)
+        #expect(morning?.isFeatured == true)
+        #expect(duringMorning.filter(\.isFeatured).count == 1)
     }
 
     @Test
-    func nothingIsCurrentWhenNoWindowIsOpen() {
-        #expect(entries(at: 14).allSatisfy { !$0.isCurrent })
+    func nothingIsFeaturedWhenNoTimeWindowIsOpen() {
+        #expect(entries(at: 14).allSatisfy { !$0.isFeatured })
     }
 
-    /// The after-prayer set follows a prayer, not a clock, so it carries
-    /// no window and can never be marked current by the hour.
     @Test
     func afterPrayerCarriesNoWindow() {
         let entry = entries(at: 7).first { $0.destination == .set(.postPrayer) }
         #expect(entry?.window == nil)
         #expect(entry?.isCurrent == false)
+        #expect(entry?.isFeatured == false)
+    }
+
+    @Test
+    func sleepIsCurrentAtNightButRemainsSupporting() {
+        let entry = entries(at: 23).first { $0.destination == .set(.sleep) }
+        #expect(entry?.isCurrent == true)
+        #expect(entry?.isFeatured == false)
     }
 
     @Test
@@ -102,10 +106,8 @@ struct RemembranceMenuTests {
         #expect(entry?.window == nil)
     }
 
-    // MARK: - The scholar-review gate
+    // MARK: - Scholar-review gate
 
-    /// Unreviewed content in a release build surfaces no text at all.
-    /// The instrument survives — it has nothing to read.
     @Test
     func unavailableContentWithholdsEverySet() {
         let entries = RemembranceMenu.entries(
@@ -114,7 +116,6 @@ struct RemembranceMenuTests {
         #expect(entries.map(\.destination) == [.freeTasbih])
     }
 
-    /// And in that state the door does not open a hub of one row.
     @Test
     func theHubOnlyOpensWhenThereIsSomethingToList() {
         #expect(RemembranceMenu.showsHub(isContentAvailable: true))

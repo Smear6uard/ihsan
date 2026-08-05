@@ -51,19 +51,31 @@ final class RemembranceDoorUITests: XCTestCase {
     // MARK: - The door
 
     @MainActor
-    func testEverySetIsReachableWhenNoWindowIsOpen() throws {
+    func testOnlyOccasionBoundActionsRemainWhenNoTimeWindowIsOpen() throws {
         let app = launch()
         openHub(app)
 
-        for name in ["Morning adhkār", "Evening adhkār", "After prayer", "Before sleep"] {
+        for name in ["After prayer", "Before sleep"] {
             let row = app.descendants(matching: .any)
                 .matching(NSPredicate(format: "label BEGINSWITH %@", name))
                 .firstMatch
             XCTAssertTrue(
                 row.waitForExistence(timeout: 6),
-                "\(name) must be reachable outside its window."
+                "\(name) must remain reachable as an occasion-bound action."
             )
         }
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH 'Morning adhkār'"))
+                .firstMatch.exists,
+            "Morning adhkār must be absent after its window closes."
+        )
+        XCTAssertFalse(
+            app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label BEGINSWITH 'Evening adhkār'"))
+                .firstMatch.exists,
+            "Evening adhkār must be absent before its window opens."
+        )
         XCTAssertTrue(app.buttons["Free tasbīḥ"].exists, "The instrument must be listed.")
     }
 
@@ -75,7 +87,7 @@ final class RemembranceDoorUITests: XCTestCase {
         openHub(app)
 
         app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label BEGINSWITH 'Morning adhkār'"))
+            .matching(NSPredicate(format: "label BEGINSWITH 'After prayer'"))
             .firstMatch
             .tap()
 

@@ -1,4 +1,5 @@
 import Testing
+import IhsanCore
 @testable import IhsanInsights
 
 @Test
@@ -30,4 +31,26 @@ func contentFilterAcceptsNeutralFactualSummary() {
     let text = "Fajr was prayed on time on 14 of 30 days. Asr was prayed on time on 22 of 30 days."
 
     #expect(InsightContentFilter.accepts(text))
+}
+
+@Test
+func contentFilterRejectsUnknownStructuredPrayerNames() {
+    let insight = WeeklyInsight(
+        summarySentence: "Fajr was prayed on time on 5 of 7 days.",
+        mostConsistentPrayer: "Sunrise",
+        leastConsistentPrayer: Prayer.fajr.displayNameEnglish
+    )
+
+    #expect(!InsightContentFilter.accepts(insight))
+}
+
+@Test
+func contentFilterRejectsEmptyStructuredSummary() {
+    let insight = WeeklyInsight(
+        summarySentence: "   ",
+        mostConsistentPrayer: Prayer.asr.displayNameEnglish,
+        leastConsistentPrayer: Prayer.fajr.displayNameEnglish
+    )
+
+    #expect(!InsightContentFilter.accepts(insight))
 }

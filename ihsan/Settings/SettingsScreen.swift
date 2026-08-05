@@ -5,6 +5,7 @@ import UserNotifications
 import IhsanCore
 import IhsanDesignSystem
 import IhsanFiqhConfig
+import IhsanInsights
 import IhsanLocation
 import IhsanNotifications
 import IhsanPrayerTimes
@@ -87,6 +88,9 @@ struct SettingsScreen: View {
                         FastingSection(settings: settings)
                         DisplaySection(settings: settings, path: $path)
                         ReflectionSyncSection(settings: settings)
+                        if InsightAvailability.isAvailable {
+                            OnDeviceInsightsSection(settings: settings)
+                        }
                         PrivacySection(
                             onExport: exportData,
                             onDelete: {
@@ -1587,6 +1591,35 @@ private struct ReflectionSyncSection: View {
             }
 
             SettingsDescriptionText("Voice recordings stay on this device by default. Enable to sync audio across your Apple devices via iCloud private database.")
+        }
+    }
+}
+
+/// This section is intentionally absent when Apple Intelligence is not
+/// available. There is no disabled control or device-upgrade prompt.
+private struct OnDeviceInsightsSection: View {
+    let settings: UserSettings
+
+    var body: some View {
+        SettingsSectionCard("On-device Insights") {
+            SettingsRow(
+                title: "Prayer pattern insights",
+                subtitle: "Weekly and monthly",
+                glyph: .privacy
+            ) {
+                Toggle("", isOn: Binding(
+                    get: { settings.aiInsightsEnabled },
+                    set: {
+                        settings.aiInsightsEnabled = $0
+                        settings.modifiedAt = .now
+                    }
+                ))
+                .labelsHidden()
+                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                .accessibilityLabel("On-device prayer pattern insights")
+            }
+
+            SettingsDescriptionText("Apple Intelligence summarizes the numeric pattern already shown in Path. Processing stays on this device; Ihsan never sends prayer data to a server.")
         }
     }
 }

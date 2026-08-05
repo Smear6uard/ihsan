@@ -92,16 +92,22 @@ public extension View {
     ///   - intensity: Tier that scales the tint contribution.
     ///   - isActive: Adds a luminous tinted ring and inner radial glow
     ///     to mark this as the "current prayer" surface.
+    ///   - isClear: Uses the neutral clear Liquid Glass character while
+    ///     retaining Ihsan's edge and active-state treatments.
     func ihsanGlass<S: InsettableShape>(
         in shape: S,
         intensity: GlassIntensity = .regular,
-        isActive: Bool = false
+        isActive: Bool = false,
+        isInteractive: Bool = false,
+        isClear: Bool = false
     ) -> some View {
         modifier(
             IhsanGlassModifier(
                 shape: shape,
                 intensity: intensity,
-                isActive: isActive
+                isActive: isActive,
+                isInteractive: isInteractive,
+                isClear: isClear
             )
         )
     }
@@ -111,7 +117,9 @@ public extension View {
     /// no-shape overload that uses the standard card radius.
     func ihsanGlass(
         intensity: GlassIntensity = .regular,
-        isActive: Bool = false
+        isActive: Bool = false,
+        isInteractive: Bool = false,
+        isClear: Bool = false
     ) -> some View {
         ihsanGlass(
             in: RoundedRectangle(
@@ -119,7 +127,9 @@ public extension View {
                 style: .continuous
             ),
             intensity: intensity,
-            isActive: isActive
+            isActive: isActive,
+            isInteractive: isInteractive,
+            isClear: isClear
         )
     }
 
@@ -134,6 +144,8 @@ internal struct IhsanGlassModifier<S: InsettableShape>: ViewModifier {
     let shape: S
     let intensity: GlassIntensity
     let isActive: Bool
+    let isInteractive: Bool
+    let isClear: Bool
     @Environment(\.timeOfDayOverride) private var override
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
@@ -150,6 +162,8 @@ internal struct IhsanGlassModifier<S: InsettableShape>: ViewModifier {
                     baseTint: baseTint,
                     intensity: intensity,
                     isActive: isActive,
+                    isInteractive: isInteractive,
+                    isClear: isClear,
                     reduceTransparency: reduceTransparency
                 )
             )
@@ -165,6 +179,8 @@ private struct IhsanGlassBaseLayer<S: InsettableShape>: ViewModifier {
     let baseTint: Color
     let intensity: GlassIntensity
     let isActive: Bool
+    let isInteractive: Bool
+    let isClear: Bool
     let reduceTransparency: Bool
 
     func body(content: Content) -> some View {
@@ -182,12 +198,15 @@ private struct IhsanGlassBaseLayer<S: InsettableShape>: ViewModifier {
                         }
                 }
         } else {
+            let glass = isClear
+                ? Glass.clear.interactive(isInteractive)
+                : Glass.regular.tint(glassTint).interactive(isInteractive)
             content
                 // iOS 26 native Liquid Glass. The tint passed in here is
                 // what gives the surface its iridescent, time-of-day
                 // quality — the ground beneath stays constant.
                 .glassEffect(
-                    .regular.tint(glassTint),
+                    glass,
                     in: shape
                 )
                 // Inner radial glow — only present on the active prayer

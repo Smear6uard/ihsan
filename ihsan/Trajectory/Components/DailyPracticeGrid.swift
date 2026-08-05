@@ -175,75 +175,94 @@ struct DailyPracticeGrid: View {
     /// honest answer is a list.
     @ViewBuilder
     private func voluntaryDetail(_ detail: DayVoluntaryDetail) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+            HStack(spacing: IhsanSpacing.sm) {
+                FourPointedStar()
+                    .fill(tokens.metal)
+                    .frame(width: IhsanSpacing.sm, height: IhsanSpacing.sm)
+                Text("BEYOND THE FIVE")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(tokens.inkSecondary)
+            }
+
             if !detail.naflKinds.isEmpty {
-                detailSection(label: "NAFL") {
-                    ChipFlow(spacing: 6) {
-                        ForEach(Array(detail.naflKinds.enumerated()), id: \.offset) { _, kind in
-                            naflChip(kind)
-                        }
-                    }
+                detailLine(title: "Voluntary prayer") {
+                    Text(detail.naflKinds.map(\.displayNameEnglish).joined(separator: " · "))
+                        .font(IhsanFont.bodyEnglish)
+                        .foregroundStyle(tokens.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
+
+            if !detail.naflKinds.isEmpty, !detail.sittings.isEmpty {
+                Rectangle()
+                    .fill(tokens.panelStroke.opacity(0.55))
+                    .frame(height: IhsanSpacing.hairline)
+                    .padding(.leading, IhsanSpacing.xl + IhsanSpacing.sm)
+            }
+
             if !detail.sittings.isEmpty {
-                detailSection(label: "DHIKR") {
-                    VStack(alignment: .leading, spacing: 3) {
+                detailLine(title: "Remembrance") {
+                    VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
                         ForEach(detail.sittings) { sitting in
-                            Text("\(sitting.label) · \(sitting.count)")
-                                .font(.system(.caption, design: .serif))
-                                .foregroundStyle(tokens.ink)
+                            HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+                                Text(sitting.label)
+                                    .font(IhsanFont.bodyEnglish)
+                                    .foregroundStyle(tokens.ink)
+                                Spacer(minLength: IhsanSpacing.sm)
+                                Text("\(sitting.count)")
+                                    .font(IhsanFont.tabular)
+                                    .foregroundStyle(tokens.inkSecondary)
+                            }
                         }
                     }
                 }
             }
         }
+        .padding(IhsanSpacing.md)
+        .background {
+            RoundedRectangle(
+                cornerRadius: IhsanSpacing.smallCardRadius,
+                style: .continuous
+            )
+            .fill(tokens.panelFill.opacity(0.48))
+        }
+        .overlay(alignment: .leading) {
+            Capsule(style: .continuous)
+                .fill(tokens.metal.opacity(0.75))
+                .frame(width: IhsanSpacing.xxs)
+                .padding(.vertical, IhsanSpacing.md)
+        }
         .padding(.leading, dateColumnWidth)
-        .padding(.top, 2)
-        .padding(.bottom, 6)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(detail.spokenSummary)
-        .transition(reduceMotion ? .identity : .opacity)
+        .transition(
+            reduceMotion
+                ? .identity
+                : .opacity.combined(with: .move(edge: .top))
+        )
     }
 
     @ViewBuilder
-    private func detailSection<Content: View>(
-        label: String, @ViewBuilder content: () -> Content
+    private func detailLine<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
     ) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Text(label)
-                .font(IhsanFont.inscription)
-                .tracking(1.3)
-                .foregroundStyle(tokens.inkSecondary)
-                .frame(width: 44, alignment: .leading)
-            content()
-        }
-    }
+        HStack(alignment: .top, spacing: IhsanSpacing.sm) {
+            Circle()
+                .fill(tokens.metal.opacity(0.85))
+                .frame(width: IhsanSpacing.xs, height: IhsanSpacing.xs)
+                .frame(width: IhsanSpacing.xl, height: IhsanSpacing.xl)
 
-    /// One recorded voluntary prayer: the ornament of the fard it
-    /// surrounds where it has one, the four-pointed mark where it
-    /// stands alone, and its name.
-    private func naflChip(_ kind: NaflKind) -> some View {
-        HStack(spacing: 4) {
-            Group {
-                if let fard = kind.surroundedFard {
-                    PrayerOrnamentShape(prayer: fard, mode: .outline)
-                        .stroke(tokens.metal.opacity(0.85), lineWidth: 0.9)
-                } else {
-                    FourPointedStar()
-                        .fill(tokens.metal.opacity(0.85))
-                }
+            VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                Text(title)
+                    .font(IhsanFont.bodyEnglishBold)
+                    .foregroundStyle(tokens.ink)
+                content()
             }
-            .frame(width: 9, height: 9)
-            Text(kind.displayNameEnglish)
-                .font(.system(.caption2, weight: .medium))
-                .foregroundStyle(tokens.ink)
-        }
-        .padding(.horizontal, 7)
-        .padding(.vertical, 3)
-        .background {
-            Capsule(style: .continuous)
-                .strokeBorder(tokens.keyline.opacity(0.35), lineWidth: 0.6)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -408,71 +427,4 @@ struct DailyPracticeGrid: View {
         .padding()
     }
     .background(tokens.pageGroundFlat)
-}
-
-// MARK: - Chip flow
-
-/// A one-purpose wrapping row: chips laid left to right, wrapping when
-/// the line runs out. A grid would give every chip the widest chip's
-/// width, and "Duha" beside "Before Maghrib" would sit in a column of
-/// air.
-private struct ChipFlow: Layout {
-    var spacing: CGFloat = 6
-
-    func sizeThatFits(
-        proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-    ) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let rows = self.rows(subviews: subviews, width: width)
-        let height = rows.reduce(0) { $0 + $1.height } +
-            spacing * CGFloat(max(0, rows.count - 1))
-        let widest = rows.map(\.width).max() ?? 0
-        return CGSize(width: min(width, max(widest, 0)), height: height)
-    }
-
-    func placeSubviews(
-        in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()
-    ) {
-        var y = bounds.minY
-        for row in rows(subviews: subviews, width: bounds.width) {
-            var x = bounds.minX
-            for index in row.indices {
-                let size = subviews[index].sizeThatFits(.unspecified)
-                subviews[index].place(
-                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
-                    proposal: ProposedViewSize(size)
-                )
-                x += size.width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    private struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    private func rows(subviews: Subviews, width: CGFloat) -> [Row] {
-        var rows: [Row] = []
-        var current = Row()
-        for index in subviews.indices {
-            let size = subviews[index].sizeThatFits(.unspecified)
-            let advance = current.indices.isEmpty ? size.width : size.width + spacing
-            if !current.indices.isEmpty, current.width + advance > width {
-                rows.append(current)
-                current = Row()
-                current.indices = [index]
-                current.width = size.width
-                current.height = size.height
-            } else {
-                current.indices.append(index)
-                current.width += advance
-                current.height = max(current.height, size.height)
-            }
-        }
-        if !current.indices.isEmpty { rows.append(current) }
-        return rows
-    }
 }

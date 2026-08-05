@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import IhsanCore
 import IhsanDesignSystem
+import IhsanInsights
 import IhsanIntents
 
 /// The Trajectory tab.
@@ -55,14 +56,19 @@ struct TrajectoryScreen: View {
     private var naflLogs: [NaflLog]
     @Query(sort: \DhikrSession.sessionDate)
     private var dhikrSessions: [DhikrSession]
+    @Query(sort: \PeriodSummary.periodStart, order: .reverse)
+    private var periodSummaries: [PeriodSummary]
 
     @State private var viewModel = TrajectoryViewModel()
     @State private var showingRepairSetup = false
     @State private var showingRepairDetail = DebugLaunch.flag("-IhsanDebugPresentRepair")
     /// A grid cell awaiting the retroactive log sheet.
     @State private var retroSelection: RetroLogSelection?
+    @State private var insightText: String?
+    @State private var isInsightLoading = false
 
     @Environment(\.nowProvider) private var nowProvider
+    @Environment(\.modelContext) private var modelContext
 
     private var settings: UserSettings? {
         settingsRows.first
@@ -73,6 +79,34 @@ struct TrajectoryScreen: View {
     private var logSignature: String {
         logs.map { "\($0.id.uuidString):\($0.modifiedAt.timeIntervalSince1970)" }
             .joined(separator: "|")
+    }
+
+    private var insightRequestID: String {
+        let dhikrSignature = dhikrSessions.map {
+            "\($0.id.uuidString):\($0.modifiedAt.timeIntervalSince1970)"
+        }.joined(separator: "|")
+        let stateSignature: String
+        switch viewModel.state {
+        case .loading: stateSignature = "loading"
+        case .empty: stateSignature = "empty"
+        case .ready(let snapshot):
+            stateSignature = [
+                snapshot.period.label,
+                String(snapshot.aggregate.totalLogged),
+                String(snapshot.aggregate.onTimeCount),
+                String(snapshot.aggregate.lateCount),
+                String(snapshot.aggregate.missedCount),
+                String(snapshot.aggregate.qadaCount),
+                String(snapshot.aggregate.jamaahCount)
+            ].joined(separator: ":")
+        }
+        return [
+            stateSignature,
+            logSignature,
+            dhikrSignature,
+            String(settings?.aiInsightsEnabled ?? false),
+            String(InsightAvailability.isAvailable)
+        ].joined(separator: "#")
     }
 
     var body: some View {
@@ -174,6 +208,9 @@ struct TrajectoryScreen: View {
                 travelIntervals: travels
             )
         }
+        .task(id: insightRequestID) {
+            await refreshInsight()
+        }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)
         }
@@ -239,6 +276,16 @@ struct TrajectoryScreen: View {
 
                 QuietSummaryRow(aggregate: snapshot.aggregate, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
+
+                if isInsightLoading || insightText != nil {
+                    TrajectoryInsightCard(
+                        text: insightText,
+                        isLoading: isInsightLoading,
+                        tokens: tokens
+                    )
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .transition(.opacity)
+                }
 
                 DailyPracticeGrid(
                     days: snapshot.days,
@@ -318,6 +365,65 @@ struct TrajectoryScreen: View {
     private var overlayDhikrDays: Set<Date>? {
         let calendar = Calendar.current
         return Set(dhikrSessions.map { calendar.startOfDay(for: $0.sessionDate) })
+    }
+
+    // MARK: - On-device insight
+
+    /// Foundation Models sees only the materialized numeric summary.
+    /// The feature remains absent when the model is unavailable, the
+    /// user turned it off, or the selected Path range has no supported
+    /// week/month summary shape.
+    private func refreshInsight() async {
+        insightText = nil
+        isInsightLoading = false
+
+        guard settings?.aiInsightsEnabled == true,
+              InsightAvailability.isAvailable,
+              case .ready(let snapshot) = viewModel.state,
+              let materialized = TrajectoryInsightMaterializer.makeSummary(
+                  snapshot: snapshot,
+                  dhikrSessions: dhikrSessions,
+                  calendar: .current,
+                  now: nowProvider.now()
+              ),
+              let kind = materialized.periodKind
+        else { return }
+
+        isInsightLoading = true
+        defer { isInsightLoading = false }
+
+        let summary: PeriodSummary
+        if let existing = periodSummaries.first(where: { $0.periodKind == kind }) {
+            TrajectoryInsightMaterializer.refresh(
+                existing,
+                from: materialized,
+                now: nowProvider.now()
+            )
+            summary = existing
+        } else {
+            modelContext.insert(materialized)
+            summary = materialized
+        }
+
+        do {
+            try modelContext.save()
+            switch kind {
+            case .week:
+                insightText = try await InsightGenerator.shared
+                    .generateWeeklyInsight(from: summary)
+                    .summarySentence
+            case .month:
+                insightText = try await InsightGenerator.shared
+                    .generateMonthlyInsight(from: summary)
+                    .summarySentence
+            }
+            try modelContext.save()
+        } catch {
+            // Availability can change while a request is in flight
+            // (model download, language, Low Power Mode). The Path
+            // remains complete without an error or an upgrade prompt.
+            insightText = nil
+        }
     }
 
     // MARK: - Retroactive logging (the ledger's way in)

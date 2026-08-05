@@ -1,4 +1,5 @@
 import Foundation
+import IhsanCore
 
 enum InsightContentFilter {
     private static let prohibitedWordPatterns = [
@@ -23,20 +24,41 @@ enum InsightContentFilter {
     }
 
     static func accepts(_ insight: WeeklyInsight) -> Bool {
-        accepts(joinedFields(
+        acceptsStructuredFields(
             summarySentence: insight.summarySentence,
             mostConsistentPrayer: insight.mostConsistentPrayer,
             leastConsistentPrayer: insight.leastConsistentPrayer,
             notableObservation: insight.notableObservation
-        ))
+        )
     }
 
     static func accepts(_ insight: MonthlyInsight) -> Bool {
-        accepts(joinedFields(
+        acceptsStructuredFields(
             summarySentence: insight.summarySentence,
             mostConsistentPrayer: insight.mostConsistentPrayer,
             leastConsistentPrayer: insight.leastConsistentPrayer,
             notableObservation: insight.notableObservation
+        )
+    }
+
+    private static func acceptsStructuredFields(
+        summarySentence: String,
+        mostConsistentPrayer: String,
+        leastConsistentPrayer: String,
+        notableObservation: String?
+    ) -> Bool {
+        let prayerNames = Set(Prayer.allCases.map(\.displayNameEnglish) + ["None"])
+        guard !summarySentence.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              summarySentence.count <= 900,
+              prayerNames.contains(mostConsistentPrayer),
+              prayerNames.contains(leastConsistentPrayer)
+        else { return false }
+
+        return accepts(joinedFields(
+            summarySentence: summarySentence,
+            mostConsistentPrayer: mostConsistentPrayer,
+            leastConsistentPrayer: leastConsistentPrayer,
+            notableObservation: notableObservation
         ))
     }
 

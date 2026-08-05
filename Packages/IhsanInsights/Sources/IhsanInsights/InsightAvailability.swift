@@ -47,12 +47,8 @@ private final class AvailabilityProviderStore: @unchecked Sendable {
 
     private static func defaultAvailability() -> Bool {
         #if canImport(FoundationModels) && !targetEnvironment(simulator)
-        switch SystemLanguageModel.default.availability {
-        case .available:
-            return true
-        default:
-            return false
-        }
+        let model = SystemLanguageModel.default
+        return model.isAvailable && model.supportsLocale(.current)
         #else
         return false
         #endif
