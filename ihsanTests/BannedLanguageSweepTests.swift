@@ -68,6 +68,13 @@ struct BannedLanguageSweepTests {
         "ihsanWidgets/LockScreen/FastingWidgets.swift",
         "ihsanWidgets/Repair/RepairMakeupWidgets.swift",
         "ihsanWidgets/Provider/PrayerTimelineEntry.swift",
+        // The two clocks and the voluntary rows.
+        "ihsan/Trajectory/Components/GestaltGrid.swift",
+        "ihsan/Trajectory/Components/DailyPracticeGrid.swift",
+        "ihsan/Trajectory/Models/DayVoluntaryDetail.swift",
+        "ihsan/Today/Helpers/YesterdayAccount.swift",
+        "Packages/IhsanCore/Sources/IhsanCore/Models/PrayerLog.swift",
+        "Packages/IhsanCore/Sources/IhsanCore/Time/CycleReattributionSweep.swift",
     ]
 
     private var repoRoot: URL {

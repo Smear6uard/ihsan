@@ -28,6 +28,18 @@ final class GalleryCaptureUITests: XCTestCase {
     private static let chicagoDawn = "2026-07-31T04:35:00"
     private static let chicagoAfternoon = "2026-07-30T15:10:00"
 
+    /// A week with something of every state in it, so the pattern is a
+    /// pattern rather than a column of one mark.
+    private static let mixedWeek = [
+        "fajr:onTime:0", "dhuhr:onTime:0", "asr:late:0",
+        "fajr:onTime:-1", "dhuhr:late:-1", "asr:onTime:-1", "maghrib:onTime:-1", "isha:onTime:-1",
+        "fajr:missed:-2", "dhuhr:onTime:-2", "asr:onTime:-2", "maghrib:qada:-2",
+        "fajr:onTime:-3", "dhuhr:onTime:-3", "asr:onTime:-3", "maghrib:onTime:-3", "isha:late:-3",
+        "fajr:late:-4", "dhuhr:onTime:-4", "asr:missed:-4", "maghrib:onTime:-4",
+        "fajr:onTime:-5", "dhuhr:onTime:-5", "asr:onTime:-5", "maghrib:onTime:-5", "isha:onTime:-5",
+        "dhuhr:onTime:-6", "asr:late:-6", "maghrib:onTime:-6"
+    ].joined(separator: ";")
+
     private static let baseArguments = [
         "-IhsanDebugCompletedOnboarding",
         "-IhsanDebugResetStore"
@@ -102,6 +114,42 @@ final class GalleryCaptureUITests: XCTestCase {
                 "-IhsanNowOverride", Self.chicagoDawn,
                 "-IhsanDebugWidgetGallery"
             ], settle: 3.0),
+            // Path's presence rows: the two states that matter are
+            // "there is voluntary worship in this window" and "there
+            // is none". The second is the card most people see, and it
+            // must stay pristine — no gutter, no labels, no rows.
+            Frame(name: "15-path-voluntary-7d-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "7",
+                "-IhsanDebugSeedVoluntary", "10",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0),
+            Frame(name: "16-path-voluntary-30d-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugSeedVoluntary", "30",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0),
+            Frame(name: "17-path-voluntary-30d-day", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugSeedVoluntary", "30",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0),
+            Frame(name: "18-path-pristine-30d-day", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0),
+            Frame(name: "19-path-day-detail", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "7",
+                "-IhsanDebugSeedVoluntary", "10",
+                "-IhsanDebugLogPrayer", Self.mixedWeek,
+                "-IhsanDebugExpandPracticeDay", "0"
+            ], settle: 3.0, scrollsToBottom: true),
             Frame(name: "11-dhikr", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
                 "-IhsanDebugPresentDhikr"

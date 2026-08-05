@@ -167,6 +167,8 @@ private struct RootGate: View {
     /// - `-IhsanDebugCompletedOnboarding` marks onboarding complete.
     /// - `-IhsanDebugLogPrayer dhuhr:onTime` logs one prayer through
     ///   the standard intent funnel (dedup and idempotency hold).
+    /// - `-IhsanDebugSeedVoluntary 30` fills the last 30 cycles with
+    ///   voluntary prayers and tasbīḥ sittings.
     /// - `-IhsanDebugResetStore` empties the prayer/nafl/pause tables
     ///   so UI tests start hermetic regardless of prior runs.
     ///
@@ -286,6 +288,60 @@ private struct RootGate: View {
                 settings.adhkarSleepEnabled = true
                 try? modelContext.save()
             }
+        }
+        // `-IhsanDebugSeedVoluntary N` turns the sunnah layer on and
+        // fills the last N cycles with a plausible mixture of
+        // voluntary prayers and tasbīḥ sittings — the harness for
+        // Path's presence rows and its day detail. Deterministic, so
+        // two runs produce the same picture.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugSeedVoluntary"),
+           arguments.indices.contains(flagIndex + 1),
+           let span = Int(arguments[flagIndex + 1]) {
+            if let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                settings.sunnahLayerEnabled = true
+                settings.sunnahRawatibEnabled = true
+                settings.sunnahDuhaEnabled = true
+                settings.sunnahNightEnabled = true
+            }
+            let today = PrayerCycleClock.sharedCycleDate(at: NowProvider.active.now())
+            let kinds: [[NaflKind]] = [
+                [.rawatibBefore(.fajr), .duha],
+                [],
+                [.witr],
+                [.rawatibBefore(.fajr), .rawatibAfter(.dhuhr), .qiyam, .witr],
+                [.duha],
+                [],
+                [.rawatibAfter(.maghrib)]
+            ]
+            let phrases: [(DhikrPhrase, Int)] = [
+                (.subhanallah, 33), (.alhamdulillah, 33), (.astaghfirullah, 100)
+            ]
+            for index in 0..<max(0, span) {
+                guard let day = Calendar.current.date(
+                    byAdding: .day, value: -index, to: today
+                ) else { continue }
+                for kind in kinds[index % kinds.count] {
+                    modelContext.insert(NaflLog(
+                        kind: kind,
+                        naflDate: day,
+                        loggedAt: day,
+                        createdAt: day,
+                        modifiedAt: day
+                    ))
+                }
+                if index % 3 != 1 {
+                    let (phrase, count) = phrases[index % phrases.count]
+                    modelContext.insert(DhikrSession(
+                        sessionDate: day,
+                        count: count,
+                        phrase: phrase,
+                        startedAt: day,
+                        createdAt: day,
+                        modifiedAt: day
+                    ))
+                }
+            }
+            try? modelContext.save()
         }
         // `-IhsanDebugLogFast ramadan:kept` seeds today's fast through
         // the standard funnel; composes with -IhsanNowOverride.

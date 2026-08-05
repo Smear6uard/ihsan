@@ -10,6 +10,17 @@ enum TrajectoryPeriod: CaseIterable, Identifiable, Hashable, Sendable {
 
     var id: Self { self }
 
+    /// The range a capture run asked for, if any.
+    static var debugStaged: TrajectoryPeriod? {
+        switch DebugLaunch.value(after: "-IhsanDebugPeriod") {
+        case "7":   return .sevenDays
+        case "30":  return .thirtyDays
+        case "90":  return .ninetyDays
+        case "365": return .year
+        default:    return nil
+        }
+    }
+
     var label: String {
         switch self {
         case .sevenDays: return "7D"

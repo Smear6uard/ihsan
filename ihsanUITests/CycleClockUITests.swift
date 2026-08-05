@@ -190,4 +190,47 @@ final class CycleClockUITests: XCTestCase {
         let allowOnce = springboard.buttons["Allow Once"]
         if allowOnce.exists { allowOnce.tap() }
     }
+
+    // MARK: - The voluntary rows, spoken
+
+    /// One day of the pattern card and its table detail, as VoiceOver
+    /// reads them.
+    ///
+    /// The presence rows are marks; without a spoken summary they are
+    /// nothing at all to a person using VoiceOver, which is how a
+    /// "quiet" row becomes a silent one.
+    @MainActor
+    func testVoluntaryRowsAndDayDetailAreSpoken() {
+        let app = launch(at: Self.middayNext, extra: [
+            "-IhsanDebugTab", "trajectory",
+            "-IhsanDebugPeriod", "7",
+            "-IhsanDebugSeedVoluntary", "7",
+            "-IhsanDebugLogPrayer", "fajr:onTime",
+            "-IhsanDebugExpandPracticeDay", "0"
+        ])
+
+        let pattern = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Pattern of prayer'"))
+            .firstMatch
+        XCTAssertTrue(pattern.waitForExistence(timeout: 20), "The pattern card is unlabelled")
+        XCTAssertTrue(
+            pattern.label.contains("labelled NAFL"),
+            "The nafl row is not named to VoiceOver: \(pattern.label)"
+        )
+        XCTAssertTrue(
+            pattern.label.contains("labelled DHIKR"),
+            "The dhikr row is not named to VoiceOver: \(pattern.label)"
+        )
+        // A presence row counts days, never shares of them.
+        XCTAssertFalse(pattern.label.contains("%"), "A presence row grew a percentage")
+
+        let detail = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Voluntary prayer:'"))
+            .firstMatch
+        XCTAssertTrue(
+            detail.waitForExistence(timeout: 10),
+            "The day detail does not voice its breakdown"
+        )
+        attach(name: "k5-path-voiceover")
+    }
 }

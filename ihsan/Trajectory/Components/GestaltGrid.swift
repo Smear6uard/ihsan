@@ -29,10 +29,15 @@ import IhsanDesignSystem
 /// column per day; YEAR gives a column per week (modal status).
 ///
 /// Beneath the fardh rows, and only when there is something in them,
-/// sit the presence overlays — nafl and dhikr — with a key underneath
-/// naming each by the mark it draws. Nothing switches them on: they
+/// sit the two presence rows — NAFL and DHIKR — each named at the left
+/// margin where a row label belongs. Nothing switches them on: they
 /// follow the data, because the switches that used to govern them could
 /// be flipped without changing a single pixel.
+///
+/// The rows share the fardh columns exactly: one `GestaltLayout`
+/// positions all seven, so a mark cannot land off-grid. They earn a
+/// label rather than a key underneath — a key names a mark, a label
+/// names a ROW, and what these needed was to be read as rows.
 struct GestaltGrid: View {
     let days: [DayCompletion]
     let period: TrajectoryPeriod
@@ -52,6 +57,12 @@ struct GestaltGrid: View {
     /// presence-only register, same appears-only-with-data rule.
     var dhikrDays: Set<Date>? = nil
 
+    /// The label gutter and row height grow with the reader's type
+    /// size: a row label that clips is a row nobody can name, which is
+    /// the defect this card is being corrected for.
+    @ScaledMetric(relativeTo: .caption2) private var labelGutter: CGFloat = 46
+    @ScaledMetric(relativeTo: .caption2) private var labelHeight: CGFloat = 13
+
     /// One rendered column: the five-prayer slate plus the day-level
     /// state that colors it.
     private struct Column {
@@ -61,72 +72,60 @@ struct GestaltGrid: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            GeometryReader { proxy in
-                let metrics = Metrics(period: period, availableWidth: proxy.size.width)
-                let columns = self.columns
+        GeometryReader { proxy in
+            let layout = self.layout(availableWidth: proxy.size.width)
+            let columns = self.columns
 
-                VStack(spacing: IhsanSpacing.sm) {
-                    grid(columns: columns, metrics: metrics)
-                    annotationRow(columns: columns, metrics: metrics)
-                }
-                .frame(maxWidth: .infinity)
+            VStack(spacing: IhsanSpacing.sm) {
+                grid(columns: columns, layout: layout)
+                annotationRow(columns: columns, layout: layout)
             }
-            .frame(height: patternHeight)
-
-            // The key, drawn only when there is a presence row to
-            // explain. This is the repair: the rows themselves are
-            // deliberately quiet, and a quiet mark nobody can name is
-            // just noise. A row-by-row gutter cannot work here — at 90D
-            // the rows are 4pt apart and a label is eleven — so the
-            // naming goes underneath, where it has room.
-            if showsNaflRow || showsDhikrRow {
-                keyRow
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .frame(height: patternHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
     }
 
-    // MARK: - Key
-
-    /// Each presence row's own mark at legible size, beside its name.
-    /// The marks are the same units the rows draw, not approximations
-    /// of them, so the key can never describe something the grid does
-    /// not show.
-    private var keyRow: some View {
-        HStack(spacing: IhsanSpacing.md) {
-            if showsNaflRow {
-                keyEntry("NAFL") {
-                    NaflOverlayDot(present: true, size: Self.keyMarkSize, tokens: tokens)
-                }
-            }
-            if showsDhikrRow {
-                keyEntry("DHIKR") {
-                    DhikrOverlayDot(present: true, size: Self.keyMarkSize, tokens: tokens)
-                }
-            }
-            Spacer(minLength: 0)
-        }
+    /// The one layout every row on this card is positioned from.
+    ///
+    /// The gutter exists only when there is a row to name. A card with
+    /// no voluntary record in the window keeps its full width for the
+    /// pattern and shows no labels at all — pristine, which is the
+    /// state most cards are in.
+    private func layout(availableWidth: CGFloat) -> GestaltLayout {
+        GestaltLayout(
+            period: period,
+            availableWidth: availableWidth,
+            labelGutter: showsAnyPresenceRow ? labelGutter : 0,
+            labelHeight: showsAnyPresenceRow ? labelHeight : 0
+        )
     }
 
-    /// Mark size in the key. Larger than any period's dot on purpose —
-    /// the key is read once, up close, and the pattern is read at arm's
-    /// length.
-    private static let keyMarkSize: CGFloat = 11
+    private var showsAnyPresenceRow: Bool { showsNaflRow || showsDhikrRow }
 
-    private func keyEntry<Mark: View>(
-        _ name: String, @ViewBuilder mark: () -> Mark
-    ) -> some View {
-        HStack(spacing: 5) {
-            mark()
-            Text(name)
-                .font(IhsanFont.inscription)
-                .tracking(1.3)
-                .foregroundStyle(tokens.inkSecondary)
-        }
-        .fixedSize()
+    // MARK: - Row labels
+
+    /// Small caps at the left margin, where the fardh rows' own labels
+    /// would sit if the pattern named them. `inkSecondary`: present to
+    /// anyone who looks for it, quiet to anyone reading the texture.
+    private func rowLabel(_ name: String, layout: GestaltLayout) -> some View {
+        Text(name)
+            .font(IhsanFont.inscription)
+            .tracking(1.3)
+            .foregroundStyle(tokens.inkSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .frame(
+                width: max(0, layout.labelGutter - Self.labelInset),
+                alignment: .trailing
+            )
+            .padding(.trailing, Self.labelInset)
     }
+
+    /// Breathing room between a label and the first column.
+    private static let labelInset: CGFloat = 6
+
 
     // MARK: - Grid
 
@@ -154,52 +153,101 @@ struct GestaltGrid: View {
     @ViewBuilder
     private func grid(
         columns: [Column],
-        metrics: Metrics
+        layout: GestaltLayout
     ) -> some View {
-        VStack(spacing: metrics.spacing) {
+        VStack(spacing: GestaltLayout.rowSpacing(for: period)) {
             ForEach(0..<5, id: \.self) { row in
-                HStack(spacing: metrics.spacing) {
-                    ForEach(0..<columns.count, id: \.self) { col in
-                        GestaltDot(
-                            completion: columns[col].slate[row],
-                            isPausedDay: columns[col].isPaused,
-                            size: metrics.dotSize,
-                            tokens: tokens
-                        )
-                    }
+                columnRow(layout: layout, count: columns.count) { col in
+                    GestaltDot(
+                        completion: columns[col].slate[row],
+                        isPausedDay: columns[col].isPaused,
+                        size: layout.dotSize,
+                        tokens: tokens
+                    )
                 }
             }
 
-            if showsNaflRow || showsDhikrRow {
-                // The overlay rows are a different register from the
+            if showsAnyPresenceRow {
+                // The presence rows are a different register from the
                 // five fardh rows — presence, not status. A row at the
                 // grid's own spacing read as a sixth prayer.
                 Color.clear.frame(height: Self.overlayGap)
             }
 
             if showsNaflRow, let naflColumns, naflColumns.count == columns.count {
-                HStack(spacing: metrics.spacing) {
-                    ForEach(0..<naflColumns.count, id: \.self) { col in
-                        NaflOverlayDot(
-                            present: naflColumns[col],
-                            size: metrics.dotSize,
-                            tokens: tokens
-                        )
-                    }
+                presenceRow(
+                    label: "NAFL", present: naflColumns, layout: layout
+                ) { present in
+                    NaflPresenceMark(
+                        present: present, size: layout.presenceMarkSize, tokens: tokens
+                    )
                 }
             }
 
             if showsDhikrRow, let dhikrColumns, dhikrColumns.count == columns.count {
-                HStack(spacing: metrics.spacing) {
-                    ForEach(0..<dhikrColumns.count, id: \.self) { col in
-                        DhikrOverlayDot(
-                            present: dhikrColumns[col],
-                            size: metrics.dotSize,
-                            tokens: tokens
-                        )
-                    }
+                presenceRow(
+                    label: "DHIKR", present: dhikrColumns, layout: layout
+                ) { present in
+                    DhikrPresenceMark(
+                        present: present, size: layout.presenceMarkSize, tokens: tokens
+                    )
                 }
             }
+        }
+    }
+
+    /// One row of the card: the label gutter, then one cell per column
+    /// at the layout's pitch. Every row on the card is built here, so
+    /// no row can acquire a spacing or an origin of its own.
+    private func columnRow<Cell: View>(
+        layout: GestaltLayout,
+        count: Int,
+        label: String? = nil,
+        rowHeight: CGFloat? = nil,
+        @ViewBuilder cell: @escaping (Int) -> Cell
+    ) -> some View {
+        // The gutter sits OUTSIDE the spaced stack. Inside it, the
+        // stack's own spacing would be added after the label and every
+        // column would start one gap further right than
+        // `GestaltLayout` says it does — the layout value has to
+        // describe the view exactly, or the test that holds the rows
+        // together is testing arithmetic nobody renders.
+        HStack(spacing: 0) {
+            if layout.labelGutter > 0 {
+                if let label {
+                    rowLabel(label, layout: layout)
+                } else {
+                    Color.clear.frame(width: layout.labelGutter, height: 1)
+                }
+            }
+            HStack(spacing: layout.spacing) {
+                ForEach(0..<count, id: \.self) { column in
+                    cell(column)
+                        .frame(width: layout.dotSize)
+                }
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(height: rowHeight)
+    }
+
+    /// A named presence row. Its marks are dot-sized and dot-centred;
+    /// only the row's HEIGHT differs, so an eleven-point label has
+    /// somewhere to sit at the periods where the dots are three points
+    /// apart.
+    private func presenceRow<Mark: View>(
+        label: String,
+        present: [Bool],
+        layout: GestaltLayout,
+        @ViewBuilder mark: @escaping (Bool) -> Mark
+    ) -> some View {
+        columnRow(
+            layout: layout,
+            count: present.count,
+            label: label,
+            rowHeight: layout.presenceRowHeight
+        ) { column in
+            mark(present[column])
         }
     }
 
@@ -225,50 +273,55 @@ struct GestaltGrid: View {
 
     /// Per-column presence of any voluntary record, aligned 1:1 with the
     /// fardh columns.
+    ///
+    /// An excused-pause column carries no mark. The pause is the app
+    /// agreeing not to keep count, and the column already says so once
+    /// — in the calm dash the fardh rows draw across it. Saying it
+    /// twice would be keeping count of the days it agreed not to.
     private var naflColumns: [Bool]? {
-        naflDays.map {
-            GestaltAggregation.presenceColumns(
-                days: days, period: period, daysWithRecord: $0
-            )
-        }
+        naflDays.map { presenceColumns(daysWithRecord: $0) }
     }
 
     private var dhikrColumns: [Bool]? {
-        dhikrDays.map {
-            GestaltAggregation.presenceColumns(
-                days: days, period: period, daysWithRecord: $0
-            )
-        }
+        dhikrDays.map { presenceColumns(daysWithRecord: $0) }
+    }
+
+    private func presenceColumns(daysWithRecord: Set<Date>) -> [Bool] {
+        let present = GestaltAggregation.presenceColumns(
+            days: days, period: period, daysWithRecord: daysWithRecord
+        )
+        let paused = columns.map(\.isPaused)
+        guard paused.count == present.count else { return present }
+        return zip(present, paused).map { $0 && !$1 }
     }
 
     /// The under-column annotations: the four-pointed star under the
     /// rightmost column ("you are here"), and the engraved plane mark
-    /// under travel columns when the scale gives it room. Mirrors the
-    /// grid's HStack structure 1:1 so marks land under their columns.
+    /// under travel columns when the scale gives it room. Built through
+    /// the same row helper as every other row, so the marks land under
+    /// their columns by construction rather than by agreement.
     private func annotationRow(
         columns: [Column],
-        metrics: Metrics
+        layout: GestaltLayout
     ) -> some View {
-        let starSize: CGFloat = max(6, min(10, metrics.dotSize + 4))
-        let planeVisible = metrics.dotSize >= 5
-        return HStack(spacing: metrics.spacing) {
-            ForEach(0..<columns.count, id: \.self) { col in
-                Group {
-                    if col == columns.count - 1 {
-                        FourPointedStar()
-                            .fill(tokens.metal.opacity(0.95))
-                            .frame(width: starSize, height: starSize)
-                    } else if columns[col].isTraveling, planeVisible {
-                        TravelPlaneMark()
-                            .fill(tokens.metal.opacity(0.60))
-                            .frame(width: starSize, height: starSize)
-                    } else {
-                        Color.clear
-                            .frame(width: 1, height: 1)
-                    }
+        let starSize: CGFloat = max(6, min(10, layout.dotSize + 4))
+        let planeVisible = layout.dotSize >= 5
+        return columnRow(layout: layout, count: columns.count) { col in
+            Group {
+                if col == columns.count - 1 {
+                    FourPointedStar()
+                        .fill(tokens.metal.opacity(0.95))
+                        .frame(width: starSize, height: starSize)
+                } else if columns[col].isTraveling, planeVisible {
+                    TravelPlaneMark()
+                        .fill(tokens.metal.opacity(0.60))
+                        .frame(width: starSize, height: starSize)
+                } else {
+                    Color.clear
+                        .frame(width: 1, height: 1)
                 }
-                .frame(width: metrics.dotSize, alignment: .center)
             }
+            .frame(width: layout.dotSize, alignment: .center)
         }
     }
 
@@ -295,85 +348,45 @@ struct GestaltGrid: View {
         }
     }
 
-    // MARK: - Layout metrics
-
-    private struct Metrics {
-        let dotSize: CGFloat
-        let spacing: CGFloat
-
-        init(period: TrajectoryPeriod, availableWidth: CGFloat) {
-            let cols = CGFloat(Self.columnCount(for: period))
-            let spec = Self.spec(for: period)
-            let idealRowWidth = spec.dot * cols + spec.dot * spec.spacingRatio * (cols - 1)
-
-            if availableWidth >= idealRowWidth {
-                self.dotSize = spec.dot
-                self.spacing = spec.dot * spec.spacingRatio
-            } else {
-                // Squeeze the dot proportionally so 90 / 52 columns still
-                // fit on narrower iPhones rather than overflowing the panel.
-                let proportional = availableWidth / (cols + spec.spacingRatio * (cols - 1))
-                self.dotSize = max(spec.minDot, min(spec.dot, proportional))
-                let remaining = max(0, availableWidth - self.dotSize * cols)
-                self.spacing = max(spec.minSpacing, remaining / (cols - 1))
-            }
-        }
-
-        private struct Spec {
-            let dot: CGFloat
-            let minDot: CGFloat
-            let spacingRatio: CGFloat
-            let minSpacing: CGFloat
-        }
-
-        private static func columnCount(for period: TrajectoryPeriod) -> Int {
-            switch period {
-            case .sevenDays:  return 7
-            case .thirtyDays: return 30
-            case .ninetyDays: return 90
-            case .year:       return 52
-            }
-        }
-
-        private static func spec(for period: TrajectoryPeriod) -> Spec {
-            switch period {
-            case .sevenDays:
-                return Spec(dot: 16, minDot: 12, spacingRatio: 0.50, minSpacing: 4)
-            case .thirtyDays:
-                return Spec(dot: 7,  minDot: 5,  spacingRatio: 0.43, minSpacing: 1.5)
-            case .ninetyDays:
-                return Spec(dot: 3,  minDot: 2,  spacingRatio: 0.30, minSpacing: 0.3)
-            case .year:
-                return Spec(dot: 5,  minDot: 3,  spacingRatio: 0.40, minSpacing: 0.5)
-            }
-        }
-    }
+    // MARK: - Height
 
     /// The pattern block needs a stable height for the parent's VStack
-    /// layout; the inner GeometryReader recomputes spacing per device,
-    /// but height barely varies across the supported widths so we pin to
-    /// the spec dot size + the annotation block.
+    /// before layout runs; `GestaltLayout` recomputes spacing per
+    /// device inside, but height barely varies across the supported
+    /// widths, so it is derived from the spec sizes here.
     ///
     /// Counts only the rows that will actually be drawn — a panel that
-    /// reserves space for an empty overlay is a panel with a hole in it.
+    /// reserves space for an empty presence row is a panel with a hole
+    /// in it.
     private var patternHeight: CGFloat {
-        let dot: CGFloat
-        let spacing: CGFloat
-        switch period {
-        case .sevenDays:  dot = 16; spacing = 8
-        case .thirtyDays: dot = 7;  spacing = 3
-        case .ninetyDays: dot = 3;  spacing = 1.0
-        case .year:       dot = 5;  spacing = 1.5
-        }
-        let overlayRows = (showsNaflRow ? 1 : 0) + (showsDhikrRow ? 1 : 0)
-        let rowCount = CGFloat(5 + overlayRows)
-        let rows = rowCount * dot + (rowCount - 1) * spacing
-        let starSize = max(6, min(10, dot + 4))
-        let gap = overlayRows == 0 ? 0 : Self.overlayGap
-        return rows + gap + IhsanSpacing.sm + starSize
+        let layout = GestaltLayout(
+            period: period,
+            availableWidth: .greatestFiniteMagnitude,
+            labelGutter: showsAnyPresenceRow ? labelGutter : 0,
+            labelHeight: showsAnyPresenceRow ? labelHeight : 0
+        )
+        let spacing = GestaltLayout.rowSpacing(for: period)
+        let presenceRows = (showsNaflRow ? 1 : 0) + (showsDhikrRow ? 1 : 0)
+        let rowCount = CGFloat(5 + presenceRows)
+
+        var height = 5 * layout.dotSize
+            + CGFloat(presenceRows) * layout.presenceRowHeight
+            + (rowCount - 1) * spacing
+        if presenceRows > 0 { height += Self.overlayGap }
+
+        let starSize = max(6, min(10, layout.dotSize + 4))
+        return height + IhsanSpacing.sm + starSize
     }
 
     // MARK: - Accessibility
+
+    /// "4 of the last 30" — a count of days with a record, never a
+    /// share of them. A presence row has no denominator, because a
+    /// denominator is the first half of a score.
+    private func presenceSummary(_ columns: [Bool]?) -> String {
+        let marked = columns?.filter { $0 }.count ?? 0
+        return marked == 1 ? "one day" : "\(marked) days"
+    }
 
     private var accessibilityLabel: String {
         let span: String
@@ -391,24 +404,28 @@ struct GestaltGrid: View {
             label += " Traveling days carry a small plane mark."
         }
         if showsNaflRow {
-            label += " A quieter sixth row, keyed NAFL, marks days with voluntary prayer."
+            label += " A quieter row beneath, labelled NAFL, marks the days"
+                + " carrying voluntary prayer: \(presenceSummary(naflColumns))."
         }
         if showsDhikrRow {
-            label += " A quieter row, keyed DHIKR, marks days with recorded dhikr."
+            label += " A row labelled DHIKR marks the days carrying a recorded"
+                + " sitting: \(presenceSummary(dhikrColumns))."
         }
         return label
     }
 }
 
-// MARK: - Dhikr overlay dot
+// MARK: - Dhikr presence mark
 
-/// One cell of the optional dhikr row: a small outlined ring — the
-/// One cell of the optional dhikr row: a small filled BEAD where the
-/// day (or week) holds a recorded sitting. A bead, not a ring — the
-/// ring is what an unlogged fardh cell already draws, so an outlined
-/// dhikr mark said "nothing happened here" in the one row where it
-/// means the opposite.
-private struct DhikrOverlayDot: View {
+/// One cell of the dhikr row: a small filled bead where the day (or
+/// week) holds a recorded sitting, and nothing at all where it does
+/// not — absence in a presence row is empty space, never an outline.
+///
+/// Filled rather than hollow, deliberately: a hollow ring is exactly
+/// what an UNLOGGED fardh cell draws, so an outlined dhikr mark said
+/// "nothing happened here" in the one row where it means the
+/// opposite.
+private struct DhikrPresenceMark: View {
     let present: Bool
     let size: CGFloat
     let tokens: SkyPaletteTokens
@@ -430,13 +447,17 @@ private struct DhikrOverlayDot: View {
     }
 }
 
-// MARK: - Nafl overlay dot
+// MARK: - Nafl presence mark
 
-/// One cell of the optional sixth row: a small four-pointed star where
-/// the day (or week) holds any voluntary record, empty space where it
-/// doesn't. Filled rather than stroked below 8 pt, where a stroke at
-/// this scale has no line to draw.
-private struct NaflOverlayDot: View {
+/// One cell of the nafl row: the four-pointed mark, filled, where the
+/// day (or week) holds any voluntary record — empty space where it
+/// does not.
+///
+/// Filled at every size now. The stroked form above 8 pt was the row's
+/// legibility problem: a hairline star at dot scale reads as debris on
+/// the panel rather than as a mark in a row, which is how a row of
+/// them came to look like marks floating in empty space.
+private struct NaflPresenceMark: View {
     let present: Bool
     let size: CGFloat
     let tokens: SkyPaletteTokens
@@ -444,14 +465,10 @@ private struct NaflOverlayDot: View {
     var body: some View {
         Group {
             if present {
-                let tint = GestaltGrid.overlayMarkValue(for: tokens).color
-                    .opacity(GestaltGrid.overlayMarkOpacity)
-                if size >= 8 {
-                    FourPointedStar()
-                        .stroke(tint, lineWidth: max(0.9, size * 0.16))
-                } else {
-                    FourPointedStar().fill(tint)
-                }
+                FourPointedStar().fill(
+                    GestaltGrid.overlayMarkValue(for: tokens).color
+                        .opacity(GestaltGrid.overlayMarkOpacity)
+                )
             } else {
                 Color.clear
             }

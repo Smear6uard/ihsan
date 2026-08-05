@@ -57,7 +57,6 @@ struct TrajectoryScreen: View {
     private var dhikrSessions: [DhikrSession]
 
     @State private var viewModel = TrajectoryViewModel()
-    @State private var selectedDay: DayCompletion?
     @State private var showingRepairSetup = false
     @State private var showingRepairDetail = DebugLaunch.flag("-IhsanDebugPresentRepair")
     /// A grid cell awaiting the retroactive log sheet.
@@ -175,12 +174,6 @@ struct TrajectoryScreen: View {
                 travelIntervals: travels
             )
         }
-        .sheet(item: $selectedDay) { day in
-            HeatmapDayPopover(day: day)
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-                .presentationBackground(.thinMaterial)
-        }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)
         }
@@ -250,9 +243,7 @@ struct TrajectoryScreen: View {
                 DailyPracticeGrid(
                     days: snapshot.days,
                     tokens: tokens,
-                    onDayTap: { day in
-                        selectedDay = day
-                    },
+                    voluntary: voluntaryDetail,
                     onCellTap: { day, completion in
                         retroSelection = RetroLogSelection(
                             day: day.date,
@@ -300,6 +291,17 @@ struct TrajectoryScreen: View {
     // The rows now follow the data: the screen hands over what it has,
     // `GestaltGrid` draws a row only when that row has marks in it, and
     // a key underneath names each one.
+
+    /// What each cycle holds beyond its five fardh, for the table's
+    /// day detail. The pattern card says a day carried voluntary
+    /// worship; this says what, for the one day a person taps.
+    private var voluntaryDetail: [Date: DayVoluntaryDetail] {
+        DayVoluntaryDetail.index(
+            naflLogs: settings?.sunnahLayerEnabled == true ? naflLogs : [],
+            dhikrSessions: dhikrSessions,
+            calendar: .current
+        )
+    }
 
     /// Days with any voluntary record. Presence only — the overlay
     /// never carries a count or a share. `nil` while the sunnah layer

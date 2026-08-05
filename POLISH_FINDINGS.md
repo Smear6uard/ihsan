@@ -1079,12 +1079,49 @@ system's half of each contract.
   the watch, and Siri's spoken dialog. Confirm the pronunciation in the
   card's logged inscription, the Path counts, and
   `LogPrayerWithStatusIntent`'s reply ("Fajr logged as delayed").
-- **The Path key row's contrast on a near-white day ground.** The key
-  draws each presence row's real mark at 11 pt against the panel;
-  `GestaltGrid.overlayMarkValue` deepens toward the keyline on light
-  panels, but the key is larger than any period's dot and was not part
-  of the measured set. Judge it on the afternoon and dawn grounds.
+- **The Path key row's contrast on a near-white day ground.**
+  *Superseded.* The key row is gone; the presence rows carry labels at
+  the left margin instead. See the two entries below for what replaced
+  it.
 - **The Remembrance band in a crowded bottom stack.** With a live
   adhkār offer card, a duha card, and the band all present under the
   focused card, confirm the stack still clears the floating tab bar on
   the smallest supported iPhone.
+
+## Corrective K — the two clocks, and the voluntary rows
+
+- **The presence marks at arm's length, on both grounds.** The nafl
+  four-pointed mark is now FILLED at every size (it was stroked above
+  8 pt, which is what made a row of them read as debris), and both
+  marks draw at the fardh dot's size through
+  `GestaltGrid.overlayMarkValue`. Captured at 7D and 30D on the night
+  and afternoon grounds — the frames are in the gallery — but the
+  actual question is whether a 3 pt filled mark at 90D still reads as
+  a mark rather than as dust. Hold the phone at arm's length on all
+  four ranges and say whether 90D should keep its presence rows at all.
+- **The row labels at accessibility type sizes.** `NAFL` / `DHIKR` sit
+  in a gutter that scales with the reader's type size and is capped at
+  a quarter of the card's width; past that cap the label shrinks
+  (`minimumScaleFactor(0.7)`) rather than the pattern narrowing
+  further. Walk the Dynamic Type range on the narrowest supported
+  iPhone and confirm the labels still read, and that 90D's pattern has
+  not become a smear.
+- **The day-detail expansion's motion.** The row expands on
+  `.easeOut(duration: 0.22)` with an opacity transition. Confirm it
+  reads as the row opening rather than the table jumping, that
+  Reduce Motion leaves something sensible, and that opening a row far
+  down a 30-day table does not scroll the panel out from under the
+  thumb.
+- **`ʿArafah`, `ʿĀshūrāʾ`, and "TOMORROW'S FAST" in VoiceOver.** The
+  evening offer speaks a new string ("Records a fasting intention for
+  tomorrow"), and the significant-day inscriptions now surface a day
+  earlier — the night before rather than the morning of. Confirm the
+  pronunciation and that the tense reads correctly when the line is
+  heard rather than seen.
+- **The reattribution report on a real store.** `CycleReattributionSweep`
+  runs once, on the first launch after upgrading, and logs its summary
+  under `com.sameerstudios.ihsan / CycleReattribution`. On a device
+  with real history, read that line in Console and confirm the counts
+  match what the person would recognise — and that any
+  `cycleDuplicate` flag Path shows is genuinely two records of one
+  prayer rather than an artefact.

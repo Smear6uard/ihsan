@@ -8,7 +8,9 @@ import IhsanCore
 @MainActor
 final class TrajectoryViewModel {
     var state: TrajectoryState = .loading
-    var period: TrajectoryPeriod = .thirtyDays {
+    /// `-IhsanDebugPeriod 7|30|90|365` stages the range for a capture
+    /// run; the selector is the only other way in.
+    var period: TrajectoryPeriod = TrajectoryPeriod.debugStaged ?? .thirtyDays {
         didSet {
             guard period != oldValue else { return }
             recompute()
