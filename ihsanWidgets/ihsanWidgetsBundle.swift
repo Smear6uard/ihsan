@@ -15,9 +15,15 @@ struct IhsanWidgetsBundle: WidgetBundle {
         // StandBy
         StandByPlateWidget()
         // Lock screen
-        NextPrayerRectangularWidget()
-        PrayerProgressCircularWidget()
         NextPrayerInlineWidget()
+        NextPrayerCircularWidget()
+        WindowGaugeCircularWidget()
+        NextPrayerRectangularWidget()
+        NowNextRectangularWidget()
+        DayRowRectangularWidget()
+        NightRectangularWidget()
+        FastingCircularWidget()
+        FastingRectangularWidget()
         RepairMakeupCircularWidget()
         // Control Center
         RepairMakeupControl()

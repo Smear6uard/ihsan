@@ -108,14 +108,38 @@ private let paused = entry(hour: 15, minute: 10) { snapshot in
     dawn
 }
 
-#Preview("Lock · circular", as: .accessoryCircular) {
-    PrayerProgressCircularWidget()
+#Preview("Lock · circular next", as: .accessoryCircular) {
+    NextPrayerCircularWidget()
 } timeline: {
     night
 }
 
+#Preview("Lock · window gauge", as: .accessoryCircular) {
+    WindowGaugeCircularWidget()
+} timeline: {
+    afternoon
+}
+
 #Preview("Lock · rectangular", as: .accessoryRectangular) {
     NextPrayerRectangularWidget()
+} timeline: {
+    night
+}
+
+#Preview("Lock · now & next", as: .accessoryRectangular) {
+    NowNextRectangularWidget()
+} timeline: {
+    afternoon
+}
+
+#Preview("Lock · day row", as: .accessoryRectangular) {
+    DayRowRectangularWidget()
+} timeline: {
+    afternoon
+}
+
+#Preview("Lock · night", as: .accessoryRectangular) {
+    NightRectangularWidget()
 } timeline: {
     night
 }

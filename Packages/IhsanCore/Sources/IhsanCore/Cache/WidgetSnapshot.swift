@@ -253,6 +253,16 @@ public extension WidgetSnapshot {
         return nil
     }
 
+    /// The night a face should speak about at `instant`: the one in
+    /// progress, or else the one ahead — through the day that is
+    /// tonight, and late in day two it is tomorrow night.
+    func relevantNight(at instant: Date) -> NightTable? {
+        if let containing = night(containing: instant) { return containing }
+        if instant < tonight.start { return tonight }
+        if instant < tomorrowNight.start { return tomorrowNight }
+        return nil
+    }
+
     /// The stamp for the civil day containing `instant`, resolved in
     /// the place timezone.
     func hijriStamp(at instant: Date) -> HijriStamp? {

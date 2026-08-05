@@ -18,6 +18,8 @@ struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
     /// Set by the configurable provider when the user pinned the
     /// small widget to one prayer; nil follows the day.
     var fixedPrayer: Prayer? = nil
+    /// The inline accessory's configured form.
+    var inlineShowsCountdown: Bool = false
 
     enum Content: Sendable, Equatable {
         case live(LiveDay)

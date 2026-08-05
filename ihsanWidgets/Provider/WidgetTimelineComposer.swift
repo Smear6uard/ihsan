@@ -105,7 +105,7 @@ struct WidgetTimelineComposer {
                 cityName: snapshot.cityName,
                 timeZoneIdentifier: snapshot.timeZoneIdentifier,
                 qiblaBearingDegrees: snapshot.qiblaBearingDegrees,
-                night: snapshot.night(containing: instant),
+                night: snapshot.relevantNight(at: instant),
                 hijri: snapshot.hijriStamp(at: instant),
                 fasting: snapshot.fastingStamp(at: instant),
                 isPaused: snapshot.isPaused,
