@@ -31,6 +31,18 @@ enum FocusedCardModel {
         return true
     }
 
+    /// The tasbih handoff belongs only to an in-window prayer that was
+    /// just recorded as completed. Historical, missed, and makeup logs
+    /// never surface a misleading post-prayer action.
+    static func offersPostPrayerTasbih(
+        windowState: PrayerWindowState,
+        status: PrayerStatus?,
+        isAvailable: Bool
+    ) -> Bool {
+        guard isAvailable, windowState.isCurrent else { return false }
+        return status == .onTime || status == .late
+    }
+
     static func resolve(
         windowState: PrayerWindowState,
         isLogged: Bool

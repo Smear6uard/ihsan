@@ -60,33 +60,29 @@ struct SkyFieldContrastTests {
         }
     }
 
-    /// The same audit swept continuously through the phase cycle. Any
-    /// height at which primary ink drops below AA must be inside an
-    /// active ink halo — the same deal `PaletteV2ContrastTests` strikes
-    /// for the ground tokens, extended to the field.
+    /// The same audit swept continuously through the phase cycle. The
+    /// adaptive figure pole uses the caption backing wherever the raw
+    /// moving sky still falls below AA.
     @Test
-    func skyDipsOnlyUnderAnActiveHalo() {
+    func movingSkyDipsOnlyUnderTheCaptionBacking() {
         let steps = 600
-        var subAA = 0
-        var samples = 0
         for step in 0..<steps {
             let phase = SkyPhase(unit: Double(step) / Double(steps))
             let tokens = PaletteState.resolved(for: phase)
             for height in Self.heights {
                 let sky = CelestialSkyView.skyValue(atFraction: height, tokens: tokens)
-                let ratio = tokens.inkValue.contrastRatio(against: sky)
-                samples += 1
-                if ratio < 4.5 {
-                    subAA += 1
-                    #expect(
-                        tokens.inkHaloStrength > 0.05,
-                        "ink at \(ratio):1 on the sky with no halo, phase \(phase.unit) height \(height)"
-                    )
+                for ink in [tokens.inkValue, tokens.inkSecondaryValue] {
+                    let ratio = ink.contrastRatio(against: sky)
+                    if ratio < 4.5 {
+                        #expect(
+                            tokens.inkHaloStrength > 0.05,
+                            "ink at \(ratio):1 without backing, phase \(phase.unit), sky height \(height)"
+                        )
+                    }
                 }
+                #expect(tokens.inkOutlineStrength == 0)
             }
         }
-        let fraction = Double(subAA) / Double(samples)
-        #expect(fraction < 0.06, "sub-AA sky passage covers \(fraction) of the swept field")
     }
 
     /// The Reduce Transparency fallback is a ground like any other:

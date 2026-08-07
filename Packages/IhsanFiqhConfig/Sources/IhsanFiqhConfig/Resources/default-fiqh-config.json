@@ -143,7 +143,12 @@
     "reflectionEmptyTitle": "Begin your record.",
     "reflectionEmptySubtitle": "Today's prompt is above. Write or speak whatever comes to mind. Past entries appear here.",
     "trajectoryEmptyTitle": "Begin your record.",
-    "trajectoryEmptySubtitle": "Log your first prayer on the Today screen to start your trajectory."
+    "trajectoryEmptySubtitle": "Log your first prayer on the Today screen to start your trajectory.",
+    "trajectoryInsight": {
+      "title": "How this ledger uses timing",
+      "body": "The five prayers have appointed times. In Ihsan, ‘On Time’ and ‘Delayed’ both describe a prayer performed within its valid window; ‘Delayed’ is a personal tracking distinction, not a separate legal ruling. A prayer performed after its window is recorded separately as qadāʾ.",
+      "citation": "Qur’an 4:103 · Ṣaḥīḥ al-Bukhārī 597 · Ṣaḥīḥ Muslim 684d"
+    }
   },
   "thresholds": {
     "lateDefinitionDescription": "A prayer is 'late' when it is performed after the preferred (mustahab) time but still within the valid time window. Ihsan does not enforce a specific threshold — you classify your own prayer based on your own honest assessment.",

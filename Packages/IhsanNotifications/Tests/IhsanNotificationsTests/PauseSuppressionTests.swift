@@ -10,7 +10,8 @@ func activePauseSuppressesAllPrayerNotifications() {
 
     let settings = NotificationScheduleSettings(userSettings: userSettings, isPaused: true)
 
-    #expect(settings.notificationsEnabled == false)
+    #expect(settings.notificationsEnabled == true)
+    #expect(settings.prayerNotificationsSuppressed == true)
 }
 
 @Test
@@ -18,6 +19,7 @@ func withoutAPauseTheUsersChoiceStands() {
     let enabled = UserSettings()
     enabled.notificationsEnabled = true
     #expect(NotificationScheduleSettings(userSettings: enabled, isPaused: false).notificationsEnabled == true)
+    #expect(NotificationScheduleSettings(userSettings: enabled, isPaused: false).prayerNotificationsSuppressed == false)
 
     let disabled = UserSettings()
     disabled.notificationsEnabled = false

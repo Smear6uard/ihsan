@@ -44,6 +44,8 @@ struct RootTabView: View {
     }()
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.modelContext) private var modelContext
+    @State private var prayerNotificationRoute = PrayerNotificationRoute.shared
+    @State private var adhkarNotificationRoute = AdhkarNotificationRoute.shared
 
     /// The tasbīḥ instrument rides over whichever tab is up — entered
     /// from the logged card's quiet link or the Siri/Shortcut intent.
@@ -90,6 +92,12 @@ struct RootTabView: View {
         .tint(IhsanColor.gold)
         .onChange(of: selectedTab) { _, _ in
             Haptics.impact(.medium)
+        }
+        .onChange(of: prayerNotificationRoute.pendingPrayer) { _, prayer in
+            if prayer != nil { selectedTab = .today }
+        }
+        .onChange(of: adhkarNotificationRoute.pendingCategory) { _, category in
+            if category != nil { selectedTab = .today }
         }
         // Widget taps arrive as URLs. Land on Today first, then let
         // the Today screen present its own sheet — the same

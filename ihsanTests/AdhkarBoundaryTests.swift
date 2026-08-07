@@ -2,12 +2,12 @@ import Foundation
 import IhsanCore
 import Testing
 
-/// The two boundaries this feature must not cross, enforced against
+/// The boundaries this feature must not cross, enforced against
 /// the sources because neither of them fails at runtime.
 ///
-/// 1. **Nothing about adhkar ever notifies.** The windows offer; they
-///    never call. A notification would turn a quiet offer into a
-///    summons, which is the opposite of what a window is for.
+/// 1. **Adhkar UI never schedules directly.** Reminder policy stays in
+///    the notification layer, where it is opt-in, silent, and bounded
+///    to the morning and evening windows.
 /// 2. **No religious text exists outside the versioned content file.**
 ///    Not a fallback string, not a preview constant, not a test
 ///    fixture that drifted into a shipping source. If it is not in
@@ -45,7 +45,7 @@ struct AdhkarBoundaryTests {
         try String(contentsOf: repoRoot.appending(path: path), encoding: .utf8)
     }
 
-    // MARK: - No notifications
+    // MARK: - Notification separation
 
     @Test("No adhkar source reaches for a notification")
     func nothingSchedulesANotification() throws {
@@ -69,22 +69,20 @@ struct AdhkarBoundaryTests {
         }
     }
 
-    /// And from the other side: the notification layer has never heard
-    /// of adhkar.
-    @Test("The notification layer knows nothing about adhkar")
-    func notificationLayerHasNoAdhkar() throws {
-        let base = repoRoot.appending(path: "Packages/IhsanNotifications/Sources")
-        let walker = FileManager.default.enumerator(at: base, includingPropertiesForKeys: nil)
-        let files = (walker?.compactMap { $0 as? URL } ?? []).filter { $0.pathExtension == "swift" }
-        #expect(!files.isEmpty, "the notifications package has no sources to sweep")
-
-        for url in files {
-            let text = ((try? String(contentsOf: url, encoding: .utf8)) ?? "").lowercased()
-            #expect(
-                !text.contains("adhkar"),
-                "\(url.lastPathComponent) mentions adhkar"
-            )
+    @Test("Adhkar reminder content is explicitly quiet")
+    func notificationLayerKeepsAdhkarQuiet() throws {
+        let text = try source(
+            "Packages/IhsanNotifications/Sources/IhsanNotifications/NotificationContent.swift"
+        )
+        guard let start = text.range(of: "public static func makeAdhkarContent"),
+              let end = text.range(of: "private static func localizedTimeString", range: start.upperBound..<text.endIndex) else {
+            Issue.record("the adhkar reminder factory is missing")
+            return
         }
+        let factory = String(text[start.lowerBound..<end.lowerBound])
+        #expect(factory.contains("content.sound = nil"))
+        #expect(!factory.contains(".timeSensitive"))
+        #expect(!factory.contains("displayNameArabic"))
     }
 
     // MARK: - One source of text

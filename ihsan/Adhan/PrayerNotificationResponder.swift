@@ -41,7 +41,13 @@ final class PrayerNotificationResponder: NSObject {
             intentIdentifiers: [],
             options: []
         )
-        center.setNotificationCategories([prayer])
+        let adhkar = UNNotificationCategory(
+            identifier: NotificationCategory.adhkar,
+            actions: [],
+            intentIdentifiers: [],
+            options: []
+        )
+        center.setNotificationCategories([prayer, adhkar])
     }
 
     private var settings: UserSettings? {
@@ -60,6 +66,11 @@ final class PrayerNotificationResponder: NSObject {
     private func prayer(from userInfo: [AnyHashable: Any]) -> Prayer? {
         (userInfo[ScheduledNotificationUserInfoKey.prayer] as? String)
             .flatMap(Prayer.init(rawValue:))
+    }
+
+    private func adhkarCategory(from userInfo: [AnyHashable: Any]) -> AdhkarCategory? {
+        (userInfo[ScheduledNotificationUserInfoKey.adhkarCategory] as? String)
+            .flatMap(AdhkarCategory.init(rawValue:))
     }
 }
 
@@ -84,6 +95,13 @@ extension PrayerNotificationResponder: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
+        if let category = await adhkarCategory(from: userInfo) {
+            guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
+            await MainActor.run {
+                AdhkarNotificationRoute.shared.pendingCategory = category
+            }
+            return
+        }
         guard let prayer = await prayer(from: userInfo) else { return }
 
         switch response.actionIdentifier {
@@ -117,5 +135,21 @@ final class PrayerNotificationRoute {
     func consume() -> Prayer? {
         defer { pendingPrayer = nil }
         return pendingPrayer
+    }
+}
+
+/// Where a tapped remembrance reminder wants the app to go. Today
+/// consumes this and opens the requested set directly.
+@MainActor
+@Observable
+final class AdhkarNotificationRoute {
+    static let shared = AdhkarNotificationRoute()
+    var pendingCategory: AdhkarCategory?
+
+    private init() {}
+
+    func consume() -> AdhkarCategory? {
+        defer { pendingCategory = nil }
+        return pendingCategory
     }
 }

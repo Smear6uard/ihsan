@@ -2,6 +2,7 @@ import SwiftUI
 import SwiftData
 import IhsanCore
 import IhsanDesignSystem
+import IhsanFiqhConfig
 import IhsanInsights
 import IhsanIntents
 
@@ -66,6 +67,11 @@ struct TrajectoryScreen: View {
     @State private var retroSelection: RetroLogSelection?
     @State private var insightText: String?
     @State private var isInsightLoading = false
+    @State private var fiqhInsight = TrajectoryInsightFraming(
+        title: "How this ledger uses timing",
+        body: "The five prayers have appointed times. In Ihsan, ‘On Time’ and ‘Delayed’ both describe a prayer performed within its valid window; ‘Delayed’ is a personal tracking distinction, not a separate legal ruling. A prayer performed after its window is recorded separately as qadāʾ.",
+        citation: "Qur’an 4:103 · Ṣaḥīḥ al-Bukhārī 597 · Ṣaḥīḥ Muslim 684d"
+    )
 
     @Environment(\.nowProvider) private var nowProvider
     @Environment(\.modelContext) private var modelContext
@@ -211,6 +217,12 @@ struct TrajectoryScreen: View {
         .task(id: insightRequestID) {
             await refreshInsight()
         }
+        .task {
+            if let framing = try? await FiqhConfigService.shared.currentConfig().framing,
+               let trajectoryInsight = framing.trajectoryInsight {
+                fiqhInsight = trajectoryInsight
+            }
+        }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)
         }
@@ -281,6 +293,7 @@ struct TrajectoryScreen: View {
                     TrajectoryInsightCard(
                         text: insightText,
                         isLoading: isInsightLoading,
+                        fiqh: fiqhInsight,
                         tokens: tokens
                     )
                     .padding(.horizontal, IhsanSpacing.md)
@@ -369,13 +382,16 @@ struct TrajectoryScreen: View {
 
     // MARK: - On-device insight
 
-    /// Foundation Models sees only the materialized numeric summary.
-    /// The feature remains absent when the model is unavailable, the
-    /// user turned it off, or the selected Path range has no supported
-    /// week/month summary shape.
+    /// A useful deterministic readout is always available when insights
+    /// are enabled. Foundation Models may refine the observation for a
+    /// supported week or month, but never owns the card's availability.
     private func refreshInsight() async {
         insightText = nil
         isInsightLoading = false
+
+        guard case .ready(let snapshot) = viewModel.state else { return }
+
+        insightText = TrajectoryInsightNarrative.make(from: snapshot.aggregate)
 
         #if DEBUG
         // `-IhsanDebugInsight` makes the real presentation surface
@@ -390,7 +406,6 @@ struct TrajectoryScreen: View {
 
         guard settings?.aiInsightsEnabled == true,
               InsightAvailability.isAvailable,
-              case .ready(let snapshot) = viewModel.state,
               let materialized = TrajectoryInsightMaterializer.makeSummary(
                   snapshot: snapshot,
                   dhikrSessions: dhikrSessions,
@@ -418,22 +433,27 @@ struct TrajectoryScreen: View {
 
         do {
             try modelContext.save()
+            let generated: String
             switch kind {
             case .week:
-                insightText = try await InsightGenerator.shared
+                generated = try await InsightGenerator.shared
                     .generateWeeklyInsight(from: summary)
                     .summarySentence
             case .month:
-                insightText = try await InsightGenerator.shared
+                generated = try await InsightGenerator.shared
                     .generateMonthlyInsight(from: summary)
                     .summarySentence
+            }
+            if TrajectoryInsightNarrative.isUsefulGeneratedObservation(generated),
+               let exactReadout = insightText {
+                insightText = exactReadout + " " + generated
             }
             try modelContext.save()
         } catch {
             // Availability can change while a request is in flight
             // (model download, language, Low Power Mode). The Path
             // remains complete without an error or an upgrade prompt.
-            insightText = nil
+            // Keep the deterministic readout already on screen.
         }
     }
 

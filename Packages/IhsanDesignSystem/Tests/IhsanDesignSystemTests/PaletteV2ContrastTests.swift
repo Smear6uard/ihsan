@@ -66,133 +66,34 @@ struct PaletteV2ContrastTests {
         }
     }
 
-    /// Transition legibility contract. At sunrise and maghrib the ink
-    /// and the ground swap luminance polarity, so any continuous
-    /// crossfade provably passes them through equal luminance — AA
-    /// cannot hold at every instant of a smooth transition. The
-    /// structural mitigation is `inkHalo`: whenever ink contrast dips,
-    /// the opposite-pole halo must be active. This test pins all three
-    /// sides of that deal:
-    ///
-    /// 1. wherever the halo is off, ink meets AA against every ground;
-    /// 2. the sub-AA passage is confined to narrow slivers of the
-    ///    cycle (< 6% total);
-    /// 3. wherever contrast is genuinely low, the halo is strong.
+    /// Transition legibility contract: atmosphere can interpolate, but
+    /// the complete figure palette chooses one readable pole. Both ink
+    /// roles clear AA against their caption backing. Any remaining raw
+    /// sky dip must engage that backing; the outline stays gone.
     @Test
-    func inkDipsOnlyUnderActiveHaloAndBriefly() {
+    func adaptiveFigurePaletteUsesBackingWithoutAnOutline() {
         let steps = 4_000
-        var subAASteps = 0
         for step in 0..<steps {
             let phase = SkyPhase(unit: Double(step) / Double(steps))
             let tokens = PaletteState.resolved(for: phase)
-            let worst = [tokens.groundTopValue, tokens.groundBottomValue, tokens.panelFillValue]
-                .map { tokens.inkValue.contrastRatio(against: $0) }
+            let surfaces = [
+                tokens.skyZenithValue,
+                tokens.groundTopValue,
+                tokens.groundBottomValue,
+                tokens.groundPlaneValue,
+                tokens.panelFillValue,
+            ]
+            let worst = [tokens.inkValue, tokens.inkSecondaryValue]
+                .flatMap { ink in surfaces.map { ink.contrastRatio(against: $0) } }
                 .min() ?? 0
-
             if worst < 4.5 {
-                subAASteps += 1
                 #expect(
                     tokens.inkHaloStrength > 0.05,
-                    "ink at \(worst):1 with no halo at phase \(phase.unit)"
+                    "ink at \(worst):1 without a caption backing at phase \(phase.unit)"
                 )
             }
-            if worst < 3.0 {
-                #expect(
-                    tokens.inkHaloStrength >= 0.5,
-                    "ink at \(worst):1 with weak halo (\(tokens.inkHaloStrength)) at phase \(phase.unit)"
-                )
-            }
+            #expect(tokens.inkOutlineStrength == 0)
         }
-        let subAAFraction = Double(subAASteps) / Double(steps)
-        #expect(subAAFraction < 0.06, "sub-AA passage covers \(subAAFraction) of the cycle")
-    }
-
-    /// The keyline must be FULLY drawn wherever the palette alone leaves
-    /// text under 3:1.
-    ///
-    /// The test above pins the halo; this pins the outline that replaced
-    /// it, and it is the rule the strength curve is tuned against rather
-    /// than a number someone liked. Partial strength is not good enough
-    /// at these phases: the rings are drawn at `inkOutlineStrength`
-    /// opacity, so a half-strength ring is a half-transparent ring that
-    /// composites toward the very ground it is meant to separate the
-    /// glyph from. Below 3:1 the ground has stopped doing any of the
-    /// work, so the ring has to do all of it.
-    ///
-    /// `>= 0.99` rather than `== 1` because the curve reaches full
-    /// strength asymptotically through a `min`, and float equality on a
-    /// `sin` is not a contract worth writing.
-    ///
-    /// The grounds are the two SKY grounds only, deliberately —
-    /// `panelFill` is not a trigger here even though the sibling test
-    /// above includes it. Text on a panel never receives the keyline
-    /// (the sky-vs-panel rule; it is why 26 `.shadow` sites in
-    /// `ihsan/Repair/**` were left alone), so raising the multiplier
-    /// cannot help one pixel of it and a failure naming a panel pair
-    /// would send the reader after a fix that does not exist. Worse, it
-    /// could make this test structurally unsatisfiable: the remedy is
-    /// gated on `inkHaloStrength`, which is identically zero on every
-    /// plateau and keyed to `groundBottomValue`'s polarity, whereas
-    /// `panelFill` blends on the figure band — the two share no
-    /// structural relationship, so a panel dip on a plateau could not be
-    /// answered by any multiplier. Ground pairs at least move with the
-    /// quantity that gates the remedy.
-    ///
-    /// Panel text under 3:1 is a real gap — 23 phases of the cycle show
-    /// it — but it needs its own contract naming its own remedy, and it
-    /// is recorded in `POLISH_FINDINGS.md` rather than smuggled in here.
-    @Test
-    func theOutlineIsFullyDrawnWhereverContrastCollapses() {
-        let steps = 4_000
-        var worstStrengthWhereNeeded = 1.0
-        var haloThere = 1.0
-        var worstUnit = 0.0
-        var worstRatio = 0.0
-
-        for step in 0..<steps {
-            let phase = SkyPhase(unit: Double(step) / Double(steps))
-            let tokens = PaletteState.resolved(for: phase)
-            let grounds = [tokens.groundTopValue, tokens.groundBottomValue]
-            let inks = [tokens.inkValue, tokens.inkSecondaryValue]
-            let worst = inks
-                .flatMap { ink in grounds.map { ink.contrastRatio(against: $0) } }
-                .min() ?? 0
-
-            guard worst < 3.0 else { continue }
-            if tokens.inkOutlineStrength < worstStrengthWhereNeeded {
-                worstStrengthWhereNeeded = tokens.inkOutlineStrength
-                haloThere = tokens.inkHaloStrength
-                worstUnit = phase.unit
-                worstRatio = worst
-            }
-        }
-
-        // A dip where the halo is identically zero cannot be answered by
-        // any multiplier — `inkOutlineStrength` is `min(1, halo × k)`.
-        // Say so, rather than printing a `required` of ~4.9e307 and
-        // sending the reader to tune a constant that cannot help.
-        if worstStrengthWhereNeeded < 0.99 && haloThere == 0 {
-            Issue.record("""
-                an ink/ground pair sits at \(worstRatio):1 at phase \(worstUnit), \
-                where inkHaloStrength is 0 — no multiplier in \
-                SkyPhase.inkOutlineStrength can raise the outline there. \
-                The palette itself has to change, or this pair needs a \
-                different remedy.
-                """)
-            return
-        }
-
-        // Derived from the raw halo strength, so the message stays true
-        // whatever the multiplier currently is.
-        let required = 0.99 / max(haloThere, .leastNonzeroMagnitude)
-        #expect(
-            worstStrengthWhereNeeded >= 0.99,
-            """
-            an ink/ground pair sits at \(worstRatio):1 at phase \(worstUnit) \
-            while the outline is only \(worstStrengthWhereNeeded) drawn — \
-            the multiplier in SkyPhase.inkOutlineStrength must be at least \(required)
-            """
-        )
     }
 
     /// The parchment overlay is capped at 8% in every state — parchment

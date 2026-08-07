@@ -46,6 +46,13 @@ func bundledConfigHasCoherentFraming() async throws {
     #expect(!config.framing.qadaLabel.isEmpty)
     #expect(!config.framing.pauseModeDescription.isEmpty)
     #expect(!config.framing.travelModeDescription.isEmpty)
+    // A valid older cached/remote schema-1 config may omit this new
+    // optional field; the app carries the same cited fallback. When the
+    // loaded config supplies it, validate the framing.
+    if let insight = config.framing.trajectoryInsight {
+        #expect(insight.body.contains("valid window"))
+        #expect(insight.citation.contains("Qur’an 4:103"))
+    }
 }
 
 @Test

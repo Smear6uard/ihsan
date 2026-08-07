@@ -277,8 +277,9 @@ private struct RootGate: View {
             }
         }
         // `-IhsanDebugEnableAdhkar` turns the remembrance layer and all
-        // four sets on — the screenshot harness for the offer cards and
-        // the reading surface. Off by default everywhere else.
+        // four sets on — including sleep, which remains opt-in in the
+        // normal defaults — for the offer-card and reading-surface
+        // screenshot harnesses.
         if arguments.contains("-IhsanDebugEnableAdhkar") {
             if let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
                 settings.adhkarLayerEnabled = true

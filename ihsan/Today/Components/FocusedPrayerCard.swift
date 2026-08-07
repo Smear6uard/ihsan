@@ -147,6 +147,17 @@ struct FocusedPrayerCard: View {
 
     private var isLogged: Bool { currentStatus != nil }
 
+    /// The post-prayer handoff belongs to the moment just completed,
+    /// not every historical log. A made-up or retroactive entry never
+    /// pretends that the prayer's live window is still open.
+    private var showsTasbihOffer: Bool {
+        FocusedCardModel.offersPostPrayerTasbih(
+            windowState: windowState,
+            status: currentStatus,
+            isAvailable: onTasbih != nil
+        )
+    }
+
     private var phase: FocusedCardModel.Phase {
         FocusedCardModel.resolve(
             windowState: windowState,
@@ -409,11 +420,6 @@ struct FocusedPrayerCard: View {
                     .fontWeight(.light)
                     .foregroundStyle(tokens.ink)
                     .inkKeyline(tokens)
-                    // Position here is cosmetic: `contentTransition` is
-                    // an environment value, so it reaches both of the
-                    // keyline's copies of the glyph either side of the
-                    // modifier. Kept next to it only so the two numeric
-                    // fields below read the same way.
                     .contentTransition(.numericText())
                 Text(inscription.uppercased())
                     .font(IhsanFont.inscription)
@@ -762,21 +768,33 @@ struct FocusedPrayerCard: View {
 
                 Spacer()
 
-                if let onTasbih {
+                if showsTasbihOffer, let onTasbih {
                     Button {
                         Haptics.impact(.light)
                         onTasbih()
                     } label: {
-                        Text("TASBĪḤ")
-                            .font(IhsanFont.inscription)
-                            .tracking(1.6)
-                            .foregroundStyle(tokens.metal.opacity(0.70))
-                            .padding(.vertical, 8)
-                            .contentShape(Rectangle())
+                        HStack(spacing: 6) {
+                            Circle()
+                                .fill(tokens.leafGold)
+                                .frame(width: 5, height: 5)
+                            Text("TASBĪḤ")
+                                .font(IhsanFont.inscription)
+                                .tracking(1.5)
+                        }
+                        .foregroundStyle(tokens.ink)
+                        .padding(.horizontal, 11)
+                        .padding(.vertical, 7)
+                        .background(tokens.metal.opacity(0.11), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(
+                                tokens.metal.opacity(0.34), lineWidth: 0.7
+                            )
+                        }
+                        .contentShape(Capsule())
                     }
                     .buttonStyle(.plain)
-                    .accessibilityLabel("Tasbīḥ")
-                    .accessibilityHint("Opens the tasbīḥ counter.")
+                    .accessibilityLabel("Continue with tasbīḥ")
+                    .accessibilityHint("Opens the tasbīḥ counter after this prayer.")
                 }
             }
 

@@ -69,12 +69,7 @@ struct PauseExclusionTests {
         }
 
         let aggregate = TrajectoryAggregator.aggregate(days: days, qadaLogs: [])
-        for prayerAggregate in aggregate.perPrayer {
-            let pausedIndices = days.indices.filter { days[$0].isPaused }
-            for index in pausedIndices {
-                #expect(prayerAggregate.dailyFractions[index] == nil)
-            }
-        }
+        #expect(aggregate.totalActiveDays == days.filter { !$0.isPaused }.count)
     }
 
     /// Logs on an active day still count normally alongside a pause

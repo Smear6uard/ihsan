@@ -126,7 +126,8 @@ func anExcusedPauseSchedulesNothingAndLeavesEveryPreferenceIntact() async throws
     settings.setTimeSensitive(true, for: .fajr)
 
     let paused = NotificationScheduleSettings(userSettings: settings, isPaused: true)
-    #expect(!paused.notificationsEnabled)
+    #expect(paused.notificationsEnabled)
+    #expect(paused.prayerNotificationsSuppressed)
 
     let scheduler = makeScheduler(now: fixedDate(), center: center, settings: paused)
     try await scheduler.rebuildSchedule()
@@ -142,8 +143,29 @@ func anExcusedPauseSchedulesNothingAndLeavesEveryPreferenceIntact() async throws
     #expect(settings.isTimeSensitive(.fajr))
     let resumed = NotificationScheduleSettings(userSettings: settings, isPaused: false)
     #expect(resumed.notificationsEnabled)
+    #expect(!resumed.prayerNotificationsSuppressed)
     #expect(resumed.preference(for: .fajr).soundChoice == .takbirat)
     #expect(resumed.preference(for: .fajr).isTimeSensitive)
+}
+
+@Test
+func optedInAdhkarRemindersAreQuietAndFollowTheirWindowOpenings() async throws {
+    let center = MockNotificationCenter()
+    let settings = NotificationScheduleSettings(
+        notificationsEnabled: false,
+        morningAdhkarReminderEnabled: true,
+        eveningAdhkarReminderEnabled: true
+    )
+    let scheduler = makeScheduler(now: fixedDate(), center: center, settings: settings)
+
+    try await scheduler.rebuildSchedule()
+
+    let pending = await center.pendingNotificationRequests()
+    let adhkar = pending.filter { $0.identifier.hasPrefix("ihsan.adhkar.") }
+    #expect(adhkar.count == 28)
+    #expect(adhkar.allSatisfy { $0.content.sound == nil })
+    #expect(adhkar.allSatisfy { $0.content.categoryIdentifier == NotificationCategory.adhkar })
+    #expect(await scheduler.scheduledNotifications().isEmpty)
 }
 
 @Test

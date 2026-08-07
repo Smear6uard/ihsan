@@ -219,6 +219,8 @@ private struct TodayReadyView: View {
     @State private var entranceProgress: Double = 0
     @State private var lastActiveAt: Date?
     @Environment(\.scenePhase) private var scenePhase
+    @State private var prayerNotificationRoute = PrayerNotificationRoute.shared
+    @State private var adhkarNotificationRoute = AdhkarNotificationRoute.shared
     /// A nafl waiting on the rak'ah dialog — only ever set when the user
     /// opted into counts.
     @State private var pendingRakahNafl: PendingNafl?
@@ -570,10 +572,28 @@ private struct TodayReadyView: View {
         // the layers animate in on their staggered clocks), and again
         // when returning to the foreground after a long absence.
         .task {
+            if let prayer = prayerNotificationRoute.consume() {
+                focusedPrayer = prayer
+            }
+            if let category = adhkarNotificationRoute.consume(),
+               AdhkarAvailability.isAvailable {
+                adhkarSelection = AdhkarSelection(category: category)
+            }
             if entranceProgress == 0 {
                 entranceProgress = 1
             }
             lastActiveAt = nowProvider.now()
+        }
+        .onChange(of: prayerNotificationRoute.pendingPrayer) { _, prayer in
+            if let prayer = prayerNotificationRoute.consume() {
+                focusedPrayer = prayer
+            }
+        }
+        .onChange(of: adhkarNotificationRoute.pendingCategory) { _, category in
+            if let category = adhkarNotificationRoute.consume(),
+               AdhkarAvailability.isAvailable {
+                adhkarSelection = AdhkarSelection(category: category)
+            }
         }
         .onChange(of: scenePhase) { _, phase in
             let now = nowProvider.now()

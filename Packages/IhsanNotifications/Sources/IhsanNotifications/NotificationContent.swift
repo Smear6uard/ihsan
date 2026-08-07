@@ -49,6 +49,30 @@ public enum NotificationContent {
         return content
     }
 
+    /// A quiet window-opening reminder. It carries no sound and never
+    /// becomes time-sensitive: the person opted into a useful nudge,
+    /// not a second adhān at the same prayer boundary.
+    public static func makeAdhkarContent(
+        category: AdhkarCategory,
+        scheduledDate: Date,
+        timeZone: TimeZone
+    ) -> UNMutableNotificationContent {
+        let content = UNMutableNotificationContent()
+        content.title = "\(category.displayName) adhkār"
+        content.body = category == .morning
+            ? "The morning remembrance window is open."
+            : "The evening remembrance window is open."
+        content.sound = nil
+        content.interruptionLevel = .active
+        content.userInfo = [
+            ScheduledNotificationUserInfoKey.adhkarCategory: category.rawValue,
+            ScheduledNotificationUserInfoKey.scheduledDate: scheduledDate,
+            ScheduledNotificationUserInfoKey.timeZoneIdentifier: timeZone.identifier,
+        ]
+        content.categoryIdentifier = NotificationCategory.adhkar
+        return content
+    }
+
     private static func localizedTimeString(for date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = .autoupdatingCurrent
@@ -63,6 +87,7 @@ public enum NotificationContent {
 /// the full call rather than only opening the app.
 public enum NotificationCategory {
     public static let prayer = "ihsan.prayer"
+    public static let adhkar = "ihsan.adhkar"
     public static let playAdhanAction = "ihsan.play-adhan"
 }
 
@@ -71,4 +96,6 @@ public enum ScheduledNotificationUserInfoKey {
     public static let scheduledDate = "scheduledDate"
     public static let soundFileName = "soundFileName"
     public static let soundChoice = "soundChoice"
+    public static let adhkarCategory = "adhkarCategory"
+    public static let timeZoneIdentifier = "timeZoneIdentifier"
 }

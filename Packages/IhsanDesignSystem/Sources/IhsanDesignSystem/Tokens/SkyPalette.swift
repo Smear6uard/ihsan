@@ -32,12 +32,12 @@ public enum PaletteState: String, CaseIterable, Sendable {
         }
     }
 
-    /// The full token set at a continuous phase. Plateaus return the
-    /// canonical states; transition bands mix adjacent states in OKLab
-    /// so there is no boundary at which any token can snap. Atmosphere
-    /// roles (ground, wash, glow, metal) drift across the wide band;
-    /// figure roles (ink, panel fill, status) cross in the narrow band
-    /// — see `SkyPhase.figureHalfWidth` for the reasoning.
+    /// The full token set at a continuous phase. Atmosphere roles drift
+    /// in OKLab. When a transition crosses luminance polarity, the
+    /// figure roles move together to the endpoint with the stronger
+    /// worst-case contrast against the current sky and panel. That one
+    /// crisp "lamp change" avoids the illegible mid-tone passage — and
+    /// the heavy text outline it previously required.
     public static func resolved(for phase: SkyPhase) -> SkyPaletteTokens {
         let atm = phase.blend
         let fig = phase.figureBlend
@@ -46,31 +46,67 @@ public enum PaletteState: String, CaseIterable, Sendable {
         let f0 = fig.from.tokens
         let f1 = fig.to.tokens
 
+        let crossesPolarity = (f0.groundBottomValue.relativeLuminance < 0.5)
+            != (f1.groundBottomValue.relativeLuminance < 0.5)
+
+        let skyZenith = SRGBValue.mix(
+            a0.skyZenithValue, a1.skyZenithValue, amount: atm.amount
+        )
+        let groundTop = SRGBValue.mix(
+            a0.groundTopValue, a1.groundTopValue, amount: atm.amount
+        )
+        let groundBottom = SRGBValue.mix(
+            a0.groundBottomValue, a1.groundBottomValue, amount: atm.amount
+        )
+        let groundPlane = SRGBValue.mix(
+            a0.groundPlaneValue, a1.groundPlaneValue, amount: atm.amount
+        )
+
+        let figure: SkyPaletteTokens
+        if crossesPolarity {
+            let grounds = [skyZenith, groundTop, groundBottom, groundPlane]
+            figure = adaptiveFigurePole(f0, f1, against: grounds)
+        } else {
+            figure = f0
+        }
+
         var tokens = SkyPaletteTokens(
-            skyZenith: .mix(a0.skyZenithValue, a1.skyZenithValue, amount: atm.amount),
-            groundTop: .mix(a0.groundTopValue, a1.groundTopValue, amount: atm.amount),
-            groundBottom: .mix(a0.groundBottomValue, a1.groundBottomValue, amount: atm.amount),
-            groundPlane: .mix(a0.groundPlaneValue, a1.groundPlaneValue, amount: atm.amount),
+            skyZenith: skyZenith,
+            groundTop: groundTop,
+            groundBottom: groundBottom,
+            groundPlane: groundPlane,
             horizonWash: .mix(a0.horizonWashValue, a1.horizonWashValue, amount: atm.amount),
-            ink: .mix(f0.inkValue, f1.inkValue, amount: fig.amount),
-            inkSecondary: .mix(f0.inkSecondaryValue, f1.inkSecondaryValue, amount: fig.amount),
+            ink: crossesPolarity
+                ? figure.inkValue
+                : .mix(f0.inkValue, f1.inkValue, amount: fig.amount),
+            inkSecondary: crossesPolarity
+                ? figure.inkSecondaryValue
+                : .mix(f0.inkSecondaryValue, f1.inkSecondaryValue, amount: fig.amount),
             metal: .mix(a0.metalValue, a1.metalValue, amount: atm.amount),
             metalHighlight: .mix(a0.metalHighlightValue, a1.metalHighlightValue, amount: atm.amount),
             leafGold: .mix(a0.leafGoldValue, a1.leafGoldValue, amount: atm.amount),
-            keyline: .mix(f0.keylineValue, f1.keylineValue, amount: fig.amount),
+            keyline: crossesPolarity
+                ? figure.keylineValue
+                : .mix(f0.keylineValue, f1.keylineValue, amount: fig.amount),
             lapis: .mix(a0.lapisValue, a1.lapisValue, amount: atm.amount),
             glow: .mix(a0.glowValue, a1.glowValue, amount: atm.amount),
-            panelFill: .mix(f0.panelFillValue, f1.panelFillValue, amount: fig.amount),
+            panelFill: crossesPolarity
+                ? figure.panelFillValue
+                : .mix(f0.panelFillValue, f1.panelFillValue, amount: fig.amount),
             panelStroke: .mix(a0.panelStrokeValue, a1.panelStrokeValue, amount: atm.amount),
             panelTexture: .mix(a0.panelTextureValue, a1.panelTextureValue, amount: atm.amount),
             panelTextureOpacity: a0.panelTextureOpacity
                 + (a1.panelTextureOpacity - a0.panelTextureOpacity) * atm.amount,
-            positive: .mix(f0.positiveValue, f1.positiveValue, amount: fig.amount),
-            attention: .mix(f0.attentionValue, f1.attentionValue, amount: fig.amount),
+            positive: crossesPolarity
+                ? figure.positiveValue
+                : .mix(f0.positiveValue, f1.positiveValue, amount: fig.amount),
+            attention: crossesPolarity
+                ? figure.attentionValue
+                : .mix(f0.attentionValue, f1.attentionValue, amount: fig.amount),
             inkHalo: .mix(f0.inkHaloValue, f1.inkHaloValue, amount: fig.amount)
         )
         tokens.inkHaloStrength = phase.inkHaloStrength
-        tokens.inkOutlineStrength = phase.inkOutlineStrength
+        tokens.inkOutlineStrength = 0
         // Keep the two halo poles un-blended through a crossing:
         // darker and lighter of the crossing states' halo tints. On a
         // plateau (fig.from == fig.to) both poles collapse to the
@@ -83,6 +119,24 @@ public enum PaletteState: String, CaseIterable, Sendable {
             tokens.inkHaloLightValue = f0.inkHaloValue
         }
         return tokens
+    }
+
+    /// Chooses a complete, internally coherent figure palette. Scoring
+    /// the secondary ink as well as the primary prevents captions from
+    /// becoming the weak link; including each pole's own panel keeps a
+    /// selected ink/panel pairing at its canonical contrast.
+    private static func adaptiveFigurePole(
+        _ first: SkyPaletteTokens,
+        _ second: SkyPaletteTokens,
+        against grounds: [SRGBValue]
+    ) -> SkyPaletteTokens {
+        func score(_ candidate: SkyPaletteTokens) -> Double {
+            let surfaces = grounds + [candidate.panelFillValue]
+            return [candidate.inkValue, candidate.inkSecondaryValue]
+                .flatMap { ink in surfaces.map { ink.contrastRatio(against: $0) } }
+                .min() ?? 0
+        }
+        return score(first) >= score(second) ? first : second
     }
 
     public var displayName: String {
@@ -176,20 +230,16 @@ public struct SkyPaletteTokens: Sendable, Equatable {
 
     // MARK: Transition legibility
 
-    /// Opposite-pole halo tint for text. Applied behind glyphs at
-    /// `inkHaloStrength` so text stays legible through the brief
-    /// mid-tone crossing at sunrise and maghrib, where continuous
-    /// interpolation provably passes ink and ground through equal
-    /// luminance.
+    /// Legacy halo tint retained for token compatibility. The adaptive
+    /// figure palette makes the rendered strength zero.
     public var inkHaloValue: SRGBValue
     /// How strongly the halo applies right now, `0...1`. Zero for
     /// every canonical state; nonzero only inside polarity-crossing
     /// transitions.
     public var inkHaloStrength: Double = 0
 
-    /// How strongly the legibility keyline draws right now, `0...1`.
-    /// Zero for every canonical state; nonzero only inside
-    /// polarity-crossing transitions. See `SkyPhase.inkOutlineStrength`.
+    /// Legacy outline strength retained for data compatibility. Resolved
+    /// palettes set this to zero and no view draws an outline.
     public var inkOutlineStrength: Double = 0
 
     /// The two halo poles, preserved un-blended through a transition.

@@ -17,6 +17,7 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
 
     public let trajectoryEmptyTitle: String
     public let trajectoryEmptySubtitle: String
+    public let trajectoryInsight: TrajectoryInsightFraming?
 
     public init(
         onTimeLabel: String,
@@ -30,7 +31,8 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
         reflectionEmptyTitle: String,
         reflectionEmptySubtitle: String,
         trajectoryEmptyTitle: String,
-        trajectoryEmptySubtitle: String
+        trajectoryEmptySubtitle: String,
+        trajectoryInsight: TrajectoryInsightFraming? = nil
     ) {
         self.onTimeLabel = onTimeLabel
         self.lateLabel = lateLabel
@@ -44,5 +46,21 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
         self.reflectionEmptySubtitle = reflectionEmptySubtitle
         self.trajectoryEmptyTitle = trajectoryEmptyTitle
         self.trajectoryEmptySubtitle = trajectoryEmptySubtitle
+        self.trajectoryInsight = trajectoryInsight
+    }
+}
+
+/// Reviewed explanatory copy that accompanies a factual Path readout.
+/// It explains the ledger's categories without turning an observation
+/// into a personal ruling.
+public struct TrajectoryInsightFraming: Codable, Sendable, Equatable {
+    public let title: String
+    public let body: String
+    public let citation: String
+
+    public init(title: String, body: String, citation: String) {
+        self.title = title
+        self.body = body
+        self.citation = citation
     }
 }

@@ -46,6 +46,44 @@ struct FocusedCardModelTests {
         #expect(atEnd == .windowClosed(at: windowEnd))
     }
 
+    @Test
+    func tasbihIsOfferedOnlyAfterAnInWindowCompletion() {
+        let current = PrayerWindowState.current(
+            startedAt: scheduled,
+            endsAt: windowEnd
+        )
+        let closed = PrayerWindowState.closed(
+            startedAt: scheduled,
+            endedAt: windowEnd
+        )
+
+        #expect(FocusedCardModel.offersPostPrayerTasbih(
+            windowState: current,
+            status: .onTime,
+            isAvailable: true
+        ))
+        #expect(FocusedCardModel.offersPostPrayerTasbih(
+            windowState: current,
+            status: .late,
+            isAvailable: true
+        ))
+        #expect(!FocusedCardModel.offersPostPrayerTasbih(
+            windowState: current,
+            status: .qada,
+            isAvailable: true
+        ))
+        #expect(!FocusedCardModel.offersPostPrayerTasbih(
+            windowState: closed,
+            status: .onTime,
+            isAvailable: true
+        ))
+        #expect(!FocusedCardModel.offersPostPrayerTasbih(
+            windowState: current,
+            status: .onTime,
+            isAvailable: false
+        ))
+    }
+
     /// Corrective G, phase 1: the never-early property at the card.
     /// For ANY now earlier than the prayer's start, the resolved
     /// phase is `.upcoming` — across every combination of the other

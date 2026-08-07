@@ -78,7 +78,10 @@ struct GestaltGrid: View {
 
             VStack(spacing: IhsanSpacing.sm) {
                 grid(columns: columns, layout: layout)
-                annotationRow(columns: columns, layout: layout)
+                if columns.contains(where: \.isTraveling) {
+                    travelRow(columns: columns, layout: layout)
+                }
+                timeAxis(layout: layout)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
@@ -149,6 +152,7 @@ struct GestaltGrid: View {
 
     /// Gap between the five fardh rows and the presence overlays.
     private static let overlayGap: CGFloat = IhsanSpacing.xs
+    private static let voluntaryHeaderHeight: CGFloat = 15
 
     @ViewBuilder
     private func grid(
@@ -168,10 +172,8 @@ struct GestaltGrid: View {
             }
 
             if showsAnyPresenceRow {
-                // The presence rows are a different register from the
-                // five fardh rows — presence, not status. A row at the
-                // grid's own spacing read as a sixth prayer.
-                Color.clear.frame(height: Self.overlayGap)
+                voluntaryHeader(layout: layout)
+                    .padding(.top, Self.overlayGap)
             }
 
             if showsNaflRow, let naflColumns, naflColumns.count == columns.count {
@@ -247,8 +249,33 @@ struct GestaltGrid: View {
             label: label,
             rowHeight: layout.presenceRowHeight
         ) { column in
-            mark(present[column])
+            ZStack {
+                Capsule()
+                    .fill(tokens.inkSecondary.opacity(0.12))
+                    .frame(
+                        width: layout.dotSize,
+                        height: max(1, layout.presenceMarkSize * 0.16)
+                    )
+                mark(present[column])
+            }
         }
+    }
+
+    /// Separates factual voluntary presence from the five obligatory
+    /// prayer rows. The old gap left isolated stars floating beneath
+    /// the matrix; this names the register before the first mark.
+    private func voluntaryHeader(layout: GestaltLayout) -> some View {
+        HStack(spacing: IhsanSpacing.sm) {
+            Text("VOLUNTARY PRACTICE")
+                .font(IhsanFont.inscription)
+                .tracking(1.35)
+                .foregroundStyle(tokens.inkSecondary)
+                .lineLimit(1)
+            Rectangle()
+                .fill(tokens.metal.opacity(0.24))
+                .frame(height: 0.5)
+        }
+        .frame(height: Self.voluntaryHeaderHeight)
     }
 
     // MARK: - Which overlay rows are drawn
@@ -295,27 +322,25 @@ struct GestaltGrid: View {
         return zip(present, paused).map { $0 && !$1 }
     }
 
-    /// The under-column annotations: the four-pointed star under the
-    /// rightmost column ("you are here"), and the engraved plane mark
-    /// under travel columns when the scale gives it room. Built through
-    /// the same row helper as every other row, so the marks land under
-    /// their columns by construction rather than by agreement.
-    private func annotationRow(
+    /// Travel is a named row rather than an unexplained symbol beneath
+    /// the pattern. Today is identified by the time axis below.
+    private func travelRow(
         columns: [Column],
         layout: GestaltLayout
     ) -> some View {
-        let starSize: CGFloat = max(6, min(10, layout.dotSize + 4))
+        let markSize: CGFloat = max(6, min(10, layout.dotSize + 4))
         let planeVisible = layout.dotSize >= 5
-        return columnRow(layout: layout, count: columns.count) { col in
+        return columnRow(
+            layout: layout,
+            count: columns.count,
+            label: layout.labelGutter > 0 ? "TRAVEL" : nil,
+            rowHeight: markSize
+        ) { col in
             Group {
-                if col == columns.count - 1 {
-                    FourPointedStar()
-                        .fill(tokens.metal.opacity(0.95))
-                        .frame(width: starSize, height: starSize)
-                } else if columns[col].isTraveling, planeVisible {
+                if columns[col].isTraveling, planeVisible {
                     TravelPlaneMark()
                         .fill(tokens.metal.opacity(0.60))
-                        .frame(width: starSize, height: starSize)
+                        .frame(width: markSize, height: markSize)
                 } else {
                     Color.clear
                         .frame(width: 1, height: 1)
@@ -323,6 +348,23 @@ struct GestaltGrid: View {
             }
             .frame(width: layout.dotSize, alignment: .center)
         }
+    }
+
+    private func timeAxis(layout: GestaltLayout) -> some View {
+        HStack(spacing: 0) {
+            if layout.labelGutter > 0 {
+                Color.clear.frame(width: layout.labelGutter, height: 1)
+            }
+            Text(period == .year ? "EARLIER WEEKS" : "EARLIER")
+            Spacer(minLength: IhsanSpacing.sm)
+            Text(period == .year ? "THIS WEEK" : "TODAY")
+        }
+        .font(IhsanFont.inscription)
+        .tracking(1.25)
+        .foregroundStyle(tokens.inkSecondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.75)
+        .frame(height: 12)
     }
 
     // MARK: - Columns source
@@ -372,10 +414,14 @@ struct GestaltGrid: View {
         var height = 5 * layout.dotSize
             + CGFloat(presenceRows) * layout.presenceRowHeight
             + (rowCount - 1) * spacing
-        if presenceRows > 0 { height += Self.overlayGap }
+        if presenceRows > 0 {
+            height += Self.overlayGap + Self.voluntaryHeaderHeight + spacing
+        }
 
-        let starSize = max(6, min(10, layout.dotSize + 4))
-        return height + IhsanSpacing.sm + starSize
+        let travelHeight = columns.contains(where: \.isTraveling)
+            ? IhsanSpacing.sm + max(6, min(10, layout.dotSize + 4))
+            : 0
+        return height + travelHeight + IhsanSpacing.sm + 12
     }
 
     // MARK: - Accessibility
@@ -449,7 +495,7 @@ private struct DhikrPresenceMark: View {
 
 // MARK: - Nafl presence mark
 
-/// One cell of the nafl row: the four-pointed mark, filled, where the
+/// One cell of the nafl row: a short rounded stroke where the
 /// day (or week) holds any voluntary record — empty space where it
 /// does not.
 ///
@@ -465,10 +511,12 @@ private struct NaflPresenceMark: View {
     var body: some View {
         Group {
             if present {
-                FourPointedStar().fill(
-                    GestaltGrid.overlayMarkValue(for: tokens).color
-                        .opacity(GestaltGrid.overlayMarkOpacity)
-                )
+                RoundedRectangle(cornerRadius: size, style: .continuous)
+                    .fill(
+                        GestaltGrid.overlayMarkValue(for: tokens).color
+                            .opacity(GestaltGrid.overlayMarkOpacity)
+                    )
+                    .frame(width: size * 0.78, height: max(2, size * 0.30))
             } else {
                 Color.clear
             }

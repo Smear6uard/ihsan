@@ -211,8 +211,7 @@ struct QuietRowLayout: Layout {
             lateCount: 2,
             missedCount: 1,
             qadaCount: 1,
-            totalActiveDays: 30,
-            dailyFractions: []
+            totalActiveDays: 30
         )
     }
     let aggregate = TrajectoryAggregate(

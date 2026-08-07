@@ -17,7 +17,7 @@ import Foundation
 /// Which set an item belongs to. The categories are the day's
 /// occasions, not a taxonomy for browsing — each one is offered in its
 /// own window and nowhere else.
-public enum AdhkarCategory: String, Codable, CaseIterable, Sendable {
+public enum AdhkarCategory: String, Codable, CaseIterable, Hashable, Sendable {
     case morning
     case evening
     case postPrayer

@@ -1075,10 +1075,8 @@ private struct SunnahSection: View {
 
 /// The Adhkar group.
 ///
-/// Off by default and invisible in the off state — the same discipline
-/// as the sunnah layer. Nothing here mentions what is missing, and
-/// nothing here schedules a notification: the windows offer, they never
-/// call.
+/// Window suggestions are on with the remembrance layer; notification
+/// reminders remain a separate, explicit device-local choice.
 ///
 /// While the bundled content is unreviewed, a release build has no
 /// adhkar at all and this section does not appear. A DEBUG build shows
@@ -1086,6 +1084,7 @@ private struct SunnahSection: View {
 private struct AdhkarSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
+    @State private var remindersEnabled = AdhkarReminderPreferenceStore.isEnabled
 
     var body: some View {
         if AdhkarAvailability.isAvailable {
@@ -1108,6 +1107,7 @@ private struct AdhkarSection: View {
                                 settings.adhkarSleepEnabled = true
                             }
                             settings.modifiedAt = .now
+                            rebuildReminderSchedule()
                         }
                     ))
                     .labelsHidden()
@@ -1120,7 +1120,10 @@ private struct AdhkarSection: View {
                         toggle(
                             label: "Morning adhkār",
                             get: { settings.adhkarMorningEnabled },
-                            set: { settings.adhkarMorningEnabled = $0 }
+                            set: {
+                                settings.adhkarMorningEnabled = $0
+                                rebuildReminderSchedule()
+                            }
                         )
                     }
 
@@ -1128,8 +1131,25 @@ private struct AdhkarSection: View {
                         toggle(
                             label: "Evening adhkār",
                             get: { settings.adhkarEveningEnabled },
-                            set: { settings.adhkarEveningEnabled = $0 }
+                            set: {
+                                settings.adhkarEveningEnabled = $0
+                                rebuildReminderSchedule()
+                            }
                         )
+                    }
+
+                    SettingsRow(
+                        title: "Window reminders",
+                        subtitle: "A quiet alert after Fajr and Maghrib",
+                        glyph: .adhan
+                    ) {
+                        Toggle("", isOn: Binding(
+                            get: { remindersEnabled },
+                            set: { setRemindersEnabled($0) }
+                        ))
+                        .labelsHidden()
+                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                        .accessibilityLabel("Morning and evening adhkār reminders")
                     }
 
                     SettingsRow(title: "After each prayer", subtitle: "From a logged prayer", glyph: .rawatib) {
@@ -1166,7 +1186,7 @@ private struct AdhkarSection: View {
                         )
                     }
 
-                    SettingsDescriptionText("Each set is offered inside its own window and nowhere else. Sittings are recorded as plain facts and count toward nothing. Nothing here sends a notification.")
+                    SettingsDescriptionText("Morning and evening sets are suggested only inside their windows. Optional reminders are silent and arrive shortly after Fajr and Maghrib. Sittings are recorded as plain facts and count toward nothing.")
 
                     if AdhkarAvailability.isShowingDraftContent {
                         SettingsDescriptionText("DRAFT — these texts are awaiting a scholar's review and cannot ship. See ADHKAR_REVIEW.md.")
@@ -1175,7 +1195,32 @@ private struct AdhkarSection: View {
                     SettingsDescriptionText("The day's remembrance, offered at its own times. Nothing is shown until you choose it.")
                 }
             }
+            .onAppear {
+                remindersEnabled = AdhkarReminderPreferenceStore.isEnabled
+            }
         }
+    }
+
+    private func setRemindersEnabled(_ enabled: Bool) {
+        guard enabled else {
+            remindersEnabled = false
+            AdhkarReminderPreferenceStore.isEnabled = false
+            rebuildReminderSchedule()
+            return
+        }
+
+        Task {
+            let granted = (try? await NotificationScheduler.shared.requestAuthorization()) == true
+            await MainActor.run {
+                remindersEnabled = granted
+                AdhkarReminderPreferenceStore.isEnabled = granted
+            }
+            try? await NotificationScheduler.shared.rebuildSchedule()
+        }
+    }
+
+    private func rebuildReminderSchedule() {
+        Task { try? await NotificationScheduler.shared.rebuildSchedule() }
     }
 
     private func toggle(
@@ -1603,7 +1648,7 @@ private struct OnDeviceInsightsSection: View {
     var body: some View {
         SettingsSectionCard("On-device Insights") {
             SettingsRow(
-                title: "Prayer pattern insights",
+                title: "Apple Intelligence detail",
                 subtitle: "Weekly and monthly",
                 glyph: .privacy
             ) {
@@ -1616,10 +1661,10 @@ private struct OnDeviceInsightsSection: View {
                 ))
                 .labelsHidden()
                 .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                .accessibilityLabel("On-device prayer pattern insights")
+                .accessibilityLabel("Apple Intelligence detail for prayer readouts")
             }
 
-            SettingsDescriptionText("Apple Intelligence summarizes the numeric pattern already shown in Path. Processing stays on this device; Ihsan never sends prayer data to a server.")
+            SettingsDescriptionText("Path always shows an exact local period readout. When this is on, Apple Intelligence may add one concrete weekly or monthly observation. Processing stays on this device; Ihsan never sends prayer data to a server.")
         }
     }
 }

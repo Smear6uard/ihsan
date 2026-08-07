@@ -116,25 +116,13 @@ enum TrajectoryAggregator {
             }
             let pQada = qadaLogs.filter { $0.prayer == prayer }.count
 
-            let fractions: [Double?] = days.map { day in
-                if day.isPaused { return nil }
-                let completion = day.prayerCompletions.first { $0.prayer == prayer }
-                switch completion?.status {
-                case .onTime: return 1.0
-                case .late: return 0.55
-                case .qada: return 0.4   // partial credit — made up later
-                case .missed, .none: return 0.0
-                }
-            }
-
             return TrajectoryAggregate.PrayerAggregate(
                 prayer: prayer,
                 onTimeCount: pOn,
                 lateCount: pLate,
                 missedCount: pMissed,
                 qadaCount: pQada,
-                totalActiveDays: activeDays.count,
-                dailyFractions: fractions
+                totalActiveDays: activeDays.count
             )
         }
 

@@ -35,6 +35,12 @@ public struct PrayerNotificationPreference: Equatable, Sendable {
 
 public struct NotificationScheduleSettings: Equatable, Sendable {
     public let notificationsEnabled: Bool
+    /// A pause suppresses ṣalāh notifications and Live Activities, but
+    /// not remembrance. Keeping this separate from the global switch
+    /// prevents an excused pause from accidentally muting adhkār too.
+    public let prayerNotificationsSuppressed: Bool
+    public let morningAdhkarReminderEnabled: Bool
+    public let eveningAdhkarReminderEnabled: Bool
     public let calculationMethod: CalculationMethodChoice
     public let madhab: MadhabChoice
     public let highLatitudeRule: HighLatitudeRule
@@ -46,6 +52,9 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
 
     public init(
         notificationsEnabled: Bool = true,
+        prayerNotificationsSuppressed: Bool = false,
+        morningAdhkarReminderEnabled: Bool = false,
+        eveningAdhkarReminderEnabled: Bool = false,
         calculationMethod: CalculationMethodChoice = .isna,
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
@@ -53,6 +62,9 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         prayerPreferences: [PrayerNotificationPreference] = Prayer.allCases.map { PrayerNotificationPreference(prayer: $0) }
     ) {
         self.notificationsEnabled = notificationsEnabled
+        self.prayerNotificationsSuppressed = prayerNotificationsSuppressed
+        self.morningAdhkarReminderEnabled = morningAdhkarReminderEnabled
+        self.eveningAdhkarReminderEnabled = eveningAdhkarReminderEnabled
         self.calculationMethod = calculationMethod
         self.madhab = madhab
         self.highLatitudeRule = highLatitudeRule
@@ -66,17 +78,30 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
 }
 
 extension NotificationScheduleSettings {
-    /// `isPaused` suppresses the whole schedule without touching any stored
-    /// preference — per-prayer overrides come back exactly as the user left
-    /// them when the pause ends.
-    init(userSettings: UserSettings, isPaused: Bool = false) {
+    /// `isPaused` suppresses prayer alerts without touching their stored
+    /// preferences. An explicitly enabled remembrance reminder remains
+    /// available because remembrance itself is not part of the pause.
+    init(
+        userSettings: UserSettings,
+        isPaused: Bool = false,
+        adhkarRemindersEnabled: Bool = false
+    ) {
         let decodedConfigs = (try? JSONDecoder().decode(
             [PrayerNotificationConfig].self,
             from: Data(userSettings.prayerNotificationsConfigJSON.utf8)
         )) ?? Prayer.allCases.map { PrayerNotificationConfig(prayer: $0) }
 
         self.init(
-            notificationsEnabled: userSettings.notificationsEnabled && !isPaused,
+            notificationsEnabled: userSettings.notificationsEnabled,
+            prayerNotificationsSuppressed: isPaused,
+            morningAdhkarReminderEnabled: adhkarRemindersEnabled
+                && AdhkarAvailability.isAvailable
+                && userSettings.adhkarLayerEnabled
+                && userSettings.adhkarMorningEnabled,
+            eveningAdhkarReminderEnabled: adhkarRemindersEnabled
+                && AdhkarAvailability.isAvailable
+                && userSettings.adhkarLayerEnabled
+                && userSettings.adhkarEveningEnabled,
             calculationMethod: userSettings.calculationMethod,
             madhab: userSettings.madhab,
             highLatitudeRule: userSettings.highLatitudeRule,
@@ -140,8 +165,25 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
 
         return NotificationScheduleSettings(
             userSettings: settings,
-            isPaused: !activePauses.isEmpty
+            isPaused: !activePauses.isEmpty,
+            adhkarRemindersEnabled: AdhkarReminderPreferenceStore.isEnabled
         )
+    }
+}
+
+/// Adhkār reminders are device-local, like notification authorization
+/// itself. Suggestions remain visible independently; this preference
+/// only decides whether the device calls attention to an opening window.
+public enum AdhkarReminderPreferenceStore {
+    public static let key = "IhsanAdhkarWindowRemindersEnabled"
+
+    private static var defaults: UserDefaults {
+        UserDefaults(suiteName: IhsanModelContainerFactory.appGroupIdentifier) ?? .standard
+    }
+
+    public static var isEnabled: Bool {
+        get { defaults.bool(forKey: key) }
+        set { defaults.set(newValue, forKey: key) }
     }
 }
 
@@ -153,7 +195,11 @@ public actor NotificationScheduler {
     )
 
     static let notificationIdentifierPrefix = "ihsan.prayer."
+    static let adhkarNotificationIdentifierPrefix = "ihsan.adhkar."
     private static let rollingWindowDayCount = 14
+    /// Avoids stacking a remembrance banner on the prayer notification
+    /// at the exact same instant while remaining well inside each window.
+    private static let adhkarReminderDelay: TimeInterval = 10 * 60
 
     private let prayerTimesProvider: any PrayerTimesProviding
     private let locationProvider: any LocationProviding
@@ -215,8 +261,11 @@ public actor NotificationScheduler {
         }
 
         let settings = try await settingsProvider.currentNotificationSettings()
-        guard settings.notificationsEnabled else {
-            logger.info("Prayer notifications are disabled; clearing Ihsan pending notifications.")
+        guard settings.notificationsEnabled
+                || settings.morningAdhkarReminderEnabled
+                || settings.eveningAdhkarReminderEnabled
+        else {
+            logger.info("Ihsan notifications are disabled; clearing pending notifications.")
             await cancelAllScheduledNotifications()
             return
         }
@@ -238,54 +287,75 @@ public actor NotificationScheduler {
         await cancelAllScheduledNotifications()
 
         for day in days {
-            for prayerTime in day.allFardh {
-                let preference = settings.preference(for: prayerTime.prayer)
-                guard preference.isEnabled else {
-                    continue
-                }
+            if settings.notificationsEnabled && !settings.prayerNotificationsSuppressed {
+                for prayerTime in day.allFardh {
+                    let preference = settings.preference(for: prayerTime.prayer)
+                    guard preference.isEnabled else {
+                        continue
+                    }
 
-                let notificationDate = prayerTime.scheduledTime.addingTimeInterval(TimeInterval(-preference.leadTimeSeconds))
-                let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(
-                    -LiveActivityWindow.preAdhanLead
-                )
-                if activityStartDate > referenceDate {
-                    try await prayerActivityScheduler.schedulePrayerActivityStart(
-                        for: prayerTime,
-                        in: day,
-                        startDate: activityStartDate
+                    let notificationDate = prayerTime.scheduledTime.addingTimeInterval(TimeInterval(-preference.leadTimeSeconds))
+                    let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(
+                        -LiveActivityWindow.preAdhanLead
                     )
-                } else if prayerTime.scheduledTime.addingTimeInterval(
-                    LiveActivityWindow.postAdhanLifetime
-                ) > referenceDate {
-                    try await prayerActivityScheduler.schedulePrayerActivityStart(
-                        for: prayerTime,
-                        in: day,
-                        startDate: activityStartDate
+                    if activityStartDate > referenceDate {
+                        try await prayerActivityScheduler.schedulePrayerActivityStart(
+                            for: prayerTime,
+                            in: day,
+                            startDate: activityStartDate
+                        )
+                    } else if prayerTime.scheduledTime.addingTimeInterval(
+                        LiveActivityWindow.postAdhanLifetime
+                    ) > referenceDate {
+                        try await prayerActivityScheduler.schedulePrayerActivityStart(
+                            for: prayerTime,
+                            in: day,
+                            startDate: activityStartDate
+                        )
+                    }
+
+                    guard notificationDate > referenceDate else {
+                        continue
+                    }
+
+                    let request = makeNotificationRequest(
+                        prayerTime: prayerTime,
+                        notificationDate: notificationDate,
+                        timeZone: place.timeZone,
+                        soundChoice: preference.soundChoice,
+                        isTimeSensitive: preference.isTimeSensitive
                     )
+                    try await notificationCenter.add(request)
                 }
+            }
 
-                guard notificationDate > referenceDate else {
-                    continue
-                }
-
-                let request = makeNotificationRequest(
-                    prayerTime: prayerTime,
-                    notificationDate: notificationDate,
-                    timeZone: place.timeZone,
-                    soundChoice: preference.soundChoice,
-                    isTimeSensitive: preference.isTimeSensitive
+            if settings.morningAdhkarReminderEnabled {
+                try await scheduleAdhkarReminder(
+                    category: .morning,
+                    windowStart: day.fajr.scheduledTime,
+                    referenceDate: referenceDate,
+                    timeZone: place.timeZone
                 )
-                try await notificationCenter.add(request)
+            }
+            if settings.eveningAdhkarReminderEnabled {
+                try await scheduleAdhkarReminder(
+                    category: .evening,
+                    windowStart: day.maghrib.scheduledTime,
+                    referenceDate: referenceDate,
+                    timeZone: place.timeZone
+                )
             }
         }
-
     }
 
     public func cancelAllScheduledNotifications() async {
         let pendingRequests = await notificationCenter.pendingNotificationRequests()
         let ihsanIdentifiers = pendingRequests
             .map(\.identifier)
-            .filter { $0.hasPrefix(Self.notificationIdentifierPrefix) }
+            .filter {
+                $0.hasPrefix(Self.notificationIdentifierPrefix)
+                    || $0.hasPrefix(Self.adhkarNotificationIdentifierPrefix)
+            }
         guard !ihsanIdentifiers.isEmpty else {
             return
         }
@@ -339,6 +409,34 @@ public actor NotificationScheduler {
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let identifier = Self.identifier(for: prayerTime.prayer, scheduledDate: prayerTime.scheduledTime)
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+    }
+
+    private func scheduleAdhkarReminder(
+        category: AdhkarCategory,
+        windowStart: Date,
+        referenceDate: Date,
+        timeZone: TimeZone
+    ) async throws {
+        let notificationDate = windowStart.addingTimeInterval(Self.adhkarReminderDelay)
+        guard notificationDate > referenceDate else { return }
+
+        let content = NotificationContent.makeAdhkarContent(
+            category: category,
+            scheduledDate: notificationDate,
+            timeZone: timeZone
+        )
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        var components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second],
+            from: notificationDate
+        )
+        components.timeZone = timeZone
+        let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
+        let identifier = "\(Self.adhkarNotificationIdentifierPrefix)\(category.rawValue).\(Int(notificationDate.timeIntervalSince1970))"
+        try await notificationCenter.add(
+            UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        )
     }
 
     private static func identifier(for prayer: Prayer, scheduledDate: Date) -> String {

@@ -37,8 +37,5 @@ struct TrajectoryAggregate: Equatable, Sendable {
         let missedCount: Int
         let qadaCount: Int
         let totalActiveDays: Int
-        /// One value per day in chronological order. `nil` for paused days
-        /// (renders as a dash); otherwise the per-prayer fraction in 0...1.
-        let dailyFractions: [Double?]
     }
 }

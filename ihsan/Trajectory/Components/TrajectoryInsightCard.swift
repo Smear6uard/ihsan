@@ -1,11 +1,14 @@
 import IhsanDesignSystem
+import IhsanFiqhConfig
 import SwiftUI
 
-/// A single factual observation generated entirely on device. The card
-/// has no score, recommendation, exhortation, or religious text.
+/// A factual on-device observation paired with reviewed fiqh framing.
+/// The two registers stay visibly separate: data never impersonates a
+/// ruling, and the cited context never judges the person's record.
 struct TrajectoryInsightCard: View {
     let text: String?
     let isLoading: Bool
+    let fiqh: TrajectoryInsightFraming
     let tokens: SkyPaletteTokens
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -39,13 +42,41 @@ struct TrajectoryInsightCard: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.md) {
                 header
 
-                if isLoading {
-                    loadingState
-                } else if let text {
+                if let text {
                     Text(text)
                         .font(IhsanFont.bodyEnglish)
                         .lineSpacing(3)
                         .foregroundStyle(tokens.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                if isLoading {
+                    Text("REFINING THIS READOUT ON DEVICE")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.2)
+                        .foregroundStyle(tokens.inkSecondary)
+                }
+
+                Rectangle()
+                    .fill(tokens.metal.opacity(0.24))
+                    .frame(height: 0.5)
+
+                VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                    Text("FIQH CONTEXT · \(fiqh.title.uppercased())")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.35)
+                        .foregroundStyle(tokens.inkSecondary)
+
+                    Text(fiqh.body)
+                        .font(IhsanFont.bodyEnglish)
+                        .lineSpacing(3)
+                        .foregroundStyle(tokens.ink)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    Text(fiqh.citation)
+                        .font(IhsanFont.inscription)
+                        .tracking(0.7)
+                        .foregroundStyle(tokens.inkSecondary)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -67,7 +98,7 @@ struct TrajectoryInsightCard: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
-            isLoading ? "Generating on-device insight" : "On-device insight, \(text ?? "")"
+            "Period readout. \(text ?? "") Fiqh context. \(fiqh.body) Source: \(fiqh.citation)"
         )
     }
 
@@ -85,7 +116,7 @@ struct TrajectoryInsightCard: View {
             .scaleEffect(isLoading && loadingPulse ? 1.045 : 1)
             .opacity(isLoading && !loadingPulse ? 0.62 : 1)
 
-            Text("PATTERN INSIGHT")
+            Text("PERIOD READOUT")
                 .font(IhsanFont.inscription)
                 .tracking(1.7)
                 .foregroundStyle(tokens.ink)
@@ -105,27 +136,6 @@ struct TrajectoryInsightCard: View {
                     Capsule()
                         .strokeBorder(tokens.metal.opacity(0.22), lineWidth: 0.65)
                 }
-        }
-    }
-
-    private var loadingState: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            Text("Reading this period’s pattern")
-                .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(tokens.inkSecondary)
-
-            GeometryReader { proxy in
-                VStack(alignment: .leading, spacing: 7) {
-                    Capsule()
-                        .fill(tokens.metal.opacity(loadingPulse ? 0.22 : 0.10))
-                        .frame(width: proxy.size.width * 0.88, height: 7)
-                    Capsule()
-                        .fill(tokens.metal.opacity(loadingPulse ? 0.14 : 0.07))
-                        .frame(width: proxy.size.width * 0.56, height: 7)
-                }
-            }
-            .frame(height: 21)
-            .accessibilityHidden(true)
         }
     }
 

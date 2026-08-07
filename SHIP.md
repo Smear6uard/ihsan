@@ -56,6 +56,12 @@ second reading:
   before Dhuhr).
 - **The reflection prompts and their citations** in
   `Packages/IhsanFiqhConfig`.
+- **The Path insight framing and its citations** in
+  `Packages/IhsanFiqhConfig`, especially the distinction the app draws
+  between its in-window “Delayed” label and a later qadāʾ record.
+- **The morning/evening adhkār windows and reminder timing.** The
+  reminder is silent and device-local; it follows the same reviewed
+  window policy as the in-app suggestion.
 - **Qadā framing throughout Repair**, which is the most theologically
   loaded surface in the app.
 

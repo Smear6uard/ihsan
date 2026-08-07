@@ -28,25 +28,38 @@ struct AdhkarQuietCard: View {
                 HStack(spacing: IhsanSpacing.sm) {
                     SequenceMark(state: .current, tokens: tokens)
 
-                    // The duha card's register — a name, not a
-                    // headline. Named in full so a card seen out of
-                    // the corner of an eye says what it is.
-                    Text("\(category.displayName) adhkār")
-                        .font(IhsanFont.bodyEnglish)
-                        .foregroundStyle(tokens.ink)
-                        .lineLimit(2)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("\(category.displayName) adhkār")
+                            .font(IhsanFont.bodyEnglish)
+                            .foregroundStyle(tokens.ink)
+                            .lineLimit(1)
+
+                        Text("OPEN UNTIL \(endTime)")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.15)
+                            .foregroundStyle(tokens.inkSecondary)
+                            .lineLimit(1)
+                    }
 
                     Spacer(minLength: 0)
 
-                    Text(windowText)
+                    Text("BEGIN")
                         .font(IhsanFont.inscription)
-                        .tracking(1.2)
-                        .foregroundStyle(tokens.inkSecondary)
+                        .tracking(1.4)
+                        .foregroundStyle(tokens.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(tokens.metal.opacity(0.11), in: Capsule())
+                        .overlay {
+                            Capsule().strokeBorder(
+                                tokens.metal.opacity(0.30), lineWidth: 0.7
+                            )
+                        }
                 }
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("\(category.displayName) adhkār, window \(windowText)")
+            .accessibilityLabel("\(category.displayName) adhkār, open until \(endTime)")
             .accessibilityHint("Double-tap to begin.")
 
             Button {
@@ -70,9 +83,9 @@ struct AdhkarQuietCard: View {
         .padding(.horizontal, IhsanSpacing.md)
     }
 
-    private var windowText: String {
+    private var endTime: String {
         var style = Date.FormatStyle(date: .omitted, time: .shortened)
         style.timeZone = timeZone
-        return "\(window.start.formatted(style)) – \(window.end.formatted(style))"
+        return window.end.formatted(style)
     }
 }

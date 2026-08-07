@@ -146,15 +146,14 @@ public final class UserSettings {
 
     // MARK: - Adhkar
     //
-    // The remembrance layer, invisible until the user turns it on —
-    // the same discipline as the sunnah layer. Nothing in the off
-    // state hints that anything is missing, and nothing here ever
-    // schedules a notification: the windows offer, they never call.
+    // The daily remembrance windows are part of the default Today
+    // experience. Each set can still be disabled independently, and
+    // reminders remain a separate, device-local opt-in.
 
-    public var adhkarLayerEnabled: Bool = false
-    public var adhkarMorningEnabled: Bool = false
-    public var adhkarEveningEnabled: Bool = false
-    public var adhkarPostPrayerEnabled: Bool = false
+    public var adhkarLayerEnabled: Bool = true
+    public var adhkarMorningEnabled: Bool = true
+    public var adhkarEveningEnabled: Bool = true
+    public var adhkarPostPrayerEnabled: Bool = true
     public var adhkarSleepEnabled: Bool = false
 
     /// Whether the reading surface shows romanised Arabic beneath the

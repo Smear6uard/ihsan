@@ -26,13 +26,13 @@ struct SkyPhaseTests {
     /// all). This detects a snap of ANY size, independent of speed
     /// tuning.
     @Test
-    func noTokenSnapsAnywhereInTheCycle() {
+    func atmosphereNeverSnapsAnywhereInTheCycle() {
         func maxStepDelta(samples: Int) -> Double {
             var previous = PaletteState.resolved(for: SkyPhase(unit: 0))
             var worst = 0.0
             for step in 1...samples {
                 let tokens = PaletteState.resolved(for: SkyPhase(unit: Double(step) / Double(samples)))
-                for (a, b) in zip(channels(of: previous), channels(of: tokens)) {
+                for (a, b) in zip(atmosphereChannels(of: previous), atmosphereChannels(of: tokens)) {
                     worst = max(worst, abs(a - b))
                 }
                 previous = tokens
@@ -69,6 +69,23 @@ struct SkyPhaseTests {
             tokens.positiveValue, tokens.attentionValue
         ]
         return values.flatMap { [$0.red, $0.green, $0.blue] } + [tokens.panelTextureOpacity]
+    }
+
+    private func atmosphereChannels(of tokens: SkyPaletteTokens) -> [Double] {
+        let values = [
+            tokens.skyZenithValue,
+            tokens.groundTopValue,
+            tokens.groundBottomValue,
+            tokens.groundPlaneValue,
+            tokens.horizonWashValue,
+            tokens.metalValue,
+            tokens.metalHighlightValue,
+            tokens.glowValue,
+            tokens.panelStrokeValue,
+            tokens.panelTextureValue,
+        ]
+        return values.flatMap { [$0.red, $0.green, $0.blue] }
+            + [tokens.panelTextureOpacity]
     }
 
     // MARK: - Plateaus and fixed states
