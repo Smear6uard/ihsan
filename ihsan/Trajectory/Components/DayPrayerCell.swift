@@ -8,7 +8,7 @@ import IhsanDesignSystem
 ///
 /// - On time — filled leaf gold bounded by the keyline
 /// - Jamāʿah — the gilded fill ringed inside with bright metal
-/// - Late — the warm metal outline
+/// - Delayed — the warm metal outline
 /// - Missed — the quiet secondary-ink outline (never vermillion)
 /// - Qadā — lapis pigment bounded by metal
 /// - Unlogged — the faintest metal outline

@@ -6,7 +6,7 @@ import SwiftData
 public struct LogPrayerWithStatusIntent: AppIntent {
     public static let title: LocalizedStringResource = "Log Prayer with Status"
     public static let description = IntentDescription(
-        "Log a prayer with an explicit status (on time, late, missed, or qada)."
+        "Log a prayer with an explicit status (on time, delayed, missed, or qada)."
     )
     public static let openAppWhenRun: Bool = false
     public static let isDiscoverable: Bool = true

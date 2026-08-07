@@ -129,7 +129,7 @@ private func testPromptConfig() -> FiqhConfig {
         ],
         framing: FiqhFraming(
             onTimeLabel: "On time",
-            lateLabel: "Late",
+            lateLabel: "Delayed",
             missedLabel: "Missed",
             qadaLabel: "Qada",
             pauseModeTitle: "Pause",

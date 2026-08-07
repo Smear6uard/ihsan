@@ -20,7 +20,7 @@ import IhsanIntents
 ///    (or per week in YEAR mode). The visual heart of the screen — the
 ///    user reads their pattern at a glance before any number is shown.
 /// 4. A quiet inscriptional row of counts (ON TIME · N, JAMAʿAH · N,
-///    LATE · N, MISSED · N, QADĀ · N). Replaces the previous giant
+///    DELAYED · N, MISSED · N, QADĀ · N). Replaces the previous giant
 ///    "% on-time" panel.
 /// 5. The day-by-day detail grid — same five-prayer × N-day matrix as
 ///    before, scaled down so the gestalt above is the headline and this
