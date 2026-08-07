@@ -2,7 +2,7 @@ import IhsanDesignSystem
 import IhsanFiqhConfig
 import SwiftUI
 
-/// A factual on-device observation paired with reviewed fiqh framing.
+/// A factual on-device observation paired with review-gated fiqh framing.
 /// The two registers stay visibly separate: data never impersonates a
 /// ruling, and the cited context never judges the person's record.
 struct TrajectoryInsightCard: View {

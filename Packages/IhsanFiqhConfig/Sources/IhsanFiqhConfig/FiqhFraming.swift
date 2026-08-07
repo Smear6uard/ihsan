@@ -50,7 +50,7 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
     }
 }
 
-/// Reviewed explanatory copy that accompanies a factual Path readout.
+/// Review-gated explanatory copy that accompanies a factual Path readout.
 /// It explains the ledger's categories without turning an observation
 /// into a personal ruling.
 public struct TrajectoryInsightFraming: Codable, Sendable, Equatable {
