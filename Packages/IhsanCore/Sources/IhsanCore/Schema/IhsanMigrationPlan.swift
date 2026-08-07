@@ -36,9 +36,27 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
                 fromVersion: IhsanSchemaV5.self,
                 toVersion: IhsanSchemaV6.self
             ),
-            .lightweight(
+            .custom(
                 fromVersion: IhsanSchemaV6.self,
-                toVersion: IhsanSchemaV7.self
+                toVersion: IhsanSchemaV7.self,
+                willMigrate: nil,
+                didMigrate: { context in
+                    // V7 introduced the adhkar surface as opt-in for
+                    // existing installs. Persist those migration defaults
+                    // explicitly so the later V8 model's new-install
+                    // defaults cannot silently opt an upgrader in.
+                    let settings = try context.fetch(
+                        FetchDescriptor<IhsanSchemaV7.UserSettings>()
+                    )
+                    for setting in settings {
+                        setting.adhkarLayerEnabled = false
+                        setting.adhkarMorningEnabled = false
+                        setting.adhkarEveningEnabled = false
+                        setting.adhkarPostPrayerEnabled = false
+                        setting.adhkarSleepEnabled = false
+                    }
+                    try context.save()
+                }
             ),
             .lightweight(
                 fromVersion: IhsanSchemaV7.self,

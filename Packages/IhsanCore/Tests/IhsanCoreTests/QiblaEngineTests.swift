@@ -86,6 +86,46 @@ struct QiblaEngineTests {
         #expect(reading.calibration == expected)
     }
 
+    @Test("an invalid sample cannot disturb an aligned instrument")
+    func invalidSampleHoldsLastValidHeading() {
+        var engine = newYorkEngine()
+        let bearing = engine.qiblaBearing
+        let aligned = engine.ingest(
+            trueHeading: bearing,
+            magneticHeading: bearing,
+            accuracy: 4,
+            timestamp: t0
+        )
+        #expect(aligned.isAligned)
+
+        let invalid = engine.ingest(
+            trueHeading: QiblaMath.normalized(bearing + 120),
+            magneticHeading: QiblaMath.normalized(bearing + 120),
+            accuracy: -1,
+            timestamp: t0.addingTimeInterval(0.1)
+        )
+
+        #expect(invalid.smoothedHeading == aligned.smoothedHeading)
+        #expect(invalid.signedDelta == aligned.signedDelta)
+        #expect(invalid.alignmentEvent == .unchanged)
+        #expect(invalid.isAligned)
+    }
+
+    @Test("an invalid first sample cannot announce alignment")
+    func invalidFirstSampleCannotEnterAlignment() {
+        var engine = newYorkEngine()
+        let bearing = engine.qiblaBearing
+        let reading = engine.ingest(
+            trueHeading: bearing,
+            magneticHeading: bearing,
+            accuracy: -1,
+            timestamp: t0
+        )
+
+        #expect(reading.alignmentEvent == .unchanged)
+        #expect(!reading.isAligned)
+    }
+
     // MARK: - Alignment through the engine
 
     @Test("a slow turn into the band fires .entered exactly once")

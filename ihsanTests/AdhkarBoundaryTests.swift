@@ -24,7 +24,7 @@ struct AdhkarBoundaryTests {
     /// Every source this feature added or touched, on the app side and
     /// in the packages.
     private static let adhkarSources: [String] = [
-        "ihsan/Adhkar/AdhkarQuietCard.swift",
+        "ihsan/Adhkar/RemembranceBand.swift",
         "ihsan/Adhkar/AdhkarSetScreen.swift",
         "ihsan/Adhkar/AdhkarTypeGalleryScreen.swift",
         "ihsan/Adhkar/Helpers/AdhkarOffer.swift",

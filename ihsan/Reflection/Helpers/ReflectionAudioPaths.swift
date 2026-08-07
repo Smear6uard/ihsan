@@ -100,4 +100,12 @@ enum ReflectionAudioPaths {
         }
         return removed
     }
+
+    /// Removes the local voice-memo directory after the user confirms
+    /// Delete All Data. Unlike orphan cleanup this is immediate: the
+    /// records and their files are one user-selected deletion scope.
+    static func deleteAllVoiceMemos() {
+        guard let directory = try? voiceMemosDirectory() else { return }
+        try? FileManager.default.removeItem(at: directory)
+    }
 }

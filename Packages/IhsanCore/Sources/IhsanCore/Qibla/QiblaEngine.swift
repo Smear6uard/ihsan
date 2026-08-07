@@ -68,6 +68,11 @@ public struct QiblaEngine: Sendable {
 
     private var filter: HeadingFilter
     private var gate: QiblaAlignmentGate
+    /// Invalid Core Location samples must not move the instrument or
+    /// cross the alignment gate. Keep the last trustworthy filtered
+    /// heading so a transient sensor failure is a calm calibration
+    /// state instead of a visual jump.
+    private var lastValidSmoothedHeading: Double?
 
     public init(
         latitude: Double,
@@ -97,11 +102,6 @@ public struct QiblaEngine: Sendable {
             ? (trueHeading, .trueNorth)
             : (magneticHeading, .magneticNorth)
 
-        let normalizedRaw = QiblaMath.normalized(raw)
-        let smoothed = filter.smooth(normalizedRaw, at: timestamp)
-        let delta = QiblaMath.signedDelta(from: smoothed, to: qiblaBearing)
-        let event = gate.update(signedDelta: delta)
-
         let calibration: CalibrationQuality = if accuracy < 0 {
             .invalid
         } else if accuracy > 20 {
@@ -109,6 +109,20 @@ public struct QiblaEngine: Sendable {
         } else {
             .good
         }
+
+        let normalizedRaw = QiblaMath.normalized(raw)
+        let smoothed: Double
+        let event: QiblaAlignmentGate.Event
+        if case .invalid = calibration {
+            smoothed = lastValidSmoothedHeading ?? normalizedRaw
+            event = .unchanged
+        } else {
+            smoothed = filter.smooth(normalizedRaw, at: timestamp)
+            lastValidSmoothedHeading = smoothed
+            let validDelta = QiblaMath.signedDelta(from: smoothed, to: qiblaBearing)
+            event = gate.update(signedDelta: validDelta)
+        }
+        let delta = QiblaMath.signedDelta(from: smoothed, to: qiblaBearing)
 
         return Reading(
             rawHeading: normalizedRaw,

@@ -2,7 +2,7 @@ import XCTest
 
 /// Drives a full remembrance set from the first item to the completion
 /// moment, then a second run that proves an excused pause changes
-/// nothing about the offer.
+/// nothing about the contextual Remembrance offer.
 ///
 /// Doubles as the capture harness for the phase report: run with
 /// `xcrun simctl io <udid> recordVideo` alongside and the whole flow is
@@ -110,8 +110,8 @@ final class AdhkarSetUITests: XCTestCase {
     /// **Hard rule: an excused pause does not suppress remembrance.**
     ///
     /// The Today screen during a pause shows the paused card instead of
-    /// the focused card — and still shows the remembrance offer, which
-    /// is the whole point.
+    /// the focused card — and still shows the Remembrance panel's direct
+    /// Begin action, which is the whole point.
     @MainActor
     func testRemembranceIsOfferedDuringAnExcusedPause() throws {
         let app = launch(
@@ -119,9 +119,7 @@ final class AdhkarSetUITests: XCTestCase {
             nowOverride: "2026-08-02T06:10:00"
         )
 
-        let offer = app.buttons
-            .containing(NSPredicate(format: "label CONTAINS[c] %@", "Morning adhkār"))
-            .firstMatch
+        let offer = app.buttons["Begin Morning adhkār"]
         XCTAssertTrue(
             offer.waitForExistence(timeout: 12),
             "the morning offer vanished during an excused pause"

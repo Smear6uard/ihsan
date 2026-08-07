@@ -24,6 +24,7 @@ struct SettingsScreen: View {
     @State private var path: [SettingsRoute] = []
     @State private var latestPlace: LocatedPlace?
     @State private var refreshMessage: String?
+    @State private var automaticLocationMessage: String?
     @State private var pauseDescription = ""
     @State private var travelDescription = ""
     @State private var confirmingPauseEnable = false
@@ -33,6 +34,9 @@ struct SettingsScreen: View {
     @State private var exportError: String?
     @State private var showingRepairSetup = false
     @State private var nightWakeUsesFallback = false
+    @State private var notificationStatusMessage: String?
+    @State private var notificationsBlockedBySystem = false
+    @State private var notificationRebuildTask: Task<Void, Never>?
 
     #if DEBUG
     @State private var showingCoordinates = false
@@ -51,6 +55,7 @@ struct SettingsScreen: View {
                             settings: settings,
                             latestPlace: latestPlace,
                             refreshMessage: refreshMessage,
+                            automaticLocationMessage: automaticLocationMessage,
                             onCityTap: showCoordinatesIfAvailable,
                             onAutomaticLocationChanged: setAutomaticLocationUpdates(_:for:),
                             onRefresh: { refreshLocation(for: settings) }
@@ -59,7 +64,14 @@ struct SettingsScreen: View {
                         CalculationSection(settings: settings, path: $path)
                         MadhabSection(settings: settings, path: $path)
                         HighLatitudeSection(settings: settings, path: $path)
-                        NotificationsSection(settings: settings, path: $path, onToggleNotifications: setNotificationsEnabled(_:for:))
+                        NotificationsSection(
+                            settings: settings,
+                            path: $path,
+                            statusMessage: notificationStatusMessage,
+                            isBlockedBySystem: notificationsBlockedBySystem,
+                            onToggleNotifications: setNotificationsEnabled(_:for:),
+                            onOpenSystemSettings: openSystemNotificationSettings
+                        )
                         PauseModeSection(
                             activePause: activePause,
                             description: pauseDescription,
@@ -68,7 +80,6 @@ struct SettingsScreen: View {
                         TravelModeSection(
                             activeTravel: activeTravel,
                             description: travelDescription,
-                            path: $path,
                             onToggle: handleTravelToggle(_:)
                         )
                         MakeupPrayersSection(
@@ -84,10 +95,14 @@ struct SettingsScreen: View {
                             wakeFallbackNote: nightWakeFallbackNote,
                             onWakeSettingsChanged: { refreshNightWake(for: settings) }
                         )
-                        AdhkarSection(settings: settings, path: $path)
+                        AdhkarSection(
+                            settings: settings,
+                            path: $path,
+                            notificationsBlockedBySystem: notificationsBlockedBySystem,
+                            onOpenSystemSettings: openSystemNotificationSettings
+                        )
                         FastingSection(settings: settings)
-                        DisplaySection(settings: settings, path: $path)
-                        ReflectionSyncSection(settings: settings)
+                        DisplaySection(settings: settings)
                         if InsightAvailability.isAvailable {
                             OnDeviceInsightsSection(settings: settings)
                         }
@@ -128,6 +143,10 @@ struct SettingsScreen: View {
             openDebugRoute()
             #endif
         }
+        .task(id: settings?.id) {
+            guard let settings else { return }
+            await reconcileSystemPermissions(for: settings)
+        }
         // Every settings mutation stamps `modifiedAt`, so this one
         // observer republishes the widget snapshot for all of them —
         // calculation method, madhab, high-latitude rule, tuning,
@@ -136,6 +155,22 @@ struct SettingsScreen: View {
         .onChange(of: settings?.modifiedAt) { previous, current in
             guard previous != nil, current != nil, previous != current else { return }
             WidgetSnapshotService.republish(using: modelContext)
+        }
+        // A calculation or notification preference is not complete
+        // until pending requests reflect it. The fingerprint excludes
+        // unrelated display/privacy changes, and the rebuild is
+        // debounced so a multi-field calculation edit becomes one pass.
+        .onChange(of: notificationConfiguration) { previous, current in
+            guard previous != nil, current != nil, previous != current else { return }
+            scheduleNotificationRebuild(
+                reportStatus: notificationStatusMessage == "Updating the prayer schedule…"
+            )
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+        ) { _ in
+            guard let settings else { return }
+            Task { await reconcileSystemPermissions(for: settings) }
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
@@ -168,7 +203,7 @@ struct SettingsScreen: View {
             Button("Delete All Data", role: .destructive, action: deleteAllData)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes prayer logs, reflections, pause and travel intervals, summaries, and settings from this device.")
+            Text("This removes prayer, remembrance, fasting, reflection, pause, travel, and makeup records; local voice memos; summaries; and preferences from this device.")
         }
         .sheet(item: $exportItem) { item in
             ActivityView(activityItems: [item.url])
@@ -194,6 +229,10 @@ struct SettingsScreen: View {
 
     private var settings: UserSettings? {
         settingsRows.first
+    }
+
+    private var notificationConfiguration: NotificationConfigurationFingerprint? {
+        settings.map(NotificationConfigurationFingerprint.init)
     }
 
     #if DEBUG
@@ -249,12 +288,6 @@ struct SettingsScreen: View {
             HighLatitudeRulePicker(settings: settings)
         case .adhanSound:
             AdhanSoundPicker(settings: settings)
-        case .jamPolicy:
-            if let activeTravel {
-                JamPolicyPicker(travel: activeTravel)
-            }
-        case .theme:
-            ThemePicker(settings: settings)
         case .rawatibCounts:
             RawatibCountsPicker(settings: settings)
         case .duhaWindow:
@@ -296,7 +329,7 @@ struct SettingsScreen: View {
             travelDescription = framing.travelModeDescription
         } catch {
             pauseDescription = "Pause Mode keeps a period out of prayer-log expectations. Ihsan does not ask why."
-            travelDescription = "Travel Mode marks a travel period and exposes jam and qasr controls."
+            travelDescription = "Travel Mode marks the period on your Path without changing how prayers are recorded."
         }
     }
 
@@ -309,25 +342,40 @@ struct SettingsScreen: View {
 
     private func setAutomaticLocationUpdates(_ isEnabled: Bool, for settings: UserSettings) {
         Haptics.impact(.light)
-        settings.automaticLocationUpdatesEnabled = isEnabled
-        settings.modifiedAt = .now
+        if !isEnabled {
+            settings.automaticLocationUpdatesEnabled = false
+            settings.modifiedAt = .now
+            automaticLocationMessage = "Off"
+            Task { await locationCoordinator.stopMonitoringSignificantChanges() }
+            return
+        }
+
+        automaticLocationMessage = "Requesting Always Location Access…"
         Task {
             do {
-                if isEnabled {
-                    _ = try await locationCoordinator.requestAlwaysAuthorization()
-                    try await locationCoordinator.startMonitoringSignificantChanges()
-                    refreshMessage = "Automatic updates enabled"
-                } else {
-                    await locationCoordinator.stopMonitoringSignificantChanges()
-                    refreshMessage = "Automatic updates disabled"
+                let authorization = try await locationCoordinator.requestAlwaysAuthorization()
+                guard authorization == .authorizedAlways else {
+                    settings.automaticLocationUpdatesEnabled = false
+                    settings.modifiedAt = .now
+                    automaticLocationMessage = "Allow Always Location Access to update while you travel"
+                    Haptics.notification(.warning)
+                    return
                 }
+                try await locationCoordinator.startMonitoringSignificantChanges()
+                settings.automaticLocationUpdatesEnabled = true
+                settings.modifiedAt = .now
+                automaticLocationMessage = "Updates when your location changes"
             } catch let error as LocationError {
+                settings.automaticLocationUpdatesEnabled = false
+                settings.modifiedAt = .now
                 if error == .permissionDenied || error == .permissionRestricted {
                     Haptics.notification(.warning)
                 }
-                refreshMessage = error.userFacingMessage
+                automaticLocationMessage = error.userFacingMessage
             } catch {
-                refreshMessage = error.localizedDescription
+                settings.automaticLocationUpdatesEnabled = false
+                settings.modifiedAt = .now
+                automaticLocationMessage = error.localizedDescription
             }
         }
     }
@@ -344,6 +392,8 @@ struct SettingsScreen: View {
                 settings.lastResolvedCountryCode = place.countryCode
                 settings.modifiedAt = .now
                 refreshMessage = "Location refreshed"
+                scheduleNotificationRebuild()
+                await NightWakeService.shared.refresh(using: modelContext)
             } catch let error as LocationError {
                 if error == .permissionDenied || error == .permissionRestricted {
                     Haptics.notification(.warning)
@@ -356,20 +406,102 @@ struct SettingsScreen: View {
     }
 
     private func setNotificationsEnabled(_ isEnabled: Bool, for settings: UserSettings) {
-        settings.notificationsEnabled = isEnabled
-        settings.modifiedAt = .now
-        guard isEnabled else { return }
+        Haptics.impact(.light)
+        guard isEnabled else {
+            settings.notificationsEnabled = false
+            settings.modifiedAt = .now
+            notificationStatusMessage = "Prayer notifications are off"
+            return
+        }
 
         Task {
             do {
-                let granted = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge])
-                if !granted {
+                let granted = try await NotificationScheduler.shared.requestAuthorization()
+                guard granted else {
                     settings.notificationsEnabled = false
                     settings.modifiedAt = .now
+                    notificationsBlockedBySystem = true
+                    notificationStatusMessage = "Off in iOS Settings"
+                    Haptics.notification(.warning)
+                    return
                 }
+                notificationsBlockedBySystem = false
+                settings.notificationsEnabled = true
+                settings.modifiedAt = .now
+                notificationStatusMessage = "Updating the prayer schedule…"
             } catch {
                 settings.notificationsEnabled = false
                 settings.modifiedAt = .now
+                notificationStatusMessage = "Notifications remain off"
+                Haptics.notification(.warning)
+            }
+        }
+    }
+
+    private func reconcileSystemPermissions(for settings: UserSettings) async {
+        let wasBlockedBySystem = notificationsBlockedBySystem
+        let notificationSettings = await UNUserNotificationCenter.current().notificationSettings()
+        switch notificationSettings.authorizationStatus {
+        case .denied:
+            notificationsBlockedBySystem = true
+            notificationStatusMessage = "Off in iOS Settings"
+            // Keep the person's in-app choice. If they restore the
+            // system permission, the schedule can return exactly as
+            // configured instead of silently losing every prayer choice.
+            scheduleNotificationRebuild()
+        case .notDetermined:
+            notificationsBlockedBySystem = false
+            if settings.notificationsEnabled {
+                settings.notificationsEnabled = false
+                settings.modifiedAt = .now
+            }
+        case .authorized, .provisional, .ephemeral:
+            notificationsBlockedBySystem = false
+            if notificationStatusMessage == "Off in iOS Settings" {
+                notificationStatusMessage = nil
+            }
+            if wasBlockedBySystem {
+                scheduleNotificationRebuild()
+            }
+        @unknown default:
+            notificationsBlockedBySystem = true
+            notificationStatusMessage = "Notification permission is unavailable"
+        }
+
+        let locationAuthorization = await locationCoordinator.currentAuthorization()
+        if settings.automaticLocationUpdatesEnabled,
+           locationAuthorization != .authorizedAlways {
+            settings.automaticLocationUpdatesEnabled = false
+            settings.modifiedAt = .now
+            automaticLocationMessage = "Allow Always Location Access for automatic updates"
+            await locationCoordinator.stopMonitoringSignificantChanges()
+        }
+    }
+
+    private func openSystemNotificationSettings() {
+        guard let url = URL(string: UIApplication.openNotificationSettingsURLString) else {
+            return
+        }
+        openURL(url)
+    }
+
+    private func scheduleNotificationRebuild(reportStatus: Bool = false) {
+        notificationRebuildTask?.cancel()
+        notificationRebuildTask = Task {
+            if !reportStatus {
+                try? await Task.sleep(nanoseconds: 250_000_000)
+            }
+            guard !Task.isCancelled else { return }
+            do {
+                try await NotificationScheduler.shared.rebuildSchedule()
+                guard reportStatus else { return }
+                notificationStatusMessage = settings?.notificationsEnabled == true
+                    ? "Scheduled for each enabled prayer"
+                    : "Prayer notifications are off"
+            } catch {
+                guard reportStatus else { return }
+                notificationStatusMessage = "Couldn't update the schedule"
+                Haptics.notification(.warning)
             }
         }
     }
@@ -393,7 +525,7 @@ struct SettingsScreen: View {
             modifiedAt: now
         ))
         Haptics.notification(.success)
-        rebuildNotificationSchedule()
+        rebuildSchedulesAfterModeChange()
     }
 
     private func closePauseInterval() {
@@ -402,13 +534,13 @@ struct SettingsScreen: View {
         activePause.endDate = now
         activePause.modifiedAt = now
         Haptics.notification(.success)
-        rebuildNotificationSchedule()
+        rebuildSchedulesAfterModeChange()
     }
 
     /// Prayer notifications suppress for the duration of a pause and return
     /// untouched when it ends; the schedule is derived, so a rebuild is all
     /// either transition needs.
-    private func rebuildNotificationSchedule() {
+    private func rebuildSchedulesAfterModeChange() {
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
             // The gentle wake honors the same pause the notification
@@ -439,6 +571,7 @@ struct SettingsScreen: View {
             modifiedAt: now
         ))
         Haptics.notification(.success)
+        WidgetSnapshotService.republish(using: modelContext)
     }
 
     private func closeTravelInterval() {
@@ -447,6 +580,7 @@ struct SettingsScreen: View {
         activeTravel.endDate = now
         activeTravel.modifiedAt = now
         Haptics.notification(.success)
+        WidgetSnapshotService.republish(using: modelContext)
     }
 
     private func exportData() {
@@ -483,8 +617,20 @@ struct SettingsScreen: View {
             try deleteAll(PeriodSummary.self)
             try deleteAll(QadaEntry.self)
             try deleteAll(QadaLedger.self)
+            try deleteAll(NaflLog.self)
+            try deleteAll(FastLog.self)
+            try deleteAll(DhikrSession.self)
+            try deleteAll(AdhkarSession.self)
             try deleteAll(UserSettings.self)
             _ = try UserSettings.fetchOrCreate(in: modelContext)
+            try modelContext.save()
+            ReflectionAudioPaths.deleteAllVoiceMemos()
+            AdhkarReminderPreferenceStore.isEnabled = false
+            Task {
+                await NotificationScheduler.shared.cancelAllScheduledNotifications()
+                await NightWakeService.shared.refresh(using: modelContext)
+            }
+            WidgetSnapshotService.republish(using: modelContext)
             Haptics.notification(.success)
         } catch {
             exportError = error.localizedDescription
@@ -513,8 +659,6 @@ private enum SettingsRoute: Hashable {
     case madhab
     case highLatitudeRule
     case adhanSound
-    case jamPolicy
-    case theme
     case rawatibCounts
     case duhaWindow
     case adhkarWindows
@@ -526,8 +670,6 @@ private enum SettingsRoute: Hashable {
         case "madhab": self = .madhab
         case "highLatitudeRule": self = .highLatitudeRule
         case "adhanSound": self = .adhanSound
-        case "jamPolicy": self = .jamPolicy
-        case "theme": self = .theme
         case "rawatibCounts": self = .rawatibCounts
         case "duhaWindow": self = .duhaWindow
         case "adhkarWindows": self = .adhkarWindows
@@ -535,6 +677,47 @@ private enum SettingsRoute: Hashable {
         }
     }
     #endif
+}
+
+/// Only values that alter a pending prayer/remembrance request belong
+/// here. Observing this instead of `modifiedAt` avoids expensive
+/// schedule churn when a display or privacy preference changes.
+private struct NotificationConfigurationFingerprint: Equatable {
+    let notificationsEnabled: Bool
+    let prayerConfiguration: String
+    let legacySoundMutes: [Bool]
+    let calculationMethod: String
+    let madhab: String
+    let highLatitudeRule: String
+    let customFajrAngle: Double?
+    let customIshaAngle: Double?
+    let customIshaIntervalMinutes: Int?
+    let prayerOffsets: [Int]
+    let adhkarLayerEnabled: Bool
+    let adhkarMorningEnabled: Bool
+    let adhkarEveningEnabled: Bool
+
+    init(_ settings: UserSettings) {
+        notificationsEnabled = settings.notificationsEnabled
+        prayerConfiguration = settings.prayerNotificationsConfigJSON
+        legacySoundMutes = Prayer.allCases.map { settings.adhanEnabled(for: $0) }
+        calculationMethod = settings.calculationMethodRaw
+        madhab = settings.madhabRaw
+        highLatitudeRule = settings.highLatitudeRuleRaw
+        customFajrAngle = settings.customFajrAngle
+        customIshaAngle = settings.customIshaAngle
+        customIshaIntervalMinutes = settings.customIshaIntervalMinutes
+        prayerOffsets = [
+            settings.prayerOffsetFajrMinutes,
+            settings.prayerOffsetDhuhrMinutes,
+            settings.prayerOffsetAsrMinutes,
+            settings.prayerOffsetMaghribMinutes,
+            settings.prayerOffsetIshaMinutes,
+        ]
+        adhkarLayerEnabled = settings.adhkarLayerEnabled
+        adhkarMorningEnabled = settings.adhkarMorningEnabled
+        adhkarEveningEnabled = settings.adhkarEveningEnabled
+    }
 }
 
 // MARK: - Sections
@@ -548,6 +731,7 @@ private struct LocationSection: View {
     let settings: UserSettings
     let latestPlace: LocatedPlace?
     let refreshMessage: String?
+    let automaticLocationMessage: String?
     let onCityTap: () -> Void
     let onAutomaticLocationChanged: (Bool, UserSettings) -> Void
     let onRefresh: () -> Void
@@ -569,7 +753,14 @@ private struct LocationSection: View {
             ) { EmptyView() }
             #endif
 
-            SettingsRow(title: "Automatic location updates", glyph: .location) {
+            SettingsRow(
+                title: "Automatic location updates",
+                subtitle: automaticLocationMessage
+                    ?? (settings.automaticLocationUpdatesEnabled
+                        ? "Updates when your location changes"
+                        : "Off"),
+                glyph: .location
+            ) {
                 Toggle("", isOn: Binding(
                     get: { settings.automaticLocationUpdatesEnabled },
                     set: { onAutomaticLocationChanged($0, settings) }
@@ -683,23 +874,41 @@ private struct HighLatitudeSection: View {
 private struct NotificationsSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
+    let statusMessage: String?
+    let isBlockedBySystem: Bool
     let onToggleNotifications: (Bool, UserSettings) -> Void
+    let onOpenSystemSettings: () -> Void
 
     var body: some View {
         SettingsSectionCard("Notifications") {
-            SettingsRow(title: "Adhan notifications", glyph: .adhan) {
+            SettingsRow(
+                title: "Prayer notifications",
+                subtitle: statusMessage
+                    ?? (settings.notificationsEnabled ? "At each enabled prayer" : "Off"),
+                glyph: .adhan
+            ) {
                 Toggle("", isOn: Binding(
                     get: { settings.notificationsEnabled },
                     set: { onToggleNotifications($0, settings) }
                 ))
                 .labelsHidden()
                 .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                .accessibilityLabel("Adhan notifications")
+                .disabled(isBlockedBySystem)
+                .accessibilityLabel("Prayer notifications")
+            }
+
+            if isBlockedBySystem {
+                SettingsRow(
+                    title: "Allow notifications in iOS Settings",
+                    subtitle: "Ihsan cannot schedule alerts until permission is restored",
+                    glyph: .adhan,
+                    action: onOpenSystemSettings
+                )
             }
 
             if settings.notificationsEnabled {
                 SettingsRow(
-                    title: "Adhan",
+                    title: "Notification sound",
                     subtitle: soundSummary,
                     glyph: .adhan,
                     action: {
@@ -808,7 +1017,6 @@ private struct PauseModeSection: View {
 private struct TravelModeSection: View {
     let activeTravel: TravelInterval?
     let description: String
-    @Binding var path: [SettingsRoute]
     let onToggle: (Bool) -> Void
 
     var body: some View {
@@ -825,31 +1033,6 @@ private struct TravelModeSection: View {
                 .labelsHidden()
                 .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                 .accessibilityLabel("Travel Mode")
-            }
-
-            if let activeTravel {
-                SettingsRow(
-                    title: "Jam policy",
-                    subtitle: activeTravel.jamPolicy.settingsDisplayName,
-                    glyph: .jam,
-                    action: {
-                        Haptics.impact(.light)
-                        path.append(.jamPolicy)
-                    }
-                )
-
-                SettingsRow(title: "Qasr enabled", glyph: .qasr) {
-                    Toggle("", isOn: Binding(
-                        get: { activeTravel.qasrEnabled },
-                        set: {
-                            activeTravel.qasrEnabled = $0
-                            activeTravel.modifiedAt = .now
-                        }
-                    ))
-                    .labelsHidden()
-                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                    .accessibilityLabel("Qasr enabled")
-                }
             }
 
             SettingsDescriptionText(description)
@@ -1084,6 +1267,8 @@ private struct SunnahSection: View {
 private struct AdhkarSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
+    let notificationsBlockedBySystem: Bool
+    let onOpenSystemSettings: () -> Void
     @State private var remindersEnabled = AdhkarReminderPreferenceStore.isEnabled
 
     var body: some View {
@@ -1138,18 +1323,27 @@ private struct AdhkarSection: View {
                         )
                     }
 
-                    SettingsRow(
-                        title: "Window reminders",
-                        subtitle: "A quiet alert after Fajr and Maghrib",
-                        glyph: .adhan
-                    ) {
-                        Toggle("", isOn: Binding(
-                            get: { remindersEnabled },
-                            set: { setRemindersEnabled($0) }
-                        ))
-                        .labelsHidden()
-                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                        .accessibilityLabel("Morning and evening adhkār reminders")
+                    if notificationsBlockedBySystem {
+                        SettingsRow(
+                            title: "Window reminders",
+                            subtitle: "Blocked by iOS · Open notification settings",
+                            glyph: .adhan,
+                            action: onOpenSystemSettings
+                        )
+                    } else {
+                        SettingsRow(
+                            title: "Window reminders",
+                            subtitle: "A quiet alert after Fajr and Maghrib",
+                            glyph: .adhan
+                        ) {
+                            Toggle("", isOn: Binding(
+                                get: { remindersEnabled },
+                                set: { setRemindersEnabled($0) }
+                            ))
+                            .labelsHidden()
+                            .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                            .accessibilityLabel("Morning and evening adhkār reminders")
+                        }
                     }
 
                     SettingsRow(title: "After each prayer", subtitle: "From a logged prayer", glyph: .rawatib) {
@@ -1527,20 +1721,9 @@ private struct FastingSection: View {
 
 private struct DisplaySection: View {
     let settings: UserSettings
-    @Binding var path: [SettingsRoute]
 
     var body: some View {
-        SettingsSectionCard("Display") {
-            SettingsRow(
-                title: "Theme",
-                subtitle: settings.theme.settingsDisplayName,
-                glyph: .nightMoon,
-                action: {
-                    Haptics.impact(.light)
-                    path.append(.theme)
-                }
-            )
-
+        SettingsSectionCard("Calendar") {
             hijriAdjustmentControl
                 .padding(.vertical, IhsanSpacing.xs)
 
@@ -1613,33 +1796,6 @@ private struct DisplaySection: View {
     }
 }
 
-private struct ReflectionSyncSection: View {
-    let settings: UserSettings
-
-    var body: some View {
-        SettingsSectionCard("Reflection Sync") {
-            SettingsRow(
-                title: "Sync voice memos via iCloud",
-                subtitle: "Off by default",
-                glyph: .sync
-            ) {
-                Toggle("", isOn: Binding(
-                    get: { settings.autoSyncAudioMemos },
-                    set: {
-                        settings.autoSyncAudioMemos = $0
-                        settings.modifiedAt = .now
-                    }
-                ))
-                .labelsHidden()
-                .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                .accessibilityLabel("Sync voice memos via iCloud")
-            }
-
-            SettingsDescriptionText("Voice recordings stay on this device by default. Enable to sync audio across your Apple devices via iCloud private database.")
-        }
-    }
-}
-
 /// This section is intentionally absent when Apple Intelligence is not
 /// available. There is no disabled control or device-upgrade prompt.
 private struct OnDeviceInsightsSection: View {
@@ -1675,14 +1831,14 @@ private struct PrivacySection: View {
 
     var body: some View {
         SettingsSectionCard("Privacy") {
-            SettingsDescriptionText("Ihsan stores your prayer log on this device and syncs only across your own Apple devices via iCloud private database, end-to-end encrypted by Apple. No analytics, no third-party services, no accounts. Your location is used to calculate prayer times and is never stored — only your city name is saved for display. Voice recordings stay on this device unless you explicitly enable audio sync above.")
+            SettingsDescriptionText("Ihsan stores your prayer log on this device and syncs eligible records only across your own Apple devices through your private iCloud database. No analytics, no third-party services, no accounts. Your location is used to calculate prayer times and is never stored — only your city name is saved for display. Voice recordings stay on this device.")
 
             SettingsRow(
-                title: "Export my data",
+                title: "Export prayer & reflection data",
                 glyph: .share,
                 action: onExport
             )
-            .accessibilityHint("Creates a JSON export and opens the share sheet.")
+            .accessibilityHint("Creates a JSON export of prayer logs and reflections, then opens the share sheet.")
 
             SettingsRow(
                 title: "Delete all data",
@@ -2400,62 +2556,6 @@ private extension AdhanSoundCatalog {
     }
 }
 
-private struct JamPolicyPicker: View {
-    let travel: TravelInterval
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        PickerScaffold(title: "Jam Policy") {
-            SettingsSectionCard("Travel") {
-                ForEach(JamPolicy.allCases, id: \.self) { policy in
-                    optionRow(
-                        title: policy.settingsDisplayName,
-                        subtitle: policy.settingsDescription,
-                        isSelected: travel.jamPolicy == policy
-                    ) {
-                        travel.jamPolicyRaw = policy.rawValue
-                        travel.modifiedAt = .now
-                        dismiss()
-                    }
-                }
-            }
-        }
-    }
-}
-
-private struct ThemePicker: View {
-    let settings: UserSettings
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        PickerScaffold(title: "Theme") {
-            SettingsSectionCard("Display") {
-                optionRow(
-                    title: "Always Dark",
-                    subtitle: "Default for v1",
-                    isSelected: settings.theme == .dark
-                ) {
-                    settings.themeRaw = ThemePreference.dark.rawValue
-                    settings.modifiedAt = .now
-                    dismiss()
-                }
-
-                optionRow(
-                    title: "System",
-                    subtitle: "Light mode experimentation is planned for v1.1",
-                    isSelected: settings.theme == .auto
-                ) {
-                    // v1 intentionally renders dark even when System is selected;
-                    // light mode support is a v1.1 rendering project.
-                    settings.themeRaw = ThemePreference.auto.rawValue
-                    settings.modifiedAt = .now
-                    dismiss()
-                }
-            }
-        }
-    }
-}
-
 private struct PickerScaffold<Content: View>: View {
     /// The floating tab bar's height plus the home indicator, with
     /// room to breathe. A subscreen inside a tab has to clear it
@@ -2680,34 +2780,6 @@ private extension HighLatitudeRule {
         case .oneSeventh: "Uses one seventh of the night."
         case .angleBased: "Uses the prayer angle as a proportion of the night."
         case .twilightAngle: "Legacy twilight-angle handling."
-        }
-    }
-}
-
-private extension JamPolicy {
-    var settingsDisplayName: String {
-        switch self {
-        case .none: "None"
-        case .taqdim: "Taqdim"
-        case .takhir: "Takhir"
-        }
-    }
-
-    var settingsDescription: String {
-        switch self {
-        case .none: "Do not combine prayers automatically."
-        case .taqdim: "Combine into the earlier prayer window."
-        case .takhir: "Combine into the later prayer window."
-        }
-    }
-}
-
-private extension ThemePreference {
-    var settingsDisplayName: String {
-        switch self {
-        case .auto: "System"
-        case .dark: "Always Dark"
-        case .light: "System"
         }
     }
 }

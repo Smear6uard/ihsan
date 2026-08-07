@@ -260,13 +260,21 @@ func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
 }
 
 @Test
-func rebuildScheduleIsNoOpWhenNotificationPermissionIsDenied() async throws {
-    let center = MockNotificationCenter(authorization: .denied)
+func rebuildScheduleClearsIhsanRequestsWhenNotificationPermissionIsDenied() async throws {
+    let center = MockNotificationCenter(
+        authorization: .denied,
+        existingRequests: [
+            makeExistingRequest(identifier: "ihsan.prayer.fajr.1"),
+            makeExistingRequest(identifier: "unrelated.notification"),
+        ]
+    )
     let scheduler = makeScheduler(now: fixedDate(), center: center)
 
     try await scheduler.rebuildSchedule()
 
-    #expect(center.events.isEmpty)
+    #expect(center.events == [.remove(["ihsan.prayer.fajr.1"])])
+    let pending = await center.pendingNotificationRequests()
+    #expect(pending.map(\.identifier) == ["unrelated.notification"])
 }
 
 private func makeScheduler(

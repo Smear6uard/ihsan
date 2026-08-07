@@ -1176,3 +1176,14 @@ system's half of each contract.
   boundaries. Verify on a device whose calculated Maghrib changes
   across the week that the menu turns at the prayer instant, not at a
   cached civil-hour bucket.
+
+## Corrective N — seated Qibla and coherent settings
+
+- **The Qibla seat on real magnetic hardware.** The engine now rejects
+  invalid-accuracy samples, the dial unwraps across north, and the
+  presentation holds the exact Qibla bearing while alignment hysteresis
+  is active. Walk slowly into and out of alignment on an iPhone, near
+  ordinary indoor magnetic interference, and confirm the final few
+  degrees feel settled without making the release feel sticky. Repeat
+  with Reduce Motion enabled and after the system shows a calibration
+  warning.

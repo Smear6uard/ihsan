@@ -10,11 +10,16 @@ import IhsanPrayerTimes
 struct TodayScreen: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.nowProvider) private var nowProvider
+    @Query private var settingsRows: [UserSettings]
     @State private var viewModel: TodayViewModel?
 
     var body: some View {
         content
-            .task {
+            // Re-run the idempotent bootstrap when Automatic Location
+            // Updates changes in Set. Tab views stay alive off-screen,
+            // so the monitor and its consumer must be reconciled here
+            // rather than waiting for another app launch.
+            .task(id: settingsRows.first?.automaticLocationUpdatesEnabled) {
                 if viewModel == nil {
                     viewModel = TodayViewModel(
                         nowProvider: nowProvider,
@@ -354,8 +359,7 @@ private struct TodayReadyView: View {
                 safeAreaTop: proxy.safeAreaInsets.top,
                 safeAreaBottom: proxy.safeAreaInsets.bottom,
                 cardHeight: FocusedPrayerCard.cardHeight,
-                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil,
-                hasAdhkarCard: adhkarOffer(at: now) != nil
+                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
             )
 
             ZStack(alignment: .bottom) {
@@ -426,34 +430,22 @@ private struct TodayReadyView: View {
                         }
                     }
 
-                    // OUTSIDE the pause branch, deliberately. A pause
-                    // suspends salah and fasting — the things a person
-                    // is excused from. It does not suspend remembrance,
-                    // which is exactly what remains available to them.
-                    // `AdhkarOfferTests` holds the rule; this is where
-                    // it has to be true.
-                    if let offer = adhkarOffer(at: now) {
-                        AdhkarQuietCard(
-                            category: offer.category,
-                            window: offer.window,
-                            timeZone: snapshot.place.timeZone,
-                            tokens: tokens,
-                            onOpen: { adhkarSelection = AdhkarSelection(category: offer.category) },
-                            onDismiss: { dismissAdhkar(offer.category, at: now) }
-                        )
-                    }
-
-                    // And the door that is always open. The card above
-                    // says "this window is open, once"; this says "any
-                    // set, any time", which is the thing that had no
-                    // way in at all before. Outside the pause branch
-                    // for the same reason the card is.
+                    // The always-open door and the current window share
+                    // one stable surface. A pause suspends salah and
+                    // fasting, not remembrance, so this remains outside
+                    // the pause branch.
                     RemembranceBand(
                         showsHub: RemembranceMenu.showsHub(
                             isContentAvailable: AdhkarAvailability.isAvailable
                         ),
+                        offer: adhkarOffer(at: now),
+                        timeZone: snapshot.place.timeZone,
                         tokens: tokens,
-                        onOpen: { openRemembrance(at: now) }
+                        onOpen: { openRemembrance(at: now) },
+                        onOpenOffer: {
+                            adhkarSelection = AdhkarSelection(category: $0)
+                        },
+                        onDismissOffer: { dismissAdhkar($0, at: now) }
                     )
                 }
                 .padding(.bottom, IhsanSpacing.md)

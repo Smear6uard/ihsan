@@ -77,8 +77,8 @@ struct QiblaScreen: View {
                             // A degraded compass dims the instrument
                             // slightly; it restores seamlessly when
                             // accuracy returns.
-                            .opacity(calibrationIsPoor ? 0.72 : 1)
-                            .animation(.easeInOut(duration: 0.5), value: calibrationIsPoor)
+                            .opacity(instrumentOpacity)
+                            .animation(.easeInOut(duration: 0.5), value: instrumentOpacity)
                     }
                     .frame(maxWidth: .infinity)
                     .frame(height: chordY)
@@ -141,13 +141,26 @@ struct QiblaScreen: View {
         }
     }
 
-    private var calibrationIsPoor: Bool {
-        viewModel.reading?.calibration == .poor
+    private var calibrationNeedsAttention: Bool {
+        guard let calibration = viewModel.reading?.calibration else { return false }
+        return switch calibration {
+        case .good: false
+        case .poor, .invalid: true
+        }
+    }
+
+    private var instrumentOpacity: Double {
+        guard let calibration = viewModel.reading?.calibration else { return 1 }
+        return switch calibration {
+        case .good: 1
+        case .poor: 0.72
+        case .invalid: 0.56
+        }
     }
 
     /// At most one guidance line — calibration outranks posture.
     private var activeGuidance: QiblaGuidanceLine.Guidance? {
-        if calibrationIsPoor { return .calibrate }
+        if calibrationNeedsAttention { return .calibrate }
         if tiltMonitor.needsFlattening { return .holdFlat }
         return nil
     }
@@ -192,14 +205,18 @@ struct QiblaScreen: View {
                 .rotationEffect(.degrees(viewModel.qiblaBearing))
             }
             .rotationEffect(.degrees(-viewModel.dialRotation))
-            .animation(.linear(duration: 0.08), value: viewModel.dialRotation)
+            // The Core filter already removes sensor noise. A smooth,
+            // continuously retargetable curve fills the gaps between
+            // hardware samples; on alignment, a heavily damped spring
+            // gives the final few degrees a precise magnetic seat.
+            .animation(dialAnimation(isAligned: isAligned), value: viewModel.dialRotation)
 
             // The approach light: ring warmth and the luminance
             // bridge, in fixed screen coordinates.
             if let reading = viewModel.reading {
                 QiblaApproachOverlay(
                     tokens: tokens,
-                    signedDelta: reading.signedDelta,
+                    signedDelta: isAligned ? 0 : reading.signedDelta,
                     approach: approach,
                     isAligned: isAligned
                 )
@@ -225,6 +242,13 @@ struct QiblaScreen: View {
         .frame(width: ringSide, height: ringSide)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(instrumentAccessibilityLabel)
+    }
+
+    private func dialAnimation(isAligned: Bool) -> Animation? {
+        guard !reduceMotion else { return nil }
+        return isAligned
+            ? .spring(response: 0.42, dampingFraction: 0.92, blendDuration: 0.12)
+            : .smooth(duration: 0.16)
     }
 
     private var instrumentAccessibilityLabel: String {

@@ -47,6 +47,11 @@ struct IhsanApp: App {
             PrayerNotificationResponder.shared.install()
         }
 
+        // Register while the process is launching; BGTaskScheduler
+        // rejects late registration. The task keeps the rolling
+        // fourteen-day prayer schedule fresh after this launch.
+        _ = BackgroundRefreshTask.register()
+
         #if canImport(ActivityKit) && os(iOS)
         Task {
             await NotificationScheduler.shared.setPrayerActivityScheduler(PrayerActivityScheduler.shared)
@@ -125,6 +130,14 @@ private struct RootGate: View {
         // settings resolve, and re-published when the row changes.
         .onChange(of: allSettings.first?.hijriCalendarOffsetDays, initial: true) { _, offset in
             HijriDisplay.publish(offsetDays: offset ?? 0)
+        }
+        .task(id: hasCompletedOnboarding) {
+            guard hasCompletedOnboarding else { return }
+            // Covers first completion and ordinary cold launches. It
+            // is safe when permission or location is unavailable and
+            // ensures onboarding's notification choice has an actual
+            // pending schedule immediately, not at the next BG refresh.
+            try? await NotificationScheduler.shared.rebuildSchedule()
         }
         #if canImport(ActivityKit) && os(iOS)
         .task(id: liveActivityLogSignature) {

@@ -254,13 +254,17 @@ public actor NotificationScheduler {
     }
 
     public func rebuildSchedule() async throws {
+        let settings = try await settingsProvider.currentNotificationSettings()
         let authorizationStatus = await notificationCenter.authorizationStatus()
         guard authorizationStatus.allowsScheduling else {
-            logger.info("Notification permission is not granted; skipping adhan notification rebuild.")
+            // Do not leave an old schedule waiting to reappear if the
+            // system permission is restored later. Pending state must
+            // always match the app's current controls.
+            await cancelAllScheduledNotifications()
+            logger.info("Notification permission is not granted; cleared the Ihsan notification schedule.")
             return
         }
 
-        let settings = try await settingsProvider.currentNotificationSettings()
         guard settings.notificationsEnabled
                 || settings.morningAdhkarReminderEnabled
                 || settings.eveningAdhkarReminderEnabled

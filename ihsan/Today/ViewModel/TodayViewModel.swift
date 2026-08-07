@@ -54,10 +54,18 @@ final class TodayViewModel {
             settings = try UserSettings.fetchOrCreate(in: modelContext)
             try await refreshSnapshot()
 
-            if settings?.automaticLocationUpdatesEnabled == true {
+            if settings?.automaticLocationUpdatesEnabled == true,
+               auth == .authorizedAlways {
                 try await locationProvider.startMonitoringSignificantChanges()
                 startObservingLocationChanges()
             } else {
+                // Significant-change relaunches require explicit Always
+                // access. Keep the stored control honest if an older
+                // install only has foreground permission.
+                if settings?.automaticLocationUpdatesEnabled == true {
+                    settings?.automaticLocationUpdatesEnabled = false
+                    settings?.modifiedAt = nowProvider.now()
+                }
                 await locationProvider.stopMonitoringSignificantChanges()
                 significantChangesTask?.cancel()
             }
@@ -341,7 +349,17 @@ final class TodayViewModel {
         significantChangesTask = Task { [weak self] in
             for await _ in stream {
                 guard let self else { return }
-                try? await self.refreshSnapshot()
+                do {
+                    try await self.refreshSnapshot()
+                    // A travel update changes every derived schedule,
+                    // not only Today. Keep notifications and the last-
+                    // third wake on the same newly resolved place.
+                    try? await NotificationScheduler.shared.rebuildSchedule()
+                    await NightWakeService.shared.refresh(using: self.modelContext)
+                } catch {
+                    // Keep observing; a transient lookup failure should
+                    // not permanently disable automatic updates.
+                }
             }
         }
     }

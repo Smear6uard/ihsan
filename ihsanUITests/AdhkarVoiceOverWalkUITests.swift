@@ -153,19 +153,26 @@ final class AdhkarVoiceOverWalkUITests: XCTestCase {
         XCTAssertEqual(refreshed.first?.value as? String, "counted")
     }
 
-    /// The offer card says what it is, when it is, and what its
-    /// dismissal does.
+    /// The contextual Remembrance panel says what is available and when,
+    /// while its Begin and dismissal actions remain distinct controls.
     @MainActor
     func testTheOfferCardSpeaksItsWindow() throws {
-        // Inside the morning window, which is when a card exists at
+        // Inside the morning window, which is when a contextual offer exists at
         // all — at one in the afternoon the day is offering nothing,
         // and that is the design rather than a fault.
         let app = launch([], nowOverride: Self.morning)
         let offer = app.buttons
-            .containing(NSPredicate(format: "label CONTAINS[c] %@", "adhkār"))
+            .containing(NSPredicate(
+                format: "label BEGINSWITH[c] %@",
+                "Remembrance, Morning adhkār available until"
+            ))
             .firstMatch
-        XCTAssertTrue(offer.waitForExistence(timeout: 25), "no offer card to read")
-        XCTAssertTrue(offer.label.contains("window"), "the card does not say its window: \(offer.label)")
+        XCTAssertTrue(offer.waitForExistence(timeout: 25), "no contextual offer to read")
+        XCTAssertTrue(
+            offer.label.contains("available until"),
+            "the panel does not say when the offer ends: \(offer.label)"
+        )
+        XCTAssertTrue(app.buttons["Begin Morning adhkār"].exists, "the Begin action is unlabelled")
         XCTAssertTrue(app.buttons["Not now"].exists, "the dismissal is unlabelled")
     }
 }

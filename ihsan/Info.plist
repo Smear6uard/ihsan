@@ -45,8 +45,10 @@
 	<string>Ihsan can wake you for the last third of the night with a gentle alarm you schedule yourself. The alarm is computed on-device from your prayer times and rings only if you turn it on.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ihsan calculates accurate prayer times for your current location. Your coordinates are used in the moment and never stored or shared. Only your city name is saved for display.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>If you turn on automatic location updates, Ihsan can keep prayer times current as you travel. Your coordinates are used in the moment and never stored or shared.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared by default. You can opt in to iCloud sync in Settings.</string>
+	<string>Ihsan records voice reflections privately on this device. Recordings are not uploaded or shared.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Ihsan transcribes your voice reflections on-device using Apple's Speech framework. No audio leaves your phone during transcription.</string>
 	<key>NSSupportsLiveActivities</key>

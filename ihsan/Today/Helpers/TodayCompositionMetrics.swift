@@ -20,10 +20,6 @@ struct TodayCompositionMetrics: Equatable {
     let safeAreaBottom: CGFloat
     let cardHeight: CGFloat
     let hasDuhaCard: Bool
-    /// Whether a remembrance window is open and offering. It rides the
-    /// same stack as the duha card and takes the same room — and it
-    /// appears during an excused pause, when the duha card does not.
-    var hasAdhkarCard: Bool = false
 
     /// Vertical room the header occupies below the safe area. The plate
     /// keeps its arc, markers, and labels clear of this band; the
@@ -33,14 +29,14 @@ struct TodayCompositionMetrics: Equatable {
     static let cardBottomPadding: CGFloat = IhsanSpacing.md
     /// Optical gap between the plate's marker zone and the card.
     static let sceneToCardGap: CGFloat = 8
-    /// Height reserved for one quiet card beneath the focused card —
-    /// duha, or a remembrance offer.
+    /// Height reserved for the optional Duha card beneath the focused card.
+    /// Remembrance keeps one stable band whether or not a set is offered.
     static let duhaCardHeight: CGFloat = 54
 
     /// Room the quiet cards below the focused card take together,
     /// including the spacing each adds above itself.
     var quietCardsHeight: CGFloat {
-        let count = (hasDuhaCard ? 1 : 0) + (hasAdhkarCard ? 1 : 0)
+        let count = hasDuhaCard ? 1 : 0
         guard count > 0 else { return 0 }
         return CGFloat(count) * Self.duhaCardHeight
             + CGFloat(count - 1) * Self.cardStackSpacing

@@ -34,7 +34,7 @@ struct BannedLanguageSweepTests {
         "Packages/IhsanIntents/Sources/IhsanIntents/Intents/StartTasbihIntent.swift",
         "Packages/IhsanIntents/Sources/IhsanIntents/Intents/SaveDhikrSessionIntent.swift",
         // The remembrance layer.
-        "ihsan/Adhkar/AdhkarQuietCard.swift",
+        "ihsan/Adhkar/RemembranceBand.swift",
         "ihsan/Adhkar/AdhkarSetScreen.swift",
         "ihsan/Adhkar/Helpers/AdhkarOffer.swift",
         "ihsan/Adhkar/ViewModel/AdhkarSetState.swift",
@@ -205,7 +205,7 @@ struct AdhkarCopyDisciplineTests {
     func noSurfaceComputesAProportion() throws {
         for path in [
             "ihsan/Adhkar/AdhkarSetScreen.swift",
-            "ihsan/Adhkar/AdhkarQuietCard.swift",
+            "ihsan/Adhkar/RemembranceBand.swift",
             "ihsan/Adhkar/ViewModel/AdhkarSetState.swift",
             "ihsan/Adhkar/Helpers/AdhkarOffer.swift",
         ] {

@@ -45,6 +45,10 @@ final class QiblaViewModel {
     private(set) var isSettled = false
 
     private var engine: QiblaEngine?
+    /// Gives the rendered card a magnetic seat inside the engine's
+    /// alignment hysteresis. The reading remains exact; only the visual
+    /// dial is held still while the user is already facing qibla.
+    private var dialStabilizer = QiblaDialStabilizer()
     /// The two soft ticks of the approach — a fine instrument finding
     /// its seat. Latched: jitter at a boundary cannot re-fire them.
     private var detent15 = QiblaDetentLatch(threshold: 15)
@@ -71,6 +75,9 @@ final class QiblaViewModel {
     /// never persisted (privacy invariant #1).
     func bootstrap(latitude: Double, longitude: Double) async {
         let engine = QiblaEngine(latitude: latitude, longitude: longitude)
+        dialStabilizer.reset()
+        dialRotation = 0
+        reading = nil
         qiblaBearing = engine.qiblaBearing
         distanceKm = engine.distanceKm
         self.engine = engine
@@ -113,7 +120,6 @@ final class QiblaViewModel {
 
     private func ingest(_ sample: HeadingSample) {
         guard var engine else { return }
-        let previous = reading?.smoothedHeading
         let next = engine.ingest(
             trueHeading: sample.trueHeading,
             magneticHeading: sample.magneticHeading,
@@ -122,11 +128,11 @@ final class QiblaViewModel {
         )
         self.engine = engine
 
-        if let previous {
-            dialRotation += QiblaMath.signedDelta(from: previous, to: next.smoothedHeading)
-        } else {
-            dialRotation = next.smoothedHeading
-        }
+        dialRotation = dialStabilizer.update(
+            smoothedHeading: next.smoothedHeading,
+            qiblaBearing: qiblaBearing,
+            isAligned: next.isAligned
+        )
         reading = next
         choreograph(next)
         announceGuidance(next, at: sample.timestamp)
