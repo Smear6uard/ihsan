@@ -13,6 +13,7 @@ struct TrajectoryInsightCard: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var loadingPulse = false
+    @State private var isFiqhExpanded = false
 
     private let cardShape = RoundedRectangle(
         cornerRadius: IhsanSpacing.cardRadius,
@@ -57,27 +58,27 @@ struct TrajectoryInsightCard: View {
                         .foregroundStyle(tokens.inkSecondary)
                 }
 
-                Rectangle()
-                    .fill(tokens.metal.opacity(0.24))
-                    .frame(height: 0.5)
+                fiqhDisclosure
 
-                VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-                    Text("FIQH CONTEXT · \(fiqh.title.uppercased())")
-                        .font(IhsanFont.inscription)
-                        .tracking(1.35)
-                        .foregroundStyle(tokens.inkSecondary)
+                if isFiqhExpanded {
+                    VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                        Text(fiqh.title)
+                            .font(IhsanFont.bodyEnglishBold)
+                            .foregroundStyle(tokens.ink)
 
-                    Text(fiqh.body)
-                        .font(IhsanFont.bodyEnglish)
-                        .lineSpacing(3)
-                        .foregroundStyle(tokens.ink)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(fiqh.body)
+                            .font(IhsanFont.bodyEnglish)
+                            .lineSpacing(3)
+                            .foregroundStyle(tokens.ink)
+                            .fixedSize(horizontal: false, vertical: true)
 
-                    Text(fiqh.citation)
-                        .font(IhsanFont.inscription)
-                        .tracking(0.7)
-                        .foregroundStyle(tokens.inkSecondary)
-                        .fixedSize(horizontal: false, vertical: true)
+                        Text(fiqh.citation)
+                            .font(IhsanFont.inscription)
+                            .tracking(0.7)
+                            .foregroundStyle(tokens.inkSecondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
                 }
             }
             .padding(IhsanSpacing.lg)
@@ -96,10 +97,37 @@ struct TrajectoryInsightCard: View {
                 loadingPulse = true
             }
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "Period readout. \(text ?? "") Fiqh context. \(fiqh.body) Source: \(fiqh.citation)"
-        )
+        .accessibilityElement(children: .contain)
+    }
+
+    private var fiqhDisclosure: some View {
+        Button {
+            Haptics.impact(.light)
+            withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
+                isFiqhExpanded.toggle()
+            }
+        } label: {
+            HStack(spacing: IhsanSpacing.sm) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 13, weight: .medium))
+
+                Text("FIQH CONTEXT")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.35)
+
+                Spacer(minLength: IhsanSpacing.xs)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .rotationEffect(.degrees(isFiqhExpanded ? 180 : 0))
+            }
+            .foregroundStyle(tokens.inkSecondary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Fiqh context")
+        .accessibilityValue(isFiqhExpanded ? "Expanded" : "Collapsed")
+        .accessibilityHint(isFiqhExpanded ? "Hides the context and source." : "Shows the context and source.")
     }
 
     private var header: some View {

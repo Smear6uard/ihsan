@@ -233,10 +233,9 @@ private struct TodayReadyView: View {
         else { return nil }
         return AdhkarSelection(category: category)
     }()
-    /// Which remembrance offers have been put away today. Presentation
-    /// state, like the significant-day and yesterday lines above it —
-    /// never worship data, and a new day clears it without anything
-    /// having to run at midnight.
+    /// Which remembrance offers have been put away in this worship
+    /// cycle. Presentation state, never worship data; the key advances
+    /// with the plate at Fajr rather than at civil midnight.
     @AppStorage("IhsanAdhkarDismissedDay")
     private var adhkarDismissedDay: String = ""
     /// The tasbīḥ link asked which one; waiting on the answer.
@@ -269,7 +268,8 @@ private struct TodayReadyView: View {
         // not on the civil day. Before dawn that is still last
         // evening's cycle, which is what the resolver has always said
         // and what the record now agrees with.
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = snapshot.place.timeZone
         let cycleStart = snapshot.scheduleWindow.cycle(at: dayAnchor).date
         let cycleEnd = calendar.date(byAdding: .day, value: 1, to: cycleStart) ?? cycleStart
         let predicate = #Predicate<PrayerLog> { log in
@@ -305,8 +305,8 @@ private struct TodayReadyView: View {
         TimelineView(.periodic(from: .distantPast, by: 1)) { context in
             let now = nowProvider.resolve(context.date)
             let resolverSchedule = snapshot.scheduleWindow.resolverSchedule
-            let resolution = PrayerStateResolver.resolve(
-                prayerTimes: resolverSchedule,
+            let resolution = TodayDisplaySchedule.resolve(
+                window: snapshot.scheduleWindow,
                 now: now
             )
             let tokens = PaletteState.resolved(
@@ -360,7 +360,7 @@ private struct TodayReadyView: View {
 
             ZStack(alignment: .bottom) {
                 CelestialPlateScene(
-                    markers: plateMarkers(resolution: resolution),
+                    markers: plateMarkers(now: now, resolution: resolution),
                     solarEvents: solarEvents,
                     latitude: snapshot.place.coordinates.latitude,
                     longitude: snapshot.place.coordinates.longitude,
@@ -623,17 +623,11 @@ private struct TodayReadyView: View {
         let prayerTime = TodayDisplaySchedule.prayerTime(
             for: prayer,
             window: snapshot.scheduleWindow,
-            resolution: resolution
+            now: now
         )
         let windowState = resolution.state(for: prayerTime)
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
-        // A rolled prayer is tomorrow's instance: today's log no
-        // longer attaches to it and its window end is not tonight's
-        // business — the card shows a pure upcoming state.
-        let rolled = TodayDisplaySchedule.isRolledToTomorrow(
-            prayer, window: snapshot.scheduleWindow, resolution: resolution
-        )
-        let log = rolled ? nil : log(for: prayer)
+        let log = log(for: prayer)
         FocusedPrayerCard(
             prayer: prayer,
             scheduledTime: prayerTime.scheduledTime,
@@ -646,7 +640,7 @@ private struct TodayReadyView: View {
             isJamaah: log?.withJamaah ?? false,
             windowState: windowState,
             rawatib: rawatibChips(for: prayer, now: now),
-            nightSet: nightChips(now: now),
+            nightSet: prayer == .isha ? nightChips(now: now) : nil,
             onToggleNafl: { kind in handleNaflTap(kind) },
             onCommit: { status, isJamaah in
                 commit(status: status, isJamaah: isJamaah, for: prayer)
@@ -785,27 +779,15 @@ private struct TodayReadyView: View {
     /// events. The two settable bounds carry the places the schools
     /// differ; both defaults sit between the positions.
     private func adhkarWindows(at now: Date) -> AdhkarOffer.Windows {
-        let day = snapshot.scheduleWindow.day
         let settings = sunnahSettings
-        return AdhkarOffer.Windows(
-            morning: AdhkarWindowResolver.morning(
-                fajr: day.fajr.scheduledTime,
-                sunrise: day.sunrise,
-                dhuhr: day.dhuhr.scheduledTime,
-                endsAfterSunrise: TimeInterval(
-                    (settings?.adhkarMorningEndsAfterSunriseMinutes ?? 90) * 60
-                )
+        return AdhkarOffer.windows(
+            cycleDay: snapshot.scheduleWindow.cycleDayTimes(at: now),
+            cycleEndFajr: snapshot.scheduleWindow.cycle(at: now).rollsAt,
+            morningEndsAfterSunrise: TimeInterval(
+                (settings?.adhkarMorningEndsAfterSunriseMinutes ?? 90) * 60
             ),
-            evening: AdhkarWindowResolver.evening(
-                maghrib: day.maghrib.scheduledTime,
-                isha: day.isha.scheduledTime,
-                extendsAfterMaghrib: TimeInterval(
-                    (settings?.adhkarEveningExtendsAfterMaghribMinutes ?? 60) * 60
-                )
-            ),
-            sleep: AdhkarWindowResolver.sleep(
-                isha: day.isha.scheduledTime,
-                nextFajr: snapshot.scheduleWindow.tomorrowFajr.scheduledTime
+            eveningExtendsAfterMaghrib: TimeInterval(
+                (settings?.adhkarEveningExtendsAfterMaghribMinutes ?? 60) * 60
             )
         )
     }
@@ -822,7 +804,9 @@ private struct TodayReadyView: View {
                 isPaused: activePause != nil,
                 dismissedCategories: AdhkarDismissal.decode(
                     adhkarDismissedDay,
-                    dayKey: AdhkarDismissal.dayKey(now, calendar: placeCalendar)
+                    dayKey: AdhkarDismissal.dayKey(
+                        cycleDay(at: now), calendar: placeCalendar
+                    )
                 ),
                 isContentAvailable: AdhkarAvailability.isAvailable
             )
@@ -874,7 +858,7 @@ private struct TodayReadyView: View {
     }
 
     private func dismissAdhkar(_ category: AdhkarCategory, at now: Date) {
-        let key = AdhkarDismissal.dayKey(now, calendar: placeCalendar)
+        let key = AdhkarDismissal.dayKey(cycleDay(at: now), calendar: placeCalendar)
         var dismissed = AdhkarDismissal.decode(adhkarDismissedDay, dayKey: key)
         dismissed.insert(category)
         adhkarDismissedDay = AdhkarDismissal.encode(dismissed, dayKey: key)
@@ -1249,13 +1233,14 @@ private struct TodayReadyView: View {
     }
 
     private func plateMarkers(
+        now: Date,
         resolution: PrayerResolution
     ) -> [CelestialPlateScene.Marker] {
-        snapshot.scheduleWindow.day.allFardh.map { time in
+        snapshot.scheduleWindow.cycleDayTimes(at: now).allFardh.map { time in
             let displayPrayerTime = TodayDisplaySchedule.prayerTime(
                 for: time.prayer,
                 window: snapshot.scheduleWindow,
-                resolution: resolution
+                now: now
             )
             return CelestialPlateScene.Marker(
                 prayer: time.prayer,
@@ -1288,10 +1273,6 @@ private struct TodayReadyView: View {
         let state = resolution.state(for: prayerTime)
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
         if state.isCurrent { return .current }
-        let rolled = prayerTime == snapshot.scheduleWindow.tomorrowFajr
-        // A rolled marker represents tomorrow's instance, so today's
-        // log no longer speaks for it.
-        if rolled { return .upcoming }
         if log(for: prayer) != nil { return .logged }
         switch state {
         case .upcoming: return .upcoming
@@ -1300,24 +1281,13 @@ private struct TodayReadyView: View {
         }
     }
 
-    /// The moment's current prayer projected onto *today's* plate: nil
-    /// when the open window belongs to yesterday's Isha (pre-dawn),
-    /// whose place on this plate is the night bowl, not the markers.
-    private func displayCurrentPrayer(resolution: PrayerResolution) -> Prayer? {
-        guard let current = resolution.currentPrayer else { return nil }
-        guard snapshot.scheduleWindow.day.time(for: current.prayer) == current.scheduledTime else {
-            return nil
-        }
-        return current.prayer
-    }
-
     /// The card's default focus: the open window's prayer, or the
     /// next prayer when no window is open. Focus is not a "current"
     /// claim — the card renders the upcoming state for a prayer whose
-    /// window hasn't opened, and only `displayCurrentPrayer` can make
-    /// a marker luminous.
+    /// window hasn't opened. The same cycle resolution makes a marker
+    /// luminous only while that exact prayer instance is current.
     private func defaultFocusPrayer(resolution: PrayerResolution) -> Prayer {
-        displayCurrentPrayer(resolution: resolution) ?? resolution.nextPrayer.prayer
+        resolution.currentPrayer?.prayer ?? resolution.nextPrayer.prayer
     }
 
     // MARK: - Focused prayer resolution
@@ -1373,7 +1343,6 @@ private struct TodayReadyView: View {
         now: Date,
         resolution: PrayerResolution
     ) -> some View {
-        let prayerTime = snapshot.scheduleWindow.day.allFardh.first { $0.prayer == prayer }
         let log = log(for: prayer)
         // Presentation-time palette — the sheet lives on the same
         // SkyPhase and consumes the same per-tick resolution as the
@@ -1382,41 +1351,39 @@ private struct TodayReadyView: View {
             for: SkyPhase.resolve(at: now, events: solarEvents)
         )
 
-        if prayerTime != nil {
-            let displayPrayerTime = TodayDisplaySchedule.prayerTime(
-                for: prayer,
-                window: snapshot.scheduleWindow,
-                resolution: resolution
-            )
-            let windowState = resolution.state(for: displayPrayerTime)
-                ?? .upcoming(opensAt: displayPrayerTime.scheduledTime)
-            PrayerLogSheet(
-                prayer: prayer,
-                // The same display instant the plate label, header,
-                // and card show — one source, one formatter.
-                scheduledTime: displayPrayerTime.scheduledTime,
-                windowEndTime: windowState.windowEnd,
-                timeZone: snapshot.place.timeZone,
-                tokens: tokens,
-                currentStatus: log?.status,
-                isJamaah: log?.withJamaah ?? false,
-                isPaused: activePause != nil,
-                // The truth rule: what can be true at this moment for
-                // this prayer today decides which tiles are live.
-                availableStatuses: TimingAvailability.allowedStatuses(
-                    cycleDate: cycleDay(at: now),
-                    dayBeingLogged: cycleDay(at: now),
-                    windowState: windowState,
-                    currentStatus: log?.status
-                ),
+        let displayPrayerTime = TodayDisplaySchedule.prayerTime(
+            for: prayer,
+            window: snapshot.scheduleWindow,
+            now: now
+        )
+        let windowState = resolution.state(for: displayPrayerTime)
+            ?? .upcoming(opensAt: displayPrayerTime.scheduledTime)
+        PrayerLogSheet(
+            prayer: prayer,
+            // The same display instant the plate label, header,
+            // and card show — one source, one formatter.
+            scheduledTime: displayPrayerTime.scheduledTime,
+            windowEndTime: windowState.windowEnd,
+            timeZone: snapshot.place.timeZone,
+            tokens: tokens,
+            currentStatus: log?.status,
+            isJamaah: log?.withJamaah ?? false,
+            isPaused: activePause != nil,
+            // The truth rule: what can be true at this moment for
+            // this prayer today decides which tiles are live.
+            availableStatuses: TimingAvailability.allowedStatuses(
+                cycleDate: cycleDay(at: now),
+                dayBeingLogged: cycleDay(at: now),
                 windowState: windowState,
-                onCommit: { status, jamaah in
-                    commit(status: status, isJamaah: jamaah, for: prayer)
-                },
-                onTogglePause: { togglePause() },
-                onCancel: {}
-            )
-        }
+                currentStatus: log?.status
+            ),
+            windowState: windowState,
+            onCommit: { status, jamaah in
+                commit(status: status, isJamaah: jamaah, for: prayer)
+            },
+            onTogglePause: { togglePause() },
+            onCancel: {}
+        )
     }
 
     /// One tap begins an excused pause; the same control ends it. The

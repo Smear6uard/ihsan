@@ -13,7 +13,7 @@ struct TodayMomentDerivationTests {
     private let chicago = TimeZone(identifier: "America/Chicago")!
 
     private func resolve(_ window: PrayerScheduleWindow, at date: Date) -> PrayerResolution {
-        PrayerStateResolver.resolve(prayerTimes: window.resolverSchedule, now: date)
+        TodayDisplaySchedule.resolve(window: window, now: date)
     }
 
     private func window(at date: Date) throws -> PrayerScheduleWindow {
@@ -35,85 +35,91 @@ struct TodayMomentDerivationTests {
         )!
     }
 
-    /// Corrective G, phase 1 — the formatter-unity invariant, with no
-    /// carve-outs: at EVERY minute of the schedule window's span, the
-    /// display instant `TodayDisplaySchedule` supplies for the
-    /// moment's next prayer IS `moment.next.scheduledTime`. The four
-    /// surfaces (header "NEXT:", plate marker label, focused card,
-    /// log sheet) all format that one instant through the one
-    /// `PlateTimeFormat`, so they render identical strings —
-    /// including the post-Isha stretch where Fajr rolls to tomorrow
-    /// and the plate used to print yesterday's minute.
+    /// The plate, card, and sheet consume the same exact prayer
+    /// instance at every minute of a cycle. The header independently
+    /// names the strictly-future next prayer; after Isha that is the
+    /// closing Fajr while the plate intentionally remains on the
+    /// current cycle until that Fajr arrives.
     @Test
-    func allFourSurfacesRenderIdenticalStringsForIdenticalTimes() throws {
+    func cycleSurfacesRenderIdenticalStringsForIdenticalPrayerInstances() throws {
         let w = try window(at: noon)
         var now = w.day.fajr.scheduledTime
         let end = w.tomorrowFajr.scheduledTime
         while now < end {
             let resolution = resolve(w, at: now)
-            let display = TodayDisplaySchedule.displayTime(
-                for: resolution.nextPrayer.prayer,
-                window: w,
-                resolution: resolution
-            )
-            // One source: the display schedule and the moment agree
-            // about which instant "next" means…
-            #expect(display == resolution.nextPrayer.scheduledTime)
+            #expect(resolution.nextPrayer.scheduledTime > now)
 
-            // …so the four surfaces' rendered strings are identical.
-            let header = PlateTimeFormat.time(resolution.nextPrayer.scheduledTime, in: chicago)
-            let plateLabel = PlateTimeFormat.time(display, in: chicago)
-            let card = PlateTimeFormat.time(display, in: chicago)
-            let sheet = PlateTimeFormat.time(display, in: chicago)
-            #expect(header == plateLabel)
-            #expect(header == card)
-            #expect(header == sheet)
+            for prayer in Prayer.allCases {
+                let display = TodayDisplaySchedule.displayTime(
+                    for: prayer, window: w, now: now
+                )
+                #expect(display == w.cycleDayTimes(at: now).time(for: prayer))
+                #expect(resolution.state(for: TodayDisplaySchedule.prayerTime(
+                    for: prayer, window: w, now: now
+                )) != nil)
+
+                let plateLabel = PlateTimeFormat.time(display, in: chicago)
+                let card = PlateTimeFormat.time(display, in: chicago)
+                let sheet = PlateTimeFormat.time(display, in: chicago)
+                #expect(plateLabel == card)
+                #expect(plateLabel == sheet)
+            }
 
             now = now.addingTimeInterval(60)
         }
     }
 
-    /// The concrete regression: after Isha begins, the plate's Fajr
-    /// label shows tomorrow's Fajr — the same instant the header and
-    /// card show — never this morning's, which is typically a minute
-    /// different.
+    /// The reproduced failure at the level the UI consumes. Two
+    /// independently refreshed windows on opposite sides of civil
+    /// midnight must select the same cycle, the same five marker
+    /// instants, and the same still-open Isha.
     @Test
-    func fajrLabelRollsToTomorrowOnceIshaOpens() throws {
-        let w = try window(at: noon)
-        let beforeIsha = w.day.isha.scheduledTime.addingTimeInterval(-60)
-        let afterIsha = w.day.isha.scheduledTime.addingTimeInterval(60)
-        let beforeResolution = resolve(w, at: beforeIsha)
-        let afterResolution = resolve(w, at: afterIsha)
+    func civilMidnightDoesNotAdvanceTheDisplayedCycle() throws {
+        let beforeMidnight = localDate(2026, 7, 20, 23, 59)
+        let afterMidnight = localDate(2026, 7, 21, 0, 1)
+        let beforeWindow = try window(at: beforeMidnight)
+        let afterWindow = try window(at: afterMidnight)
+        let beforeResolution = resolve(beforeWindow, at: beforeMidnight)
+        let afterResolution = resolve(afterWindow, at: afterMidnight)
 
-        #expect(
-            TodayDisplaySchedule.displayTime(
-                for: .fajr, window: w, resolution: beforeResolution
-            )
-                == w.day.fajr.scheduledTime
-        )
-        #expect(!TodayDisplaySchedule.isRolledToTomorrow(
-            .fajr, window: w, resolution: beforeResolution
-        ))
-
-        #expect(
-            TodayDisplaySchedule.displayTime(
-                for: .fajr, window: w, resolution: afterResolution
-            )
-                == w.tomorrowFajr.scheduledTime
-        )
-        #expect(TodayDisplaySchedule.isRolledToTomorrow(
-            .fajr, window: w, resolution: afterResolution
-        ))
-
-        // The other four prayers never roll.
-        for prayer in [Prayer.dhuhr, .asr, .maghrib, .isha] {
+        #expect(beforeWindow.cycle(at: beforeMidnight).date == afterWindow.cycle(at: afterMidnight).date)
+        for prayer in Prayer.allCases {
             #expect(
                 TodayDisplaySchedule.displayTime(
-                    for: prayer, window: w, resolution: afterResolution
+                    for: prayer, window: beforeWindow, now: beforeMidnight
                 )
-                    == w.day.time(for: prayer)
+                    == TodayDisplaySchedule.displayTime(
+                        for: prayer, window: afterWindow, now: afterMidnight
+                    )
             )
         }
+        #expect(beforeResolution.currentPrayer == beforeWindow.day.isha)
+        #expect(afterResolution.currentPrayer == afterWindow.yesterday.isha)
+        #expect(afterResolution.currentWindowEnd == afterWindow.day.fajr.scheduledTime)
+    }
+
+    @Test("At 1 AM the plate and card still resolve yesterday's Isha")
+    func oneAmUsesTheEveningCycle() throws {
+        let oneAm = localDate(2026, 7, 21, 1, 0)
+        let w = try window(at: oneAm)
+        let resolution = resolve(w, at: oneAm)
+        let isha = TodayDisplaySchedule.prayerTime(for: .isha, window: w, now: oneAm)
+
+        #expect(isha == w.yesterday.isha)
+        #expect(resolution.currentPrayer == isha)
+        #expect(resolution.state(for: isha)?.isCurrent == true)
+        #expect(resolution.currentWindowEnd == w.day.fajr.scheduledTime)
+        #expect(resolution.nextPrayer == w.day.fajr)
+    }
+
+    private func localDate(
+        _ year: Int, _ month: Int, _ day: Int, _ hour: Int, _ minute: Int
+    ) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = chicago
+        return calendar.date(from: DateComponents(
+            year: year, month: month, day: day, hour: hour, minute: minute
+        ))!
     }
 
     /// The formatter localises into the *place's* timezone, not the

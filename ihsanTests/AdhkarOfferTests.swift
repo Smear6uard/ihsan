@@ -98,6 +98,50 @@ struct AdhkarOfferTests {
         #expect(AdhkarOffer.offer(context(at: 20.0))?.category == .evening)
     }
 
+    @Test("The night remembrance window survives civil midnight until Fajr")
+    func sleepWindowStaysOnTheSameCycleAcrossMidnight() throws {
+        let timeZone = try #require(TimeZone(identifier: "America/Chicago"))
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        func date(_ day: Int, _ hour: Int, _ minute: Int) -> Date {
+            calendar.date(from: DateComponents(
+                year: 2026, month: 7, day: day, hour: hour, minute: minute
+            ))!
+        }
+        let beforeMidnight = date(20, 23, 59)
+        let afterMidnight = date(21, 0, 1)
+        let provider = AdhanPrayerTimesProvider()
+        func window(at instant: Date) throws -> PrayerScheduleWindow {
+            try provider.scheduleWindow(
+                for: instant,
+                coordinates: Coordinates(latitude: 41.8781, longitude: -87.6298),
+                timeZone: timeZone,
+                calculationMethod: .isna,
+                madhab: .standard,
+                highLatitudeRule: .middleOfNight
+            )
+        }
+        let beforeSchedule = try window(at: beforeMidnight)
+        let afterSchedule = try window(at: afterMidnight)
+        let before = AdhkarOffer.windows(
+            cycleDay: beforeSchedule.cycleDayTimes(at: beforeMidnight),
+            cycleEndFajr: beforeSchedule.cycle(at: beforeMidnight).rollsAt,
+            morningEndsAfterSunrise: 90 * 60,
+            eveningExtendsAfterMaghrib: 60 * 60
+        )
+        let after = AdhkarOffer.windows(
+            cycleDay: afterSchedule.cycleDayTimes(at: afterMidnight),
+            cycleEndFajr: afterSchedule.cycle(at: afterMidnight).rollsAt,
+            morningEndsAfterSunrise: 90 * 60,
+            eveningExtendsAfterMaghrib: 60 * 60
+        )
+
+        #expect(before.sleep == after.sleep)
+        #expect(before.sleep?.contains(beforeMidnight) == true)
+        #expect(after.sleep?.contains(afterMidnight) == true)
+        #expect(after.sleep?.end == afterSchedule.day.fajr.scheduledTime)
+    }
+
     /// Two cards must never be open at once.
     @Test("No two sets are ever offered at the same moment")
     func offersNeverOverlap() {
@@ -200,8 +244,8 @@ struct AdhkarDismissalTests {
         #expect(AdhkarDismissal.decode(encoded, dayKey: key) == [.morning, .sleep])
     }
 
-    /// A new day clears yesterday's dismissals without anything having
-    /// to run at midnight.
+    /// A new cycle clears the previous cycle's dismissals without a
+    /// scheduled reset job.
     @Test("Yesterday's dismissals do not carry into today")
     func dismissalsExpireWithTheDay() {
         let encoded = AdhkarDismissal.encode([.morning], dayKey: "2026-08-01")

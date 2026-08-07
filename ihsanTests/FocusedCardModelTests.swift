@@ -350,4 +350,21 @@ struct FocusedCardModelTests {
         #expect(!text.contains(PlateTimeFormat.time(scheduled, in: timeZone)))
         #expect(!text.contains(PlateTimeFormat.time(windowEnd, in: timeZone)))
     }
+
+    @Test("The focused card uses Delayed, never the retired Late label")
+    func delayedCopyUsesSharedVocabulary() {
+        let text = FocusedCardModel.inscription(
+            for: .logged,
+            status: .late,
+            loggedAt: scheduled,
+            isJamaah: false,
+            windowEndTime: windowEnd,
+            scheduledTime: scheduled,
+            now: scheduled,
+            timeZone: timeZone
+        )
+
+        #expect(text.hasPrefix("Delayed ·"))
+        #expect(!text.hasPrefix("Late ·"))
+    }
 }

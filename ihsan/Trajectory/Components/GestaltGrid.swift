@@ -266,14 +266,15 @@ struct GestaltGrid: View {
     /// the matrix; this names the register before the first mark.
     private func voluntaryHeader(layout: GestaltLayout) -> some View {
         HStack(spacing: IhsanSpacing.sm) {
+            FourPointedStar()
+                .fill(tokens.metal.opacity(0.72))
+                .frame(width: 7, height: 7)
             Text("VOLUNTARY PRACTICE")
                 .font(IhsanFont.inscription)
                 .tracking(1.35)
                 .foregroundStyle(tokens.inkSecondary)
                 .lineLimit(1)
-            Rectangle()
-                .fill(tokens.metal.opacity(0.24))
-                .frame(height: 0.5)
+            Spacer(minLength: 0)
         }
         .frame(height: Self.voluntaryHeaderHeight)
     }

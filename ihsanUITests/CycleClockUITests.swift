@@ -52,6 +52,26 @@ final class CycleClockUITests: XCTestCase {
             header.waitForExistence(timeout: 20),
             "At 1 AM the next prayer must be the Fajr that ends this cycle"
         )
+
+        let focusedIsha = app.descendants(matching: .any)
+            .matching(NSPredicate(
+                format: "label BEGINSWITH[c] 'Isha prayer' AND label CONTAINS[c] 'in its window until'"
+            ))
+            .firstMatch
+        XCTAssertTrue(
+            focusedIsha.waitForExistence(timeout: 10),
+            "At 1 AM the focused card must keep yesterday's Isha current and loggable"
+        )
+
+        let currentIshaMarker = app.descendants(matching: .any)
+            .matching(NSPredicate(
+                format: "label BEGINSWITH[c] 'Isha at' AND label CONTAINS[c] 'happening now'"
+            ))
+            .firstMatch
+        XCTAssertTrue(
+            currentIshaMarker.waitForExistence(timeout: 10),
+            "At 1 AM the plate must project the still-open Isha onto the current cycle"
+        )
         attach(name: "k1-today-1am")
     }
 

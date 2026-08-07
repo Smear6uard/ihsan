@@ -118,7 +118,7 @@ enum FocusedCardModel {
         case .onTime:
             return "\(jamaahPrefix)On time\(loggedClause)"
         case .late:
-            return "\(jamaahPrefix)Late\(loggedClause)"
+            return "\(jamaahPrefix)\(PrayerStatus.late.displayName)\(loggedClause)"
         case .qada:
             let day = loggedAt.map { " \(PlateTimeFormat.dayMonth($0, in: timeZone))" } ?? ""
             return "Qadā · logged\(day)"

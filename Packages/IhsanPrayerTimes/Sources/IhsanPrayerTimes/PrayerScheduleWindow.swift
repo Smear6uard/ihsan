@@ -195,6 +195,48 @@ public enum PrayerStateResolver {
             (prayerTimes.isha, prayerTimes.tomorrowFajr.scheduledTime)
         ]
 
+        return makeResolution(
+            windows: windows,
+            nextCandidates: prayerTimes.dayPrayerTimes + [prayerTimes.tomorrowFajr],
+            terminalFajr: prayerTimes.tomorrowFajr,
+            now: now
+        )
+    }
+
+    /// Resolves the five prayers belonging to one exact Fajr-to-Fajr
+    /// cycle. App surfaces use this overload after
+    /// `PrayerScheduleWindow.cycleDayTimes(at:)` selects the cycle in
+    /// progress. Unlike a civil-day bracket, it contains all five
+    /// marker/card instances the person is looking at before dawn —
+    /// including the previous evening's Maghrib and Isha.
+    public static func resolve(
+        cycleDay: DayPrayerTimes,
+        nextFajr: PrayerTime,
+        now: Date
+    ) -> PrayerResolution {
+        let windows: [(PrayerTime, Date)] = [
+            (cycleDay.fajr, cycleDay.sunrise),
+            (cycleDay.dhuhr, cycleDay.asr.scheduledTime),
+            (cycleDay.asr, cycleDay.maghrib.scheduledTime),
+            (cycleDay.maghrib, cycleDay.isha.scheduledTime),
+            (cycleDay.isha, nextFajr.scheduledTime)
+        ]
+
+        return makeResolution(
+            windows: windows,
+            nextCandidates: cycleDay.allFardh + [nextFajr],
+            terminalFajr: nextFajr,
+            now: now
+        )
+    }
+
+    private static func makeResolution(
+        windows: [(PrayerTime, Date)],
+        nextCandidates: [PrayerTime],
+        terminalFajr: PrayerTime,
+        now: Date
+    ) -> PrayerResolution {
+
         let resolvedWindows = windows.map { prayerTime, end in
             let state: PrayerWindowState
             if now < prayerTime.scheduledTime {
@@ -208,18 +250,20 @@ public enum PrayerStateResolver {
         }
 
         let current = resolvedWindows.first { $0.state.isCurrent }?.prayerTime
-        let next = (prayerTimes.dayPrayerTimes + [prayerTimes.tomorrowFajr])
+        let next = nextCandidates
             .first { $0.scheduledTime > now }
             // A schedule is consumed only before tomorrow Fajr. The
             // fallback keeps resolution total if an extension briefly
             // renders a stale entry while requesting its replacement.
-            ?? prayerTimes.tomorrowFajr
+            ?? terminalFajr
 
         var allStates = resolvedWindows
-        allStates.append(ResolvedPrayerWindow(
-            prayerTime: prayerTimes.tomorrowFajr,
-            state: .upcoming(opensAt: prayerTimes.tomorrowFajr.scheduledTime)
-        ))
+        if !allStates.contains(where: { $0.prayerTime == terminalFajr }) {
+            allStates.append(ResolvedPrayerWindow(
+                prayerTime: terminalFajr,
+                state: .upcoming(opensAt: terminalFajr.scheduledTime)
+            ))
+        }
 
         let state: PrayerWindowState
         if let current,
@@ -234,7 +278,7 @@ public enum PrayerStateResolver {
             nextPrayer: next,
             windowState: state,
             prayerWindows: allStates,
-            isScheduleExhausted: now >= prayerTimes.tomorrowFajr.scheduledTime
+            isScheduleExhausted: now >= terminalFajr.scheduledTime
         )
     }
 }

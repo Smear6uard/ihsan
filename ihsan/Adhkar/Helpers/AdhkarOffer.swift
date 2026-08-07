@@ -85,6 +85,34 @@ enum AdhkarOffer {
         var window: AdhkarWindow
     }
 
+    /// Builds remembrance windows from the prayer cycle in progress.
+    /// The sleep set therefore spans its Isha through the Fajr that
+    /// closes that cycle, even when midnight falls between them.
+    static func windows(
+        cycleDay: DayPrayerTimes,
+        cycleEndFajr: Date,
+        morningEndsAfterSunrise: TimeInterval,
+        eveningExtendsAfterMaghrib: TimeInterval
+    ) -> Windows {
+        Windows(
+            morning: AdhkarWindowResolver.morning(
+                fajr: cycleDay.fajr.scheduledTime,
+                sunrise: cycleDay.sunrise,
+                dhuhr: cycleDay.dhuhr.scheduledTime,
+                endsAfterSunrise: morningEndsAfterSunrise
+            ),
+            evening: AdhkarWindowResolver.evening(
+                maghrib: cycleDay.maghrib.scheduledTime,
+                isha: cycleDay.isha.scheduledTime,
+                extendsAfterMaghrib: eveningExtendsAfterMaghrib
+            ),
+            sleep: AdhkarWindowResolver.sleep(
+                isha: cycleDay.isha.scheduledTime,
+                nextFajr: cycleEndFajr
+            )
+        )
+    }
+
     /// **An excused pause does not suspend remembrance.**
     ///
     /// A pause suspends salah and fasting, because those are the things
@@ -128,9 +156,9 @@ enum AdhkarOffer {
     }
 }
 
-/// The day's dismissals, stored as presentation state — never worship
-/// data. Encoded as `"2026-08-02:morning,evening"` so a new day clears
-/// them without anything having to run at midnight.
+/// The cycle's dismissals, stored as presentation state — never worship
+/// data. Encoded as `"2026-08-02:morning,evening"` so the next Fajr
+/// clears them without anything having to run at a boundary.
 enum AdhkarDismissal {
 
     static func dayKey(_ date: Date, calendar: Calendar) -> String {
