@@ -17,11 +17,13 @@ struct MasjidEmptyState: View {
                     .font(IhsanFont.subtitle)
                     .foregroundStyle(tokens.ink)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("Open Maps to search a wider area.")
                     .font(IhsanFont.bodyEnglish)
                     .foregroundStyle(tokens.inkSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Button {
@@ -43,7 +45,8 @@ struct MasjidEmptyState: View {
             .buttonStyle(.plain)
             .accessibilityHint("Opens Maps at your current location")
         }
-        .padding(IhsanSpacing.xl)
+        .padding(.horizontal, IhsanSpacing.xl)
+        .padding(.vertical, IhsanSpacing.lg)
         .frame(maxWidth: .infinity)
         .celestialPanel(tokens: tokens, cornerRadius: 18)
     }

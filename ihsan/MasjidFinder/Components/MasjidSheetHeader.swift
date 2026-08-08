@@ -15,11 +15,13 @@ struct MasjidSheetHeader: View {
                     .font(.system(.title2, design: .serif, weight: .medium))
                     .foregroundStyle(tokens.ink)
                     .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("CURRENT LOCATION")
                     .font(IhsanFont.inscription)
                     .tracking(1.8)
                     .foregroundStyle(tokens.inkSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .accessibilityElement(children: .combine)
             .accessibilityAddTraits(.isHeader)

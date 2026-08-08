@@ -82,25 +82,37 @@ struct MasjidFinderScreen: View {
     private func content(tokens: SkyPaletteTokens) -> some View {
         switch displayedState {
         case .loading:
-            MasjidLoadingState(tokens: tokens)
-                .padding(IhsanSpacing.md)
+            ScrollView {
+                MasjidLoadingState(tokens: tokens)
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.vertical, IhsanSpacing.sm)
+            }
 
         case .needsLocationPermission:
-            permissionState(tokens: tokens)
-                .padding(IhsanSpacing.md)
+            ScrollView {
+                permissionState(tokens: tokens)
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.vertical, IhsanSpacing.sm)
+            }
 
         case .ready(let results):
             resultsList(results, tokens: tokens)
 
         case .empty:
-            MasjidEmptyState(tokens: tokens) {
-                openMapsToCurrentArea()
+            ScrollView {
+                MasjidEmptyState(tokens: tokens) {
+                    openMapsToCurrentArea()
+                }
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.vertical, IhsanSpacing.sm)
             }
-            .padding(IhsanSpacing.md)
 
         case .failure:
-            failureState(tokens: tokens)
-                .padding(IhsanSpacing.md)
+            ScrollView {
+                failureState(tokens: tokens)
+                    .padding(.horizontal, IhsanSpacing.md)
+                    .padding(.vertical, IhsanSpacing.sm)
+            }
         }
     }
 
@@ -132,11 +144,13 @@ struct MasjidFinderScreen: View {
                     .font(IhsanFont.subtitle)
                     .foregroundStyle(tokens.ink)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("Allow location access in Settings to look nearby.")
                     .font(IhsanFont.bodyEnglish)
                     .foregroundStyle(tokens.inkSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             #if canImport(UIKit)
@@ -152,7 +166,8 @@ struct MasjidFinderScreen: View {
             }
             #endif
         }
-        .padding(IhsanSpacing.xl)
+        .padding(.horizontal, IhsanSpacing.xl)
+        .padding(.vertical, IhsanSpacing.lg)
         .frame(maxWidth: .infinity)
         .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
@@ -167,11 +182,13 @@ struct MasjidFinderScreen: View {
                     .font(IhsanFont.subtitle)
                     .foregroundStyle(tokens.ink)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 Text("Check your internet connection, then try again.")
                     .font(IhsanFont.bodyEnglish)
                     .foregroundStyle(tokens.inkSecondary)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Button {
@@ -189,7 +206,8 @@ struct MasjidFinderScreen: View {
             .buttonStyle(.plain)
             .accessibilityHint("Repeats the nearby Apple Maps search")
         }
-        .padding(IhsanSpacing.xl)
+        .padding(.horizontal, IhsanSpacing.xl)
+        .padding(.vertical, IhsanSpacing.lg)
         .frame(maxWidth: .infinity)
         .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
@@ -200,6 +218,7 @@ struct MasjidFinderScreen: View {
             .tracking(1.4)
             .foregroundStyle(tokens.inkSecondary)
             .multilineTextAlignment(.center)
+            .fixedSize(horizontal: false, vertical: true)
             .accessibilityLabel("Search runs through Apple Maps. Results and location are not saved.")
     }
 

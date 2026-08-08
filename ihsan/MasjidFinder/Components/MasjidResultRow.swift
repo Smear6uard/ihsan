@@ -24,6 +24,7 @@ struct MasjidResultRow: View {
                         .foregroundStyle(tokens.ink)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
 
                     Text(detailLine)
                         .font(IhsanFont.inscription)
@@ -31,6 +32,7 @@ struct MasjidResultRow: View {
                         .foregroundStyle(tokens.inkSecondary)
                         .multilineTextAlignment(.leading)
                         .frame(maxWidth: .infinity, alignment: .leading)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 SettingsGlyphView(.directions, color: tokens.metal)
