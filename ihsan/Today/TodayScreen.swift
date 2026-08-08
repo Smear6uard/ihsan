@@ -208,6 +208,7 @@ private struct TodayReadyView: View {
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = DebugLaunch.flag("-IhsanDebugPresentQibla")
     @State private var isHijriSheetPresented = DebugLaunch.flag("-IhsanDebugPresentHijriSheet")
+    @State private var isMasjidFinderPresented = DebugLaunch.flag("-IhsanDebugPresentMasjids")
     /// Civil-day key ("2026-07-30") of the day the user dismissed the
     /// significant-day line — presentation state, not worship data.
     @AppStorage("IhsanSignificantDayDismissedDay")
@@ -387,6 +388,7 @@ private struct TodayReadyView: View {
                         timeZone: snapshot.place.timeZone,
                         tokens: tokens,
                         onMoonPhaseTap: { isCelestialReferencePresented = true },
+                        onLocationTap: { isMasjidFinderPresented = true },
                         onHijriTap: { isHijriSheetPresented = true },
                         significantDayInscription: headerLineText(at: now),
                         significantDayHint: headerLineHint(at: now),
@@ -471,6 +473,14 @@ private struct TodayReadyView: View {
             }
             .sheet(isPresented: $isHijriSheetPresented) {
                 hijriMonthSheet
+            }
+            .sheet(isPresented: $isMasjidFinderPresented) {
+                MasjidFinderScreen(
+                    locationName: snapshot.place.cityName ?? "Current Location"
+                )
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.thinMaterial)
             }
             .sheet(isPresented: $isYesterdaySheetPresented) {
                 yesterdaySheet(at: now)

@@ -645,20 +645,30 @@ public struct CelestialSkyView: View {
 /// CelestialShaders.metal`, currently excluded from the build) adds
 /// live filmic movement on hardware once the Metal toolchain is
 /// available; this Canvas layer is its exact static fallback.
-struct PlateGrainOverlay: View {
+public struct PlateGrainOverlay: View {
 
     /// One grain mark per this many point². The gold-dust scatter is
     /// calibrated against it.
-    static let markArea: Double = 210
+    public static let markArea: Double = 210
     /// Grain strength on the near-white day fields — the threshold of
     /// visibility at arm's length. The night states keep 0.03.
-    static let dayIntensity: Double = 0.045
+    public static let dayIntensity: Double = 0.045
 
-    let tint: Color
-    let seed: UInt64
-    var intensity: Double = 0.03
+    public let tint: Color
+    public let seed: UInt64
+    public var intensity: Double
 
-    var body: some View {
+    public init(
+        tint: Color,
+        seed: UInt64,
+        intensity: Double = 0.03
+    ) {
+        self.tint = tint
+        self.seed = seed
+        self.intensity = intensity
+    }
+
+    public var body: some View {
         Canvas { context, size in
             var rng = SeededGenerator(state: seed ^ 0xF11A_9AA1_77E1_D05B)
             let strength = min(0.05, intensity)

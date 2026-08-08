@@ -22,11 +22,23 @@ final class GalleryCaptureUITests: XCTestCase {
         /// Some surfaces are taller than the screen; this scrolls to
         /// the end before the shutter so the frame shows the rest.
         var scrollsToBottom: Bool = false
+        /// An accessibility-labelled control to open after launch.
+        /// Used for user-initiated flows whose destination must never
+        /// be staged automatically in production.
+        var tapLabel: String? = nil
+        /// An accessibility-label fragment that must arrive before
+        /// capture (for example, a live Maps result row).
+        var waitLabelFragment: String? = nil
     }
 
     private static let chicagoNight = "2026-07-30T21:40:00"
     private static let chicagoDawn = "2026-07-31T04:35:00"
     private static let chicagoAfternoon = "2026-07-30T15:10:00"
+    /// Feature captures run with the simulator staged in Makkah for
+    /// the travel gate. These Chicago-zone instants resolve to a
+    /// Makkah afternoon and night respectively.
+    private static let travelAfternoon = "2026-07-30T07:10:00"
+    private static let travelNight = "2026-07-30T15:00:00"
 
     /// A week with something of every state in it, so the pattern is a
     /// pattern rather than a column of one mark.
@@ -216,6 +228,141 @@ final class GalleryCaptureUITests: XCTestCase {
         }
     }
 
+    /// Feature-gate evidence for nearby masjids and pattern sharing.
+    /// Masjid result rows are checked separately against a simulated
+    /// travel location using live MapKit; these four frames pin every
+    /// non-result branch without turning network behavior into a mock.
+    @MainActor
+    func testCaptureNearbyMasjidAndPatternSharing() throws {
+        let frames: [Frame] = [
+            Frame(name: "20-masjid-loading-day", arguments: [
+                "-IhsanNowOverride", Self.travelAfternoon,
+                "-IhsanDebugPresentMasjids",
+                "-IhsanDebugMasjidState", "loading"
+            ]),
+            Frame(name: "21-masjid-empty-day", arguments: [
+                "-IhsanNowOverride", Self.travelAfternoon,
+                "-IhsanDebugPresentMasjids",
+                "-IhsanDebugMasjidState", "empty"
+            ]),
+            Frame(name: "22-masjid-permission-night", arguments: [
+                "-IhsanNowOverride", Self.travelNight,
+                "-IhsanDebugPresentMasjids",
+                "-IhsanDebugMasjidState", "permission"
+            ]),
+            Frame(name: "23-masjid-failure-night", arguments: [
+                "-IhsanNowOverride", Self.travelNight,
+                "-IhsanDebugPresentMasjids",
+                "-IhsanDebugMasjidState", "offline"
+            ]),
+            Frame(name: "24-share-preview-7d-day", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "7",
+                "-IhsanDebugSeedVoluntary", "10",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0, tapLabel: "Share the current pattern"),
+            Frame(name: "25-share-preview-30d-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "30",
+                "-IhsanDebugSeedVoluntary", "30",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0, tapLabel: "Share the current pattern"),
+            Frame(name: "26-share-preview-a5-day", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "7",
+                "-IhsanDebugSeedVoluntary", "10",
+                "-IhsanDebugLogPrayer", Self.mixedWeek,
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityXXXL"
+            ], settle: 3.0, tapLabel: "Share the current pattern"),
+            Frame(name: "27-masjid-travel-live-day", arguments: [
+                "-IhsanNowOverride", Self.travelAfternoon,
+                "-IhsanDebugPresentMasjids"
+            ], settle: 3.0, waitLabelFragment: "Opens directions in Maps")
+        ]
+
+        for frame in frames {
+            capture(frame)
+        }
+    }
+
+    /// Completes the 7D/30D × day/night export matrix without making
+    /// the primary state-capture loop repeat its four masjid launches.
+    @MainActor
+    func testCapturePatternShareCrossPhaseVariants() throws {
+        let frames: [Frame] = [
+            Frame(name: "24b-share-preview-7d-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "7",
+                "-IhsanDebugSeedVoluntary", "10",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0, tapLabel: "Share the current pattern"),
+            Frame(name: "25b-share-preview-30d-day", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "30",
+                "-IhsanDebugSeedVoluntary", "30",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0, tapLabel: "Share the current pattern"),
+            Frame(name: "25c-share-preview-30d-night", arguments: [
+                "-IhsanNowOverride", Self.chicagoNight,
+                "-IhsanDebugTab", "trajectory",
+                "-IhsanDebugPeriod", "30",
+                "-IhsanDebugSeedVoluntary", "30",
+                "-IhsanDebugLogPrayer", Self.mixedWeek
+            ], settle: 3.0, tapLabel: "Share the current pattern")
+        ]
+
+        for frame in frames {
+            capture(frame)
+        }
+    }
+
+    /// Drives the complete, always-user-initiated handoff. Run this
+    /// while `simctl io recordVideo` is active to regenerate the flow
+    /// recording used at the feature gate.
+    @MainActor
+    func testPatternShareSystemHandoff() throws {
+        let app = XCUIApplication()
+        app.launchArguments = Self.baseArguments + [
+            "-IhsanNowOverride", Self.chicagoAfternoon,
+            "-IhsanDebugTab", "trajectory",
+            "-IhsanDebugPeriod", "7",
+            "-IhsanDebugSeedVoluntary", "10",
+            "-IhsanDebugLogPrayer", Self.mixedWeek
+        ]
+        app.launch()
+
+        let entry = app.buttons["Share the current pattern"]
+        XCTAssertTrue(entry.waitForExistence(timeout: 20))
+        entry.tap()
+
+        let handoff = app.buttons["Share this pattern image"]
+        XCTAssertTrue(handoff.waitForExistence(timeout: 10))
+        handoff.tap()
+
+        let activityList = app.otherElements["ActivityListView"]
+        XCTAssertTrue(
+            activityList.waitForExistence(timeout: 10),
+            "The system share sheet did not appear"
+        )
+        Thread.sleep(forTimeInterval: 3.0)
+
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
+        attachment.name = "28-pattern-system-share-sheet"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+
+        let dismissRegion = app.otherElements["PopoverDismissRegion"]
+        if dismissRegion.exists {
+            dismissRegion.tap()
+        }
+    }
+
     // MARK: - Capture
 
     @MainActor
@@ -240,6 +387,31 @@ final class GalleryCaptureUITests: XCTestCase {
             Thread.sleep(forTimeInterval: 0.5)
         }
         Thread.sleep(forTimeInterval: frame.settle)
+
+        if let tapLabel = frame.tapLabel {
+            let control = app.buttons[tapLabel]
+            XCTAssertTrue(
+                control.waitForExistence(timeout: 10),
+                "Missing control labelled \(tapLabel)"
+            )
+            control.tap()
+            XCTAssertTrue(
+                app.staticTexts["This is what will be shared"]
+                    .waitForExistence(timeout: 10),
+                "Pattern preview did not open"
+            )
+            Thread.sleep(forTimeInterval: 2.0)
+        }
+
+        if let fragment = frame.waitLabelFragment {
+            let match = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label CONTAINS[c] %@", fragment))
+                .firstMatch
+            XCTAssertTrue(
+                match.waitForExistence(timeout: 20),
+                "No element arrived with label containing \(fragment)"
+            )
+        }
 
         if frame.scrollsToBottom {
             for _ in 0..<4 {
