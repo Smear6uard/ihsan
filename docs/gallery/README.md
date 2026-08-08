@@ -18,3 +18,12 @@ Each frame is one launch with the debug arguments that stage its state
 (`-IhsanNowOverride`, `-IhsanDebugTab`, `-IhsanDebugSettingsRoute`, …),
 so a frame is reproducible rather than a moment someone happened to
 catch.
+
+## Live Activity
+
+`live-activity-compact.png`, `live-activity-expanded.png`, and
+`live-activity-lock-screen.png` come from the real ActivityKit fixture in
+`LiveActivityCaptureUITests`. The minimal frame is also a SpringBoard
+capture; it uses a second, ad-hoc simulator bundle because iOS groups two
+activities from one app into the ordinary compact presentation instead
+of selecting the distinct-app minimal presentation.

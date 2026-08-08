@@ -76,12 +76,14 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
     @discardableResult
     public func startActivity(
         for prayerTime: PrayerTime,
-        in dayTimes: DayPrayerTimes
+        in dayTimes: DayPrayerTimes,
+        windowEnd: Date
     ) async throws -> String? {
+        guard !Self.isDebugFixtureCapture else { return nil }
         let currentDate = now()
         let scheduledTime = prayerTime.scheduledTime
-        guard currentDate < scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime) else {
-            logger.info("Skipping \(prayerTime.prayer.rawValue) activity because its post-adhan window has passed.")
+        guard currentDate < windowEnd else {
+            logger.info("Skipping \(prayerTime.prayer.rawValue) activity because its resolver window has closed.")
             return nil
         }
 
@@ -90,9 +92,17 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
             return nil
         }
 
-        if let existing = await matchingActivity(for: prayerTime.prayer, scheduledTime: scheduledTime) {
+        if let existing = await matchingActivity(
+            for: prayerTime.prayer,
+            scheduledTime: scheduledTime,
+            windowEnd: windowEnd
+        ) {
             await updateExistingActivity(existing)
-            scheduleLocalTransitions(activityId: existing.id, scheduledTime: scheduledTime)
+            scheduleLocalTransitions(
+                activityId: existing.id,
+                scheduledTime: scheduledTime,
+                windowEnd: windowEnd
+            )
             return existing.id
         }
 
@@ -101,26 +111,37 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         let attributes = PrayerActivityAttributes(
             prayer: prayerTime.prayer,
             scheduledTime: scheduledTime,
+            windowEnd: windowEnd,
+            timeZoneIdentifier: dayTimes.timeZoneIdentifier,
             arabicName: prayerTime.prayer.displayNameArabic,
             englishName: prayerTime.prayer.displayNameEnglish
         )
         let state = PrayerActivityAttributes.ContentState(
-            countdownPhase: phase(for: scheduledTime, at: currentDate),
+            countdownPhase: phase(
+                for: scheduledTime,
+                windowEnd: windowEnd,
+                at: currentDate
+            ),
             hasBeenLoggedThisActivity: false
         )
-        let staleDate = scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
+        let staleDate = windowEnd
         let activityId = try await client.request(attributes: attributes, state: state, staleDate: staleDate)
-        scheduleLocalTransitions(activityId: activityId, scheduledTime: scheduledTime)
+        scheduleLocalTransitions(
+            activityId: activityId,
+            scheduledTime: scheduledTime,
+            windowEnd: windowEnd
+        )
         logger.info("Started \(prayerTime.prayer.rawValue) Live Activity \(activityId, privacy: .public).")
-        _ = dayTimes
         return activityId
     }
 
     public func schedulePrayerActivityStart(
         for prayerTime: PrayerTime,
         in dayTimes: DayPrayerTimes,
+        windowEnd: Date,
         startDate: Date
     ) async throws {
+        guard !Self.isDebugFixtureCapture else { return }
         let currentDate = now()
         let taskKey = startTaskKey(for: prayerTime)
 
@@ -135,6 +156,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
                     try await self.startScheduledActivity(
                         for: prayerTime,
                         in: dayTimes,
+                        windowEnd: windowEnd,
                         taskKey: taskKey
                     )
                 } catch {
@@ -143,7 +165,7 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
             }
             return
         }
-        _ = try await startActivity(for: prayerTime, in: dayTimes)
+        _ = try await startActivity(for: prayerTime, in: dayTimes, windowEnd: windowEnd)
     }
 
     public func updateToAdhanWindow(activityId: String) async {
@@ -158,8 +180,24 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         await client.update(
             activityId: activityId,
             state: state,
-            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
+            staleDate: snapshot.attributes.windowEnd
         )
+    }
+
+    public func cancelAllPrayerActivities() async {
+        guard !Self.isDebugFixtureCapture else { return }
+        scheduledStartTasks.values.forEach { $0.cancel() }
+        scheduledStartTasks.removeAll()
+        transitionTasks.values.forEach { $0.cancel() }
+        transitionTasks.removeAll()
+
+        for activity in await client.activeActivities() {
+            await client.end(
+                activityId: activity.id,
+                state: activity.state,
+                dismissal: .immediate
+            )
+        }
     }
 
     public func endActivity(activityId: String, reason: PrayerActivityEndReason) async {
@@ -205,23 +243,28 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
 
     private func updateExistingActivity(_ snapshot: PrayerActivitySnapshot) async {
         let state = PrayerActivityAttributes.ContentState(
-            countdownPhase: phase(for: snapshot.attributes.scheduledTime, at: now()),
+            countdownPhase: phase(
+                for: snapshot.attributes.scheduledTime,
+                windowEnd: snapshot.attributes.windowEnd,
+                at: now()
+            ),
             hasBeenLoggedThisActivity: snapshot.state.hasBeenLoggedThisActivity
         )
         await client.update(
             activityId: snapshot.id,
             state: state,
-            staleDate: snapshot.attributes.scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
+            staleDate: snapshot.attributes.windowEnd
         )
     }
 
     private func startScheduledActivity(
         for prayerTime: PrayerTime,
         in dayTimes: DayPrayerTimes,
+        windowEnd: Date,
         taskKey: String
     ) async throws {
         scheduledStartTasks[taskKey] = nil
-        _ = try await startActivity(for: prayerTime, in: dayTimes)
+        _ = try await startActivity(for: prayerTime, in: dayTimes, windowEnd: windowEnd)
     }
 
     private func clearScheduledStartTask(_ taskKey: String) {
@@ -238,10 +281,15 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         }
     }
 
-    private func matchingActivity(for prayer: Prayer, scheduledTime: Date) async -> PrayerActivitySnapshot? {
+    private func matchingActivity(
+        for prayer: Prayer,
+        scheduledTime: Date,
+        windowEnd: Date
+    ) async -> PrayerActivitySnapshot? {
         await client.activeActivities().first {
             $0.attributes.prayer == prayer &&
-            abs($0.attributes.scheduledTime.timeIntervalSince(scheduledTime)) < 1
+            abs($0.attributes.scheduledTime.timeIntervalSince(scheduledTime)) < 1 &&
+            abs($0.attributes.windowEnd.timeIntervalSince(windowEnd)) < 1
         }
     }
 
@@ -253,7 +301,11 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         await client.activeActivities().first { $0.id == activityId }
     }
 
-    private func scheduleLocalTransitions(activityId: String, scheduledTime: Date) {
+    private func scheduleLocalTransitions(
+        activityId: String,
+        scheduledTime: Date,
+        windowEnd: Date
+    ) {
         transitionTasks[activityId]?.cancel()
 
         transitionTasks[activityId] = Task { [now, sleep] in
@@ -269,15 +321,14 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
                 await self.updateToAdhanWindow(activityId: activityId)
             }
 
-            let timeoutDate = scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime)
             let afterAdhanDate = now()
-            guard timeoutDate > afterAdhanDate else {
+            guard windowEnd > afterAdhanDate else {
                 await self.endActivity(activityId: activityId, reason: .timedOut)
                 return
             }
 
             do {
-                try await sleep(Self.duration(for: timeoutDate.timeIntervalSince(afterAdhanDate)))
+                try await sleep(Self.duration(for: windowEnd.timeIntervalSince(afterAdhanDate)))
                 await self.endActivity(activityId: activityId, reason: .timedOut)
             } catch {
                 return
@@ -285,11 +336,15 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
         }
     }
 
-    private func phase(for scheduledTime: Date, at date: Date) -> PrayerActivityAttributes.CountdownPhase {
+    private func phase(
+        for scheduledTime: Date,
+        windowEnd: Date,
+        at date: Date
+    ) -> PrayerActivityAttributes.CountdownPhase {
         if date < scheduledTime {
             return .preAdhan
         }
-        if date < scheduledTime.addingTimeInterval(LiveActivityWindow.postAdhanLifetime) {
+        if date < windowEnd {
             return .adhanWindow
         }
         return .postAdhan
@@ -297,6 +352,18 @@ public actor PrayerActivityScheduler: PrayerActivityScheduling {
 
     private static func duration(for seconds: TimeInterval) -> Duration {
         .milliseconds(Int64(max(0, seconds) * 1_000))
+    }
+
+    /// The screenshot fixture owns ActivityKit while its explicit debug
+    /// launch argument is present. Ordinary schedule rebuilds can race a
+    /// cold launch, so suppressing them here keeps the system captures
+    /// deterministic without changing release behavior.
+    private static var isDebugFixtureCapture: Bool {
+        #if DEBUG
+        ProcessInfo.processInfo.arguments.contains("-IhsanDebugLiveActivity")
+        #else
+        false
+        #endif
     }
 }
 

@@ -18,6 +18,4 @@ public enum LiveActivityWindow {
     /// How long before the adhan the activity may appear.
     public static let preAdhanLead: TimeInterval = 30 * 60
 
-    /// How long after the adhan it stays before ending on its own.
-    public static let postAdhanLifetime: TimeInterval = 30 * 60
 }

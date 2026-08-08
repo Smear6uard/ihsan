@@ -139,6 +139,11 @@ private struct RootGate: View {
             // pending schedule immediately, not at the next BG refresh.
             try? await NotificationScheduler.shared.rebuildSchedule()
         }
+        #if DEBUG && canImport(ActivityKit) && os(iOS)
+        .task {
+            await PrayerActivityDebugLauncher.launchIfRequested()
+        }
+        #endif
         #if canImport(ActivityKit) && os(iOS)
         .task(id: liveActivityLogSignature) {
             await endLiveActivitiesForNewLogs()

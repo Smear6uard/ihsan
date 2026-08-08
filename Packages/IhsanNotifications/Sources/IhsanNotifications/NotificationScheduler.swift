@@ -133,8 +133,14 @@ public protocol PrayerActivityScheduling: Sendable {
     func schedulePrayerActivityStart(
         for prayerTime: PrayerTime,
         in dayTimes: DayPrayerTimes,
+        windowEnd: Date,
         startDate: Date
     ) async throws
+
+    /// Withdraws active activities and every deferred start. An
+    /// excused pause calls this immediately; a task scheduled before
+    /// the pause must never wake later and recreate an activity.
+    func cancelAllPrayerActivities() async
 }
 
 public struct NoOpPrayerActivityScheduler: PrayerActivityScheduling {
@@ -143,10 +149,13 @@ public struct NoOpPrayerActivityScheduler: PrayerActivityScheduling {
     public func schedulePrayerActivityStart(
         for prayerTime: PrayerTime,
         in dayTimes: DayPrayerTimes,
+        windowEnd: Date,
         startDate: Date
     ) async throws {
-        _ = (prayerTime, dayTimes, startDate)
+        _ = (prayerTime, dayTimes, windowEnd, startDate)
     }
+
+    public func cancelAllPrayerActivities() async {}
 }
 
 public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProviding {
@@ -261,8 +270,13 @@ public actor NotificationScheduler {
             // system permission is restored later. Pending state must
             // always match the app's current controls.
             await cancelAllScheduledNotifications()
+            await prayerActivityScheduler.cancelAllPrayerActivities()
             logger.info("Notification permission is not granted; cleared the Ihsan notification schedule.")
             return
+        }
+
+        if !settings.notificationsEnabled || settings.prayerNotificationsSuppressed {
+            await prayerActivityScheduler.cancelAllPrayerActivities()
         }
 
         guard settings.notificationsEnabled
@@ -277,9 +291,16 @@ public actor NotificationScheduler {
         let place = try await locationProvider.currentPlace()
         let referenceDate = now()
         let dateRangeEnd = try scheduleEndDate(from: referenceDate, timeZone: place.timeZone)
+        var placeCalendar = Calendar(identifier: .gregorian)
+        placeCalendar.timeZone = place.timeZone
+        let boundaryRangeEnd = placeCalendar.date(
+            byAdding: .day,
+            value: 1,
+            to: dateRangeEnd
+        ) ?? dateRangeEnd
         let days = try prayerTimesProvider.dayTimesRange(
             from: referenceDate,
-            to: dateRangeEnd,
+            to: boundaryRangeEnd,
             coordinates: place.coordinates,
             timeZone: place.timeZone,
             calculationMethod: settings.calculationMethod,
@@ -290,7 +311,7 @@ public actor NotificationScheduler {
 
         await cancelAllScheduledNotifications()
 
-        for day in days {
+        for (dayIndex, day) in days.prefix(Self.rollingWindowDayCount).enumerated() {
             if settings.notificationsEnabled && !settings.prayerNotificationsSuppressed {
                 for prayerTime in day.allFardh {
                     let preference = settings.preference(for: prayerTime.prayer)
@@ -302,18 +323,29 @@ public actor NotificationScheduler {
                     let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(
                         -LiveActivityWindow.preAdhanLead
                     )
+                    // The extra day fetched above contributes only its
+                    // Fajr boundary. Every activity receives the exact
+                    // end of its resolver window; Isha therefore ends
+                    // at next Fajr, never after a private fixed lifetime.
+                    guard days.indices.contains(dayIndex + 1) else {
+                        continue
+                    }
+                    let windowEnd = day.windowEnd(
+                        for: prayerTime.prayer,
+                        nextFajr: days[dayIndex + 1].fajr.scheduledTime
+                    )
                     if activityStartDate > referenceDate {
                         try await prayerActivityScheduler.schedulePrayerActivityStart(
                             for: prayerTime,
                             in: day,
+                            windowEnd: windowEnd,
                             startDate: activityStartDate
                         )
-                    } else if prayerTime.scheduledTime.addingTimeInterval(
-                        LiveActivityWindow.postAdhanLifetime
-                    ) > referenceDate {
+                    } else if windowEnd > referenceDate {
                         try await prayerActivityScheduler.schedulePrayerActivityStart(
                             for: prayerTime,
                             in: day,
+                            windowEnd: windowEnd,
                             startDate: activityStartDate
                         )
                     }

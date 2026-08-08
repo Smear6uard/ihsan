@@ -22,6 +22,8 @@ func rebuildScheduleCancelsExistingIhsanRequestsThenSchedulesRollingWindow() asy
     #expect(events.first == .remove(["ihsan.prayer.fajr.1"]))
     #expect(events.filter(\.isAdd).count == 70)
     #expect(activityScheduler.requests.count == 70)
+    let firstIsha = try #require(activityScheduler.requests.first { $0.prayer == .isha })
+    #expect(firstIsha.windowEnd == firstIsha.scheduledTime.addingTimeInterval(8 * 3_600))
 
     let pending = await center.pendingNotificationRequests()
     #expect(pending.count == 71)
@@ -129,13 +131,20 @@ func anExcusedPauseSchedulesNothingAndLeavesEveryPreferenceIntact() async throws
     #expect(paused.notificationsEnabled)
     #expect(paused.prayerNotificationsSuppressed)
 
-    let scheduler = makeScheduler(now: fixedDate(), center: center, settings: paused)
+    let activityScheduler = MockPrayerActivityScheduler()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: paused,
+        activityScheduler: activityScheduler
+    )
     try await scheduler.rebuildSchedule()
 
     let added = center.events.filter(\.isAdd)
     #expect(added.isEmpty, "A pause must schedule nothing at all.")
     let scheduled = await scheduler.scheduledNotifications()
     #expect(scheduled.isEmpty)
+    #expect(activityScheduler.cancelCount == 1)
 
     // And the preferences it suppressed are untouched, so they come
     // back exactly as they were when the pause ends.
@@ -507,29 +516,41 @@ private final class MockPrayerActivityScheduler: PrayerActivityScheduling, @unch
     struct Request: Equatable {
         let prayer: Prayer
         let scheduledTime: Date
+        let windowEnd: Date
         let startDate: Date
     }
 
     private var recordedRequests: [Request] = []
+    private var recordedCancelCount = 0
     private let lock = NSLock()
 
     var requests: [Request] {
         lock.withLock { recordedRequests }
     }
 
+    var cancelCount: Int {
+        lock.withLock { recordedCancelCount }
+    }
+
     func schedulePrayerActivityStart(
         for prayerTime: PrayerTime,
         in dayTimes: DayPrayerTimes,
+        windowEnd: Date,
         startDate: Date
     ) async throws {
         lock.withLock {
             recordedRequests.append(Request(
                 prayer: prayerTime.prayer,
                 scheduledTime: prayerTime.scheduledTime,
+                windowEnd: windowEnd,
                 startDate: startDate
             ))
         }
         _ = dayTimes
+    }
+
+    func cancelAllPrayerActivities() async {
+        lock.withLock { recordedCancelCount += 1 }
     }
 }
 

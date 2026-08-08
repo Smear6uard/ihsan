@@ -9,6 +9,7 @@ import Testing
 @Test
 func startActivityCreatesPreAdhanLiveActivity() async throws {
     let scheduledTime = Date(timeIntervalSince1970: 1_800_000)
+    let windowEnd = scheduledTime.addingTimeInterval(2 * 3_600)
     let client = MockPrayerActivityClient()
     let scheduler = PrayerActivityScheduler(
         client: client,
@@ -19,12 +20,15 @@ func startActivityCreatesPreAdhanLiveActivity() async throws {
 
     let activityId = try await scheduler.startActivity(
         for: PrayerTime(prayer: .asr, scheduledTime: scheduledTime),
-        in: makeDayPrayerTimes(scheduledTime: scheduledTime)
+        in: makeDayPrayerTimes(scheduledTime: scheduledTime),
+        windowEnd: windowEnd
     )
 
     #expect(activityId == "activity-1")
     #expect(client.requests.count == 1)
     #expect(client.requests.first?.attributes.prayer == .asr)
+    #expect(client.requests.first?.attributes.windowEnd == windowEnd)
+    #expect(client.requests.first?.staleDate == windowEnd)
     #expect(client.requests.first?.state.countdownPhase == .preAdhan)
     #expect(client.requests.first?.state.hasBeenLoggedThisActivity == false)
 }
@@ -40,6 +44,7 @@ func theLiveActivityAppearsExactlyThirtyMinutesAheadAndNotSooner() async throws 
     let scheduledTime = Date(timeIntervalSince1970: 1_800_000)
     let prayerTime = PrayerTime(prayer: .asr, scheduledTime: scheduledTime)
     let day = makeDayPrayerTimes(scheduledTime: scheduledTime)
+    let windowEnd = scheduledTime.addingTimeInterval(2 * 3_600)
 
     func startedActivity(secondsBefore: TimeInterval) async throws -> String? {
         let client = MockPrayerActivityClient()
@@ -49,7 +54,11 @@ func theLiveActivityAppearsExactlyThirtyMinutesAheadAndNotSooner() async throws 
             sleep: { _ in throw CancellationError() },
             calendar: Calendar(identifier: .gregorian)
         )
-        return try await scheduler.startActivity(for: prayerTime, in: day)
+        return try await scheduler.startActivity(
+            for: prayerTime,
+            in: day,
+            windowEnd: windowEnd
+        )
     }
 
     // A second inside the window opens it.
@@ -60,6 +69,45 @@ func theLiveActivityAppearsExactlyThirtyMinutesAheadAndNotSooner() async throws 
     // screen should be counting down to Asr yet.
     #expect(try await startedActivity(secondsBefore: 31 * 60) == nil)
     #expect(try await startedActivity(secondsBefore: 60 * 60) == nil)
+}
+
+/// The activity's lifetime is the resolver window captured in the
+/// shared schedule snapshot. A long Isha window therefore remains
+/// active beyond the old private thirty-minute timeout and closes at
+/// next Fajr exactly.
+@Test
+func activityLifetimeUsesTheSharedWindowBoundary() async throws {
+    let scheduledTime = Date(timeIntervalSince1970: 1_800_000)
+    let nextFajr = scheduledTime.addingTimeInterval(7 * 3_600)
+    let prayerTime = PrayerTime(prayer: .isha, scheduledTime: scheduledTime)
+    let day = makeDayPrayerTimes(scheduledTime: scheduledTime)
+
+    let activeClient = MockPrayerActivityClient()
+    let activeScheduler = PrayerActivityScheduler(
+        client: activeClient,
+        now: { scheduledTime.addingTimeInterval(2 * 3_600) },
+        sleep: { _ in throw CancellationError() }
+    )
+    #expect(try await activeScheduler.startActivity(
+        for: prayerTime,
+        in: day,
+        windowEnd: nextFajr
+    ) != nil)
+    #expect(activeClient.requests.first?.state.countdownPhase == .adhanWindow)
+    #expect(activeClient.requests.first?.staleDate == nextFajr)
+
+    let closedClient = MockPrayerActivityClient()
+    let closedScheduler = PrayerActivityScheduler(
+        client: closedClient,
+        now: { nextFajr },
+        sleep: { _ in throw CancellationError() }
+    )
+    #expect(try await closedScheduler.startActivity(
+        for: prayerTime,
+        in: day,
+        windowEnd: nextFajr
+    ) == nil)
+    #expect(closedClient.requests.isEmpty)
 }
 
 @Test
@@ -122,6 +170,26 @@ func timeoutEndDismissesImmediatelyWithoutConfirmation() async {
 
     #expect(client.updates.isEmpty)
     #expect(client.ends.last?.state == originalState)
+    #expect(client.ends.last?.dismissal == .immediate)
+}
+
+@Test
+func excusedPauseCancellationEndsEveryActivePrayerActivity() async {
+    let scheduledTime = Date(timeIntervalSince1970: 1_800_000)
+    let client = MockPrayerActivityClient(activities: [
+        makeSnapshot(
+            id: "activity-1",
+            prayer: .isha,
+            scheduledTime: scheduledTime,
+            state: PrayerActivityAttributes.ContentState(countdownPhase: .adhanWindow)
+        )
+    ])
+    let scheduler = PrayerActivityScheduler(client: client)
+
+    await scheduler.cancelAllPrayerActivities()
+
+    #expect(await client.activeActivities().isEmpty)
+    #expect(client.ends.last?.activityId == "activity-1")
     #expect(client.ends.last?.dismissal == .immediate)
 }
 
@@ -216,6 +284,8 @@ private func makeSnapshot(
         attributes: PrayerActivityAttributes(
             prayer: prayer,
             scheduledTime: scheduledTime,
+            windowEnd: scheduledTime.addingTimeInterval(6 * 3_600),
+            timeZoneIdentifier: "America/Chicago",
             arabicName: prayer.displayNameArabic,
             englishName: prayer.displayNameEnglish
         ),

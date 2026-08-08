@@ -15,6 +15,20 @@ import Foundation
 /// this single source of positioning truth.
 public struct PlateGeometry: Sendable, Equatable {
 
+    /// The sunrise mark is part of the plate's bounded layout, not a
+    /// view-local offset. `point` is the exact time-position on the day
+    /// arc; `labelFrame` is the nearest clear inscription frame that
+    /// remains inside the plate and outside every marker knockout.
+    public struct SunriseMarkLayout: Sendable, Equatable {
+        public let point: CGPoint
+        public let labelFrame: CGRect
+
+        public init(point: CGPoint, labelFrame: CGRect) {
+            self.point = point
+            self.labelFrame = labelFrame
+        }
+    }
+
     // MARK: Inputs
 
     /// The scene rectangle the plate composes within.
@@ -102,12 +116,188 @@ public struct PlateGeometry: Sendable, Equatable {
     /// the returned point sits strictly inside the plate for ANY
     /// input, including the domain endpoints and out-of-range times.
     public func markerPosition(for time: Date) -> CGPoint {
+        arcPoint(at: arcParameter(for: time))
+    }
+
+    /// Bounded sunrise placement, including the pre-Fajr case where
+    /// the displayed markers belong to the previous prayer cycle but
+    /// sunrise belongs to the coming morning.
+    ///
+    /// The sunrise-to-Fajr/Dhuhr ratio comes from the displayed solar
+    /// schedule. That ratio is then laid onto the plate's visible
+    /// Fajr-to-Dhuhr segment. This keeps the mark at its real morning
+    /// time-position without ever treating a next-day absolute instant
+    /// as an event after Isha and clamping it to the arc end.
+    ///
+    /// `markerFajr` and `markerDhuhr` are the instants used by the two
+    /// visible prayer markers. During the civil day they equal `fajr`
+    /// and `dhuhr`; before Fajr they belong to the previous cycle.
+    public func sunriseMarkLayout(
+        sunrise: Date,
+        fajr: Date,
+        dhuhr: Date,
+        markerFajr: Date,
+        markerDhuhr: Date,
+        labelSize: CGSize = CGSize(width: 112, height: 18),
+        avoiding markerKnockouts: [CGRect] = [],
+        ornamentClearance: CGFloat = 7
+    ) -> SunriseMarkLayout {
+        let solarSpan = max(60, dhuhr.timeIntervalSince(fajr))
+        let morningFraction = max(
+            0.0,
+            min(1.0, sunrise.timeIntervalSince(fajr) / solarSpan)
+        )
+        let fajrParameter = arcParameter(for: markerFajr)
+        let dhuhrParameter = arcParameter(for: markerDhuhr)
+        let parameter = fajrParameter + morningFraction * (dhuhrParameter - fajrParameter)
+        let point = arcPoint(at: parameter)
+        let labelFrame = clearInscriptionFrame(
+            beside: point,
+            size: labelSize,
+            avoiding: markerKnockouts,
+            clearance: ornamentClearance
+        )
+        return SunriseMarkLayout(point: point, labelFrame: labelFrame)
+    }
+
+    /// Convenience for the ordinary civil-day case, where the solar
+    /// anchors and the visible prayer-marker anchors are identical.
+    public func sunriseMarkLayout(
+        sunrise: Date,
+        fajr: Date,
+        dhuhr: Date,
+        labelSize: CGSize = CGSize(width: 112, height: 18),
+        avoiding markerKnockouts: [CGRect] = [],
+        ornamentClearance: CGFloat = 7
+    ) -> SunriseMarkLayout {
+        sunriseMarkLayout(
+            sunrise: sunrise,
+            fajr: fajr,
+            dhuhr: dhuhr,
+            markerFajr: fajr,
+            markerDhuhr: dhuhr,
+            labelSize: labelSize,
+            avoiding: markerKnockouts,
+            ornamentClearance: ornamentClearance
+        )
+    }
+
+    /// The sunrise tick uses the plate's filament knockout discipline:
+    /// it is cut into tapered kept runs before it can cross a prayer
+    /// ornament or label. When sunrise is extremely close to Fajr, the
+    /// ornament wins and the occluded portion of the subordinate tick
+    /// disappears instead of drawing through it.
+    public func sunriseTickFilamentSegments(
+        at point: CGPoint,
+        avoiding markerKnockouts: [CGRect],
+        ornamentClearance: CGFloat = 7,
+        length: CGFloat = 12,
+        samples: Int = 24,
+        maxThickness: CGFloat = 1.2
+    ) -> [CGPath] {
+        guard samples >= 2 else { return [] }
+        let startY = point.y - length / 2
+        let points = (0...samples).map { index in
+            CGPoint(
+                x: point.x,
+                y: startY + length * CGFloat(index) / CGFloat(samples)
+            )
+        }
+        return Self.segments(
+            of: points,
+            avoiding: markerKnockouts,
+            clearance: ornamentClearance
+        ).map { Self.taperedRibbonPath(along: $0, maxThickness: maxThickness) }
+    }
+
+    private func arcParameter(for time: Date) -> Double {
         let fraction = max(
             0.0,
             min(1.0, (time.timeIntervalSinceReferenceDate - domainStart) / domainSpan)
         )
-        let u = angularInsetFraction + fraction * (1 - 2 * angularInsetFraction)
-        return arcPoint(at: u)
+        return angularInsetFraction + fraction * (1 - 2 * angularInsetFraction)
+    }
+
+    /// Finds the nearest label frame that satisfies the same 7-point
+    /// marker-clearance discipline as the plate's engraved filaments.
+    /// Candidate frames are clamped before collision testing, so the
+    /// returned frame is inside `rect` by construction.
+    private func clearInscriptionFrame(
+        beside point: CGPoint,
+        size: CGSize,
+        avoiding markerKnockouts: [CGRect],
+        clearance: CGFloat
+    ) -> CGRect {
+        let width = min(max(1, size.width), max(1, rect.width - 4))
+        let height = min(max(1, size.height), max(1, rect.height - 4))
+        let safeRect = rect.insetBy(dx: 2, dy: 2)
+        let zones = markerKnockouts.map {
+            $0.insetBy(dx: -clearance, dy: -clearance)
+        }
+
+        func boundedFrame(x: CGFloat, y: CGFloat) -> CGRect {
+            let boundedX = min(max(x, safeRect.minX), safeRect.maxX - width)
+            let boundedY = min(max(y, safeRect.minY), safeRect.maxY - height)
+            return CGRect(x: boundedX, y: boundedY, width: width, height: height)
+        }
+
+        func isClear(_ frame: CGRect) -> Bool {
+            !zones.contains { $0.intersects(frame) }
+        }
+
+        let preferred = CGPoint(x: point.x + 10, y: point.y + 8)
+        let xOrigins = [
+            preferred.x,
+            point.x - width - 10,
+            point.x - width / 2
+        ]
+        let yOrigins = [
+            preferred.y,
+            point.y - height - 8,
+            point.y + 30,
+            point.y - height - 30,
+            point.y + 52,
+            point.y - height - 52
+        ]
+
+        var candidates: [CGRect] = []
+        for y in yOrigins {
+            for x in xOrigins {
+                let candidate = boundedFrame(x: x, y: y)
+                if !candidates.contains(candidate) { candidates.append(candidate) }
+            }
+        }
+        if let candidate = candidates.first(where: isClear) {
+            return candidate
+        }
+
+        // Dense scenes (especially the watch plate) can exhaust the
+        // nearby placements. Search the whole bounded plate, then keep
+        // the clear frame nearest the preferred inscription origin.
+        var nearest: (frame: CGRect, distance: CGFloat)?
+        let xStep = max(2, min(6, width / 16))
+        let yStep = max(2, min(6, height / 3))
+        var y = safeRect.minY
+        while y <= safeRect.maxY - height + 0.01 {
+            var x = safeRect.minX
+            while x <= safeRect.maxX - width + 0.01 {
+                let candidate = CGRect(x: x, y: y, width: width, height: height)
+                if isClear(candidate) {
+                    let distance = hypot(candidate.minX - preferred.x, candidate.minY - preferred.y)
+                    if nearest == nil || distance < nearest!.distance {
+                        nearest = (candidate, distance)
+                    }
+                }
+                x += xStep
+            }
+            y += yStep
+        }
+        if let nearest { return nearest.frame }
+
+        // A plate physically too dense to fit this inscription still
+        // gets a bounded frame; callers can shorten copy, but geometry
+        // never returns an off-screen label.
+        return boundedFrame(x: preferred.x, y: preferred.y)
     }
 
     /// A point on the arc at angular parameter `u` in `0...1`

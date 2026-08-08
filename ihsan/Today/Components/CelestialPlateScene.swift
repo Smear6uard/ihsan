@@ -432,11 +432,10 @@ struct CelestialPlateScene: View {
     /// disqualifying however well it read up close.
     private static let sunRayOpacity: Double = 0.20
 
-    /// The bounding forms filaments must terminate at: each marker's
-    /// ornament box, its two-line label block, and the sunrise
-    /// inscription. Real geometry for `PlateGeometry`'s segmentation —
-    /// never background patches.
-    private func knockoutRects(plate: PlateGeometry) -> [CGRect] {
+    /// The bounding forms belonging to prayer markers: each ornament
+    /// and its two-line label block. Sunrise uses this same collection
+    /// for its own bounded label placement and tick segmentation.
+    private func markerKnockoutRects(plate: PlateGeometry) -> [CGRect] {
         markers.flatMap { marker -> [CGRect] in
             let position = plate.markerPosition(for: marker.time)
             let size = marker.state == .current ? Self.currentMarkerSize : Self.markerSize
@@ -450,18 +449,34 @@ struct CelestialPlateScene: View {
                 width: 56, height: 26
             )
             return [ornament, label]
-        } + [sunriseLabelRect(plate: plate)]
+        }
+    }
+
+    /// Every engraved field filament also clears the sunrise
+    /// inscription registered by PlateGeometry's layout contract.
+    private func knockoutRects(plate: PlateGeometry) -> [CGRect] {
+        markerKnockoutRects(plate: plate) + [sunriseLayout(plate: plate).labelFrame]
     }
 
     // MARK: - The sunrise mark
 
-    /// Where the sunrise inscription sits: down-right of the tick,
-    /// inside the plate's interior, clear of Fajr's marker label. A
-    /// knockout like any label block, so every filament terminates
-    /// short of the text.
-    private func sunriseLabelRect(plate: PlateGeometry) -> CGRect {
-        let tick = plate.markerPosition(for: solarEvents.sunrise)
-        return CGRect(x: tick.x + 10, y: tick.y + 8, width: 104, height: 16)
+    /// The displayed solar schedule can belong to the coming civil day
+    /// while the visible prayer cycle is still yesterday's (after
+    /// midnight, before Fajr). PlateGeometry maps the real
+    /// Fajr→sunrise→Dhuhr ratio onto the visible Fajr→Dhuhr arc segment,
+    /// so next sunrise stays on the morning side in every SkyPhase.
+    private func sunriseLayout(plate: PlateGeometry) -> PlateGeometry.SunriseMarkLayout {
+        let markerFajr = markers.first { $0.prayer == .fajr }?.time ?? solarEvents.fajr
+        let markerDhuhr = markers.first { $0.prayer == .dhuhr }?.time ?? solarEvents.solarNoon
+        return plate.sunriseMarkLayout(
+            sunrise: solarEvents.sunrise,
+            fajr: solarEvents.fajr,
+            dhuhr: solarEvents.solarNoon,
+            markerFajr: markerFajr,
+            markerDhuhr: markerDhuhr,
+            avoiding: markerKnockoutRects(plate: plate),
+            ornamentClearance: Self.filamentClearance
+        )
     }
 
     /// Sunrise on the plate: a fine engraved tick crossing the arc at
@@ -471,14 +486,18 @@ struct CelestialPlateScene: View {
     /// visible endpoint of Fajr's window.
     @ViewBuilder
     private func sunriseMark(plate: PlateGeometry, tokens: SkyPaletteTokens) -> some View {
-        let tick = plate.markerPosition(for: solarEvents.sunrise)
-        let label = sunriseLabelRect(plate: plate)
+        let markerKnockouts = markerKnockoutRects(plate: plate)
+        let layout = sunriseLayout(plate: plate)
+        let tickSegments = plate.sunriseTickFilamentSegments(
+            at: layout.point,
+            avoiding: markerKnockouts,
+            ornamentClearance: Self.filamentClearance
+        )
 
         Canvas { context, _ in
-            context.fill(
-                Path(plate.midnightFilamentPath(at: tick, length: 12, thickness: 1.2)),
-                with: .color(tokens.metal.opacity(0.65))
-            )
+            for segment in tickSegments {
+                context.fill(Path(segment), with: .color(tokens.metal.opacity(0.65)))
+            }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -488,15 +507,20 @@ struct CelestialPlateScene: View {
             .tracking(1.2)
             .foregroundStyle(tokens.inkSecondary)
             .lineLimit(1)
-            .fixedSize()
+            .minimumScaleFactor(0.8)
+            .allowsTightening(true)
             .inkKeyline(tokens)
             // Outside the keyline: the modifier draws its content twice,
             // so a translucent foreground would composite with itself and
             // take a near-black wash from the upper copy's ring. Here the
             // inscription and its rings fade together.
             .opacity(0.9)
-            .frame(width: label.width, height: label.height, alignment: .leading)
-            .position(x: label.midX, y: label.midY)
+            .frame(
+                width: layout.labelFrame.width,
+                height: layout.labelFrame.height,
+                alignment: .leading
+            )
+            .position(x: layout.labelFrame.midX, y: layout.labelFrame.midY)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }

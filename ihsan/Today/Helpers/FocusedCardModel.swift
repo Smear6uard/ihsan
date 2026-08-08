@@ -80,10 +80,11 @@ enum FocusedCardModel {
     ) -> String {
         switch phase {
         case .active(let until):
-            if let windowEndDescriptor {
-                return "Now · until \(windowEndDescriptor) \(PlateTimeFormat.time(until, in: timeZone))"
-            }
-            return "Now · until \(PlateTimeFormat.time(until, in: timeZone))"
+            return PrayerWindowText.activeLine(
+                until: until,
+                timeZone: timeZone,
+                windowEndDescriptor: windowEndDescriptor
+            )
         case .upcoming:
             return "Opens in · \(countdown(until: scheduledTime, now: now))"
         case .windowClosed(let end):

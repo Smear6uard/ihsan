@@ -25,17 +25,25 @@ nonisolated public struct PrayerActivityAttributes: ActivityAttributes, Equatabl
 
     public var prayer: Prayer
     public var scheduledTime: Date
+    /// Exact resolver boundary captured from the shared day snapshot.
+    /// The widget counts down to it; the scheduler updates/ends at it.
+    public var windowEnd: Date
+    public var timeZoneIdentifier: String
     public var arabicName: String
     public var englishName: String
 
     public init(
         prayer: Prayer,
         scheduledTime: Date,
+        windowEnd: Date,
+        timeZoneIdentifier: String,
         arabicName: String,
         englishName: String
     ) {
         self.prayer = prayer
         self.scheduledTime = scheduledTime
+        self.windowEnd = windowEnd
+        self.timeZoneIdentifier = timeZoneIdentifier
         self.arabicName = arabicName
         self.englishName = englishName
     }

@@ -72,4 +72,23 @@ public struct DayPrayerTimes: Sendable, Equatable {
             isha.scheduledTime
         }
     }
+
+    /// The exact boundary that closes one prayer's window in this
+    /// Fajr-to-Fajr schedule snapshot. Callers supply the next Fajr
+    /// because it belongs to the adjacent day table; no consumer is
+    /// allowed to invent an Isha lifetime of its own.
+    public func windowEnd(for prayer: Prayer, nextFajr: Date) -> Date {
+        switch prayer {
+        case .fajr:
+            sunrise
+        case .dhuhr:
+            asr.scheduledTime
+        case .asr:
+            maghrib.scheduledTime
+        case .maghrib:
+            isha.scheduledTime
+        case .isha:
+            nextFajr
+        }
+    }
 }

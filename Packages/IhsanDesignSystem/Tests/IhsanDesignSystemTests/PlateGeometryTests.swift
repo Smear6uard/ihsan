@@ -7,8 +7,16 @@ import Testing
 /// date, and resulting event schedule — including high-latitude
 /// summers where Fajr and Isha crowd the ends of the day — no marker
 /// bounding box (at maximum ornament size plus label) may intersect
-/// the scene edge.
+/// the scene edge. Sunrise's tick/label layout is part of the same
+/// contract and must also clear every marker.
 struct PlateGeometryTests {
+
+    private struct DayEvents {
+        let markers: [Date]
+        let fajr: Date
+        let sunrise: Date
+        let dhuhr: Date
+    }
 
     /// Deterministic RNG so the "random" locations are reproducible.
     private struct SplitMix64 {
@@ -47,7 +55,7 @@ struct PlateGeometryTests {
         latitude: Double,
         longitude: Double,
         dayStart: Date
-    ) -> [Date] {
+    ) -> DayEvents {
         let step: TimeInterval = 300
         var samples: [(Date, Double)] = []
         for i in 0...(288) {
@@ -68,10 +76,16 @@ struct PlateGeometryTests {
 
         let noon = samples.max { $0.1 < $1.1 }?.0 ?? dayStart.addingTimeInterval(43_200)
         let fajr = crossing(-15, rising: true) ?? dayStart.addingTimeInterval(40 * 60)
+        let sunrise = crossing(-0.833, rising: true) ?? dayStart.addingTimeInterval(6 * 3600)
         let sunset = crossing(-0.833, rising: false) ?? dayStart.addingTimeInterval(23 * 3600)
         let isha = crossing(-15, rising: false) ?? dayStart.addingTimeInterval(23.8 * 3600)
         let asr = noon.addingTimeInterval(sunset.timeIntervalSince(noon) * 0.55)
-        return [fajr, noon, asr, sunset, isha]
+        return DayEvents(
+            markers: [fajr, noon, asr, sunset, isha],
+            fajr: fajr,
+            sunrise: sunrise,
+            dhuhr: noon
+        )
     }
 
     @Test
@@ -90,7 +104,12 @@ struct PlateGeometryTests {
             let dayStart = Date(
                 timeIntervalSinceReferenceDate: 790_000_000 + rng.double(in: 0...(3 * 365 * 86_400))
             )
-            let events = eventTimes(latitude: latitude, longitude: longitude, dayStart: dayStart)
+            let day = eventTimes(latitude: latitude, longitude: longitude, dayStart: dayStart)
+            // Half the worlds model the post-midnight plate: prayer
+            // markers still belong to the previous cycle, while the
+            // sunrise inscription names the coming morning.
+            let markerShift: TimeInterval = world.isMultiple(of: 2) ? 0 : -86_400
+            let events = day.markers.map { $0.addingTimeInterval(markerShift) }
             let rect = rects[world % rects.count]
             let plate = PlateGeometry(
                 rect: rect,
@@ -104,6 +123,33 @@ struct PlateGeometryTests {
                 #expect(
                     rect.contains(box),
                     "world \(world) (lat \(latitude), lon \(longitude)): marker box \(box) escapes \(rect)"
+                )
+            }
+
+            let markerKnockouts = events.map {
+                markerBox(around: plate.markerPosition(for: $0))
+            }
+            let sunrise = plate.sunriseMarkLayout(
+                sunrise: day.sunrise,
+                fajr: day.fajr,
+                dhuhr: day.dhuhr,
+                markerFajr: day.fajr.addingTimeInterval(markerShift),
+                markerDhuhr: day.dhuhr.addingTimeInterval(markerShift),
+                avoiding: markerKnockouts,
+                ornamentClearance: 7
+            )
+            #expect(
+                rect.contains(sunrise.point),
+                "world \(world): sunrise tick \(sunrise.point) escapes \(rect)"
+            )
+            #expect(
+                rect.contains(sunrise.labelFrame),
+                "world \(world): sunrise label \(sunrise.labelFrame) escapes \(rect)"
+            )
+            for marker in markerKnockouts {
+                #expect(
+                    !marker.insetBy(dx: -7, dy: -7).intersects(sunrise.labelFrame),
+                    "world \(world): sunrise label \(sunrise.labelFrame) collides with marker \(marker)"
                 )
             }
 
@@ -184,6 +230,46 @@ struct PlateGeometryTests {
         let dusk = plate.markerPosition(for: events[2])
         #expect(dawn.x < noon.x && noon.x < dusk.x)
         #expect(noon.y < dawn.y && noon.y < dusk.y)
+    }
+
+    /// Before Fajr the visible prayer markers still belong to the
+    /// previous Fajr-to-Fajr cycle, while the sunrise inscription names
+    /// the coming morning. Treating that absolute instant as one more
+    /// marker clamps it to the domain end beside Isha. Sunrise instead
+    /// belongs on the morning side, between Fajr and Dhuhr.
+    @Test
+    func postMidnightComingSunriseStaysBetweenFajrAndDhuhr() {
+        let dayStart = Date(timeIntervalSinceReferenceDate: 800_000_000)
+        let fajr = dayStart.addingTimeInterval(5 * 3_600)
+        let dhuhr = dayStart.addingTimeInterval(12.5 * 3_600)
+        let events = [
+            fajr,
+            dhuhr,
+            dayStart.addingTimeInterval(16 * 3_600),
+            dayStart.addingTimeInterval(19 * 3_600),
+            dayStart.addingTimeInterval(21 * 3_600)
+        ]
+        let comingSunrise = dayStart.addingTimeInterval(30 * 3_600)
+        let plate = PlateGeometry(
+            rect: CGRect(x: 0, y: 0, width: 393, height: 420),
+            eventTimes: events
+        )
+
+        let comingFajr = dayStart.addingTimeInterval(29 * 3_600)
+        let comingDhuhr = dayStart.addingTimeInterval(36.5 * 3_600)
+        let sunriseLayout = plate.sunriseMarkLayout(
+            sunrise: comingSunrise,
+            fajr: comingFajr,
+            dhuhr: comingDhuhr,
+            markerFajr: fajr,
+            markerDhuhr: dhuhr
+        )
+        let sunrisePoint = sunriseLayout.point
+        let fajrPoint = plate.markerPosition(for: fajr)
+        let dhuhrPoint = plate.markerPosition(for: dhuhr)
+
+        #expect(sunrisePoint.x > fajrPoint.x)
+        #expect(sunrisePoint.x < dhuhrPoint.x)
     }
 
     /// The horizon chord and filament stay inside the plate and taper

@@ -214,13 +214,9 @@ public enum PrayerStateResolver {
         nextFajr: PrayerTime,
         now: Date
     ) -> PrayerResolution {
-        let windows: [(PrayerTime, Date)] = [
-            (cycleDay.fajr, cycleDay.sunrise),
-            (cycleDay.dhuhr, cycleDay.asr.scheduledTime),
-            (cycleDay.asr, cycleDay.maghrib.scheduledTime),
-            (cycleDay.maghrib, cycleDay.isha.scheduledTime),
-            (cycleDay.isha, nextFajr.scheduledTime)
-        ]
+        let windows: [(PrayerTime, Date)] = cycleDay.allFardh.map {
+            ($0, cycleDay.windowEnd(for: $0.prayer, nextFajr: nextFajr.scheduledTime))
+        }
 
         return makeResolution(
             windows: windows,
@@ -383,14 +379,7 @@ public struct PrayerScheduleWindow: Sendable, Equatable {
             ? day.fajr.scheduledTime
             : tomorrowFajr.scheduledTime
         let start = table.time(for: prayer)
-        let end: Date
-        switch prayer {
-        case .fajr:    end = table.sunrise
-        case .dhuhr:   end = table.asr.scheduledTime
-        case .asr:     end = table.maghrib.scheduledTime
-        case .maghrib: end = table.isha.scheduledTime
-        case .isha:    end = cycleEndFajr
-        }
+        let end = table.windowEnd(for: prayer, nextFajr: cycleEndFajr)
         return (start, end)
     }
 

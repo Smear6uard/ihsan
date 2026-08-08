@@ -39,6 +39,10 @@ struct PrayerActivityWidget: Widget {
     var body: some WidgetConfiguration {
         ActivityConfiguration(for: PrayerActivityAttributes.self) { context in
             PrayerLockScreenActivityView(context: context)
+                .activityBackgroundTint(
+                    activityTokens(at: context.attributes.scheduledTime).ground
+                )
+                .widgetURL(WidgetDeeplink.logSheet(for: context.attributes.prayer))
                 .activitySystemActionForegroundColor(
                     activityTokens(at: context.attributes.scheduledTime).leafGold
                 )
@@ -48,7 +52,8 @@ struct PrayerActivityWidget: Widget {
                     PrayerIslandExpandedLeading(context: context)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    PrayerIslandExpandedActions(context: context)
+                    PrayerCountdownText(context: context, mode: .expanded)
+                        .frame(maxWidth: 72, alignment: .trailing)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     PrayerIslandExpandedBottom(context: context)
@@ -61,9 +66,10 @@ struct PrayerActivityWidget: Widget {
                 PrayerCountdownText(context: context, mode: .compact)
                     .frame(minWidth: 42, alignment: .trailing)
             } minimal: {
-                LockOrnament(prayer: context.attributes.prayer, size: 13, isEmphasised: true)
-                    .accessibilityLabel(context.attributes.englishName)
+                PrayerCountdownText(context: context, mode: .minimal)
+                    .frame(maxWidth: 30)
             }
+            .widgetURL(WidgetDeeplink.logSheet(for: context.attributes.prayer))
             .keylineTint(activityTokens(at: context.attributes.scheduledTime).leafGold)
         }
     }
@@ -76,67 +82,34 @@ private struct PrayerLockScreenActivityView: View {
     var body: some View {
         let tokens = activityTokens(at: context.attributes.scheduledTime)
 
-        VStack(alignment: .leading, spacing: 14) {
-            HStack(alignment: .center, spacing: 10) {
+        VStack(alignment: .leading, spacing: 9) {
+            HStack(alignment: .center, spacing: 12) {
                 PrayerMarkerOrnament(
                     prayer: context.attributes.prayer,
-                    size: 26,
+                    size: 28,
                     state: context.state.countdownPhase == .preAdhan ? .upcoming : .current,
                     tokens: tokens
                 )
-                .frame(width: 34, height: 34)
+                .frame(width: 38, height: 38)
 
-                VStack(alignment: .leading, spacing: 2) {
-                    HStack(spacing: 8) {
-                        Text(context.attributes.englishName)
-                            .font(.system(size: 17, weight: .semibold, design: .serif))
-                            .foregroundStyle(tokens.ink)
-                        Text(context.attributes.arabicName)
-                            .font(IhsanFont.bodyArabic)
-                            .foregroundStyle(tokens.inkSecondary)
-                    }
-                    Text(context.attributes.scheduledTime, format: .dateTime.hour().minute())
-                        .font(.system(.subheadline, design: .rounded).monospacedDigit())
-                        .foregroundStyle(tokens.inkSecondary)
+                VStack(alignment: .leading, spacing: 5) {
+                    PrayerActivityNameLine(context: context, mode: .lockScreen)
+                    PrayerActivityStateLine(context: context)
                 }
+                .layoutPriority(1)
 
-                Spacer(minLength: 8)
+                Spacer(minLength: 0)
             }
 
-            HStack(alignment: .bottom, spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    PrayerCountdownText(context: context, mode: .lockScreen)
-                        .foregroundStyle(tokens.ink)
-                    Text(statusLine)
-                        .font(IhsanFont.inscription)
-                        .tracking(1.2)
-                        .foregroundStyle(tokens.inkSecondary)
+            if !context.state.hasBeenLoggedThisActivity {
+                HStack {
+                    Spacer(minLength: 0)
+                    PrayerActivityActions(context: context, compact: false)
                 }
-
-                Spacer(minLength: 8)
-
-                PrayerActivityLogButton(context: context, compact: false)
             }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 8)
         .accessibilityElement(children: .combine)
-    }
-
-    /// The inscription register: small caps, stating where in the
-    /// prayer's own window this moment is. Never "soon", never a nudge.
-    private var statusLine: String {
-        if context.state.hasBeenLoggedThisActivity {
-            return "LOGGED"
-        }
-
-        switch context.state.countdownPhase {
-        case .preAdhan:
-            return "UNTIL ADHAN"
-        case .adhanWindow:
-            return "ADHAN"
-        case .postAdhan:
-            return "THE WINDOW IS OPEN"
-        }
     }
 }
 
@@ -154,46 +127,7 @@ private struct PrayerIslandExpandedLeading: View {
                 tokens: tokens
             )
             .frame(width: 26, height: 26)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(context.attributes.englishName)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
-                    .foregroundStyle(tokens.ink)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                Text(context.attributes.arabicName)
-                    .font(.system(size: 15, weight: .regular))
-                    .foregroundStyle(tokens.inkSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
-        }
-    }
-}
-
-@available(iOSApplicationExtension 16.2, *)
-private struct PrayerIslandExpandedActions: View {
-    let context: ActivityViewContext<PrayerActivityAttributes>
-
-    var body: some View {
-        let tokens = activityTokens(at: context.attributes.scheduledTime)
-        HStack(spacing: 8) {
-            PrayerActivityLogButton(context: context, compact: true)
-            Button(intent: DismissPrayerActivityIntent(
-                prayer: context.attributes.prayer,
-                scheduledTime: context.attributes.scheduledTime
-            )) {
-                // A drawn cross, like every other mark in the app.
-                DismissMark()
-                    .stroke(
-                        tokens.inkSecondary,
-                        style: StrokeStyle(lineWidth: 1.4, lineCap: .round)
-                    )
-                    .frame(width: 11, height: 11)
-                    .frame(width: 32, height: 32)
-                    .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss \(context.attributes.englishName) activity")
+            PrayerActivityNameLine(context: context, mode: .expanded)
         }
     }
 }
@@ -203,16 +137,114 @@ private struct PrayerIslandExpandedBottom: View {
     let context: ActivityViewContext<PrayerActivityAttributes>
 
     var body: some View {
-        let tokens = activityTokens(at: context.attributes.scheduledTime)
-        HStack(spacing: 8) {
-            PrayerCountdownText(context: context, mode: .expanded)
-                .foregroundStyle(tokens.ink)
-            Spacer(minLength: 8)
-            Text(context.attributes.scheduledTime, format: .dateTime.hour().minute())
-                .font(.system(size: 13, weight: .medium, design: .rounded).monospacedDigit())
-                .foregroundStyle(tokens.inkSecondary)
+        HStack(alignment: .center, spacing: 10) {
+            PrayerActivityStateLine(context: context, usesDarkSurface: true)
+                .layoutPriority(1)
+            Spacer(minLength: 4)
+            PrayerActivityActions(context: context, compact: true)
         }
-        .padding(.top, 2)
+        .padding(.top, 4)
+    }
+}
+
+@available(iOSApplicationExtension 16.2, *)
+private struct PrayerActivityNameLine: View {
+    enum Mode { case lockScreen, expanded }
+
+    let context: ActivityViewContext<PrayerActivityAttributes>
+    let mode: Mode
+
+    var body: some View {
+        let tokens = activityTokens(at: context.attributes.scheduledTime)
+        let english = Text(context.attributes.englishName)
+            .font(.system(size: mode == .lockScreen ? 19 : 16, weight: .semibold, design: .serif))
+            .foregroundColor(mode == .lockScreen ? tokens.ink : tokens.metalHighlight)
+        let arabic = Text(context.attributes.arabicName)
+            .font(mode == .lockScreen ? IhsanFont.bodyArabic : .system(size: 15, weight: .regular))
+            .foregroundColor(mode == .lockScreen ? tokens.inkSecondary : tokens.metal)
+
+        Text("\(english) \(arabic)")
+            .lineLimit(1)
+            .minimumScaleFactor(0.72)
+            .allowsTightening(true)
+            .accessibilityLabel("\(context.attributes.englishName), \(context.attributes.arabicName)")
+    }
+}
+
+@available(iOSApplicationExtension 16.2, *)
+private struct PrayerActivityStateLine: View {
+    let context: ActivityViewContext<PrayerActivityAttributes>
+    var usesDarkSurface = false
+
+    var body: some View {
+        let tokens = activityTokens(at: context.attributes.scheduledTime)
+        Group {
+            if context.state.hasBeenLoggedThisActivity {
+                Text("LOGGED")
+            } else if context.state.countdownPhase == .preAdhan {
+                HStack(spacing: 3) {
+                    Text("OPENS IN ·")
+                    Text(context.attributes.scheduledTime, style: .timer)
+                        .monospacedDigit()
+                }
+            } else {
+                Text(activeWindowLine.uppercased())
+            }
+        }
+        .font(IhsanFont.inscription)
+        .tracking(1.05)
+        .foregroundStyle(usesDarkSurface ? tokens.metal : tokens.inkSecondary)
+        .lineLimit(1)
+        .minimumScaleFactor(0.72)
+        .allowsTightening(true)
+    }
+
+    private var activeWindowLine: String {
+        let timeZone = TimeZone(identifier: context.attributes.timeZoneIdentifier) ?? .current
+        return PrayerWindowText.activeLine(
+            until: context.attributes.windowEnd,
+            timeZone: timeZone,
+            windowEndDescriptor: PrayerWindowText.windowEndDescriptor(
+                for: context.attributes.prayer
+            )
+        )
+    }
+}
+
+@available(iOSApplicationExtension 16.2, *)
+private struct PrayerActivityActions: View {
+    let context: ActivityViewContext<PrayerActivityAttributes>
+    let compact: Bool
+
+    var body: some View {
+        let tokens = activityTokens(at: context.attributes.scheduledTime)
+        if context.state.hasBeenLoggedThisActivity {
+            Text("LOGGED")
+                .font(IhsanFont.inscription)
+                .tracking(1.2)
+                .foregroundStyle(tokens.inkSecondary)
+        } else if context.state.countdownPhase == .preAdhan {
+            Link(destination: WidgetDeeplink.logSheet(for: context.attributes.prayer)) {
+                Text("Open")
+                    .font(.system(size: compact ? 12 : 13, weight: .semibold, design: .rounded))
+                    .frame(minWidth: compact ? 50 : 62, minHeight: compact ? 30 : 36)
+            }
+            .foregroundStyle(compact ? tokens.metalHighlight : tokens.ink)
+            .accessibilityLabel("Open \(context.attributes.englishName) in Ihsan")
+        } else {
+            HStack(spacing: compact ? 7 : 9) {
+                Link(destination: WidgetDeeplink.logSheet(for: context.attributes.prayer)) {
+                    Text("Other")
+                        .font(IhsanFont.inscription)
+                        .tracking(0.8)
+                        .lineLimit(1)
+                }
+                .foregroundStyle(compact ? tokens.metal : tokens.inkSecondary)
+                .accessibilityLabel("Choose another \(context.attributes.englishName) status")
+
+                PrayerActivityLogButton(context: context, compact: compact)
+            }
+        }
     }
 }
 
@@ -224,40 +256,21 @@ private struct PrayerActivityLogButton: View {
     var body: some View {
         let tokens = activityTokens(at: context.attributes.scheduledTime)
 
-        if context.state.hasBeenLoggedThisActivity {
-            Text("LOGGED")
-                .font(IhsanFont.inscription)
-                .tracking(1.4)
-                .foregroundStyle(tokens.ink)
-                .frame(minWidth: compact ? 70 : 104, minHeight: compact ? 32 : 44)
-                .accessibilityLabel("\(context.attributes.englishName) logged")
-        } else {
-            Button(intent: LogPrayerIntent(prayer: context.attributes.prayer)) {
-                Text(compact ? "Prayed" : "I prayed")
-                    .font(buttonFont)
-                    .frame(minWidth: compact ? 70 : 104, minHeight: compact ? 32 : 44)
-                    .contentShape(Capsule())
-            }
-            .buttonStyle(.plain)
-            // At the adhan itself the button is gold leaf on lapis —
-            // the same gilding the current ornament wears. Before it,
-            // the same shape, quiet.
-            .foregroundStyle(isPrimaryMoment ? tokens.keyline : tokens.ink)
-            .background {
-                Capsule().fill(isPrimaryMoment ? tokens.leafGold : tokens.panelFill)
-            }
-            .overlay {
-                Capsule().strokeBorder(
-                    isPrimaryMoment ? tokens.keyline.opacity(0.6) : tokens.panelStroke,
-                    lineWidth: 0.75
-                )
-            }
-            .accessibilityLabel("I prayed \(context.attributes.englishName)")
+        Button(intent: LogPrayerIntent(prayer: context.attributes.prayer)) {
+            Text("I prayed")
+                .font(buttonFont)
+                .lineLimit(1)
+                .minimumScaleFactor(0.82)
+                .frame(minWidth: compact ? 72 : 94, minHeight: compact ? 32 : 40)
+                .contentShape(Capsule())
         }
-    }
-
-    private var isPrimaryMoment: Bool {
-        context.state.countdownPhase == .adhanWindow
+        .buttonStyle(.plain)
+        .foregroundStyle(tokens.keyline)
+        .background { Capsule().fill(tokens.leafGold) }
+        .overlay {
+            Capsule().strokeBorder(tokens.keyline.opacity(0.6), lineWidth: 0.75)
+        }
+        .accessibilityLabel("I prayed \(context.attributes.englishName), on time")
     }
 
     private var buttonFont: Font {
@@ -265,24 +278,12 @@ private struct PrayerActivityLogButton: View {
     }
 }
 
-/// The dismissal cross, drawn rather than borrowed.
-private struct DismissMark: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.move(to: CGPoint(x: rect.maxX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-        return path
-    }
-}
-
 @available(iOSApplicationExtension 16.2, *)
 private struct PrayerCountdownText: View {
     enum Mode {
-        case lockScreen
         case expanded
         case compact
+        case minimal
     }
 
     let context: ActivityViewContext<PrayerActivityAttributes>
@@ -293,31 +294,31 @@ private struct PrayerCountdownText: View {
             if context.state.hasBeenLoggedThisActivity {
                 Text("Logged")
             } else {
-                switch context.state.countdownPhase {
-                case .preAdhan:
-                    Text("-\(context.attributes.scheduledTime, style: .timer)")
-                case .adhanWindow:
-                    Text("Now")
-                case .postAdhan:
-                    Text("Now")
-                }
+                Text(countdownTarget, style: .timer)
             }
         }
         .font(font)
         .monospacedDigit()
         .lineLimit(1)
-        .minimumScaleFactor(0.78)
+        .minimumScaleFactor(0.62)
+        .allowsTightening(true)
         .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var countdownTarget: Date {
+        context.state.countdownPhase == .preAdhan
+            ? context.attributes.scheduledTime
+            : context.attributes.windowEnd
     }
 
     private var font: Font {
         switch mode {
-        case .lockScreen:
-            return .system(size: 40, weight: .medium, design: .rounded)
         case .expanded:
-            return .system(size: 22, weight: .semibold, design: .rounded)
+            return .system(size: 17, weight: .semibold, design: .rounded)
         case .compact:
-            return .system(size: 13, weight: .semibold, design: .rounded)
+            return .system(size: 12, weight: .semibold, design: .rounded)
+        case .minimal:
+            return .system(size: 10, weight: .bold, design: .rounded)
         }
     }
 
@@ -330,7 +331,7 @@ private struct PrayerCountdownText: View {
         case .preAdhan:
             return "Time remaining until \(context.attributes.englishName)"
         case .adhanWindow, .postAdhan:
-            return "\(context.attributes.englishName) is now"
+            return "Time remaining in the \(context.attributes.englishName) window"
         }
     }
 }
@@ -377,5 +378,46 @@ struct DismissPrayerActivityIntent: LiveActivityIntent {
 
         return .result()
     }
+}
+
+// MARK: - Live Activity capture states
+
+@available(iOSApplicationExtension 17.0, *)
+private let prayerActivityPreviewAttributes = PrayerActivityAttributes(
+    prayer: .isha,
+    scheduledTime: .now.addingTimeInterval(-20 * 60),
+    windowEnd: .now.addingTimeInterval(7 * 3_600),
+    timeZoneIdentifier: "America/Chicago",
+    arabicName: Prayer.isha.displayNameArabic,
+    englishName: Prayer.isha.displayNameEnglish
+)
+
+@available(iOSApplicationExtension 17.0, *)
+private let prayerActivityPreviewState = PrayerActivityAttributes.ContentState(
+    countdownPhase: .adhanWindow
+)
+
+#Preview("Live Activity · Lock Screen", as: .content, using: prayerActivityPreviewAttributes) {
+    PrayerActivityWidget()
+} contentStates: {
+    prayerActivityPreviewState
+}
+
+#Preview("Dynamic Island · Compact", as: .dynamicIsland(.compact), using: prayerActivityPreviewAttributes) {
+    PrayerActivityWidget()
+} contentStates: {
+    prayerActivityPreviewState
+}
+
+#Preview("Dynamic Island · Minimal", as: .dynamicIsland(.minimal), using: prayerActivityPreviewAttributes) {
+    PrayerActivityWidget()
+} contentStates: {
+    prayerActivityPreviewState
+}
+
+#Preview("Dynamic Island · Expanded", as: .dynamicIsland(.expanded), using: prayerActivityPreviewAttributes) {
+    PrayerActivityWidget()
+} contentStates: {
+    prayerActivityPreviewState
 }
 #endif
