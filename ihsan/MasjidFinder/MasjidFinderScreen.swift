@@ -1,232 +1,260 @@
 import SwiftUI
 import MapKit
+import IhsanCore
 import IhsanDesignSystem
 
 #if canImport(UIKit)
 import UIKit
 #endif
 
-/// Sheet-presented screen that lists masjids near the user's current
-/// location. Three parallel `MKLocalSearch` queries through Apple's
-/// MapKit return mosques, masjids, and Islamic centers; results are
-/// merged, deduplicated, and sorted by distance. Tapping a row hands
-/// off to Apple Maps for directions.
-///
-/// Always renders against the standard dark ground. The sheet supports
-/// `.medium` and `.large` detents — drag the indicator to switch.
+/// A sheet-scoped, privacy-preserving Apple Maps search. Results and
+/// coordinates live only in this view's state and leave memory when the
+/// sheet closes; nothing is written to the model, preferences, or disk.
 struct MasjidFinderScreen: View {
+    let locationName: String
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.nowProvider) private var nowProvider
     @State private var viewModel = MasjidFinderViewModel()
-    @State private var closeButtonDismissed = false
 
     var body: some View {
-        ZStack {
-            IhsanColor.ground.ignoresSafeArea()
+        TimelineView(.periodic(from: .distantPast, by: 60)) { context in
+            let now = nowProvider.resolve(context.date)
+            let tokens = IhsanPageChrome.tokens(at: now)
 
-            VStack(spacing: 0) {
-                MasjidSheetHeader {
-                    closeButtonDismissed = true
-                    Haptics.impact(.medium)
-                    dismiss()
-                }
-
-                RadiusSelector(radius: $viewModel.radius)
-                    .padding(.horizontal, IhsanSpacing.md)
-                    .padding(.top, IhsanSpacing.md)
-                    .padding(.bottom, IhsanSpacing.sm)
-
-                content
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                privacyNote
-                    .padding(.horizontal, IhsanSpacing.xl)
-                    .padding(.top, IhsanSpacing.sm)
-                    .padding(.bottom, IhsanSpacing.lg)
-            }
+            sheet(tokens: tokens)
+                .environment(\.timeOfDayOverride, now)
         }
+        .ihsanManuscriptPage()
         .task {
+            #if DEBUG
+            guard stagedState == nil else { return }
+            #endif
             await viewModel.bootstrap()
         }
-        .onDisappear {
-            if !closeButtonDismissed {
-                Haptics.impact(.medium)
-            }
+    }
+
+    /// Verification-only staging for the four non-result branches.
+    /// The live ready-state travel check still runs the real location
+    /// coordinator and MKLocalSearch stack.
+    #if DEBUG
+    private var stagedState: MasjidFinderState? {
+        switch DebugLaunch.value(after: "-IhsanDebugMasjidState") {
+        case "loading": .loading
+        case "permission": .needsLocationPermission
+        case "empty": .empty
+        case "offline": .failure
+        default: nil
+        }
+    }
+    #endif
+
+    private var displayedState: MasjidFinderState {
+        #if DEBUG
+        stagedState ?? viewModel.state
+        #else
+        viewModel.state
+        #endif
+    }
+
+    private func sheet(tokens: SkyPaletteTokens) -> some View {
+        VStack(spacing: 0) {
+            MasjidSheetHeader(
+                locationName: viewModel.cityName ?? locationName,
+                tokens: tokens,
+                onClose: { dismiss() }
+            )
+
+            OrnamentalDivider(tint: tokens.metal, opacity: 0.45)
+                .padding(.horizontal, IhsanSpacing.md)
+                .padding(.top, IhsanSpacing.sm)
+
+            content(tokens: tokens)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            privacyNote(tokens: tokens)
+                .padding(.horizontal, IhsanSpacing.xl)
+                .padding(.vertical, IhsanSpacing.md)
         }
     }
 
     @ViewBuilder
-    private var content: some View {
-        switch viewModel.state {
+    private func content(tokens: SkyPaletteTokens) -> some View {
+        switch displayedState {
         case .loading:
-            loadingState
+            MasjidLoadingState(tokens: tokens)
+                .padding(IhsanSpacing.md)
+
         case .needsLocationPermission:
-            permissionState
+            permissionState(tokens: tokens)
+                .padding(IhsanSpacing.md)
+
         case .ready(let results):
-            resultsList(results)
+            resultsList(results, tokens: tokens)
+
         case .empty:
-            MasjidEmptyState(radiusLabel: viewModel.radius.label) {
+            MasjidEmptyState(tokens: tokens) {
                 openMapsToCurrentArea()
             }
-        case .error(let message):
-            errorState(message)
+            .padding(IhsanSpacing.md)
+
+        case .failure:
+            failureState(tokens: tokens)
+                .padding(IhsanSpacing.md)
         }
     }
 
-    // MARK: - States
-
-    private var loadingState: some View {
-        VStack(spacing: IhsanSpacing.md) {
-            ProgressView()
-                .progressViewStyle(.circular)
-                .tint(IhsanColor.textSecondary)
-            Text(searchingText)
-                .font(IhsanFont.smallCaps)
-                .tracking(1.0)
-                .foregroundStyle(IhsanColor.textMuted)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, IhsanSpacing.xl)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private var permissionState: some View {
-        VStack(spacing: IhsanSpacing.lg) {
-            Image(systemName: "location.slash")
-                .font(.system(size: 48, weight: .light))
-                .foregroundStyle(IhsanColor.textMuted)
-                .symbolRenderingMode(.hierarchical)
-            Text("Location access is needed to find masjids near you")
-                .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, IhsanSpacing.xl)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func resultsList(_ results: [MasjidResult]) -> some View {
+    private func resultsList(
+        _ results: [MasjidResult],
+        tokens: SkyPaletteTokens
+    ) -> some View {
         ScrollView {
             LazyVStack(spacing: IhsanSpacing.sm) {
                 ForEach(results) { result in
                     MasjidResultRow(
                         result: result,
-                        onTap: { viewModel.openInMaps(result) },
-                        onCopyAddress: { copyAddress(result) },
-                        onShare: { shareLocation(result) }
+                        tokens: tokens,
+                        onTap: { viewModel.openInMaps(result) }
                     )
                 }
             }
-            .padding(.horizontal, IhsanSpacing.md)
-            .padding(.top, IhsanSpacing.xs)
-            .padding(.bottom, IhsanSpacing.lg)
+            .padding(IhsanSpacing.md)
         }
     }
 
-    private func errorState(_ message: String) -> some View {
-        VStack(spacing: IhsanSpacing.md) {
-            Image(systemName: "exclamationmark.triangle")
-                .font(.system(size: 32, weight: .light))
-                .foregroundStyle(IhsanColor.textMuted)
-                .symbolRenderingMode(.hierarchical)
-            Text(message)
-                .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, IhsanSpacing.xl)
-            Button {
-                Haptics.impact(.light)
-                Task { await viewModel.search() }
-            } label: {
-                Text("Try Again")
-                    .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textPrimary)
-                    .padding(.horizontal, IhsanSpacing.lg)
-                    .padding(.vertical, IhsanSpacing.sm)
-                    .background {
-                        Capsule()
-                            .fill(.ultraThinMaterial)
-                            .overlay {
-                                Capsule()
-                                    .strokeBorder(
-                                        IhsanColor.atmospheric,
-                                        lineWidth: 0.5
-                                    )
-                            }
-                    }
+    private func permissionState(tokens: SkyPaletteTokens) -> some View {
+        VStack(spacing: IhsanSpacing.lg) {
+            SettingsGlyphView(.location, color: tokens.metal.opacity(0.65))
+                .frame(width: IhsanSpacing.xxl, height: IhsanSpacing.xxl)
+
+            VStack(spacing: IhsanSpacing.sm) {
+                Text("Location access is needed")
+                    .font(IhsanFont.subtitle)
+                    .foregroundStyle(tokens.ink)
+                    .multilineTextAlignment(.center)
+
+                Text("Allow location access in Settings to look nearby.")
+                    .font(IhsanFont.bodyEnglish)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.plain)
+
+            #if canImport(UIKit)
+            if let settingsURL = URL(string: UIApplication.openSettingsURLString) {
+                Link(destination: settingsURL) {
+                    Text("ALLOW IN SETTINGS")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                        .foregroundStyle(tokens.leafGold)
+                        .padding(.vertical, IhsanSpacing.sm)
+                }
+                .accessibilityHint("Opens Ihsan's location settings")
+            }
+            #endif
         }
         .padding(IhsanSpacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
 
-    private var privacyNote: some View {
-        Text("Search runs through Apple Maps. Your location is not stored or shared.")
-            .font(IhsanFont.smallCaps)
-            .tracking(0.8)
-            .foregroundStyle(IhsanColor.textMuted.opacity(0.7))
+    private func failureState(tokens: SkyPaletteTokens) -> some View {
+        VStack(spacing: IhsanSpacing.lg) {
+            SettingsGlyphView(.location, color: tokens.metal.opacity(0.65))
+                .frame(width: IhsanSpacing.xxl, height: IhsanSpacing.xxl)
+
+            VStack(spacing: IhsanSpacing.sm) {
+                Text("Apple Maps could not be reached")
+                    .font(IhsanFont.subtitle)
+                    .foregroundStyle(tokens.ink)
+                    .multilineTextAlignment(.center)
+
+                Text("Check your internet connection, then try again.")
+                    .font(IhsanFont.bodyEnglish)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            Button {
+                Haptics.impact(.light)
+                Task { await viewModel.retry() }
+            } label: {
+                Text("TRY AGAIN")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(tokens.ink)
+                    .padding(.horizontal, IhsanSpacing.lg)
+                    .padding(.vertical, IhsanSpacing.md)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityHint("Repeats the nearby Apple Maps search")
+        }
+        .padding(IhsanSpacing.xl)
+        .frame(maxWidth: .infinity)
+        .celestialPanel(tokens: tokens, cornerRadius: 18)
+    }
+
+    private func privacyNote(tokens: SkyPaletteTokens) -> some View {
+        Text("SEARCHED IN APPLE MAPS · NOTHING SAVED")
+            .font(IhsanFont.inscription)
+            .tracking(1.4)
+            .foregroundStyle(tokens.inkSecondary)
             .multilineTextAlignment(.center)
-            .accessibilityLabel(
-                "Search runs through Apple Maps. Your location is not stored or shared."
-            )
+            .accessibilityLabel("Search runs through Apple Maps. Results and location are not saved.")
     }
 
-    private var searchingText: String {
-        if let city = viewModel.cityName {
-            return "Searching for masjids near \(city)"
-        }
-        return "Searching for masjids nearby"
-    }
-
-    // MARK: - Side effects
-
-    private func copyAddress(_ result: MasjidResult) {
-        let toCopy = result.address ?? result.name
-        #if canImport(UIKit)
-        UIPasteboard.general.string = toCopy
-        #endif
-        Haptics.success()
-    }
-
-    private func shareLocation(_ result: MasjidResult) {
-        #if canImport(UIKit)
-        guard let url = result.shareURL else { return }
-        let activityVC = UIActivityViewController(
-            activityItems: [url],
-            applicationActivities: nil
-        )
-        guard let scene = UIApplication.shared.connectedScenes
-                .first(where: { $0.activationState == .foregroundActive }) as? UIWindowScene,
-              let root = scene.windows.first?.rootViewController else {
-            return
-        }
-        // Anchor for iPad popover presentation.
-        if let popover = activityVC.popoverPresentationController {
-            popover.sourceView = root.view
-            popover.sourceRect = CGRect(
-                x: root.view.bounds.midX,
-                y: root.view.bounds.midY,
-                width: 0, height: 0
-            )
-            popover.permittedArrowDirections = []
-        }
-        // Walk down to the topmost presented controller before presenting.
-        var presenter: UIViewController = root
-        while let next = presenter.presentedViewController {
-            presenter = next
-        }
-        presenter.present(activityVC, animated: true)
-        #endif
-    }
-
-    /// Open Apple Maps centered on the user's current location.
-    /// `MKMapItem.forCurrentLocation()` is the documented way to launch
-    /// Maps without a destination — drops the user where they are.
     private func openMapsToCurrentArea() {
         MKMapItem.forCurrentLocation().openInMaps()
     }
 }
 
-#Preview("Masjid Finder — Loading") {
-    MasjidFinderScreen()
+/// A quiet row-shaped placeholder. Reduce Motion keeps it static;
+/// otherwise the panel breathes once per second without moving layout.
+private struct MasjidLoadingState: View {
+    let tokens: SkyPaletteTokens
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var isLit = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+            Text("SEARCHING APPLE MAPS")
+                .font(IhsanFont.inscription)
+                .tracking(1.6)
+                .foregroundStyle(tokens.inkSecondary)
+
+            ForEach(0..<4, id: \.self) { _ in
+                VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
+                    Capsule()
+                        .fill(tokens.ink.opacity(0.16))
+                        .frame(maxWidth: 220)
+                        .frame(height: IhsanSpacing.sm)
+                    Capsule()
+                        .fill(tokens.inkSecondary.opacity(0.12))
+                        .frame(maxWidth: 150)
+                        .frame(height: IhsanSpacing.xs)
+                }
+                .padding(IhsanSpacing.md)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .opacity(reduceMotion ? 0.72 : (isLit ? 0.9 : 0.5))
+                .celestialPanel(
+                    tokens: tokens,
+                    cornerRadius: IhsanSpacing.smallCardRadius
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .onAppear {
+            guard !reduceMotion else { return }
+            withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
+                isLit = true
+            }
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("Searching Apple Maps for nearby masjids")
+    }
+}
+
+#Preview("Nearby masjids") {
+    MasjidFinderScreen(locationName: "Chicago")
 }

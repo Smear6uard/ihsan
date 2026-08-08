@@ -7,20 +7,18 @@ import IhsanPrayerTimes
 @MainActor
 final class MasjidFinderViewModel {
     var state: MasjidFinderState = .loading
-    var radius: SearchRadius = .fiveKm {
-        didSet {
-            guard radius != oldValue else { return }
-            Task { await search() }
-        }
-    }
     var cityName: String?
 
     private let locationProvider: LocationProviding
-    private let searchService = MasjidSearchService()
+    private let searchService: any MasjidSearching
     private var currentCoordinates: Coordinates?
 
-    init(locationProvider: LocationProviding = CoreLocationCoordinator.shared) {
+    init(
+        locationProvider: any LocationProviding = CoreLocationCoordinator.shared,
+        searchService: any MasjidSearching = MasjidSearchService()
+    ) {
         self.locationProvider = locationProvider
+        self.searchService = searchService
     }
 
     func bootstrap() async {
@@ -41,24 +39,31 @@ final class MasjidFinderViewModel {
         } catch let error as LocationError {
             if error == .permissionDenied || error == .permissionRestricted {
                 Haptics.notification(.warning)
+                state = .needsLocationPermission
+            } else {
+                state = .failure
             }
-            state = .error(error.userFacingMessage)
         } catch {
-            state = .error(error.localizedDescription)
+            state = .failure
         }
     }
 
-    func search() async {
+    private func search() async {
         guard let coordinates = currentCoordinates else { return }
         state = .loading
         do {
-            let results = try await searchService.search(
-                near: coordinates,
-                radiusKm: radius.rawValue
-            )
+            let results = try await searchService.search(near: coordinates)
             state = results.isEmpty ? .empty : .ready(results)
         } catch {
-            state = .error("Could not search nearby masjids. Try again.")
+            state = .failure
+        }
+    }
+
+    func retry() async {
+        if currentCoordinates == nil {
+            await bootstrap()
+        } else {
+            await search()
         }
     }
 

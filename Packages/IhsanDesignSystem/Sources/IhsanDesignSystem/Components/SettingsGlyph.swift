@@ -9,6 +9,8 @@ import SwiftUI
 public enum SettingsGlyph: Sendable {
     /// Compass rose — location.
     case location
+    /// A fine route arrow — directions handed to Maps.
+    case directions
     /// Astrolabe quadrant — calculation method.
     case method
     /// Gnomon and its shadow — the Asr method.
@@ -112,6 +114,20 @@ public struct SettingsGlyphShape: Shape {
             p.addLine(to: pt(0.5, 0.78))
             p.addLine(to: pt(0.37, 0.5))
             p.closeSubpath()
+
+        case .directions:
+            // A route turning toward a small arrowhead. Unlike the
+            // location compass, this names movement to a destination.
+            p.move(to: pt(0.14, 0.78))
+            p.addCurve(
+                to: pt(0.64, 0.28),
+                control1: pt(0.42, 0.78),
+                control2: pt(0.38, 0.28)
+            )
+            p.addLine(to: pt(0.84, 0.28))
+            p.move(to: pt(0.68, 0.12))
+            p.addLine(to: pt(0.84, 0.28))
+            p.addLine(to: pt(0.68, 0.44))
 
         case .method:
             // Quadrant arc anchored at the lower-left, one radius, and
@@ -360,7 +376,7 @@ public struct SettingsGlyphShape: Shape {
 #Preview("Settings glyphs") {
     let tokens = PaletteState.afternoon.tokens
     let glyphs: [SettingsGlyph] = [
-        .location, .method, .asrShadow, .highLatitude, .sun, .adhan,
+        .location, .directions, .method, .asrShadow, .highLatitude, .sun, .adhan,
         .clock, .calendar, .pause, .travel, .jam, .qasr, .makeupLedger,
         .nightMoon, .rawatib, .counts, .voiceWaves, .sync, .privacy,
         .share, .info, .heart, .book, .remove,

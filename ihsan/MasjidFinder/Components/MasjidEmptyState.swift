@@ -1,34 +1,27 @@
 import SwiftUI
 import IhsanDesignSystem
 
-/// Empty state when the search returns nothing. The building glyph
-/// renders large at .light weight to feel monumental rather than
-/// disappointing — scale + restraint, not an apology. The fallback
-/// "Open Apple Maps" button hands off to a tool the user can use to
-/// look further afield without leaving the moment.
 struct MasjidEmptyState: View {
-    let radiusLabel: String
+    let tokens: SkyPaletteTokens
     let onOpenMaps: () -> Void
 
     var body: some View {
         VStack(spacing: IhsanSpacing.lg) {
-            Image(systemName: "building.2")
-                .font(.system(size: 56, weight: .ultraLight))
-                .foregroundStyle(IhsanColor.textMuted)
-                .symbolRenderingMode(.hierarchical)
+            EightPointedStar()
+                .stroke(tokens.metal.opacity(0.6), lineWidth: 1)
+                .frame(width: IhsanSpacing.xxl, height: IhsanSpacing.xxl)
+                .accessibilityHidden(true)
 
             VStack(spacing: IhsanSpacing.sm) {
-                Text("No masjids found within \(radiusLabel)")
+                Text("No masjids found nearby")
                     .font(IhsanFont.subtitle)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .foregroundStyle(tokens.ink)
                     .multilineTextAlignment(.center)
 
-                Text("Try increasing the radius or check your area in Apple Maps directly.")
+                Text("Open Maps to search a wider area.")
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(IhsanColor.textSecondary)
+                    .foregroundStyle(tokens.inkSecondary)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, IhsanSpacing.xl)
-                    .fixedSize(horizontal: false, vertical: true)
             }
 
             Button {
@@ -36,35 +29,22 @@ struct MasjidEmptyState: View {
                 onOpenMaps()
             } label: {
                 HStack(spacing: IhsanSpacing.sm) {
-                    Image(systemName: "map")
-                        .font(.system(size: 14, weight: .semibold))
-                    Text("Open Apple Maps")
-                        .font(IhsanFont.bodyEnglishBold)
+                    SettingsGlyphView(.location, color: tokens.metal)
+                        .frame(width: 18, height: 18)
+                    Text("OPEN MAPS")
+                        .font(IhsanFont.inscription)
+                        .tracking(1.6)
+                        .foregroundStyle(tokens.ink)
                 }
-                .foregroundStyle(IhsanColor.textPrimary)
                 .padding(.horizontal, IhsanSpacing.lg)
-                .padding(.vertical, IhsanSpacing.sm)
-                .background {
-                    Capsule()
-                        .fill(.ultraThinMaterial)
-                        .overlay {
-                            Capsule()
-                                .strokeBorder(
-                                    IhsanColor.atmospheric,
-                                    lineWidth: 0.5
-                                )
-                        }
-                }
+                .padding(.vertical, IhsanSpacing.md)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityHint("Opens Apple Maps to your current area")
+            .accessibilityHint("Opens Maps at your current location")
         }
         .padding(IhsanSpacing.xl)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(maxWidth: .infinity)
+        .celestialPanel(tokens: tokens, cornerRadius: 18)
     }
-}
-
-#Preview {
-    MasjidEmptyState(radiusLabel: "1 km") {}
-        .ihsanManuscriptPage()
 }

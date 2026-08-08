@@ -45,6 +45,8 @@ struct TodayHeader: View {
     /// Tap callback for the moon-phase glyph — opens the celestial
     /// reference / qibla compass overlay.
     let onMoonPhaseTap: () -> Void
+    /// Tap callback for the displayed place — opens nearby masjids.
+    var onLocationTap: (() -> Void)? = nil
     /// Tap callback for the Hijri date — opens the Hijri month sheet.
     var onHijriTap: (() -> Void)? = nil
     /// A curated significant-day inscription for today ("WHITE DAY ·
@@ -78,29 +80,38 @@ struct TodayHeader: View {
             VStack(alignment: .leading, spacing: 4) {
                 Button {
                     Haptics.impact(.light)
+                    onLocationTap?()
+                } label: {
+                    Text(cityName)
+                        .font(.system(.title3, design: .serif))
+                        .foregroundStyle(foreground)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.7)
+                        .inkKeyline(tokens)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .disabled(onLocationTap == nil)
+                .accessibilityElement(children: .ignore)
+                .accessibilityLabel("Location: \(cityName)")
+                .accessibilityHint(onLocationTap == nil ? "" : "Shows nearby masjids")
+                .accessibilityAddTraits(.isHeader)
+
+                Button {
+                    Haptics.impact(.light)
                     onHijriTap?()
                 } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(cityName)
-                            .font(.system(.title3, design: .serif))
-                            .foregroundStyle(foreground)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                            .inkKeyline(tokens)
-
-                        inscriptionLine(
-                            nextInscription: nextInscription,
-                            foreground: foregroundSecondary
-                        )
-                    }
+                    inscriptionLine(
+                        nextInscription: nextInscription,
+                        foreground: foregroundSecondary
+                    )
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .disabled(onHijriTap == nil)
                 .accessibilityElement(children: .ignore)
                 .accessibilityLabel(accessibilityLabel(nextInscription: nextInscription))
-                .accessibilityHint(onHijriTap == nil ? "" : "Opens the Hijri month.")
-                .accessibilityAddTraits(.isHeader)
+                .accessibilityHint(onHijriTap == nil ? "" : "Opens the Hijri month")
 
                 if let significantDayInscription {
                     Button {
@@ -237,7 +248,6 @@ struct TodayHeader: View {
             )
         }
         _ = nextInscription
-        parts.append("Tap the moon phase indicator for the celestial reference and qibla compass.")
         return parts.joined(separator: ". ") + "."
     }
 }
