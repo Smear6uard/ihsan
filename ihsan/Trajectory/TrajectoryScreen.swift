@@ -67,6 +67,9 @@ struct TrajectoryScreen: View {
     @State private var retroSelection: RetroLogSelection?
     @State private var insightText: String?
     @State private var isInsightLoading = false
+    @State private var isRenderingPatternShare = false
+    @State private var sharePreview: PatternSharePayload?
+    @State private var shareRenderError = false
     @State private var fiqhInsight = TrajectoryInsightFraming(
         title: "How this ledger uses timing",
         body: "The five prayers have appointed times. In Ihsan, ‘On Time’ and ‘Delayed’ both describe a prayer performed within its valid window; ‘Delayed’ is a personal tracking distinction, not a separate legal ruling. A prayer performed after its window is recorded separately as qadāʾ.",
@@ -75,6 +78,7 @@ struct TrajectoryScreen: View {
 
     @Environment(\.nowProvider) private var nowProvider
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     private var settings: UserSettings? {
         settingsRows.first
@@ -122,7 +126,8 @@ struct TrajectoryScreen: View {
         // shared page-chrome modifiers to the same instant.
         TimelineView(.periodic(from: .distantPast, by: 60)) { context in
             let now = nowProvider.resolve(context.date)
-            let tokens = IhsanPageChrome.tokens(at: now)
+            let phase = IhsanPageChrome.phase(at: now)
+            let tokens = PaletteState.resolved(for: phase)
             page(tokens: tokens)
                 .environment(\.timeOfDayOverride, now)
         }
@@ -234,6 +239,17 @@ struct TrajectoryScreen: View {
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(item: $sharePreview) { payload in
+            PatternSharePreviewSheet(payload: payload)
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+                .presentationBackground(.thinMaterial)
+        }
+        .alert("The image could not be prepared", isPresented: $shareRenderError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text("Return to Path and try again.")
+        }
     }
 
     // MARK: - Header
@@ -241,17 +257,79 @@ struct TrajectoryScreen: View {
     @ViewBuilder
     private func header(tokens: SkyPaletteTokens) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text("A pattern of days")
-                .font(.system(size: 32, weight: .medium, design: .serif))
-                .foregroundStyle(tokens.ink)
+            HStack(alignment: .top, spacing: IhsanSpacing.md) {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("A pattern of days")
+                        .font(.system(size: 32, weight: .medium, design: .serif))
+                        .foregroundStyle(tokens.ink)
 
-            Text(subtitleText)
-                .font(IhsanFont.inscription)
-                .tracking(1.8)
-                .foregroundStyle(tokens.inkSecondary)
+                    Text(subtitleText)
+                        .font(IhsanFont.inscription)
+                        .tracking(1.8)
+                        .foregroundStyle(tokens.inkSecondary)
+                }
+
+                Spacer(minLength: IhsanSpacing.sm)
+
+                if case .ready = viewModel.state {
+                    Button {
+                        beginPatternShare(tokens: tokens)
+                    } label: {
+                        Group {
+                            if isRenderingPatternShare {
+                                ProgressView()
+                                    .tint(tokens.metal)
+                            } else {
+                                SettingsGlyphView(.share, color: tokens.metal)
+                            }
+                        }
+                        .frame(width: IhsanSpacing.lg, height: IhsanSpacing.lg)
+                        .frame(width: 44, height: 44)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isRenderingPatternShare)
+                    .accessibilityLabel(
+                        isRenderingPatternShare
+                            ? "Preparing pattern image"
+                            : "Share the current pattern"
+                    )
+                    .accessibilityHint("Opens a preview before the system share sheet")
+                }
+            }
 
             OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
                 .padding(.top, IhsanSpacing.xs)
+        }
+    }
+
+    private func beginPatternShare(tokens: SkyPaletteTokens) {
+        guard case .ready(let snapshot) = viewModel.state,
+              !isRenderingPatternShare else { return }
+
+        Haptics.impact(.light)
+        isRenderingPatternShare = true
+        let exportContent = PatternExportPrivacy.prepare(
+            days: snapshot.days,
+            aggregate: snapshot.aggregate,
+            naflDays: overlayNaflDays,
+            dhikrDays: overlayDhikrDays
+        )
+
+        Task { @MainActor in
+            await Task.yield()
+            let payload = PatternShareRenderer.render(
+                content: exportContent,
+                period: snapshot.period,
+                tokens: tokens,
+                reduceTransparency: reduceTransparency
+            )
+            isRenderingPatternShare = false
+            if let payload {
+                sharePreview = payload
+            } else {
+                shareRenderError = true
+            }
         }
     }
 

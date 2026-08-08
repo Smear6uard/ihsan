@@ -2,6 +2,25 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
+/// The five factual counts a quiet summary can draw. This narrow value
+/// also lets privacy-sensitive renderers receive only what they use,
+/// instead of a wider aggregate carrying pause or travel metadata.
+struct QuietSummary: Equatable, Sendable {
+    let onTimeCount: Int
+    let jamaahCount: Int
+    let lateCount: Int
+    let missedCount: Int
+    let qadaCount: Int
+
+    init(aggregate: TrajectoryAggregate) {
+        onTimeCount = aggregate.onTimeCount
+        jamaahCount = aggregate.jamaahCount
+        lateCount = aggregate.lateCount
+        missedCount = aggregate.missedCount
+        qadaCount = aggregate.qadaCount
+    }
+}
+
 /// A single quiet line of period-summary counts.
 ///
 /// The gestalt dot grid above does the work of *showing* the user's
@@ -14,8 +33,17 @@ import IhsanDesignSystem
 /// spreads the stats evenly across those rows rather than packing the
 /// first one full and leaving a single orphan below it.
 struct QuietSummaryRow: View {
-    let aggregate: TrajectoryAggregate
+    let summary: QuietSummary
     let tokens: SkyPaletteTokens
+
+    init(aggregate: TrajectoryAggregate, tokens: SkyPaletteTokens) {
+        self.init(summary: QuietSummary(aggregate: aggregate), tokens: tokens)
+    }
+
+    init(summary: QuietSummary, tokens: SkyPaletteTokens) {
+        self.summary = summary
+        self.tokens = tokens
+    }
 
     var body: some View {
         QuietRowLayout(spacing: IhsanSpacing.lg, rowSpacing: IhsanSpacing.xs) {
@@ -43,20 +71,20 @@ struct QuietSummaryRow: View {
 
     private var entries: [(label: String, count: Int)] {
         [
-            (PrayerStatus.onTime.inscription, aggregate.onTimeCount),
-            (IhsanVocabulary.jamaahInscription, aggregate.jamaahCount),
-            (PrayerStatus.late.inscription, aggregate.lateCount),
-            (PrayerStatus.missed.inscription, aggregate.missedCount),
-            (PrayerStatus.qada.inscription, aggregate.qadaCount)
+            (PrayerStatus.onTime.inscription, summary.onTimeCount),
+            (IhsanVocabulary.jamaahInscription, summary.jamaahCount),
+            (PrayerStatus.late.inscription, summary.lateCount),
+            (PrayerStatus.missed.inscription, summary.missedCount),
+            (PrayerStatus.qada.inscription, summary.qadaCount)
         ]
     }
 
     private var accessibilityLabel: String {
-        "\(PrayerStatus.onTime.displayName): \(aggregate.onTimeCount). "
-        + "\(IhsanVocabulary.jamaahTitle): \(aggregate.jamaahCount). "
-        + "\(PrayerStatus.late.displayName): \(aggregate.lateCount). "
-        + "\(PrayerStatus.missed.displayName): \(aggregate.missedCount). "
-        + "\(PrayerStatus.qada.displayName): \(aggregate.qadaCount)."
+        "\(PrayerStatus.onTime.displayName): \(summary.onTimeCount). "
+        + "\(IhsanVocabulary.jamaahTitle): \(summary.jamaahCount). "
+        + "\(PrayerStatus.late.displayName): \(summary.lateCount). "
+        + "\(PrayerStatus.missed.displayName): \(summary.missedCount). "
+        + "\(PrayerStatus.qada.displayName): \(summary.qadaCount)."
     }
 }
 
