@@ -5,6 +5,7 @@ import IhsanDesignSystem
 import IhsanFiqhConfig
 import IhsanInsights
 import IhsanIntents
+import IhsanNotifications
 
 /// The Trajectory tab.
 ///
@@ -67,6 +68,11 @@ struct TrajectoryScreen: View {
     @State private var retroSelection: RetroLogSelection?
     @State private var insightText: String?
     @State private var isInsightLoading = false
+    @State private var finding: PathFinding?
+    @State private var findingGrounding = TrajectoryFindingFraming.standard(for: .steady)
+    @State private var showingMasjidFinder = false
+    @State private var actionConfirmation: String?
+    @State private var confirmationDismissal: Task<Void, Never>?
     @State private var isRenderingPatternShare = false
     @State private var sharePreview: PatternSharePayload?
     @State private var shareRenderError = false
@@ -223,13 +229,23 @@ struct TrajectoryScreen: View {
             await refreshInsight()
         }
         .task {
-            if let framing = try? await FiqhConfigService.shared.currentConfig().framing,
-               let trajectoryInsight = framing.trajectoryInsight {
+            if let trajectoryInsight = await currentFraming()?.trajectoryInsight {
                 fiqhInsight = trajectoryInsight
             }
         }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)
+        }
+        .sheet(isPresented: $showingMasjidFinder) {
+            // Only the resolved city name travels here, never a
+            // coordinate — the finder resolves its own location and
+            // keeps it in that sheet's memory.
+            MasjidFinderScreen(
+                locationName: settings?.lastResolvedCityName ?? "Current Location"
+            )
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationBackground(.thinMaterial)
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
@@ -367,12 +383,16 @@ struct TrajectoryScreen: View {
                 QuietSummaryRow(aggregate: snapshot.aggregate, tokens: tokens)
                     .padding(.horizontal, IhsanSpacing.md)
 
-                if isInsightLoading || insightText != nil {
+                if isInsightLoading || insightText != nil || finding != nil {
                     TrajectoryInsightCard(
+                        finding: finding,
                         text: insightText,
                         isLoading: isInsightLoading,
-                        fiqh: fiqhInsight,
-                        tokens: tokens
+                        grounding: findingGrounding,
+                        ledger: fiqhInsight,
+                        confirmation: actionConfirmation,
+                        tokens: tokens,
+                        onAct: act(on:)
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                     .transition(.opacity)
@@ -458,6 +478,87 @@ struct TrajectoryScreen: View {
         return Set(dhikrSessions.map { calendar.startOfDay(for: $0.sessionDate) })
     }
 
+    // MARK: - The finding's one action
+
+    /// Every prayer's reminder as the user actually experiences it: a
+    /// per-prayer toggle under a global switch counts as off when the
+    /// global switch is off.
+    private var reminderSettings: [PathReminderSetting] {
+        guard let settings else {
+            return Prayer.allCases.map { PathReminderSetting(prayer: $0, isEnabled: false) }
+        }
+        return Prayer.allCases.map { prayer in
+            PathReminderSetting(
+                prayer: prayer,
+                isEnabled: settings.notificationsEnabled && settings.notificationEnabled(for: prayer)
+            )
+        }
+    }
+
+    private func currentFraming() async -> FiqhFraming? {
+        try? await FiqhConfigService.shared.currentConfig().framing
+    }
+
+    private func act(on action: PathFindingAction) {
+        switch action {
+        case .logSlot(let day, let prayer):
+            retroSelection = RetroLogSelection(
+                day: day,
+                prayer: prayer,
+                currentStatus: nil,
+                isJamaah: false
+            )
+
+        case .openMakeupLedger:
+            // The ledger has to exist before it can be opened. Somebody
+            // who never set qadāʾ tracking up gets the setup flow, which
+            // is the same door from the invite card above.
+            if settings?.qadaTrackingEnabled == true {
+                showingRepairDetail = true
+            } else {
+                showingRepairSetup = true
+            }
+
+        case .enableReminder(let prayer):
+            guard let settings else { return }
+            settings.notificationsEnabled = true
+            settings.setNotificationEnabled(true, for: prayer)
+            settings.modifiedAt = .now
+            Task {
+                // Authorization may never have been asked for, and the
+                // toggle means nothing until it is. The card reports
+                // what actually happened rather than claiming a
+                // reminder that iOS will never deliver — the button
+                // itself is about to change to the next rung, so
+                // without this there is no evidence either way.
+                let granted = (try? await NotificationScheduler.shared.requestAuthorization()) ?? false
+                if granted {
+                    try? await NotificationScheduler.shared.rebuildSchedule()
+                    confirm("\(prayer.displayNameEnglish) reminder is on.")
+                } else {
+                    confirm("Allow notifications in iOS Settings to receive it.")
+                }
+                // The reminder state feeds the next reading.
+                await refreshInsight()
+            }
+
+        case .findCongregation:
+            showingMasjidFinder = true
+        }
+    }
+
+    /// A short-lived receipt for the one action that changes something
+    /// without opening a sheet. The other three are their own evidence.
+    private func confirm(_ message: String) {
+        actionConfirmation = message
+        confirmationDismissal?.cancel()
+        confirmationDismissal = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            actionConfirmation = nil
+        }
+    }
+
     // MARK: - On-device insight
 
     /// A useful deterministic readout is always available when insights
@@ -466,10 +567,38 @@ struct TrajectoryScreen: View {
     private func refreshInsight() async {
         insightText = nil
         isInsightLoading = false
+        finding = nil
 
         guard case .ready(let snapshot) = viewModel.state else { return }
 
-        insightText = TrajectoryInsightNarrative.make(from: snapshot.aggregate)
+        // The finding is the card's point, so it is derived first and
+        // from the ledger alone. It does not wait on Foundation Models,
+        // does not depend on the insights toggle, and is identical on a
+        // device where Apple Intelligence never becomes available.
+        let resolved = PathFinding.make(
+            days: snapshot.days,
+            aggregate: snapshot.aggregate,
+            logs: logs,
+            reminders: reminderSettings,
+            now: nowProvider.now(),
+            calendar: .current
+        )
+        // Both halves of the card land in the same frame, with the
+        // shipped grounding already matched to the reading. Awaiting
+        // the config first would put a reading and last reading's
+        // citation on screen together for as long as the load takes.
+        finding = resolved
+        findingGrounding = .standard(for: resolved.kind)
+        insightText = TrajectoryInsightNarrative.make(
+            days: snapshot.days,
+            aggregate: snapshot.aggregate,
+            now: nowProvider.now(),
+            calendar: .current
+        )
+
+        if let configured = await currentFraming()?.findingFraming(for: resolved.kind) {
+            findingGrounding = configured
+        }
 
         #if DEBUG
         // `-IhsanDebugInsight` makes the real presentation surface

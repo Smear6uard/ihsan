@@ -79,6 +79,12 @@ struct BannedLanguageSweepTests {
         "ihsan/Trajectory/TrajectoryScreen.swift",
         "ihsan/Trajectory/Share/PatternShareCard.swift",
         "ihsan/Trajectory/Share/PatternSharePreviewSheet.swift",
+        // The Path readout: a blunt card is exactly where a scolding
+        // sentence would arrive, so it is swept with everything else.
+        "ihsan/Trajectory/Helpers/PathFinding.swift",
+        "ihsan/Trajectory/Helpers/TrajectoryInsightNarrative.swift",
+        "ihsan/Trajectory/Components/TrajectoryInsightCard.swift",
+        "Packages/IhsanFiqhConfig/Sources/IhsanFiqhConfig/PathFindingGrounding.swift",
         "ihsan/Today/Helpers/YesterdayAccount.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Models/PrayerLog.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Time/CycleReattributionSweep.swift",

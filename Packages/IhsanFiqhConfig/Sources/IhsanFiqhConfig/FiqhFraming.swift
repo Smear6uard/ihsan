@@ -18,6 +18,11 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
     public let trajectoryEmptyTitle: String
     public let trajectoryEmptySubtitle: String
     public let trajectoryInsight: TrajectoryInsightFraming?
+    /// Per-reading overrides for the Path card's cited context. Absent
+    /// in every config shipped so far; the binary carries the canonical
+    /// text (`TrajectoryFindingFraming.standard(for:)`) and this exists
+    /// so a correction can reach devices without an app release.
+    public let trajectoryFindings: [TrajectoryFindingFraming]?
 
     public init(
         onTimeLabel: String,
@@ -32,7 +37,8 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
         reflectionEmptySubtitle: String,
         trajectoryEmptyTitle: String,
         trajectoryEmptySubtitle: String,
-        trajectoryInsight: TrajectoryInsightFraming? = nil
+        trajectoryInsight: TrajectoryInsightFraming? = nil,
+        trajectoryFindings: [TrajectoryFindingFraming]? = nil
     ) {
         self.onTimeLabel = onTimeLabel
         self.lateLabel = lateLabel
@@ -47,6 +53,22 @@ public struct FiqhFraming: Codable, Sendable, Equatable {
         self.trajectoryEmptyTitle = trajectoryEmptyTitle
         self.trajectoryEmptySubtitle = trajectoryEmptySubtitle
         self.trajectoryInsight = trajectoryInsight
+        self.trajectoryFindings = trajectoryFindings
+    }
+
+    /// The cited context for one Path reading. An override is honoured
+    /// only when it is complete — a config that supplies an entry with
+    /// an empty body or a stripped citation falls back to the shipped
+    /// text rather than rendering a finding with nothing behind it.
+    public func findingFraming(for kind: PathFindingKind) -> TrajectoryFindingFraming {
+        guard let override = trajectoryFindings?.first(where: { $0.kind == kind }),
+              !override.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !override.body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              !override.citation.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return .standard(for: kind)
+        }
+        return override
     }
 }
 
