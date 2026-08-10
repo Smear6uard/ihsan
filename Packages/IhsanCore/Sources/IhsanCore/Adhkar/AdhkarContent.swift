@@ -115,6 +115,11 @@ public struct AdhkarItem: Codable, Sendable, Equatable, Hashable, Identifiable {
     public let repetitions: Int
     /// The occasion, for situational items; nil elsewhere.
     public let note: String?
+    /// The content version that introduced this item, for items added
+    /// after the first review request went out. The review generator
+    /// flags an item NEW while this equals the file's current
+    /// `contentVersion`; older items carry nil.
+    public let addedIn: String?
 
     public init(
         id: String,
@@ -125,7 +130,8 @@ public struct AdhkarItem: Codable, Sendable, Equatable, Hashable, Identifiable {
         translation: String,
         source: AdhkarSource,
         repetitions: Int,
-        note: String? = nil
+        note: String? = nil,
+        addedIn: String? = nil
     ) {
         self.id = id
         self.category = category
@@ -136,6 +142,7 @@ public struct AdhkarItem: Codable, Sendable, Equatable, Hashable, Identifiable {
         self.source = source
         self.repetitions = repetitions
         self.note = note
+        self.addedIn = addedIn
     }
 }
 

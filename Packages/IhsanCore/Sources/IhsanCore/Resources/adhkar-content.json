@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "contentVersion": "2026.08.02-draft.1",
+  "contentVersion": "2026.08.09-draft.1",
   "reviewStatus": "draft",
-  "reviewNote": "DRAFT — PENDING SCHOLAR REVIEW. Every text in this file was transcribed from the well-known authentic morning/evening, post-prayer, and sleep adhkar as attested in al-Bukhari, Muslim, Abu Dawud, al-Tirmidhi and gathered in Hisn al-Muslim. Nothing here was composed, paraphrased, shortened, or reworded by software. It has NOT yet been read by a scholar. While this field reads 'draft' the app shows none of it in a release build. The review request, item by item, is ADHKAR_REVIEW.md at the repository root. Clear this gate only after a qualified reviewer has signed that document.",
+  "reviewNote": "DRAFT — PENDING SCHOLAR REVIEW. Every text in this file was transcribed from the well-known authentic morning/evening, post-prayer, sleep, and occasioned adhkar (including the weather supplications for rain, after rain, wind, and thunder) as attested in al-Bukhari, Muslim, Abu Dawud, al-Tirmidhi, Malik's Muwatta and gathered in Hisn al-Muslim. Nothing here was composed, paraphrased, shortened, or reworded by software. It has NOT yet been read by a scholar. While this field reads 'draft' the app shows none of it in a release build. The review request, item by item, is ADHKAR_REVIEW.md at the repository root. Clear this gate only after a qualified reviewer has signed that document.",
   "items": [
     {
       "id": "morning.ayat-al-kursi",
@@ -586,6 +586,54 @@
       "source": { "collection": "Muslim", "reference": "713" },
       "repetitions": 1,
       "note": "On leaving the masjid."
+    },
+    {
+      "id": "situational.rain",
+      "category": "situational",
+      "order": 9,
+      "arabic": "اللَّهُمَّ صَيِّبًا نَافِعًا",
+      "transliteration": "Allāhumma ṣayyiban nāfiʿā.",
+      "translation": "O Allah, (make it) a beneficial downpour.",
+      "source": { "collection": "al-Bukhārī", "reference": "1032" },
+      "repetitions": 1,
+      "note": "When rain falls.",
+      "addedIn": "2026.08.09-draft.1"
+    },
+    {
+      "id": "situational.after-rain",
+      "category": "situational",
+      "order": 10,
+      "arabic": "مُطِرْنَا بِفَضْلِ اللَّهِ وَرَحْمَتِهِ",
+      "transliteration": "Muṭirnā bi-faḍli'llāhi wa raḥmatih.",
+      "translation": "We have been given rain by the grace and mercy of Allah.",
+      "source": { "collection": "al-Bukhārī; Muslim", "reference": "al-Bukhārī 846; Muslim 71", "needsVerification": true },
+      "repetitions": 1,
+      "note": "After rainfall.",
+      "addedIn": "2026.08.09-draft.1"
+    },
+    {
+      "id": "situational.wind",
+      "category": "situational",
+      "order": 11,
+      "arabic": "اللَّهُمَّ إِنِّي أَسْأَلُكَ خَيْرَهَا، وَخَيْرَ مَا فِيهَا، وَخَيْرَ مَا أُرْسِلَتْ بِهِ، وَأَعُوذُ بِكَ مِنْ شَرِّهَا، وَشَرِّ مَا فِيهَا، وَشَرِّ مَا أُرْسِلَتْ بِهِ",
+      "transliteration": "Allāhumma innī as'aluka khayrahā, wa khayra mā fīhā, wa khayra mā ursilat bih, wa aʿūdhu bika min sharrihā, wa sharri mā fīhā, wa sharri mā ursilat bih.",
+      "translation": "O Allah, I ask You for its goodness, the good within it, and the good it was sent with; and I take refuge with You from its evil, the evil within it, and from the evil it was sent with.",
+      "source": { "collection": "Muslim", "reference": "899" },
+      "repetitions": 1,
+      "note": "When the wind blows hard.",
+      "addedIn": "2026.08.09-draft.1"
+    },
+    {
+      "id": "situational.thunder",
+      "category": "situational",
+      "order": 12,
+      "arabic": "سُبْحَانَ الَّذِي يُسَبِّحُ الرَّعْدُ بِحَمْدِهِ وَالْمَلَائِكَةُ مِنْ خِيفَتِهِ",
+      "transliteration": "Subḥāna'lladhī yusabbiḥu'r-raʿdu bi-ḥamdihi wa'l-malā'ikatu min khīfatih.",
+      "translation": "Glory be to the One Whom the thunder glorifies with His praise, and the angels out of awe of Him.",
+      "source": { "collection": "Mālik; al-Bukhārī (al-Adab al-Mufrad)", "reference": "al-Muwaṭṭaʾ 56.26 (3641); al-Adab al-Mufrad 723", "needsVerification": true },
+      "repetitions": 1,
+      "note": "On hearing thunder.",
+      "addedIn": "2026.08.09-draft.1"
     }
   ]
 }

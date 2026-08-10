@@ -154,6 +154,49 @@ struct SkyConditionsTests {
         }
     }
 
+    // MARK: - Dua trigger predicates
+
+    @Test("Raining means rain-family or storm-family kinds, or measured rain under a dry kind")
+    func rainingPredicate() {
+        func probe(_ kind: SkyConditions.Kind, precipitating: Bool = false) -> Bool {
+            SkyConditions(
+                kind: kind,
+                isPrecipitating: precipitating,
+                windBand: .calm,
+                cloudBand: .overcast,
+                fetchedAt: .now
+            ).isRaining
+        }
+        #expect(probe(.rain))
+        #expect(probe(.drizzle))
+        #expect(probe(.thunderstorms))
+        #expect(probe(.hurricane))
+        #expect(probe(.cloudy, precipitating: true))
+        #expect(!probe(.cloudy))
+        #expect(!probe(.clear))
+        // Snow is not rain: the transmitted rain dua is for rain, and
+        // the snow treatment triggers no dua line.
+        #expect(!probe(.snow))
+        #expect(!probe(.blizzard, precipitating: true))
+    }
+
+    @Test("Thunder means the thunderstorm kinds and nothing else")
+    func thunderPredicate() {
+        let thundery: Set<SkyConditions.Kind> = [
+            .isolatedThunderstorms, .scatteredThunderstorms, .thunderstorms, .strongStorms,
+        ]
+        for kind in SkyConditions.Kind.allCases {
+            let sample = SkyConditions(
+                kind: kind,
+                isPrecipitating: false,
+                windBand: .calm,
+                cloudBand: .clear,
+                fetchedAt: .now
+            )
+            #expect(sample.isThundery == thundery.contains(kind), "\(kind)")
+        }
+    }
+
     @Test("An unrecognized stored kind decodes as unknown rather than failing")
     func unknownKindDecodes() throws {
         let json = """

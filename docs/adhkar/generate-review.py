@@ -26,7 +26,7 @@ CATEGORY_TITLES = {
     "evening": "Evening set",
     "postPrayer": "After each prayer",
     "sleep": "Before sleep",
-    "situational": "Occasioned duas (no surface in this build)",
+    "situational": "Occasioned duas",
 }
 
 CATEGORY_ORDER = ["morning", "evening", "postPrayer", "sleep", "situational"]
@@ -67,10 +67,15 @@ anything ships.
   no browse-all list, no library.
 - Items are counted on the app's existing dhikr instrument. Sessions
   are recorded as plain facts — no streaks, no scores, no percentages.
-- The occasioned duas at the end are carried in the file and reviewed
-  here, but **no surface in this build offers them**. They are
-  reviewed now so that a future occasioned surface starts from vetted
-  text.
+- Of the occasioned duas at the end, only the four weather ones
+  (rain, after rain, wind, thunder) have a surface: a quiet,
+  dismissible line on the Today screen while the matching weather is
+  actually happening, which opens the text to read. It is never a
+  notification. The remaining occasioned duas still have **no
+  surface in this build** and are reviewed now so that a future
+  occasioned surface starts from vetted text.
+- Items carrying a `NEW` flag were added after the first review
+  request went out and have never been in front of a reviewer.
 
 ## Editorial decisions taken (please confirm or correct)
 
@@ -155,13 +160,13 @@ def render(content: dict) -> str:
             continue
         lines.append(f"\n## {CATEGORY_TITLES[category]}\n")
         for item in group:
-            lines.append(render_item(item))
+            lines.append(render_item(item, content["contentVersion"]))
 
     lines.append(FOOTER)
     return "\n".join(lines)
 
 
-def render_item(item: dict) -> str:
+def render_item(item: dict, content_version: str) -> str:
     source = item["source"]
     citation = f"{source['collection']} — {source['reference']}"
     if source.get("needsVerification"):
@@ -172,6 +177,11 @@ def render_item(item: dict) -> str:
 
     parts = [
         f"### {item['order']}. `{item['id']}`\n",
+    ]
+    if item.get("addedIn") == content_version:
+        parts.append("**NEW — PENDING REVIEW** — added in this draft, "
+                     "never yet in front of a reviewer.\n")
+    parts += [
         f"- [ ] Arabic, translation, source, and count are all correct.\n",
         "> " + item["arabic"] + "\n",
         f"**Transliteration.** {item['transliteration']}\n",

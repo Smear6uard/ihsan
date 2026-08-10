@@ -39,9 +39,19 @@ struct BannedLanguageSweepTests {
         "Packages/IhsanIntents/Sources/IhsanIntents/Intents/SaveDhikrSessionIntent.swift",
         // The remembrance layer.
         "ihsan/Adhkar/RemembranceBand.swift",
+        "ihsan/Adhkar/RemembranceSheet.swift",
         "ihsan/Adhkar/AdhkarSetScreen.swift",
         "ihsan/Adhkar/Helpers/AdhkarOffer.swift",
+        "ihsan/Adhkar/Helpers/RemembranceMenu.swift",
         "ihsan/Adhkar/ViewModel/AdhkarSetState.swift",
+        // The weather layer: its register lines and everything that
+        // decides them.
+        "ihsan/Weather/WeatherDuaOffer.swift",
+        "ihsan/Weather/WeatherEpisodeLedger.swift",
+        "ihsan/Weather/SkyWeatherModel.swift",
+        "ihsan/Weather/WeatherInterest.swift",
+        "Packages/IhsanCore/Sources/IhsanCore/Weather/SkyConditions.swift",
+        "Packages/IhsanDesignSystem/Sources/IhsanDesignSystem/Celestial/SkyWeatherTreatment.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Adhkar/AdhkarContent.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Adhkar/AdhkarContentLoader.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Models/AdhkarSession.swift",

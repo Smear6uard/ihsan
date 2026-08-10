@@ -244,6 +244,12 @@ private struct TodayReadyView: View {
     /// with the plate at Fajr rather than at civil midnight.
     @AppStorage("IhsanAdhkarDismissedDay")
     private var adhkarDismissedDay: String = ""
+    /// Weather dua episodes that have been put away. Keys name the
+    /// episode ("rain:<start>"), so the same rain never asks twice and
+    /// the next rain may ask again; the store prunes itself as weather
+    /// passes. Presentation state, never worship data.
+    @AppStorage("IhsanWeatherDuaDismissedEpisodes")
+    private var weatherDuaDismissedEpisodes: String = ""
     /// The tasbīḥ link asked which one; waiting on the answer.
     @State private var isChoosingPostPrayer = false
     /// The always-open door's hub. `-IhsanDebugPresentRemembrance`
@@ -400,6 +406,21 @@ private struct TodayReadyView: View {
                             yesterdayOfferDismissedDay = YesterdayAccount.civilDayKey(
                                 cycleDay(at: now), calendar: placeCalendar
                             )
+                        },
+                        weatherInscription: weatherDuaOffer(at: now)?.kind.inscription,
+                        weatherSpokenLabel: weatherDuaOffer(at: now)?.kind.spokenLabel,
+                        onWeatherTap: {
+                            if let offer = weatherDuaOffer(at: now) {
+                                adhkarSelection = AdhkarSelection(
+                                    category: .situational,
+                                    itemIDs: [offer.kind.itemID]
+                                )
+                            }
+                        },
+                        onWeatherDismiss: {
+                            if let offer = weatherDuaOffer(at: now) {
+                                dismissWeatherDua(offer)
+                            }
                         }
                     )
                     .padding(.horizontal, IhsanSpacing.md)
@@ -524,6 +545,7 @@ private struct TodayReadyView: View {
             .fullScreenCover(item: $adhkarSelection) { selection in
                 AdhkarSetScreen(
                     category: selection.category,
+                    itemIDs: selection.itemIDs,
                     showsTransliteration: sunnahSettings?.adhkarShowsTransliteration ?? true,
                     onDismiss: { adhkarSelection = nil }
                 )
@@ -821,6 +843,32 @@ private struct TodayReadyView: View {
                 ),
                 isContentAvailable: AdhkarAvailability.isAvailable
             )
+        )
+    }
+
+    /// The weather dua line, if this moment has one. Deliberately
+    /// outside every pause consideration: an excused pause suspends
+    /// salah and fasting, never remembrance.
+    private func weatherDuaOffer(at now: Date) -> WeatherDuaOffer.Offer? {
+        WeatherDuaOffer.offer(
+            WeatherDuaOffer.Context(
+                conditions: viewModel.skyWeather.current(at: now),
+                ledger: viewModel.skyWeather.episodes,
+                now: now,
+                dismissedEpisodes: WeatherDuaDismissal.decode(weatherDuaDismissedEpisodes),
+                isContentAvailable: AdhkarAvailability.isAvailable,
+                layerEnabled: sunnahSettings?.adhkarLayerEnabled ?? false
+            )
+        )
+    }
+
+    private func dismissWeatherDua(_ offer: WeatherDuaOffer.Offer) {
+        let dismissed = WeatherDuaDismissal
+            .decode(weatherDuaDismissedEpisodes)
+            .union([offer.episodeKey])
+        weatherDuaDismissedEpisodes = WeatherDuaDismissal.encode(
+            dismissed,
+            keeping: WeatherDuaOffer.liveEpisodeKeys(ledger: viewModel.skyWeather.episodes)
         )
     }
 
@@ -1443,7 +1491,12 @@ private struct PendingNafl: Identifiable {
 }
 
 /// The remembrance set currently open, as a presentation selection.
+/// `itemIDs` narrows the reader to specific items — the weather dua
+/// line opens exactly the one text its moment named.
 private struct AdhkarSelection: Identifiable {
     let category: AdhkarCategory
-    var id: String { category.rawValue }
+    var itemIDs: [String]? = nil
+    var id: String {
+        category.rawValue + (itemIDs.map { ":" + $0.joined(separator: ",") } ?? "")
+    }
 }

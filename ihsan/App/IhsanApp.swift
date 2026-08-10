@@ -217,7 +217,9 @@ private struct RootGate: View {
             for key in [
                 "IhsanSignificantDayDismissedDay",
                 "IhsanYesterdayOfferDismissedDay",
-                "IhsanSunnahCardDismissed"
+                "IhsanSunnahCardDismissed",
+                "IhsanAdhkarDismissedDay",
+                "IhsanWeatherDuaDismissedEpisodes"
             ] {
                 UserDefaults.standard.removeObject(forKey: key)
             }

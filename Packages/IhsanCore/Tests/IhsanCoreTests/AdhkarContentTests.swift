@@ -99,13 +99,43 @@ struct AdhkarContentTests {
     @Test("The set stays curated")
     func scopeStaysSmall() throws {
         let content = try content()
-        #expect(content.items.count <= 60, "\(content.items.count) items — past the curated ceiling")
+        #expect(content.items.count <= 65, "\(content.items.count) items — past the curated ceiling")
 
         for category in AdhkarCategory.allCases {
             let count = content.items(in: category).count
             #expect(count > 0, "\(category.rawValue) is empty")
         }
-        #expect(content.items(in: .situational).count <= 10)
+        // Raised from 10 when the four weather duas landed; the
+        // occasioned set is considered complete at twelve, so the very
+        // next addition forces this deliberate edit again.
+        #expect(content.items(in: .situational).count <= 12)
+    }
+
+    /// The weather duas ride the situational category: transmitted
+    /// texts for rain, after rain, hard wind, and thunder, surfaced by
+    /// the weather register line.
+    @Test("The weather duas are present as situational occasions")
+    func weatherDuasArePresent() throws {
+        let items = try content().items(in: .situational)
+        let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
+        for expected in [
+            "situational.rain", "situational.after-rain",
+            "situational.wind", "situational.thunder",
+        ] {
+            let item = byID[expected]
+            #expect(item != nil, "\(expected)")
+            #expect(item?.note?.isEmpty == false, "\(expected) needs its occasion line")
+            // Provenance: these arrived in the 2026-08-09 draft and the
+            // stamp is what flags them NEW in the review artifact.
+            #expect(item?.addedIn == "2026.08.09-draft.1", "\(expected)")
+        }
+    }
+
+    @Test("Items without an addedIn stamp decode with nil, not a failure")
+    func addedInIsOptional() throws {
+        let legacy = try content().items.first { $0.id == "situational.waking" }
+        #expect(legacy != nil)
+        #expect(legacy?.addedIn == nil)
     }
 
     /// The transmitted counts the reader will actually be asked to

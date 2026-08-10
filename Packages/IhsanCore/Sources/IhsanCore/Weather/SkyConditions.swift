@@ -124,6 +124,29 @@ public extension SkyConditions {
     func usable(at now: Date) -> SkyConditions? {
         isExpired(at: now) ? nil : self
     }
+
+    /// Whether rain — not snow — is falling. The transmitted rain dua
+    /// is for rain; a dry kind with measured precipitation counts, a
+    /// snowing sky does not.
+    var isRaining: Bool {
+        let snowFamily: Set<Kind> = [
+            .snow, .heavySnow, .flurries, .blowingSnow, .sunFlurries, .blizzard,
+        ]
+        if snowFamily.contains(kind) { return false }
+        return kind.impliesPrecipitation || isPrecipitating
+    }
+
+    /// Whether the sky is the kind that thunders. The thunder dhikr is
+    /// for thunder heard, so only the thunderstorm kinds qualify —
+    /// not every violent sky.
+    var isThundery: Bool {
+        switch kind {
+        case .isolatedThunderstorms, .scatteredThunderstorms, .thunderstorms, .strongStorms:
+            return true
+        default:
+            return false
+        }
+    }
 }
 
 /// When to actually go to the network. Kept pure so the policy is
