@@ -49,6 +49,13 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     /// must move the Fajr notification too.
     public let calculationTuning: CalculationTuning
     public let prayerPreferences: [PrayerNotificationPreference]
+    /// The user's masjid, when they set one. A value copy — `@Model` types
+    /// are not `Sendable` and cannot cross into this actor.
+    public let myMasjid: MyMasjidSnapshot?
+    /// Which prayer-days already carry a log, keyed by
+    /// `NotificationScheduler.iqamahDayKey`. Someone who has already
+    /// prayed does not need to be called to the congregation.
+    public let loggedPrayerKeys: Set<String>
 
     public init(
         notificationsEnabled: Bool = true,
@@ -59,8 +66,12 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         madhab: MadhabChoice = .standard,
         highLatitudeRule: HighLatitudeRule = .middleOfNight,
         calculationTuning: CalculationTuning = .standard,
-        prayerPreferences: [PrayerNotificationPreference] = Prayer.allCases.map { PrayerNotificationPreference(prayer: $0) }
+        prayerPreferences: [PrayerNotificationPreference] = Prayer.allCases.map { PrayerNotificationPreference(prayer: $0) },
+        myMasjid: MyMasjidSnapshot? = nil,
+        loggedPrayerKeys: Set<String> = []
     ) {
+        self.myMasjid = myMasjid
+        self.loggedPrayerKeys = loggedPrayerKeys
         self.notificationsEnabled = notificationsEnabled
         self.prayerNotificationsSuppressed = prayerNotificationsSuppressed
         self.morningAdhkarReminderEnabled = morningAdhkarReminderEnabled
@@ -84,7 +95,9 @@ extension NotificationScheduleSettings {
     init(
         userSettings: UserSettings,
         isPaused: Bool = false,
-        adhkarRemindersEnabled: Bool = false
+        adhkarRemindersEnabled: Bool = false,
+        myMasjid: MyMasjidSnapshot? = nil,
+        loggedPrayerKeys: Set<String> = []
     ) {
         let decodedConfigs = (try? JSONDecoder().decode(
             [PrayerNotificationConfig].self,
@@ -120,7 +133,9 @@ extension NotificationScheduleSettings {
                     leadTimeSeconds: $0.leadTimeSeconds,
                     isTimeSensitive: $0.isTimeSensitive
                 )
-            }
+            },
+            myMasjid: myMasjid,
+            loggedPrayerKeys: loggedPrayerKeys
         )
     }
 }
@@ -172,10 +187,28 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
             predicate: #Predicate { $0.endDate == nil }
         ))
 
+        // Only the recent past can already be logged, and only those days
+        // overlap the rolling window. Each key is built from the log's own
+        // stored zone, which is the zone it was recorded in.
+        let horizon = Date.now.addingTimeInterval(-2 * 24 * 3_600)
+        let recentLogs = try context.fetch(FetchDescriptor<PrayerLog>(
+            predicate: #Predicate { $0.prayerDate >= horizon }
+        ))
+        let loggedKeys = Set(recentLogs.compactMap { log -> String? in
+            guard let prayer = log.prayer else { return nil }
+            return NotificationScheduler.iqamahDayKey(
+                prayer: prayer,
+                adhan: log.scheduledTime,
+                timeZone: TimeZone(identifier: log.loggedTimeZoneIdentifier) ?? .current
+            )
+        })
+
         return NotificationScheduleSettings(
             userSettings: settings,
             isPaused: !activePauses.isEmpty,
-            adhkarRemindersEnabled: AdhkarReminderPreferenceStore.isEnabled
+            adhkarRemindersEnabled: AdhkarReminderPreferenceStore.isEnabled,
+            myMasjid: MyMasjid.fetchExisting(in: context)?.snapshot,
+            loggedPrayerKeys: loggedKeys
         )
     }
 }
@@ -205,6 +238,10 @@ public actor NotificationScheduler {
 
     static let notificationIdentifierPrefix = "ihsan.prayer."
     static let adhkarNotificationIdentifierPrefix = "ihsan.adhkar."
+    /// Iqamah reminders ride the same rolling rebuild as the prayer
+    /// notifications and are swept by the same pass, so a masjid removed
+    /// or a time changed cannot leave one standing.
+    public static let iqamahNotificationIdentifierPrefix = "ihsan.iqamah."
     private static let rollingWindowDayCount = 14
     /// Avoids stacking a remembrance banner on the prayer notification
     /// at the exact same instant while remaining well inside each window.
@@ -365,6 +402,20 @@ public actor NotificationScheduler {
                 }
             }
 
+            // The congregation's own call, for the prayers a person asked
+            // to be reminded of. Inside the ṣalāh gate: an excused pause
+            // silences this exactly as it silences the adhan notification.
+            if settings.notificationsEnabled && !settings.prayerNotificationsSuppressed {
+                for prayerTime in day.allFardh {
+                    try await scheduleIqamahReminder(
+                        prayerTime: prayerTime,
+                        settings: settings,
+                        referenceDate: referenceDate,
+                        timeZone: place.timeZone
+                    )
+                }
+            }
+
             if settings.morningAdhkarReminderEnabled {
                 try await scheduleAdhkarReminder(
                     category: .morning,
@@ -391,6 +442,7 @@ public actor NotificationScheduler {
             .filter {
                 $0.hasPrefix(Self.notificationIdentifierPrefix)
                     || $0.hasPrefix(Self.adhkarNotificationIdentifierPrefix)
+                    || $0.hasPrefix(Self.iqamahNotificationIdentifierPrefix)
             }
         guard !ihsanIdentifiers.isEmpty else {
             return
@@ -445,6 +497,93 @@ public actor NotificationScheduler {
         let trigger = UNCalendarNotificationTrigger(dateMatching: components, repeats: false)
         let identifier = Self.identifier(for: prayerTime.prayer, scheduledDate: prayerTime.scheduledTime)
         return UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+    }
+
+    /// Which prayer-day a log belongs to, for reminder suppression.
+    ///
+    /// Keyed by the adhan's civil date in the place's timezone rather than
+    /// by `PrayerLog.dedupKey`: the scheduler would otherwise have to
+    /// reproduce the cycle-attribution rule to build a matching key, and
+    /// two implementations of that rule is exactly one too many.
+    public static func iqamahDayKey(
+        prayer: Prayer,
+        adhan: Date,
+        timeZone: TimeZone
+    ) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let parts = calendar.dateComponents([.year, .month, .day], from: adhan)
+        let year = parts.year ?? 0
+        let month = parts.month ?? 0
+        let day = parts.day ?? 0
+        return String(format: "%@-%04d-%02d-%02d", prayer.rawValue, year, month, day)
+    }
+
+    /// One reminder, a shared lead before this prayer's resolved iqamah.
+    ///
+    /// Deliberately not time-sensitive: breaking through Focus belongs to
+    /// the prayer itself, and only where the person asked for it. This is
+    /// a reminder that the congregation is gathering, not a summons.
+    private func scheduleIqamahReminder(
+        prayerTime: PrayerTime,
+        settings: NotificationScheduleSettings,
+        referenceDate: Date,
+        timeZone: TimeZone
+    ) async throws {
+        guard let masjid = settings.myMasjid else { return }
+
+        let entry = masjid.entry(for: prayerTime.prayer)
+        guard entry.reminderEnabled, entry.isSet else { return }
+
+        // Someone who has already prayed does not need to be called again
+        // — for that day only.
+        let dayKey = Self.iqamahDayKey(
+            prayer: prayerTime.prayer, adhan: prayerTime.scheduledTime, timeZone: timeZone
+        )
+        guard !settings.loggedPrayerKeys.contains(dayKey) else { return }
+
+        // The one resolver every surface reads, so the reminder cannot
+        // fire against a different time than the card shows — Friday's
+        // khutbah included.
+        guard let resolved = IqamahResolver.resolved(
+            masjid: masjid,
+            prayer: prayerTime.prayer,
+            adhan: prayerTime.scheduledTime,
+            timeZone: timeZone
+        ) else {
+            return
+        }
+
+        let fireDate = resolved.time.addingTimeInterval(
+            TimeInterval(-masjid.reminderLeadMinutes * 60)
+        )
+        guard fireDate > referenceDate else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = NotificationContent.iqamahTitle(masjidName: masjid.name)
+        content.body = NotificationContent.iqamahBody(
+            prayer: prayerTime.prayer,
+            kind: resolved.kind,
+            leadMinutes: masjid.reminderLeadMinutes
+        )
+        content.sound = .default
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let trigger = UNCalendarNotificationTrigger(
+            dateMatching: calendar.dateComponents(
+                [.year, .month, .day, .hour, .minute, .second], from: fireDate
+            ),
+            repeats: false
+        )
+        let identifier = """
+            \(Self.iqamahNotificationIdentifierPrefix)\
+            \(prayerTime.prayer.rawValue).\
+            \(Int(fireDate.timeIntervalSince1970))
+            """
+        try await notificationCenter.add(
+            UNNotificationRequest(identifier: identifier, content: content, trigger: trigger)
+        )
     }
 
     private func scheduleAdhkarReminder(
