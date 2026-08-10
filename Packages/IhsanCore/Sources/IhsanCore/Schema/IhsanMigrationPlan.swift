@@ -10,7 +10,8 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             IhsanSchemaV5.self,
             IhsanSchemaV6.self,
             IhsanSchemaV7.self,
-            IhsanSchemaV8.self
+            IhsanSchemaV8.self,
+            IhsanSchemaV9.self
         ]
     }
 
@@ -61,6 +62,12 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             .lightweight(
                 fromVersion: IhsanSchemaV7.self,
                 toVersion: IhsanSchemaV8.self
+            ),
+            // V9 adds the `MyMasjid` entity and changes no existing record
+            // type, so there is nothing for a custom stage to do.
+            .lightweight(
+                fromVersion: IhsanSchemaV8.self,
+                toVersion: IhsanSchemaV9.self
             )
         ]
     }
