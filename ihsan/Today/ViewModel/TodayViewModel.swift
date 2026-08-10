@@ -129,7 +129,10 @@ final class TodayViewModel {
                 }(),
                 offsetDays: settings.hijriCalendarOffsetDays
             ),
-            night: relevantNight(now: now, place: place, settings: settings)
+            night: relevantNight(now: now, place: place, settings: settings),
+            // Read, never created: asking whether a masjid is set must not
+            // be what brings one into being.
+            myMasjid: MyMasjid.fetchExisting(in: modelContext)?.snapshot
         ))
 
         // The one-shot repair of records filed under the midnight

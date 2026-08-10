@@ -359,7 +359,13 @@ private struct TodayReadyView: View {
                 ),
                 safeAreaTop: proxy.safeAreaInsets.top,
                 safeAreaBottom: proxy.safeAreaInsets.bottom,
-                cardHeight: FocusedPrayerCard.cardHeight,
+                // The same number the card frames itself to, so the scene
+                // above is laid out against the card that actually exists.
+                cardHeight: FocusedPrayerCard.cardHeight(
+                    hasIqamah: focusedIqamahInscription(
+                        now: now, resolution: resolution
+                    ) != nil
+                ),
                 hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
             )
 
@@ -615,6 +621,22 @@ private struct TodayReadyView: View {
         }
     }
 
+    /// Whether the focused card will carry a congregation line, asked
+    /// where the page's geometry is decided so the scene above is measured
+    /// against the card that actually renders.
+    private func focusedIqamahInscription(
+        now: Date,
+        resolution: PrayerResolution
+    ) -> String? {
+        let prayer = effectiveFocusedPrayer(resolution: resolution)
+        let prayerTime = TodayDisplaySchedule.prayerTime(
+            for: prayer,
+            window: snapshot.scheduleWindow,
+            now: now
+        )
+        return iqamahInscription(for: prayer, adhan: prayerTime.scheduledTime)
+    }
+
     @ViewBuilder
     private func focusedCard(
         now: Date,
@@ -641,6 +663,8 @@ private struct TodayReadyView: View {
             loggedAt: log?.loggedAt,
             isJamaah: log?.withJamaah ?? false,
             windowState: windowState,
+            iqamahInscription: iqamahInscription(for: prayer, adhan: prayerTime.scheduledTime),
+            iqamahSpoken: iqamahSpoken(for: prayer, adhan: prayerTime.scheduledTime),
             rawatib: rawatibChips(for: prayer, now: now),
             nightSet: prayer == .isha ? nightChips(now: now) : nil,
             onToggleNafl: { kind in handleNaflTap(kind) },
@@ -1380,11 +1404,38 @@ private struct TodayReadyView: View {
                 currentStatus: log?.status
             ),
             windowState: windowState,
+            iqamahInscription: iqamahInscription(
+                for: prayer, adhan: displayPrayerTime.scheduledTime
+            ),
+            iqamahSpoken: iqamahSpoken(
+                for: prayer, adhan: displayPrayerTime.scheduledTime
+            ),
             onCommit: { status, jamaah in
                 commit(status: status, isJamaah: jamaah, for: prayer)
             },
             onTogglePause: { togglePause() },
             onCancel: {}
+        )
+    }
+
+    /// The congregation's line for this prayer, or nil when no masjid is
+    /// set and when this prayer keeps no time. Both surfaces read the one
+    /// resolver, so the card and the sheet cannot disagree.
+    private func iqamahInscription(for prayer: Prayer, adhan: Date) -> String? {
+        IqamahInscription.text(
+            masjid: snapshot.myMasjid,
+            prayer: prayer,
+            adhan: adhan,
+            timeZone: snapshot.place.timeZone
+        )
+    }
+
+    private func iqamahSpoken(for prayer: Prayer, adhan: Date) -> String? {
+        IqamahInscription.spoken(
+            masjid: snapshot.myMasjid,
+            prayer: prayer,
+            adhan: adhan,
+            timeZone: snapshot.place.timeZone
         )
     }
 
