@@ -139,6 +139,40 @@ public final class MyMasjid {
         self.modifiedAt = .now
     }
 
+    /// Whether a search result is this masjid.
+    ///
+    /// Coordinates are compared at four decimal places — roughly eleven
+    /// metres, the same precision the search uses to collapse its own
+    /// near-duplicates. Two searches return the same venue at slightly
+    /// different points, and without the tolerance the row would forget it
+    /// is already the user's masjid between one search and the next.
+    ///
+    /// A masjid typed by hand has no coordinate and matches nothing: it
+    /// never came from a search and cannot claim to be a row in one.
+    public func matches(name: String, latitude: Double, longitude: Double) -> Bool {
+        guard let storedLatitude = self.latitude,
+              let storedLongitude = self.longitude,
+              let storedName = self.name
+        else {
+            return false
+        }
+
+        func rounded(_ value: Double) -> Double {
+            (value * 10_000).rounded() / 10_000
+        }
+
+        func normalized(_ value: String) -> String {
+            value
+                .folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+        }
+
+        return normalized(storedName) == normalized(name)
+            && rounded(storedLatitude) == rounded(latitude)
+            && rounded(storedLongitude) == rounded(longitude)
+    }
+
     public var snapshot: MyMasjidSnapshot {
         MyMasjidSnapshot(
             name: name,

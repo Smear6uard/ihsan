@@ -153,3 +153,83 @@ struct MyMasjidTests {
         #expect(!labels.contains("longitude"))
     }
 }
+
+@Suite("My Masjid identity")
+@MainActor
+struct MyMasjidIdentityTests {
+
+    private func makeMasjid() throws -> MyMasjid {
+        let container = try ModelContainer(
+            for: Schema(IhsanSchemaV9.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let masjid = try MyMasjid.fetchOrCreate(in: ModelContext(container))
+        masjid.replaceVenue(
+            name: "Masjid al-Noor", streetLabel: "12 Mill Rd",
+            latitude: 41.8781, longitude: -87.6298
+        )
+        return masjid
+    }
+
+    @Test("The same venue matches")
+    func matchesTheSameVenue() throws {
+        let masjid = try makeMasjid()
+        #expect(
+            masjid.matches(name: "Masjid al-Noor", latitude: 41.8781, longitude: -87.6298)
+        )
+    }
+
+    /// Two searches return the same masjid at slightly different
+    /// coordinates. Matching to roughly eleven metres is what stops the
+    /// row forgetting it is already the user's masjid.
+    @Test("A coordinate that drifts a few metres still matches")
+    func toleratesSmallCoordinateDrift() throws {
+        let masjid = try makeMasjid()
+        #expect(
+            masjid.matches(name: "Masjid al-Noor", latitude: 41.87812, longitude: -87.62983)
+        )
+    }
+
+    @Test("A different venue does not match")
+    func doesNotMatchADifferentVenue() throws {
+        let masjid = try makeMasjid()
+        #expect(
+            masjid.matches(name: "Masjid al-Rahma", latitude: 41.9000, longitude: -87.7000)
+                == false
+        )
+    }
+
+    @Test("The same name a mile away does not match")
+    func doesNotMatchTheSameNameElsewhere() throws {
+        let masjid = try makeMasjid()
+        #expect(
+            masjid.matches(name: "Masjid al-Noor", latitude: 41.9000, longitude: -87.6298)
+                == false
+        )
+    }
+
+    @Test("Case and diacritics do not decide identity")
+    func matchesRegardlessOfCaseAndDiacritics() throws {
+        let masjid = try makeMasjid()
+        #expect(
+            masjid.matches(name: "MASJID AL-NOOR", latitude: 41.8781, longitude: -87.6298)
+        )
+    }
+
+    /// A masjid typed by hand has no coordinate. It cannot claim to be any
+    /// particular row in a search it never came from.
+    @Test("A masjid with no coordinate matches no search row")
+    func aCoordinatelessMasjidMatchesNothing() throws {
+        let container = try ModelContainer(
+            for: Schema(IhsanSchemaV9.models),
+            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
+        )
+        let masjid = try MyMasjid.fetchOrCreate(in: ModelContext(container))
+        masjid.name = "Masjid al-Noor"
+
+        #expect(
+            masjid.matches(name: "Masjid al-Noor", latitude: 41.8781, longitude: -87.6298)
+                == false
+        )
+    }
+}
