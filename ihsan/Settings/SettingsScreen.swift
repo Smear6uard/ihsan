@@ -97,7 +97,11 @@ struct SettingsScreen: View {
                         SunnahSection(
                             settings: settings,
                             path: $path,
-                            wakeFallbackNote: nightWakeFallbackNote,
+                            onWakeSettingsChanged: { refreshNightWake(for: settings) }
+                        )
+                        WakesAndAlarmsSection(
+                            settings: settings,
+                            fallbackNote: nightWakeFallbackNote,
                             onWakeSettingsChanged: { refreshNightWake(for: settings) }
                         )
                         AdhkarSection(
@@ -308,8 +312,11 @@ struct SettingsScreen: View {
     }
 
     private var nightWakeFallbackNote: String? {
-        guard settings?.nightWakeEnabled == true, nightWakeUsesFallback else { return nil }
-        return "Alarms aren't permitted on this device, so the wake arrives as a time-sensitive notification instead."
+        let anyEnabled = settings.map { settings in
+            WakeAnchor.allCases.contains { settings.wakeAnchorConfig(for: $0).isEnabled }
+        } ?? false
+        guard anyEnabled, nightWakeUsesFallback else { return nil }
+        return "Alarms aren't permitted on this device, so these arrive as time-sensitive notifications instead."
     }
 
     /// Re-syncs the standing wake after any wake-related change in Set,
@@ -1114,12 +1121,163 @@ private struct MakeupPrayersSection: View {
     }
 }
 
+/// The wakes group.
+///
+/// Four anchors, each its own switch and its own lead. Every one is
+/// strictly opt-in, none fires during an excused pause, and each day's
+/// wake is computed from that day's own sky rather than from a clock time.
+///
+/// The last third keeps the row it has always had, in the words it has
+/// always used, and appears only while the night-prayer layer is on —
+/// nobody's alarm behaviour changes because these controls moved house.
+private struct WakesAndAlarmsSection: View {
+    let settings: UserSettings
+    /// Plain-spoken note shown when wakes will arrive as time-sensitive
+    /// notifications rather than true alarms.
+    var fallbackNote: String?
+    var onWakeSettingsChanged: () -> Void = {}
+
+    /// Reading order is the order of the night: the last third, then
+    /// suhoor's end, then the window closing, then iftar.
+    private var visibleAnchors: [WakeAnchor] {
+        var anchors: [WakeAnchor] = []
+        if settings.sunnahLayerEnabled && settings.sunnahNightEnabled {
+            anchors.append(.lastThird)
+        }
+        anchors.append(contentsOf: [.fajrStart, .sunrise, .maghrib])
+        return anchors
+    }
+
+    var body: some View {
+        SettingsSectionCard("Wakes & Alarms") {
+            ForEach(visibleAnchors, id: \.self) { anchor in
+                anchorRow(anchor)
+            }
+
+            SettingsDescriptionText("Each wake is computed from that day's own sky, so it moves with the season and with where you are. None of them rings during a pause.")
+
+            if let fallbackNote {
+                SettingsDescriptionText(fallbackNote)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func anchorRow(_ anchor: WakeAnchor) -> some View {
+        let config = settings.wakeAnchorConfig(for: anchor)
+
+        SettingsRow(
+            title: Self.title(for: anchor),
+            subtitle: Self.subtitle(for: anchor),
+            glyph: Self.glyph(for: anchor)
+        ) {
+            Toggle("", isOn: Binding(
+                get: { config.isEnabled },
+                set: { isOn in
+                    var updated = config
+                    updated.isEnabled = isOn
+                    settings.setWakeAnchorConfig(updated)
+                    settings.modifiedAt = .now
+                    onWakeSettingsChanged()
+                }
+            ))
+            .labelsHidden()
+            .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+            .accessibilityLabel(Self.title(for: anchor))
+        }
+
+        if config.isEnabled {
+            HStack {
+                miniCountControl(
+                    label: Self.offsetLabel(for: anchor),
+                    value: config.offsetMinutes,
+                    step: 5,
+                    range: 0...60,
+                    accessibilityLabel: Self.offsetAccessibilityLabel(for: anchor)
+                ) { minutes in
+                    var updated = config
+                    updated.offsetMinutes = minutes
+                    settings.setWakeAnchorConfig(updated)
+                    settings.modifiedAt = .now
+                    onWakeSettingsChanged()
+                }
+                Spacer()
+            }
+            .padding(.vertical, IhsanSpacing.xs)
+
+            SettingsDescriptionText(Self.explanation(for: anchor))
+        }
+    }
+
+    // MARK: - Copy
+    //
+    // One plain line each, naming the moment and why someone would want
+    // to be awake for it.
+
+    static func title(for anchor: WakeAnchor) -> String {
+        switch anchor {
+        case .lastThird: "Gentle wake"
+        case .fajrStart: "Suhoor's end"
+        case .sunrise: "Before Fajr ends"
+        case .maghrib: "Iftar"
+        }
+    }
+
+    static func subtitle(for anchor: WakeAnchor) -> String {
+        switch anchor {
+        case .lastThird: "For the last third"
+        case .fajrStart: "Before Fajr begins"
+        case .sunrise: "Before sunrise"
+        case .maghrib: "At Maghrib"
+        }
+    }
+
+    static func glyph(for anchor: WakeAnchor) -> SettingsGlyph {
+        switch anchor {
+        case .lastThird: .nightMoon
+        case .fajrStart: .clock
+        case .sunrise: .sun
+        case .maghrib: .highLatitude
+        }
+    }
+
+    static func offsetLabel(for anchor: WakeAnchor) -> String {
+        switch anchor {
+        case .lastThird: "Wake before it begins (min)"
+        case .fajrStart: "Wake before Fajr begins (min)"
+        case .sunrise: "Wake before sunrise (min)"
+        case .maghrib: "Alert before Maghrib (min)"
+        }
+    }
+
+    static func offsetAccessibilityLabel(for anchor: WakeAnchor) -> String {
+        switch anchor {
+        case .lastThird: "Minutes before the last third to wake"
+        case .fajrStart: "Minutes before Fajr begins to wake"
+        case .sunrise: "Minutes before sunrise to wake"
+        case .maghrib: "Minutes before Maghrib to be alerted"
+        }
+    }
+
+    static func explanation(for anchor: WakeAnchor) -> String {
+        switch anchor {
+        case .lastThird:
+            "The last third of the night is computed from each night's own span, Maghrib to the coming Fajr — the wake follows it, softly, and never rings during a pause."
+        case .fajrStart:
+            "Before Fajr begins — while the meal is still open."
+        case .sunrise:
+            "Before Fajr ends — wake in time to pray before sunrise."
+        case .maghrib:
+            "Iftar — when the fast opens at Maghrib."
+        }
+    }
+}
+
 private struct SunnahSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
-    /// Plain-spoken note shown when the wake will arrive as a
-    /// time-sensitive notification rather than a true alarm.
-    var wakeFallbackNote: String?
+    /// The last-third anchor is gated by this layer, so flipping either
+    /// toggle here has to re-sync the standing wake.
     var onWakeSettingsChanged: () -> Void = {}
 
     var body: some View {
@@ -1211,46 +1369,6 @@ private struct SunnahSection: View {
                     .labelsHidden()
                     .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
                     .accessibilityLabel("Night prayer")
-                }
-
-                if settings.sunnahNightEnabled {
-                    SettingsRow(title: "Gentle wake", subtitle: "For the last third", glyph: .clock) {
-                        Toggle("", isOn: Binding(
-                            get: { settings.nightWakeEnabled },
-                            set: {
-                                settings.nightWakeEnabled = $0
-                                settings.modifiedAt = .now
-                                onWakeSettingsChanged()
-                            }
-                        ))
-                        .labelsHidden()
-                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                        .accessibilityLabel("Gentle wake")
-                    }
-
-                    if settings.nightWakeEnabled {
-                        HStack {
-                            miniCountControl(
-                                label: "Wake before it begins (min)",
-                                value: settings.nightWakeOffsetMinutes,
-                                step: 5,
-                                range: 0...60,
-                                accessibilityLabel: "Minutes before the last third to wake"
-                            ) {
-                                settings.nightWakeOffsetMinutes = $0
-                                settings.modifiedAt = .now
-                                onWakeSettingsChanged()
-                            }
-                            Spacer()
-                        }
-                        .padding(.vertical, IhsanSpacing.xs)
-
-                        SettingsDescriptionText("The last third of the night is computed from each night's own span, Maghrib to the coming Fajr — the wake follows it, softly, and never rings during a pause.")
-
-                        if let wakeFallbackNote {
-                            SettingsDescriptionText(wakeFallbackNote)
-                        }
-                    }
                 }
 
                 SettingsRow(title: "Ask for rak'ah counts", subtitle: "Off: one tap records", glyph: .counts) {
