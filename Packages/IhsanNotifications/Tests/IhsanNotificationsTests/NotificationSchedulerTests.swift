@@ -243,6 +243,18 @@ func theGentleWakeAndTheNotificationShareOneTone() {
     #expect(AdhanAsset.nightWake == AdhanAsset.chime)
 }
 
+/// `AdhanAsset.nightWake` is a computed alias for the chime and it is THE
+/// swap point: when the muezzin-era recordings land, replacing the chime
+/// replaces all four anchors with no code change anywhere else. This test
+/// exists so the swap point cannot quietly become plural.
+@Test
+func everyWakeAnchorSharesOneTone() {
+    for anchor in WakeAnchor.allCases {
+        #expect(WakeSound.assetName(for: anchor) == AdhanAsset.nightWake)
+    }
+    #expect(Set(WakeAnchor.allCases.map { WakeSound.assetName(for: $0) }).count == 1)
+}
+
 @Test
 func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     let center = MockNotificationCenter()
@@ -573,4 +585,284 @@ private extension Calendar {
         calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         return calendar
     }
+}
+
+// MARK: - Iqamah reminders
+//
+// An ordinary notification, not an alarm: it says the congregation is
+// about to begin and then gets out of the way.
+
+private func masjidFixture(
+    entries: [IqamahEntry],
+    leadMinutes: Int = 10,
+    name: String? = "Masjid al-Noor",
+    khutbah: Int? = nil
+) -> MyMasjidSnapshot {
+    MyMasjidSnapshot(
+        name: name,
+        streetLabel: nil,
+        entries: Prayer.allCases.map { prayer in
+            entries.first { $0.prayer == prayer } ?? IqamahEntry(prayer: prayer)
+        },
+        jumuahKhutbahMinutesFromMidnight: khutbah,
+        reminderLeadMinutes: leadMinutes
+    )
+}
+
+/// Fire instants recovered from the identifiers, which carry the epoch
+/// exactly the way the adhkār reminders' do.
+private func iqamahFireDates(
+    _ center: MockNotificationCenter,
+    prayer: Prayer? = nil
+) async -> [Date] {
+    let prefix = NotificationScheduler.iqamahNotificationIdentifierPrefix
+    return await center.pendingNotificationRequests()
+        .map(\.identifier)
+        .filter { $0.hasPrefix(prefix) }
+        .filter { identifier in
+            guard let prayer else { return true }
+            return identifier.contains(".\(prayer.rawValue).")
+        }
+        .compactMap { identifier -> Date? in
+            guard let epoch = identifier.split(separator: ".").last.flatMap({ Double($0) })
+            else { return nil }
+            return Date(timeIntervalSince1970: epoch)
+        }
+        .sorted()
+}
+
+@Test
+func iqamahReminderFiresTheConfiguredLeadBeforeTheResolvedIqamah() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(
+                entries: [
+                    IqamahEntry(
+                        prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                    )
+                ],
+                leadMinutes: 10
+            )
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    // Mock Dhuhr is dayStart + 12h; iqamah is +20; the reminder is −10.
+    let expected = fixedDate().addingTimeInterval(12 * 3_600 + 10 * 60)
+    let fires = await iqamahFireDates(center, prayer: .dhuhr)
+    #expect(fires.first == expected)
+}
+
+@Test
+func iqamahReminderResolvesAFixedTimeRatherThanAnOffset() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(
+                entries: [
+                    IqamahEntry(
+                        prayer: .dhuhr,
+                        mode: .fixed,
+                        fixedMinutesFromMidnight: 13 * 60 + 30,
+                        reminderEnabled: true
+                    )
+                ],
+                leadMinutes: 15
+            )
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    // 1:30 PM in the place's zone (GMT here), less the 15-minute lead.
+    let expected = fixedDate().addingTimeInterval(13 * 3_600 + 15 * 60)
+    let fires = await iqamahFireDates(center, prayer: .dhuhr)
+    #expect(fires.first == expected)
+}
+
+@Test
+func iqamahReminderSchedulesOnlyPrayersWhoseReminderIsOn() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                ),
+                IqamahEntry(
+                    prayer: .asr, mode: .offset, offsetMinutes: 15, reminderEnabled: false
+                ),
+            ])
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    #expect(!(await iqamahFireDates(center, prayer: .dhuhr)).isEmpty)
+    #expect((await iqamahFireDates(center, prayer: .asr)).isEmpty)
+}
+
+@Test
+func iqamahReminderSkipsAnArmedPrayerWithNoTimeSet() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(prayer: .dhuhr, mode: .none, reminderEnabled: true)
+            ])
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    #expect((await iqamahFireDates(center)).isEmpty)
+}
+
+/// Rest is rest. A pause suppresses ṣalāh notifications, and the iqamah
+/// reminder is one of them.
+@Test
+func iqamahReminderIsSuppressedByAnOpenPause() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            prayerNotificationsSuppressed: true,
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                )
+            ])
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    #expect((await iqamahFireDates(center)).isEmpty)
+}
+
+/// Someone who has already prayed does not need to be called again — and
+/// only for the day they logged, not for the whole rolling window.
+@Test
+func iqamahReminderIsSuppressedForADayAlreadyLogged() async throws {
+    let center = MockNotificationCenter()
+    let gmt = TimeZone(secondsFromGMT: 0)!
+    let todaysDhuhr = fixedDate().addingTimeInterval(12 * 3_600)
+    let key = NotificationScheduler.iqamahDayKey(
+        prayer: .dhuhr, adhan: todaysDhuhr, timeZone: gmt
+    )
+
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                )
+            ]),
+            loggedPrayerKeys: [key]
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    let fires = await iqamahFireDates(center, prayer: .dhuhr)
+    let todaysReminder = fixedDate().addingTimeInterval(12 * 3_600 + 10 * 60)
+    #expect(!fires.contains(todaysReminder))
+    // Tomorrow's is untouched: one logged prayer silences one day.
+    #expect(fires.contains(todaysReminder.addingTimeInterval(24 * 3_600)))
+}
+
+@Test
+func iqamahReminderNeedsAMasjid() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(myMasjid: nil)
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    #expect((await iqamahFireDates(center)).isEmpty)
+}
+
+/// It is a reminder, not a summons. Breaking through Focus belongs to the
+/// prayer itself, and only when the user asked for it.
+@Test
+func iqamahReminderIsNotTimeSensitive() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                )
+            ])
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    let requests = await center.pendingNotificationRequests().filter {
+        $0.identifier.hasPrefix(NotificationScheduler.iqamahNotificationIdentifierPrefix)
+    }
+    #expect(!requests.isEmpty)
+    #expect(requests.allSatisfy { $0.content.interruptionLevel != .timeSensitive })
+}
+
+@Test
+func iqamahRemindersAreSweptWithTheRestOfTheSchedule() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                )
+            ])
+        )
+    )
+    try await scheduler.rebuildSchedule()
+    #expect(!(await iqamahFireDates(center)).isEmpty)
+
+    await scheduler.cancelAllScheduledNotifications()
+
+    #expect((await iqamahFireDates(center)).isEmpty)
+}
+
+@Test
+func iqamahReminderNeverSchedulesAMomentAlreadyPast() async throws {
+    let center = MockNotificationCenter()
+    let scheduler = makeScheduler(
+        now: fixedDate().addingTimeInterval(13 * 3_600),
+        center: center,
+        settings: NotificationScheduleSettings(
+            myMasjid: masjidFixture(entries: [
+                IqamahEntry(
+                    prayer: .dhuhr, mode: .offset, offsetMinutes: 20, reminderEnabled: true
+                )
+            ])
+        )
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    let reference = fixedDate().addingTimeInterval(13 * 3_600)
+    #expect((await iqamahFireDates(center)).allSatisfy { $0 > reference })
 }

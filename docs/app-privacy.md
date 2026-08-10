@@ -40,12 +40,30 @@ and no identifier is shared with anyone.
 
 | Permission | Used for | Not used for |
 | --- | --- | --- |
-| **Location** (when in use) | Prayer times and the qibla bearing. | Anything else. Coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, a file, or a network call. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. |
+| **Location** (when in use) | Prayer times, the qibla bearing, and the nearby-masjid search. | Anything else. Your coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, a file, or a network call. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. The one place a coordinate is stored is a masjid you deliberately set as your own — see below. |
 | **Microphone** | Recording a voice reflection. | Nothing is uploaded. The `.m4a` stays in the App Group container and is deliberately excluded from CloudKit sync; only the transcript and metadata travel, and audio sync is opt-in (`adhanPlaysInSilentMode`'s neighbour, `autoSyncAudioMemos`, off by default). |
 | **Speech recognition** | Transcribing a voice reflection, on device. | No audio leaves the phone during transcription. |
 | **Motion** | One thing: `DeviceTiltMonitor` reads device pitch so the qibla dial can say "lay the phone flat" when it is held near-vertical and magnetic heading stops being reliable. It publishes a single boolean. | Not parallax, not analytics, not activity or step data. |
 | **Notifications** | One notification per prayer, at its time. Per-prayer sound and Focus behaviour are the person's choice, and every prayer can be silenced on its own. | Nothing is sent from a server; every notification is scheduled locally. |
 | **Alarms (AlarmKit)** | The optional gentle wake for the last third of the night, off by default. Requested only when someone turns that on. | — |
+
+## The one coordinate the app stores
+
+Your own position is never written down. A masjid you choose is.
+
+When you set a masjid as yours — from the nearby sheet, or by typing its
+name — the app keeps its name, its street label, and, if it came from a
+search, its coordinate. That is a place you picked and entered prayer
+times for, not a record of where you have been, and it is the only
+coordinate in the store. It is encrypted at rest, lives in your private
+iCloud database, and is written in exactly one place in the code: the
+moment you adopt a masjid.
+
+The times themselves are yours too. Nothing fetches iqamah times from any
+service — there is no masjid-times server behind this feature, and no
+request leaves the phone when you enter or read them.
+
+Removing your masjid removes all of it.
 
 ## Background modes
 

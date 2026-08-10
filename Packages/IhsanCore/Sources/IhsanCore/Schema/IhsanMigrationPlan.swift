@@ -10,7 +10,9 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             IhsanSchemaV5.self,
             IhsanSchemaV6.self,
             IhsanSchemaV7.self,
-            IhsanSchemaV8.self
+            IhsanSchemaV8.self,
+            IhsanSchemaV9.self,
+            IhsanSchemaV10.self
         ]
     }
 
@@ -61,6 +63,45 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             .lightweight(
                 fromVersion: IhsanSchemaV7.self,
                 toVersion: IhsanSchemaV8.self
+            ),
+            // V9 adds the `MyMasjid` entity and changes no existing record
+            // type, so there is nothing for a custom stage to do.
+            .lightweight(
+                fromVersion: IhsanSchemaV8.self,
+                toVersion: IhsanSchemaV9.self
+            ),
+            .custom(
+                fromVersion: IhsanSchemaV9.self,
+                toVersion: IhsanSchemaV10.self,
+                willMigrate: nil,
+                didMigrate: { context in
+                    // The last-third wake keeps the configuration its
+                    // owner set. Written EXPLICITLY, for the reason
+                    // V6 -> V7 was: a lightweight stage would let the new
+                    // model's all-off default land on an upgrader and
+                    // silently retire a wake they rely on.
+                    //
+                    // The other three arrive off. Nobody is opted into an
+                    // alarm by an upgrade.
+                    // The LIVE `UserSettings`, because V10 is the current
+                    // schema and its models are the live classes. Naming a
+                    // nested type here would be naming a class this store
+                    // is not using.
+                    let settings = try context.fetch(FetchDescriptor<UserSettings>())
+                    for setting in settings {
+                        setting.wakeAnchorsConfigJSON = WakeAnchorConfig.encode([
+                            WakeAnchorConfig(
+                                anchor: .lastThird,
+                                isEnabled: setting.nightWakeEnabled,
+                                offsetMinutes: setting.nightWakeOffsetMinutes
+                            ),
+                            WakeAnchorConfig(anchor: .fajrStart),
+                            WakeAnchorConfig(anchor: .sunrise),
+                            WakeAnchorConfig(anchor: .maghrib),
+                        ])
+                    }
+                    try context.save()
+                }
             )
         ]
     }

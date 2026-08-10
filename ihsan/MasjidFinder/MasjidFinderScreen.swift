@@ -2,6 +2,7 @@ import SwiftUI
 import MapKit
 import IhsanCore
 import IhsanDesignSystem
+import SwiftData
 
 #if canImport(UIKit)
 import UIKit
@@ -15,7 +16,14 @@ struct MasjidFinderScreen: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.nowProvider) private var nowProvider
+    @Environment(\.modelContext) private var modelContext
     @State private var viewModel = MasjidFinderViewModel()
+
+    /// The row awaiting a decision, when choosing it would displace a
+    /// masjid the user already set.
+    @State private var pendingReplacement: MasjidResult?
+    /// True while the times editor is up, after a venue has been chosen.
+    @State private var isEditingTimes = false
 
     var body: some View {
         TimelineView(.periodic(from: .distantPast, by: 60)) { context in
@@ -32,6 +40,79 @@ struct MasjidFinderScreen: View {
             #endif
             await viewModel.bootstrap()
         }
+        .confirmationDialog(
+            "Replace your masjid?",
+            isPresented: replacementPrompt,
+            titleVisibility: .visible
+        ) {
+            Button("Replace", role: .destructive) {
+                if let pendingReplacement { adopt(pendingReplacement) }
+                pendingReplacement = nil
+            }
+            Button("Keep", role: .cancel) { pendingReplacement = nil }
+        } message: {
+            Text(replacementMessage)
+        }
+        .sheet(isPresented: $isEditingTimes) {
+            if let masjid = MyMasjid.fetchExisting(in: modelContext),
+               let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                NavigationStack {
+                    MyMasjidEditorScreen(masjid: masjid, settings: settings)
+                }
+            }
+        }
+    }
+
+    // MARK: - Choosing a masjid
+
+    private var currentMasjid: MyMasjid? {
+        MyMasjid.fetchExisting(in: modelContext)
+    }
+
+    private func isMyMasjid(_ result: MasjidResult) -> Bool {
+        currentMasjid?.matches(
+            name: result.name,
+            latitude: result.coordinate.latitude,
+            longitude: result.coordinate.longitude
+        ) ?? false
+    }
+
+    private var replacementPrompt: Binding<Bool> {
+        Binding(
+            get: { pendingReplacement != nil },
+            set: { if !$0 { pendingReplacement = nil } }
+        )
+    }
+
+    /// Says what will be lost before it is lost. The times described the
+    /// other congregation's schedule, so they cannot come along.
+    private var replacementMessage: String {
+        let existing = currentMasjid?.name ?? "your current masjid"
+        return "The times you entered for \(existing) will be cleared."
+    }
+
+    /// Choosing a venue: adopt it outright when nothing is set or nothing
+    /// would be lost, and ask first when times would be discarded.
+    private func chooseAsMine(_ result: MasjidResult) {
+        guard let existing = currentMasjid, existing.hasAnyIqamah else {
+            adopt(result)
+            return
+        }
+        pendingReplacement = result
+    }
+
+    /// The one deliberate write of a venue's coordinate. The search path
+    /// itself still stores nothing.
+    private func adopt(_ result: MasjidResult) {
+        guard let masjid = try? MyMasjid.fetchOrCreate(in: modelContext) else { return }
+        masjid.replaceVenue(
+            name: result.name,
+            streetLabel: result.street,
+            latitude: result.coordinate.latitude,
+            longitude: result.coordinate.longitude
+        )
+        try? modelContext.save()
+        isEditingTimes = true
     }
 
     /// Verification-only staging for the four non-result branches.
@@ -126,7 +207,9 @@ struct MasjidFinderScreen: View {
                     MasjidResultRow(
                         result: result,
                         tokens: tokens,
-                        onTap: { viewModel.openInMaps(result) }
+                        isMyMasjid: isMyMasjid(result),
+                        onTap: { viewModel.openInMaps(result) },
+                        onSetAsMine: { chooseAsMine(result) }
                     )
                 }
             }

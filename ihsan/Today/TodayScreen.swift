@@ -359,7 +359,13 @@ private struct TodayReadyView: View {
                 ),
                 safeAreaTop: proxy.safeAreaInsets.top,
                 safeAreaBottom: proxy.safeAreaInsets.bottom,
-                cardHeight: FocusedPrayerCard.cardHeight,
+                // The same number the card frames itself to, so the scene
+                // above is laid out against the card that actually exists.
+                cardHeight: FocusedPrayerCard.cardHeight(
+                    hasIqamah: focusedIqamahInscription(
+                        now: now, resolution: resolution
+                    ) != nil
+                ),
                 hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
             )
 
@@ -418,6 +424,10 @@ private struct TodayReadyView: View {
                     } else {
                         if let inscription = fastingInscription(at: now) {
                             fastingInscriptionRow(inscription, tokens: tokens, now: now)
+                        }
+
+                        if showsSuhoorOffer {
+                            suhoorOfferRow(tokens: tokens)
                         }
 
                         focusedCard(now: now, resolution: resolution, tokens: tokens)
@@ -615,6 +625,22 @@ private struct TodayReadyView: View {
         }
     }
 
+    /// Whether the focused card will carry a congregation line, asked
+    /// where the page's geometry is decided so the scene above is measured
+    /// against the card that actually renders.
+    private func focusedIqamahInscription(
+        now: Date,
+        resolution: PrayerResolution
+    ) -> String? {
+        let prayer = effectiveFocusedPrayer(resolution: resolution)
+        let prayerTime = TodayDisplaySchedule.prayerTime(
+            for: prayer,
+            window: snapshot.scheduleWindow,
+            now: now
+        )
+        return iqamahInscription(for: prayer, adhan: prayerTime.scheduledTime)
+    }
+
     @ViewBuilder
     private func focusedCard(
         now: Date,
@@ -641,6 +667,8 @@ private struct TodayReadyView: View {
             loggedAt: log?.loggedAt,
             isJamaah: log?.withJamaah ?? false,
             windowState: windowState,
+            iqamahInscription: iqamahInscription(for: prayer, adhan: prayerTime.scheduledTime),
+            iqamahSpoken: iqamahSpoken(for: prayer, adhan: prayerTime.scheduledTime),
             rawatib: rawatibChips(for: prayer, now: now),
             nightSet: prayer == .isha ? nightChips(now: now) : nil,
             onToggleNafl: { kind in handleNaflTap(kind) },
@@ -1118,6 +1146,72 @@ private struct TodayReadyView: View {
         )
     }
 
+    /// Whether the one-time suhoor suggestion has a turn right now.
+    private var showsSuhoorOffer: Bool {
+        guard let settings = sunnahSettings, snapshot.isCurrentlyRamadan else { return false }
+        return SuhoorOffer.shouldOffer(
+            isRamadan: true,
+            anchorEnabled: settings.wakeAnchorConfig(for: .fajrStart).isEnabled,
+            offeredAt: settings.suhoorAnchorOfferedAt
+        )
+    }
+
+    /// The suggestion, in the fasting register: one quiet line and two
+    /// plain answers.
+    ///
+    /// Offered, never assumed. Only the accept path enables the anchor,
+    /// and both answers stamp the offer as spent — a suggestion that
+    /// returns every Ramadan stops being a suggestion.
+    @ViewBuilder
+    private func suhoorOfferRow(tokens: SkyPaletteTokens) -> some View {
+        VStack(spacing: IhsanSpacing.xs) {
+            Text(SuhoorOffer.message)
+                .font(IhsanFont.bodyEnglish)
+                .foregroundStyle(tokens.inkSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: IhsanSpacing.md) {
+                Button(SuhoorOffer.acceptTitle) {
+                    Haptics.settle()
+                    answerSuhoorOffer(enable: true)
+                }
+                .font(IhsanFont.inscription)
+                .foregroundStyle(tokens.ink)
+                .accessibilityHint("Turns on a wake before Fajr begins.")
+
+                Button(SuhoorOffer.declineTitle) {
+                    Haptics.impact(.light)
+                    answerSuhoorOffer(enable: false)
+                }
+                .font(IhsanFont.inscription)
+                .foregroundStyle(tokens.inkSecondary)
+                .accessibilityHint("Dismisses this suggestion for good.")
+            }
+        }
+        .padding(.horizontal, IhsanSpacing.lg)
+        .padding(.bottom, IhsanSpacing.sm)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func answerSuhoorOffer(enable: Bool) {
+        guard let settings = sunnahSettings else { return }
+        if enable {
+            var config = settings.wakeAnchorConfig(for: .fajrStart)
+            config.isEnabled = true
+            settings.setWakeAnchorConfig(config)
+        }
+        // Stamped either way: the question has been asked and answered.
+        settings.suhoorAnchorOfferedAt = nowProvider.now()
+        settings.modifiedAt = nowProvider.now()
+        Task {
+            if enable {
+                await WakeAnchorService.shared.requestAlarmAuthorizationIfNeeded()
+            }
+            await WakeAnchorService.shared.refresh(using: modelContext)
+        }
+    }
+
     /// Inscription register, no countdown urgency: one small-caps
     /// line. Facts sit still; the two offers are quiet buttons.
     @ViewBuilder
@@ -1380,11 +1474,38 @@ private struct TodayReadyView: View {
                 currentStatus: log?.status
             ),
             windowState: windowState,
+            iqamahInscription: iqamahInscription(
+                for: prayer, adhan: displayPrayerTime.scheduledTime
+            ),
+            iqamahSpoken: iqamahSpoken(
+                for: prayer, adhan: displayPrayerTime.scheduledTime
+            ),
             onCommit: { status, jamaah in
                 commit(status: status, isJamaah: jamaah, for: prayer)
             },
             onTogglePause: { togglePause() },
             onCancel: {}
+        )
+    }
+
+    /// The congregation's line for this prayer, or nil when no masjid is
+    /// set and when this prayer keeps no time. Both surfaces read the one
+    /// resolver, so the card and the sheet cannot disagree.
+    private func iqamahInscription(for prayer: Prayer, adhan: Date) -> String? {
+        IqamahInscription.text(
+            masjid: snapshot.myMasjid,
+            prayer: prayer,
+            adhan: adhan,
+            timeZone: snapshot.place.timeZone
+        )
+    }
+
+    private func iqamahSpoken(for prayer: Prayer, adhan: Date) -> String? {
+        IqamahInscription.spoken(
+            masjid: snapshot.myMasjid,
+            prayer: prayer,
+            adhan: adhan,
+            timeZone: snapshot.place.timeZone
         )
     }
 
@@ -1411,7 +1532,7 @@ private struct TodayReadyView: View {
         }
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
-            await NightWakeService.shared.refresh(using: modelContext)
+            await WakeAnchorService.shared.refresh(using: modelContext)
         }
         // Widgets honor the pause the moment it begins or ends —
         // a paused day shows times and no logging surface.

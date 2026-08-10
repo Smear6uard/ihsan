@@ -278,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV8.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV10.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -985,5 +985,137 @@ private func assertV7StoreMigratesToV8() throws {
             in: context
         )
         #expect(second == nil)
+    }
+}
+
+// MARK: - V8 -> V9: the masjid arrives
+
+private func seedV8Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV8.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let log = IhsanSchemaV8.PrayerLog()
+    log.dedupKey = "fajr-\(iso(plainDay))"
+    log.prayerRaw = Prayer.fajr.rawValue
+    log.prayerDate = plainDay
+    log.loggedTimeZoneIdentifier = "UTC"
+    log.scheduledTime = utcAt(plainDay, 5, 12)
+    log.loggedAt = utcAt(plainDay, 5, 20)
+    log.statusRaw = PrayerStatus.onTime.rawValue
+    context.insert(log)
+
+    let settings = IhsanSchemaV8.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.sunnahLayerEnabled = true
+    settings.sunnahNightEnabled = true
+    settings.nightWakeEnabled = true
+    settings.nightWakeOffsetMinutes = 15
+    settings.lastResolvedCityName = "Toronto"
+    context.insert(settings)
+
+    try context.save()
+}
+
+@Test
+func migratingSeededV8StoreAddsTheMasjidAndDisturbsNothing() async {
+    await #expect(processExitsWith: .success) {
+        try assertV8StoreMigratesToV9()
+    }
+}
+
+private func assertV8StoreMigratesToV9() throws {
+    try withMigratedStore(seed: seedV8Store) { context in
+        // The new entity arrives empty. Nobody is given a masjid they did
+        // not set, and nothing asks them to.
+        #expect(try context.fetch(FetchDescriptor<MyMasjid>()).isEmpty)
+        #expect(MyMasjid.fetchExisting(in: context) == nil)
+
+        // And the upgrade touches nothing that was already there.
+        #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 1)
+        let settings = try #require(try context.fetch(FetchDescriptor<UserSettings>()).first)
+        #expect(settings.hasCompletedOnboarding == true)
+        #expect(settings.lastResolvedCityName == "Toronto")
+        #expect(settings.nightWakeEnabled == true)
+        #expect(settings.nightWakeOffsetMinutes == 15)
+    }
+}
+
+// MARK: - V9 -> V10: the wake anchors, and the wake that was already set
+
+private func seedV9Store(at url: URL, configuredWake: Bool) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV9.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let settings = IhsanSchemaV9.UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.sunnahLayerEnabled = configuredWake
+    settings.sunnahNightEnabled = configuredWake
+    settings.nightWakeEnabled = configuredWake
+    settings.nightWakeOffsetMinutes = configuredWake ? 15 : 0
+    context.insert(settings)
+
+    let masjid = IhsanSchemaV9.MyMasjid()
+    masjid.id = MyMasjid.singletonID
+    masjid.name = "Masjid al-Noor"
+    masjid.reminderLeadMinutes = 10
+    context.insert(masjid)
+
+    try context.save()
+}
+
+private func seedV9StoreWithConfiguredWake(at url: URL) throws {
+    try seedV9Store(at: url, configuredWake: true)
+}
+
+private func seedV9StoreWithNoWake(at url: URL) throws {
+    try seedV9Store(at: url, configuredWake: false)
+}
+
+/// The one that matters: somebody who set the gentle wake still has it
+/// after the upgrade that replaced it, with the same offset.
+@Test
+func migratingSeededV9StoreKeepsAConfiguredWake() async {
+    await #expect(processExitsWith: .success) {
+        try withMigratedStore(seed: seedV9StoreWithConfiguredWake) { context in
+            let settings = try #require(
+                try context.fetch(FetchDescriptor<UserSettings>()).first
+            )
+
+            let lastThird = settings.wakeAnchorConfig(for: .lastThird)
+            #expect(lastThird.isEnabled)
+            #expect(lastThird.offsetMinutes == 15)
+
+            // Nobody is opted into an alarm by an upgrade.
+            for anchor in [WakeAnchor.fajrStart, .sunrise, .maghrib] {
+                #expect(settings.wakeAnchorConfig(for: anchor).isEnabled == false)
+                #expect(settings.wakeAnchorConfig(for: anchor).offsetMinutes == 0)
+            }
+
+            // The suggestion has not had its turn yet.
+            #expect(settings.suhoorAnchorOfferedAt == nil)
+
+            // And the masjid crossed the stage untouched.
+            let masjid = try #require(MyMasjid.fetchExisting(in: context))
+            #expect(masjid.name == "Masjid al-Noor")
+            #expect(masjid.reminderLeadMinutes == 10)
+        }
+    }
+}
+
+@Test
+func migratingSeededV9StoreLeavesAnUnsetWakeOff() async {
+    await #expect(processExitsWith: .success) {
+        try withMigratedStore(seed: seedV9StoreWithNoWake) { context in
+            let settings = try #require(
+                try context.fetch(FetchDescriptor<UserSettings>()).first
+            )
+            for anchor in WakeAnchor.allCases {
+                #expect(settings.wakeAnchorConfig(for: anchor).isEnabled == false)
+            }
+        }
     }
 }

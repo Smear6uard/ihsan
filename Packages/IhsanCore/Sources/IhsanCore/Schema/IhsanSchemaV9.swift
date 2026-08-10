@@ -1,17 +1,15 @@
 import Foundation
 import SwiftData
 
-/// Frozen snapshot of the schema as it stood at V8: V7 plus
-/// `PrayerLog.reviewFlagRaw` and `UserSettings.cycleReattributionVersion`.
+/// Frozen snapshot of the schema as it stood at V9: V8 plus the
+/// `MyMasjid` entity.
 ///
-/// Frozen rather than extended, for the same reason V5 through V7 were:
-/// stores on disk already claim this version, and changing what it means
-/// leaves them unmigratable ("unknown model version"). The live model
-/// classes are top-level in `Models/` and are listed by the latest
-/// `IhsanSchemaV*`.
-public enum IhsanSchemaV8: VersionedSchema {
+/// Frozen rather than extended, for the same reason V5 through V8 were:
+/// stores on disk already claim this version. The live model classes are
+/// top-level in `Models/` and are listed by the latest `IhsanSchemaV*`.
+public enum IhsanSchemaV9: VersionedSchema {
     public static var versionIdentifier: Schema.Version {
-        Schema.Version(8, 0, 0)
+        Schema.Version(9, 0, 0)
     }
 
     public static var models: [any PersistentModel.Type] {
@@ -28,7 +26,8 @@ public enum IhsanSchemaV8: VersionedSchema {
             NaflLog.self,
             FastLog.self,
             DhikrSession.self,
-            AdhkarSession.self
+            AdhkarSession.self,
+            MyMasjid.self
         ]
     }
 
@@ -413,6 +412,31 @@ public enum IhsanSchemaV8: VersionedSchema {
         public var modifiedAt: Date = Date.distantPast
 
         #Index<AdhkarSession>([\.sessionDate])
+
+        public init() {}
+    }
+
+    @Model
+    public final class MyMasjid {
+        public var id: UUID = UUID()
+
+        @Attribute(.allowsCloudEncryption)
+        public var name: String?
+
+        @Attribute(.allowsCloudEncryption)
+        public var streetLabel: String?
+
+        @Attribute(.allowsCloudEncryption)
+        public var latitude: Double?
+
+        @Attribute(.allowsCloudEncryption)
+        public var longitude: Double?
+
+        public var iqamahConfigJSON: String = "[]"
+        public var jumuahKhutbahMinutesFromMidnight: Int?
+        public var reminderLeadMinutes: Int = 10
+        public var createdAt: Date = Date.distantPast
+        public var modifiedAt: Date = Date.distantPast
 
         public init() {}
     }

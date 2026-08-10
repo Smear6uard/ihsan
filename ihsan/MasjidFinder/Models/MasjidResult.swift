@@ -43,6 +43,13 @@ nonisolated struct MasjidResult: Identifiable, Hashable, Sendable {
         self.id = "\(normalizedName)-\(lat)-\(lon)"
     }
 
+    /// The venue's coordinate, for the one place it is ever written down:
+    /// the deliberate act of setting this masjid as the user's own. Nothing
+    /// on the search path itself persists it.
+    var coordinate: (latitude: Double, longitude: Double) {
+        (latitude, longitude)
+    }
+
     /// Open Apple Maps with this masjid as the destination, the user's
     /// current location as origin. Maps honors the person's preferred
     /// route mode rather than this app choosing one for them.

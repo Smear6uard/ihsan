@@ -77,6 +77,19 @@ struct FocusedPrayerCard: View {
     /// performs no independent boundary comparisons.
     let windowState: PrayerWindowState
 
+    /// The congregation's time for this prayer, already resolved and
+    /// formatted — "IQAMAH · 1:30 PM", or "KHUTBAH · 1:15 PM" on Friday.
+    ///
+    /// It joins the state line's register: same inscription face, same
+    /// tracking, same `inkSecondary`. Deliberately not a badge, a chip, or
+    /// gilded — gold means *committed* in this app, and an informational
+    /// time may not borrow that meaning.
+    ///
+    /// `nil` renders the card exactly as it was before My Masjid existed.
+    var iqamahInscription: String?
+    /// The spoken form of the same line, for VoiceOver.
+    var iqamahSpoken: String?
+
     /// Sunnah-layer surfaces; all default off so the five-prayer card
     /// is untouched until the user opts in.
     var rawatib: RawatibChips?
@@ -126,6 +139,28 @@ struct FocusedPrayerCard: View {
     /// above is measured against. Every non-expanded state lays out
     /// within this bound, so switching prayers never moves the card.
     static let cardHeight: CGFloat = 140
+
+    /// What a congregation line costs: one inscription row plus the
+    /// spacing above it.
+    ///
+    /// The card grows rather than compressing, because the state it has
+    /// least room in — `.upcoming`, which already carries a title-scale
+    /// numeral above its inscription — is exactly the state where the
+    /// iqamah is most useful: it is what a person plans their departure
+    /// around. Absorbing the line by shrinking the numeral or letting it
+    /// clip would take the room from the wrong place.
+    static let iqamahLineHeight: CGFloat = 20
+
+    /// The resting height for a card that may carry a congregation line.
+    /// The scene above is measured against this same number, so the page
+    /// stays one composition instead of the card quietly covering more sky.
+    static func cardHeight(hasIqamah: Bool) -> CGFloat {
+        hasIqamah ? cardHeight + iqamahLineHeight : cardHeight
+    }
+
+    static func expandedCardHeight(hasIqamah: Bool) -> CGFloat {
+        hasIqamah ? expandedCardHeight + iqamahLineHeight : expandedCardHeight
+    }
 
     /// The expanded height. Taller than the resting card on purpose:
     /// the growth is a direct answer to a tap, animated, and it is what
@@ -194,7 +229,11 @@ struct FocusedPrayerCard: View {
         contentForMode
             .padding(14)
             .frame(maxWidth: .infinity)
-            .frame(height: isExpandedLayout ? Self.expandedCardHeight : Self.cardHeight)
+            .frame(
+                height: isExpandedLayout
+                    ? Self.expandedCardHeight(hasIqamah: iqamahInscription != nil)
+                    : Self.cardHeight(hasIqamah: iqamahInscription != nil)
+            )
             .celestialPanel(tokens: tokens, cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
             // The card follows the finger a little on the way to its
@@ -407,11 +446,41 @@ struct FocusedPrayerCard: View {
         }
     }
 
+    /// The congregation's time, joining the state line's register.
+    ///
+    /// One definition, used by the collapsed, expanded, and logged
+    /// layouts, so the line cannot drift between them. Hidden from
+    /// VoiceOver here because each layout combines its children into a
+    /// single spoken label that already carries it.
+    @ViewBuilder
+    private var iqamahLine: some View {
+        if let iqamahInscription {
+            Text(iqamahInscription)
+                .font(IhsanFont.inscription)
+                .tracking(1.4)
+                .monospacedDigit()
+                .foregroundStyle(tokens.inkSecondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
+                .inkKeyline(tokens)
+                .accessibilityHidden(true)
+        }
+    }
+
     /// The card's second line, per the state hierarchy: upcoming keeps
     /// the prayer time as the primary numeral with the countdown as an
     /// inscription; the active window is described in small caps only.
+    /// The congregation's line, when there is one, sits beneath.
     @ViewBuilder
     private var phaseDetail: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            phaseDetailPrimary
+            iqamahLine
+        }
+    }
+
+    @ViewBuilder
+    private var phaseDetailPrimary: some View {
         switch phase {
         case .upcoming:
             VStack(alignment: .leading, spacing: 4) {
@@ -491,6 +560,9 @@ struct FocusedPrayerCard: View {
         case .logged:
             break
         }
+        if let iqamahSpoken {
+            parts.append(iqamahSpoken)
+        }
         return parts.joined(separator: ", ")
     }
 
@@ -524,6 +596,7 @@ struct FocusedPrayerCard: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.75)
                         .inkKeyline(tokens)
+                    iqamahLine
                 }
                 Spacer(minLength: 0)
                 Button {
@@ -760,6 +833,7 @@ struct FocusedPrayerCard: View {
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .inkKeyline(tokens)
+                        iqamahLine
                     }
                 }
                 .accessibilityElement(children: .combine)
@@ -813,6 +887,9 @@ struct FocusedPrayerCard: View {
         }
         if let status = currentStatus {
             parts.append(status.spokenLabel)
+        }
+        if let iqamahSpoken {
+            parts.append(iqamahSpoken)
         }
         return parts.joined(separator: ", ")
     }

@@ -139,10 +139,26 @@ public final class UserSettings {
     /// Vestigial, for the same reason as `pathNaflOverlayEnabled`: the
     /// dhikr presence row now follows the data.
     public var pathDhikrOverlayEnabled: Bool = false
-    /// The gentle wake for the last third of the night. Strictly opt-in.
+    /// Vestigial. The wake settings now live in `wakeAnchorsConfigJSON`,
+    /// which carries all four anchors; the V9 → V10 migration copied these
+    /// two into the `.lastThird` entry and nothing has read them since.
+    ///
+    /// Kept in the schema because deleting a stored property costs a
+    /// migration over every row to remove two scalars. Do not re-wire a
+    /// control to them — a control bound here can be toggled without
+    /// changing anything that rings.
     public var nightWakeEnabled: Bool = false
-    /// Minutes before the last third's start to wake; 0 wakes at its start.
+    /// Vestigial, for the same reason as `nightWakeEnabled`.
     public var nightWakeOffsetMinutes: Int = 0
+
+    /// The four wake anchors, encoded. Defaults to every anchor off: a
+    /// fresh install rings for nothing until asked.
+    public var wakeAnchorsConfigJSON: String = WakeAnchorConfig.encode(WakeAnchorConfig.allOff)
+
+    /// When the one-time Ramadan suhoor suggestion was shown. Non-nil
+    /// means it has had its turn — offered once, in one Ramadan, and never
+    /// raised again whatever the person decided.
+    public var suhoorAnchorOfferedAt: Date?
 
     // MARK: - Adhkar
     //
@@ -456,5 +472,32 @@ public extension UserSettings {
         case .maghrib: adhanEnabledMaghrib = enabled
         case .isha: adhanEnabledIsha = enabled
         }
+    }
+
+    // MARK: - Wake anchors
+
+    /// Every anchor, in a fixed order, falling back to all-off when the
+    /// stored payload is unreadable. An anchor missing from the payload
+    /// comes back off rather than absent — a wake nobody can see is worse
+    /// than one that is plainly not set.
+    var wakeAnchorConfigs: [WakeAnchorConfig] {
+        let stored = WakeAnchorConfig.decode(wakeAnchorsConfigJSON)
+        return WakeAnchor.allCases.map { anchor in
+            stored.first { $0.anchor == anchor } ?? WakeAnchorConfig(anchor: anchor)
+        }
+    }
+
+    func wakeAnchorConfig(for anchor: WakeAnchor) -> WakeAnchorConfig {
+        wakeAnchorConfigs.first { $0.anchor == anchor } ?? WakeAnchorConfig(anchor: anchor)
+    }
+
+    func setWakeAnchorConfig(_ config: WakeAnchorConfig) {
+        var configs = wakeAnchorConfigs
+        if let index = configs.firstIndex(where: { $0.anchor == config.anchor }) {
+            configs[index] = config
+        } else {
+            configs.append(config)
+        }
+        wakeAnchorsConfigJSON = WakeAnchorConfig.encode(configs)
     }
 }

@@ -203,6 +203,10 @@ private struct RootGate: View {
             try? modelContext.delete(model: DhikrSession.self)
             try? modelContext.delete(model: QadaEntry.self)
             try? modelContext.delete(model: QadaLedger.self)
+            // The masjid goes too. A test that set one would otherwise
+            // hand the next test its iqamah times, and a test that
+            // silently inherits state is not a test.
+            try? modelContext.delete(model: MyMasjid.self)
             // Preferences leak between runs too — a custom angle set by
             // one test is still there for the next one, and a test that
             // silently inherits state is not a test. The settings row

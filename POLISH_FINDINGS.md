@@ -1187,3 +1187,41 @@ system's half of each contract.
   degrees feel settled without making the release feel sticky. Repeat
   with Reduce Motion enabled and after the system shows a calibration
   warning.
+
+## Daily utilities — My Masjid and the wake anchors
+
+- **A wake anchor firing on real hardware.** Every anchor's fire time is
+  pinned in source (`WakeAnchorTests` asserts `fire == event − offset`
+  for all four across both DST boundaries), and the coordinator is
+  proven to leave exactly one standing alarm through a location change.
+  What source cannot prove is that AlarmKit actually wakes a locked,
+  silenced phone. Please arm one anchor — `.fajrStart` is the easiest to
+  wait for — with a small offset, lock the device, and confirm it rings,
+  that the tone is the chime, and that the stop button reads correctly
+  on the lock screen. Then repeat with alarm permission declined, and
+  confirm the time-sensitive notification arrives instead and that Set
+  says so plainly.
+
+- **The upcoming card's numeral at `.accessibility5`.** The focused card
+  now grows by one inscription row when a congregation line is present,
+  and the page geometry is measured against the same number. But
+  `.upcoming` renders its time in `.system(.title, design: .monospaced)`
+  — a text *style*, so unlike the rest of the card's fixed-size
+  inscription faces it does scale with Dynamic Type. At the largest
+  sizes on the narrowest supported phone, confirm the numeral, the
+  countdown inscription, and the iqamah line all still fit the panel
+  without the numeral clipping. This scaling behaviour predates this
+  work; the added line makes it worth a look.
+
+- **The nearby row's third line under Dynamic Type.** `SET AS MY MASJID`
+  is a full-width target on its own line precisely so it survives large
+  text. Confirm on device at `.accessibility5` that it does not wrap
+  into the distance line above it, and that VoiceOver reads the row and
+  the affordance as two distinct elements rather than one.
+
+- **Iqamah reminder timing against a real masjid board.** The reminder
+  resolves through the same `IqamahResolver` the card reads, so they
+  cannot disagree in source. Worth one real-world check across a Friday
+  boundary: confirm the Dhuhr card shows `KHUTBAH` rather than `IQAMAH`
+  on Friday, and that the reminder that morning fires against the
+  khutbah time.

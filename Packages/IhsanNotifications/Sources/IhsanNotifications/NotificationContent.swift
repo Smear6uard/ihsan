@@ -73,6 +73,31 @@ public enum NotificationContent {
         return content
     }
 
+    /// The masjid's own name when it has one — a person recognises "Masjid
+    /// al-Noor" faster than a generic word, and they chose that name.
+    public static func iqamahTitle(masjidName: String?) -> String {
+        guard let masjidName, !masjidName.trimmingCharacters(in: .whitespaces).isEmpty
+        else {
+            return "Iqamah"
+        }
+        return "Iqamah at \(masjidName)"
+    }
+
+    /// States the fact and stops. No urging, no exhortation — the person
+    /// set this reminder and knows what it is for.
+    public static func iqamahBody(
+        prayer: Prayer,
+        kind: IqamahKind,
+        leadMinutes: Int
+    ) -> String {
+        let name = kind == .khutbah ? "Khutbah" : "\(prayer.displayNameEnglish) iqamah"
+        if leadMinutes <= 0 {
+            return "\(name) now."
+        }
+        let unit = leadMinutes == 1 ? "minute" : "minutes"
+        return "\(name) in \(leadMinutes) \(unit)."
+    }
+
     private static func localizedTimeString(for date: Date, timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
         formatter.locale = .autoupdatingCurrent

@@ -50,6 +50,11 @@ struct PrayerLogSheet: View {
     /// The exact state produced by `PrayerStateResolver`. `nil`
     /// (retroactive days) shows the date, no live temporal claim.
     var windowState: PrayerWindowState? = nil
+    /// The congregation's time for this prayer, already resolved and
+    /// formatted. `nil` renders the header exactly as it was before My
+    /// Masjid existed.
+    var iqamahInscription: String? = nil
+    var iqamahSpoken: String? = nil
 
     /// One commit: the chosen timing plus the jamāʿah flag, together.
     let onCommit: (PrayerStatus, Bool) -> Void
@@ -74,6 +79,8 @@ struct PrayerLogSheet: View {
         availableStatuses: Set<PrayerStatus>,
         displayDate: Date? = nil,
         windowState: PrayerWindowState? = nil,
+        iqamahInscription: String? = nil,
+        iqamahSpoken: String? = nil,
         onCommit: @escaping (PrayerStatus, Bool) -> Void,
         onTogglePause: @escaping () -> Void = {},
         onCancel: @escaping () -> Void
@@ -89,6 +96,8 @@ struct PrayerLogSheet: View {
         self.availableStatuses = availableStatuses
         self.displayDate = displayDate
         self.windowState = windowState
+        self.iqamahInscription = iqamahInscription
+        self.iqamahSpoken = iqamahSpoken
         self.onCommit = onCommit
         self.onTogglePause = onTogglePause
         self.onCancel = onCancel
@@ -214,6 +223,17 @@ struct PrayerLogSheet: View {
                     .tracking(1.4)
                     .monospacedDigit()
                     .foregroundStyle(tokens.inkSecondary)
+
+                // The congregation's time, in the same register directly
+                // beneath the window it belongs to.
+                if let iqamahInscription {
+                    Text(iqamahInscription)
+                        .font(IhsanFont.inscription)
+                        .tracking(1.4)
+                        .monospacedDigit()
+                        .foregroundStyle(tokens.inkSecondary)
+                        .accessibilityLabel(iqamahSpoken ?? iqamahInscription)
+                }
             }
 
             Spacer(minLength: IhsanSpacing.xs)

@@ -129,7 +129,10 @@ final class TodayViewModel {
                 }(),
                 offsetDays: settings.hijriCalendarOffsetDays
             ),
-            night: relevantNight(now: now, place: place, settings: settings)
+            night: relevantNight(now: now, place: place, settings: settings),
+            // Read, never created: asking whether a masjid is set must not
+            // be what brings one into being.
+            myMasjid: MyMasjid.fetchExisting(in: modelContext)?.snapshot
         ))
 
         // The one-shot repair of records filed under the midnight
@@ -198,7 +201,7 @@ final class TodayViewModel {
         // Snapshot refreshes fire on foreground and on significant
         // location change — exactly the moments the wake must recompute
         // from the (possibly new) night.
-        await NightWakeService.shared.refresh(using: modelContext)
+        await WakeAnchorService.shared.refresh(using: modelContext)
     }
 
     /// Move records filed under the midnight rule onto the cycles they
@@ -355,7 +358,7 @@ final class TodayViewModel {
                     // not only Today. Keep notifications and the last-
                     // third wake on the same newly resolved place.
                     try? await NotificationScheduler.shared.rebuildSchedule()
-                    await NightWakeService.shared.refresh(using: self.modelContext)
+                    await WakeAnchorService.shared.refresh(using: self.modelContext)
                 } catch {
                     // Keep observing; a transient lookup failure should
                     // not permanently disable automatic updates.
