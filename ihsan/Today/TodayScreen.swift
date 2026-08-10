@@ -426,6 +426,10 @@ private struct TodayReadyView: View {
                             fastingInscriptionRow(inscription, tokens: tokens, now: now)
                         }
 
+                        if showsSuhoorOffer {
+                            suhoorOfferRow(tokens: tokens)
+                        }
+
                         focusedCard(now: now, resolution: resolution, tokens: tokens)
 
                         if let duhaWindow = activeDuhaWindow(at: now) {
@@ -1140,6 +1144,72 @@ private struct TodayReadyView: View {
             maghrib: fastDayMaghrib(at: now),
             timeZone: snapshot.place.timeZone
         )
+    }
+
+    /// Whether the one-time suhoor suggestion has a turn right now.
+    private var showsSuhoorOffer: Bool {
+        guard let settings = sunnahSettings, snapshot.isCurrentlyRamadan else { return false }
+        return SuhoorOffer.shouldOffer(
+            isRamadan: true,
+            anchorEnabled: settings.wakeAnchorConfig(for: .fajrStart).isEnabled,
+            offeredAt: settings.suhoorAnchorOfferedAt
+        )
+    }
+
+    /// The suggestion, in the fasting register: one quiet line and two
+    /// plain answers.
+    ///
+    /// Offered, never assumed. Only the accept path enables the anchor,
+    /// and both answers stamp the offer as spent — a suggestion that
+    /// returns every Ramadan stops being a suggestion.
+    @ViewBuilder
+    private func suhoorOfferRow(tokens: SkyPaletteTokens) -> some View {
+        VStack(spacing: IhsanSpacing.xs) {
+            Text(SuhoorOffer.message)
+                .font(IhsanFont.bodyEnglish)
+                .foregroundStyle(tokens.inkSecondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: IhsanSpacing.md) {
+                Button(SuhoorOffer.acceptTitle) {
+                    Haptics.settle()
+                    answerSuhoorOffer(enable: true)
+                }
+                .font(IhsanFont.inscription)
+                .foregroundStyle(tokens.ink)
+                .accessibilityHint("Turns on a wake before Fajr begins.")
+
+                Button(SuhoorOffer.declineTitle) {
+                    Haptics.impact(.light)
+                    answerSuhoorOffer(enable: false)
+                }
+                .font(IhsanFont.inscription)
+                .foregroundStyle(tokens.inkSecondary)
+                .accessibilityHint("Dismisses this suggestion for good.")
+            }
+        }
+        .padding(.horizontal, IhsanSpacing.lg)
+        .padding(.bottom, IhsanSpacing.sm)
+        .accessibilityElement(children: .contain)
+    }
+
+    private func answerSuhoorOffer(enable: Bool) {
+        guard let settings = sunnahSettings else { return }
+        if enable {
+            var config = settings.wakeAnchorConfig(for: .fajrStart)
+            config.isEnabled = true
+            settings.setWakeAnchorConfig(config)
+        }
+        // Stamped either way: the question has been asked and answered.
+        settings.suhoorAnchorOfferedAt = nowProvider.now()
+        settings.modifiedAt = nowProvider.now()
+        Task {
+            if enable {
+                await WakeAnchorService.shared.requestAlarmAuthorizationIfNeeded()
+            }
+            await WakeAnchorService.shared.refresh(using: modelContext)
+        }
     }
 
     /// Inscription register, no countdown urgency: one small-caps
