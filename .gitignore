@@ -5,3 +5,7 @@ build/
 DerivedData/
 xcuserdata/
 CLAUDE.md
+# Agent scratch space. Holds git worktrees — whole checkouts, gigabytes of
+# them, each with its own .git file. Untracked and unignored, one `git add
+# -A` stages the lot.
+.claude/
