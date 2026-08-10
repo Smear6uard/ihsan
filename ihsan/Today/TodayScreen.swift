@@ -569,6 +569,12 @@ private struct TodayReadyView: View {
                 try? await viewModel.refreshSnapshot()
             }
         }
+        // The weather cadence: once when this id first resolves, then
+        // once per hour turn. The policy inside decides whether the
+        // network is actually asked; most firings serve the cache.
+        .task(id: Int(now.timeIntervalSinceReferenceDate / SkyConditions.refreshInterval)) {
+            await viewModel.refreshWeather()
+        }
         // The entrance: fire once after first appearance (the state
         // starts at 0 so the first frame composes at rest-zero, then
         // the layers animate in on their staggered clocks), and again
@@ -609,6 +615,9 @@ private struct TodayReadyView: View {
                     }
                 }
                 lastActiveAt = now
+                // Foreground is a weather moment: a stale reading
+                // refreshes here, a fresh one costs nothing.
+                Task { await viewModel.refreshWeather() }
             } else {
                 lastActiveAt = now
             }

@@ -1870,6 +1870,14 @@ private struct AboutSection: View {
                 glyph: .book,
                 action: { openURL(URL(string: "https://github.com/sameerstudios/ihsan-fiqh-config")!) }
             )
+            // Required Apple Weather attribution: the trademark line
+            // and the legal link, quiet in the inscription register.
+            SettingsRow(
+                title: "Weather data",
+                subtitle: "Apple Weather",
+                glyph: .sun,
+                action: { openURL(URL(string: "https://weatherkit.apple.com/legal-attribution.html")!) }
+            )
             SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", glyph: .heart) { EmptyView() }
             SettingsRow(
                 title: "Privacy policy",

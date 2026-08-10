@@ -21,6 +21,10 @@ final class TodayViewModel {
     private let modelContext: ModelContext
     private var settings: UserSettings?
 
+    /// The sky's weather reading, refreshed beside — never inside —
+    /// the schedule work. Everything it serves is allowed to be nil.
+    let skyWeather: SkyWeatherModel
+
     @ObservationIgnored
     private nonisolated(unsafe) var significantChangesTask: Task<Void, Never>?
 
@@ -29,6 +33,7 @@ final class TodayViewModel {
         prayerTimesProvider: PrayerTimesProviding = AdhanPrayerTimesProvider(),
         hijriCalendar: Calendar = RamadanContext.currentHijriCalendar,
         nowProvider: NowProvider = .system,
+        weatherProvider: any SkyWeatherProviding = WeatherKitSkyProvider(),
         modelContext: ModelContext
     ) {
         self.locationProvider = locationProvider
@@ -36,6 +41,10 @@ final class TodayViewModel {
         self.hijriCalendar = hijriCalendar
         self.nowProvider = nowProvider
         self.modelContext = modelContext
+        self.skyWeather = SkyWeatherModel(
+            provider: weatherProvider,
+            locate: { try await locationProvider.currentPlace().coordinates }
+        )
     }
 
     /// Called by the screen on appear. Idempotent: safe to call again after
@@ -53,6 +62,11 @@ final class TodayViewModel {
 
             settings = try UserSettings.fetchOrCreate(in: modelContext)
             try await refreshSnapshot()
+
+            // Weather rides beside the snapshot, never inside it: the
+            // plate is ready before the sky knows anything, and a
+            // fetch that fails changes nothing on screen.
+            Task { [weak self] in await self?.refreshWeather() }
 
             if settings?.automaticLocationUpdatesEnabled == true,
                auth == .authorizedAlways {
@@ -343,6 +357,17 @@ final class TodayViewModel {
         }
     }
 
+    /// Silent, optional, and cheap when nothing wants it. Interest is
+    /// re-decided on every call so flipping a consumer off stops the
+    /// fetching without any teardown.
+    func refreshWeather(force: Bool = false) async {
+        await skyWeather.refresh(
+            interested: WeatherInterest.isActive(settings: settings),
+            now: nowProvider.now(),
+            force: force
+        )
+    }
+
     private func startObservingLocationChanges() {
         significantChangesTask?.cancel()
         let stream = locationProvider.significantLocationChanges()
@@ -356,6 +381,10 @@ final class TodayViewModel {
                     // third wake on the same newly resolved place.
                     try? await NotificationScheduler.shared.rebuildSchedule()
                     await NightWakeService.shared.refresh(using: self.modelContext)
+                    // A new place can mean a new sky. Forced, because
+                    // the hourly freshness window is keyed to time,
+                    // not to where the reading was taken.
+                    await self.refreshWeather(force: true)
                 } catch {
                     // Keep observing; a transient lookup failure should
                     // not permanently disable automatic updates.
