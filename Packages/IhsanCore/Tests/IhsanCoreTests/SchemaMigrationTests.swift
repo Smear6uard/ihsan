@@ -278,7 +278,7 @@ private func withMigratedStore(
 
     try seed(storeURL)
 
-    let schema = Schema(versionedSchema: IhsanSchemaV10.self)
+    let schema = Schema(versionedSchema: IhsanSchemaV11.self)
     let configuration = ModelConfiguration(schema: schema, url: storeURL, cloudKitDatabase: .none)
     let container = try ModelContainer(
         for: schema,
@@ -1116,6 +1116,57 @@ func migratingSeededV9StoreLeavesAnUnsetWakeOff() async {
             for anchor in WakeAnchor.allCases {
                 #expect(settings.wakeAnchorConfig(for: anchor).isEnabled == false)
             }
+        }
+    }
+}
+
+// MARK: - V10 -> V11: numeric Khatam ledgers
+
+private func seedV10Store(at url: URL) throws {
+    let schema = Schema(versionedSchema: IhsanSchemaV10.self)
+    let configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
+    let container = try ModelContainer(for: schema, configurations: configuration)
+    let context = ModelContext(container)
+
+    let settings = UserSettings()
+    settings.hasCompletedOnboarding = true
+    settings.lastResolvedCityName = "Chicago"
+    context.insert(settings)
+    context.insert(PrayerLog(
+        prayer: .fajr,
+        prayerDate: Date(timeIntervalSinceReferenceDate: 800_000_000),
+        loggedTimeZoneIdentifier: "America/Chicago",
+        scheduledTime: Date(timeIntervalSinceReferenceDate: 800_000_100),
+        status: .onTime
+    ))
+    try context.save()
+}
+
+@Test
+func migratingSeededV10StoreAddsEmptyWritableKhatamLedgers() async {
+    await #expect(processExitsWith: .success) {
+        try withMigratedStore(seed: seedV10Store) { context in
+            #expect(try context.fetch(FetchDescriptor<KhatamPlan>()).isEmpty)
+            #expect(try context.fetch(FetchDescriptor<KhatamEntry>()).isEmpty)
+            #expect(try context.fetch(FetchDescriptor<PrayerLog>()).count == 1)
+            let settings = try #require(
+                try context.fetch(FetchDescriptor<UserSettings>()).first
+            )
+            #expect(settings.lastResolvedCityName == "Chicago")
+
+            let plan = KhatamPlan(
+                startDate: .now,
+                endDate: .now.addingTimeInterval(29 * 86_400)
+            )
+            context.insert(plan)
+            context.insert(KhatamEntry(
+                planID: plan.id,
+                entryDate: .now,
+                unitsRead: 4
+            ))
+            try context.save()
+            #expect(try context.fetch(FetchDescriptor<KhatamPlan>()).count == 1)
+            #expect(try context.fetch(FetchDescriptor<KhatamEntry>()).count == 1)
         }
     }
 }

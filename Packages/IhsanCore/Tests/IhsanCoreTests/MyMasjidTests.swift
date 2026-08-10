@@ -9,7 +9,7 @@ struct MyMasjidTests {
 
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
-            for: Schema(IhsanSchemaV10.models),
+            for: Schema(IhsanSchemaV11.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         return ModelContext(container)
@@ -160,7 +160,7 @@ struct MyMasjidIdentityTests {
 
     private func makeMasjid() throws -> MyMasjid {
         let container = try ModelContainer(
-            for: Schema(IhsanSchemaV10.models),
+            for: Schema(IhsanSchemaV11.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let masjid = try MyMasjid.fetchOrCreate(in: ModelContext(container))
@@ -221,7 +221,7 @@ struct MyMasjidIdentityTests {
     @Test("A masjid with no coordinate matches no search row")
     func aCoordinatelessMasjidMatchesNothing() throws {
         let container = try ModelContainer(
-            for: Schema(IhsanSchemaV10.models),
+            for: Schema(IhsanSchemaV11.models),
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let masjid = try MyMasjid.fetchOrCreate(in: ModelContext(container))

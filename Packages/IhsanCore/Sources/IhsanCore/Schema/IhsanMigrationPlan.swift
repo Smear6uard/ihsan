@@ -12,7 +12,8 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
             IhsanSchemaV7.self,
             IhsanSchemaV8.self,
             IhsanSchemaV9.self,
-            IhsanSchemaV10.self
+            IhsanSchemaV10.self,
+            IhsanSchemaV11.self
         ]
     }
 
@@ -102,6 +103,10 @@ public enum IhsanMigrationPlan: SchemaMigrationPlan {
                     }
                     try context.save()
                 }
+            ),
+            .lightweight(
+                fromVersion: IhsanSchemaV10.self,
+                toVersion: IhsanSchemaV11.self
             )
         ]
     }
