@@ -20,6 +20,7 @@ struct SettingsScreen: View {
     @Query(sort: \TravelInterval.startDate, order: .reverse) private var travels: [TravelInterval]
     @Query(sort: \PrayerLog.prayerDate, order: .reverse) private var prayerLogs: [PrayerLog]
     @Query(sort: \Reflection.forDate, order: .reverse) private var reflections: [Reflection]
+    @Query(sort: \KhatamPlan.createdAt, order: .reverse) private var khatamPlans: [KhatamPlan]
 
     @State private var path: [SettingsRoute] = []
     @State private var latestPlace: LocatedPlace?
@@ -33,6 +34,8 @@ struct SettingsScreen: View {
     @State private var exportItem: ExportItem?
     @State private var exportError: String?
     @State private var showingRepairSetup = false
+    @State private var showingKhatamSetup = false
+    @State private var showingKhatamDetail = false
     @State private var wakeUsesFallback = false
     @State private var notificationStatusMessage: String?
     @State private var notificationsBlockedBySystem = false
@@ -92,6 +95,18 @@ struct SettingsScreen: View {
                             onBeginSetup: {
                                 Haptics.impact(.light)
                                 showingRepairSetup = true
+                            }
+                        )
+                        KhatamSettingsSection(
+                            hasPlanHistory: !khatamPlans.isEmpty,
+                            hasActivePlan: KhatamSurfaceModel.activePlan(in: khatamPlans) != nil,
+                            onOpen: {
+                                Haptics.impact(.light)
+                                if khatamPlans.isEmpty {
+                                    showingKhatamSetup = true
+                                } else {
+                                    showingKhatamDetail = true
+                                }
                             }
                         )
                         SunnahSection(
@@ -185,6 +200,14 @@ struct SettingsScreen: View {
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
         }
+        .fullScreenCover(isPresented: $showingKhatamSetup) {
+            KhatamSetupFlow()
+        }
+        .sheet(isPresented: $showingKhatamDetail) {
+            KhatamDetailScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
         .confirmationDialog(
             "Pause prayer tracking?",
             isPresented: $confirmingPauseEnable,
@@ -213,7 +236,7 @@ struct SettingsScreen: View {
             Button("Delete All Data", role: .destructive, action: deleteAllData)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes prayer, remembrance, fasting, reflection, pause, travel, and makeup records; local voice memos; summaries; and preferences from this device.")
+            Text("This removes prayer, remembrance, fasting, Khatam, reflection, pause, travel, and makeup records; local voice memos; summaries; and preferences from this device.")
         }
         .sheet(item: $exportItem) { item in
             ActivityView(activityItems: [item.url])
@@ -649,6 +672,8 @@ struct SettingsScreen: View {
             try deleteAll(FastLog.self)
             try deleteAll(DhikrSession.self)
             try deleteAll(AdhkarSession.self)
+            try deleteAll(KhatamEntry.self)
+            try deleteAll(KhatamPlan.self)
             try deleteAll(UserSettings.self)
             _ = try UserSettings.fetchOrCreate(in: modelContext)
             try modelContext.save()
@@ -1128,6 +1153,24 @@ private struct MakeupPrayersSection: View {
 
                 SettingsDescriptionText("If you carry prayers to return to, Ihsan can hold the count with you. Nothing is shown until you choose it.")
             }
+        }
+    }
+}
+
+private struct KhatamSettingsSection: View {
+    let hasPlanHistory: Bool
+    let hasActivePlan: Bool
+    let onOpen: () -> Void
+
+    var body: some View {
+        SettingsSectionCard("Khatam") {
+            SettingsRow(
+                title: "Khatam",
+                subtitle: hasActivePlan ? "Plan and reading log" : (hasPlanHistory ? "Completed readings and a new plan" : "Pace a reading from your own mushaf"),
+                glyph: .book,
+                action: onOpen
+            )
+            SettingsDescriptionText("Numbers only — pages or ajzā’. Ihsan does not contain a Qur’an reader.")
         }
     }
 }

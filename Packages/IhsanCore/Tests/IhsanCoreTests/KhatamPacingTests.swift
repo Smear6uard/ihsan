@@ -133,4 +133,30 @@ struct KhatamPacingTests {
         try writer.remove(entry, now: day(1), in: context)
         #expect(plan.completedAt == nil)
     }
+
+    @Test("Plan settings recompute completion against the new target")
+    @MainActor
+    func settingsRecomputeCompletion() throws {
+        let container = try IhsanModelContainerFactory.makeContainer(inMemory: true)
+        let context = container.mainContext
+        let writer = KhatamPlanWriter()
+        let plan = try writer.begin(
+            startDate: day(0), endDate: day(29), unit: .pages,
+            mushafPageTotal: 10, isRamadan: false, now: day(0), in: context
+        )
+        _ = try writer.log(units: 10, on: day(0), for: plan, now: day(0), in: context)
+        #expect(plan.completedAt != nil)
+
+        try writer.updatePlan(
+            plan,
+            endDate: day(39),
+            mushafPageTotal: 20,
+            targetCount: 1,
+            now: day(1),
+            in: context
+        )
+        #expect(plan.endDate == day(39))
+        #expect(plan.targetUnits == 20)
+        #expect(plan.completedAt == nil)
+    }
 }

@@ -203,6 +203,8 @@ private struct RootGate: View {
             try? modelContext.delete(model: DhikrSession.self)
             try? modelContext.delete(model: QadaEntry.self)
             try? modelContext.delete(model: QadaLedger.self)
+            try? modelContext.delete(model: KhatamEntry.self)
+            try? modelContext.delete(model: KhatamPlan.self)
             // The masjid goes too. A test that set one would otherwise
             // hand the next test its iqamah times, and a test that
             // silently inherits state is not a test.
@@ -224,6 +226,7 @@ private struct RootGate: View {
                 "IhsanSunnahCardDismissed",
                 "IhsanAdhkarDismissedDay",
                 "IhsanWeatherDuaDismissedEpisodes",
+                "IhsanKhatamOfferRamadanYear",
                 WeatherInterest.livingSkyDefaultsKey
             ] {
                 UserDefaults.standard.removeObject(forKey: key)

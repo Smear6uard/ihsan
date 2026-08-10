@@ -37,6 +37,8 @@ struct TrajectoryScreen: View {
     private var travels: [TravelInterval]
 
     @Query private var settingsRows: [UserSettings]
+    @Query(sort: \KhatamPlan.createdAt, order: .reverse)
+    private var khatamPlans: [KhatamPlan]
 
     /// Whether the sunnah invitation has been answered. Presentation
     /// state, like the other one-time cards — never worship data.
@@ -64,6 +66,10 @@ struct TrajectoryScreen: View {
     @State private var viewModel = TrajectoryViewModel()
     @State private var showingRepairSetup = false
     @State private var showingRepairDetail = DebugLaunch.flag("-IhsanDebugPresentRepair")
+    @State private var showingKhatamSetup = DebugLaunch.flag("-IhsanDebugPresentKhatamSetup")
+    @State private var showingKhatamDetail = DebugLaunch.flag("-IhsanDebugPresentKhatam")
+    @AppStorage("IhsanKhatamOfferRamadanYear")
+    private var khatamOfferRamadanYear: Int = 0
     /// A grid cell awaiting the retroactive log sheet.
     @State private var retroSelection: RetroLogSelection?
     @State private var insightText: String?
@@ -160,6 +166,19 @@ struct TrajectoryScreen: View {
                     .padding(.horizontal, IhsanSpacing.md)
                 }
 
+                if shouldOfferRamadanKhatam {
+                    KhatamRamadanOfferCard(
+                        onBegin: {
+                            khatamOfferRamadanYear = currentHijriYear
+                            showingKhatamSetup = true
+                        },
+                        onDismiss: {
+                            khatamOfferRamadanYear = currentHijriYear
+                        }
+                    )
+                    .padding(.horizontal, IhsanSpacing.md)
+                }
+
                 // The sunnah layer is invisible until turned on, which
                 // is right and also means nobody finds it. This is the
                 // one time the app mentions it — after a fortnight, and
@@ -182,6 +201,11 @@ struct TrajectoryScreen: View {
                 }
 
                 content(tokens: tokens)
+
+                if KhatamSurfaceModel.activePlan(in: khatamPlans) != nil {
+                    KhatamSection(onOpen: { showingKhatamDetail = true })
+                        .padding(.horizontal, IhsanSpacing.md)
+                }
 
                 if settings?.qadaTrackingEnabled == true {
                     RepairSection(onOpen: { showingRepairDetail = true })
@@ -250,8 +274,16 @@ struct TrajectoryScreen: View {
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
         }
+        .fullScreenCover(isPresented: $showingKhatamSetup) {
+            KhatamSetupFlow(prefersRamadan: true)
+        }
         .sheet(isPresented: $showingRepairDetail) {
             RepairDetailScreen()
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
+        }
+        .sheet(isPresented: $showingKhatamDetail) {
+            KhatamDetailScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
         }
@@ -266,6 +298,23 @@ struct TrajectoryScreen: View {
         } message: {
             Text("Return to Path and try again.")
         }
+    }
+
+    private var currentHijriYear: Int {
+        HijriConverter.components(
+            for: nowProvider.now(),
+            offsetDays: settings?.hijriCalendarOffsetDays ?? 0,
+            timeZone: .current
+        ).year
+    }
+
+    private var shouldOfferRamadanKhatam: Bool {
+        KhatamSurfaceModel.activePlan(in: khatamPlans) == nil
+            && RamadanContext(
+                at: nowProvider.now(),
+                offsetDays: settings?.hijriCalendarOffsetDays ?? 0
+            ).isCurrentlyRamadan
+            && khatamOfferRamadanYear != currentHijriYear
     }
 
     // MARK: - Header

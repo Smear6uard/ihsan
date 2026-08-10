@@ -103,6 +103,22 @@ public struct KhatamPlanWriter {
         try context.save()
     }
 
+    public func updatePlan(
+        _ plan: KhatamPlan,
+        endDate: Date,
+        mushafPageTotal: Int,
+        targetCount: Int,
+        now: Date = .now,
+        in context: ModelContext
+    ) throws {
+        plan.endDate = max(plan.startDate, endDate)
+        plan.mushafPageTotal = max(1, mushafPageTotal)
+        plan.targetCount = max(1, targetCount)
+        plan.modifiedAt = now
+        try settleCompletion(of: plan, now: now, in: context)
+        try context.save()
+    }
+
     private func settleCompletion(
         of plan: KhatamPlan,
         now: Date,
