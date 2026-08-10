@@ -110,6 +110,19 @@ public enum WakeAlarmIdentity {
     }
 }
 
+/// The wake tone. One tone for all four anchors, and one constant.
+///
+/// `AdhanAsset.nightWake` is a computed alias for the chime and is the
+/// swap point: when the muezzin-era recordings land, replacing the chime
+/// replaces every anchor with no code change here. The wake and the prayer
+/// notification cannot drift apart.
+public enum WakeSound {
+    public static func assetName(for anchor: WakeAnchor) -> String {
+        _ = anchor
+        return AdhanAsset.nightWake
+    }
+}
+
 /// What the coordinator drives: one standing wake per anchor, scheduled or
 /// cancelled. The app supplies an AlarmKit-backed client, falling back to a
 /// time-sensitive notification where alarms are unavailable or declined.

@@ -142,7 +142,7 @@ struct SettingsScreen: View {
         .task {
             bootstrapSettings()
             latestPlace = locationCoordinator.mostRecentResolvedPlace()
-            nightWakeUsesFallback = NightWakeService.shared.usesNotificationFallback
+            nightWakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
             await loadFiqhFraming()
             #if DEBUG
             openDebugRoute()
@@ -317,10 +317,10 @@ struct SettingsScreen: View {
     private func refreshNightWake(for settings: UserSettings) {
         Task {
             if settings.nightWakeEnabled {
-                await NightWakeService.shared.requestAlarmAuthorizationIfNeeded()
+                await WakeAnchorService.shared.requestAlarmAuthorizationIfNeeded()
             }
-            await NightWakeService.shared.refresh(using: modelContext)
-            nightWakeUsesFallback = NightWakeService.shared.usesNotificationFallback
+            await WakeAnchorService.shared.refresh(using: modelContext)
+            nightWakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
         }
     }
 
@@ -403,7 +403,7 @@ struct SettingsScreen: View {
                 settings.modifiedAt = .now
                 refreshMessage = "Location refreshed"
                 scheduleNotificationRebuild()
-                await NightWakeService.shared.refresh(using: modelContext)
+                await WakeAnchorService.shared.refresh(using: modelContext)
             } catch let error as LocationError {
                 if error == .permissionDenied || error == .permissionRestricted {
                     Haptics.notification(.warning)
@@ -555,7 +555,7 @@ struct SettingsScreen: View {
             try? await NotificationScheduler.shared.rebuildSchedule()
             // The gentle wake honors the same pause the notification
             // schedule does — re-sync it whenever the schedule rebuilds.
-            await NightWakeService.shared.refresh(using: modelContext)
+            await WakeAnchorService.shared.refresh(using: modelContext)
         }
         // Pause and travel transitions change what a widget may show
         // (a paused day carries no logging surface at all).
@@ -638,7 +638,7 @@ struct SettingsScreen: View {
             AdhkarReminderPreferenceStore.isEnabled = false
             Task {
                 await NotificationScheduler.shared.cancelAllScheduledNotifications()
-                await NightWakeService.shared.refresh(using: modelContext)
+                await WakeAnchorService.shared.refresh(using: modelContext)
             }
             WidgetSnapshotService.republish(using: modelContext)
             Haptics.notification(.success)

@@ -1462,7 +1462,7 @@ private struct TodayReadyView: View {
         }
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
-            await NightWakeService.shared.refresh(using: modelContext)
+            await WakeAnchorService.shared.refresh(using: modelContext)
         }
         // Widgets honor the pause the moment it begins or ends —
         // a paused day shows times and no logging surface.

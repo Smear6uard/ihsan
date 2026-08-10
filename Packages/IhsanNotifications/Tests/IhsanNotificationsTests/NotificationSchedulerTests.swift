@@ -243,6 +243,18 @@ func theGentleWakeAndTheNotificationShareOneTone() {
     #expect(AdhanAsset.nightWake == AdhanAsset.chime)
 }
 
+/// `AdhanAsset.nightWake` is a computed alias for the chime and it is THE
+/// swap point: when the muezzin-era recordings land, replacing the chime
+/// replaces all four anchors with no code change anywhere else. This test
+/// exists so the swap point cannot quietly become plural.
+@Test
+func everyWakeAnchorSharesOneTone() {
+    for anchor in WakeAnchor.allCases {
+        #expect(WakeSound.assetName(for: anchor) == AdhanAsset.nightWake)
+    }
+    #expect(Set(WakeAnchor.allCases.map { WakeSound.assetName(for: $0) }).count == 1)
+}
+
 @Test
 func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     let center = MockNotificationCenter()
