@@ -44,8 +44,12 @@ import Foundation
 /// fully dissolved, so the sun still has no pixel at which it stops.
 public enum EngravedSunRays {
 
-    /// Twelve rays, first pointing up, exactly as the Shamsa lays them.
-    static let rayCount = 12
+    /// Thirty-two rays — sixteen long, sixteen short, alternating —
+    /// first pointing up, on the Shamsa's own angular construction.
+    /// Twelve was the medallion's count and read sparse at arm's
+    /// length on the open sky; the plate's second ornament sun earns a
+    /// denser collar, still hairline, still inside the bloom.
+    static let rayCount = 32
     static let firstRayDegrees = -90.0
 
     /// Ray radii as multiples of the sun's disc diameter. A fifth of a

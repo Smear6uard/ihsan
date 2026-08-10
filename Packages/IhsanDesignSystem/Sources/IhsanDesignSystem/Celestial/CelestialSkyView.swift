@@ -151,10 +151,23 @@ public struct CelestialSkyView: View {
     /// groundBottom at the chord.
     nonisolated static let skyBreakpoint: Double = 0.55
     /// Samples above and below the breakpoint. The upper segment gets
-    /// far more because it carries the whole zenith→near-white
-    /// journey; the lower one crosses two near-identical near-whites.
-    nonisolated private static let zenithSegmentSamples = 11
-    nonisolated private static let horizonSegmentSamples = 5
+    /// far more because it carries the whole zenith→pearl journey;
+    /// the lower one drifts from the pearl into the horizon's warmth.
+    nonisolated private static let zenithSegmentSamples = 15
+    nonisolated private static let horizonSegmentSamples = 6
+    /// The seasoned middle band (corrective: "kill the washed middle
+    /// band"). The ramp used to run zenith → groundTop linearly and
+    /// had surrendered every trace of lapis by mid-sky, leaving a dead
+    /// cream zone between the blue and the warm horizon. Two small
+    /// moves re-grade it into one continuous breath: the descent holds
+    /// the zenith's chroma longer (`zenithHoldExponent` eases the mix),
+    /// and it lands not on bare groundTop but on a pearl carrying a
+    /// residue of the zenith (`breakpointZenithResidue`), which the
+    /// lower segment then walks into the warm groundBottom. Endpoints
+    /// stay exact: the zenith is the zenith, the horizon is the
+    /// horizon; only the journey between them keeps its color.
+    nonisolated private static let breakpointZenithResidue = 0.08
+    nonisolated private static let zenithHoldExponent = 1.35
 
     /// The sky's stop table: zenith → groundTop → groundBottom,
     /// sampled in OKLCH so the ramp keeps its chroma, with `groundTop`
@@ -185,19 +198,22 @@ public struct CelestialSkyView: View {
         let zenith = tokens.skyZenithValue
         let upper = tokens.groundTopValue
         let lower = tokens.groundBottomValue
+        // The breakpoint pearl: groundTop with a residue of the zenith
+        // still in it, so the middle of the page never reads flavorless.
+        let pearl = SRGBValue.mixOKLCH(upper, zenith, amount: breakpointZenithResidue)
         var samples: [(location: Double, value: SRGBValue)] = []
         for i in 0...zenithSegmentSamples {
             let f = Double(i) / Double(zenithSegmentSamples)
             samples.append((
                 skyBreakpoint * f,
-                .mixOKLCH(zenith, upper, amount: f)
+                .mixOKLCH(zenith, pearl, amount: pow(f, zenithHoldExponent))
             ))
         }
         for i in 1...horizonSegmentSamples {
             let f = Double(i) / Double(horizonSegmentSamples)
             samples.append((
                 skyBreakpoint + (1 - skyBreakpoint) * f,
-                .mixOKLCH(upper, lower, amount: f)
+                .mixOKLCH(pearl, lower, amount: f)
             ))
         }
         return samples
@@ -383,9 +399,13 @@ public struct CelestialSkyView: View {
                     .init(color: plane.scalingLightness(by: 0.78).color, location: 1)
                 ]
                 : [
+                    // Deepened in the seasoning pass: the old 0.925 →
+                    // 0.86 span read as a khaki strip rather than
+                    // worked ground. Same token, same front-loading,
+                    // a real value journey.
                     .init(color: plane.color, location: 0),
-                    .init(color: plane.scalingLightness(by: 0.925).color, location: 0.22),
-                    .init(color: plane.scalingLightness(by: 0.86).color, location: 1)
+                    .init(color: plane.scalingLightness(by: 0.915).color, location: 0.22),
+                    .init(color: plane.scalingLightness(by: 0.82).color, location: 1)
                 ]
             context.fill(
                 Path(groundRect),
@@ -419,9 +439,12 @@ public struct CelestialSkyView: View {
                     (21, 0.9, 0.24, 0.18)
                 ]
                 : [
-                    (7, 1.2, 0.11, 0.52),
-                    (14, 1.0, 0.17, 0.34),
-                    (21, 0.9, 0.24, 0.21)
+                    // Raised again in the seasoning pass — the H-item-3
+                    // weights still undershot arm's-length visibility
+                    // on the near-white field.
+                    (7, 1.2, 0.11, 0.62),
+                    (14, 1.0, 0.17, 0.42),
+                    (21, 0.9, 0.24, 0.28)
                 ]
         // The engraving yields to the light. Three parallel full-width
         // marks lit by the sun's own bloom read as rays off it — the
@@ -465,7 +488,10 @@ public struct CelestialSkyView: View {
             thickness: 0.9,
             insetFraction: 0.085
         )
-        context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.55)))
+        // 0.55 → 0.62 in the seasoning pass: the pair must read as a
+        // pair — gold AND lapis — at arm's length, not gold with a
+        // rumor beneath it.
+        context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.62)))
 
         // The sun's horizon interaction — PAINTED light, strictly
         // local. No full-width band, no screen-center hotspot: a
@@ -591,11 +617,18 @@ public struct CelestialSkyView: View {
     /// field quiet — see `goldDustLaysLessInkThanTheGrain`, which pins
     /// the two densities against each other so neither can be retuned
     /// into a texture.
-    nonisolated static let goldDustPeakOpacity: Double = 0.13
+    /// Raised from 0.13/2 680 in the clear-day seasoning pass: the
+    /// specified arm's-length visibility had been undershot — the dust
+    /// registered only on close inspection. Brighter flecks, slightly
+    /// more of them, still two orders sparser than the grain and still
+    /// pinned under its total ink by `goldDustLaysLessInkThanTheGrain`.
+    /// 0.15 is the material-register ceiling's edge: at 0.17 the
+    /// brightest fleck crossed `skySpeckleStaysInTheMaterialRegister`,
+    /// which is the line between a caught glint and a sparkle artifact.
+    nonisolated static let goldDustPeakOpacity: Double = 0.15
 
-    /// One fleck per this many point² of sky. Two orders of magnitude
-    /// sparser than the grain's one-per-210.
-    nonisolated static let goldDustMarkArea: Double = 2_680
+    /// One fleck per this many point² of sky.
+    nonisolated static let goldDustMarkArea: Double = 2_300
 
     private static func drawStars(
         into context: inout GraphicsContext,

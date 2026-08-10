@@ -1187,3 +1187,39 @@ system's half of each contract.
   degrees feel settled without making the release feel sticky. Repeat
   with Reduce Motion enabled and after the system shows a calibration
   warning.
+
+## The living sky — weather duas and the seasoned day
+
+- **The arm's-length photo test for the seasoned day.** The clear-day
+  pass raised the almucantars (day term 0.10+0.18·daylight,
+  CelestialPlateScene.swift), the worked-ground filaments (0.62/0.42/
+  0.28 day weights), the gold dust (peak 0.15 — the material-register
+  ceiling's edge; brighter trips
+  `skySpeckleStaysInTheMaterialRegister`), the lapis horizon hairline
+  (0.62), and deepened the ground band's value journey (0.915→0.82).
+  The specified acceptance is a PHOTO of the physical phone at arm's
+  length in normal room light: if the engraving and dust do not
+  register in the photo, raise further — the next step up requires
+  deliberately moving the render-audit ceiling in SkyRenderTests — and
+  if they do, stop here.
+- **GATED — the corner pieces.** Fine engraved filigree in the plate's
+  top two corners, margin-ornament linework at 18% metal, filament
+  weights, compact (PlateCornerFiligree.swift; placed in
+  CelestialPlateScene.swift). One-word verdict on device: keep or cut.
+  The kill switch is `PlateCornerFiligree.isEnabled = false`; if it
+  reads as wallpaper or competes with anything, it dies without appeal.
+- **The ray collar's breath on device.** The densified collar (16/16)
+  breathes ±2% at 20 fps beside the horizon bloom's own cycle. Confirm
+  on device that the two breaths read as one ambient life rather than
+  two clocks, and that Reduce Motion holds the collar perfectly still.
+- **WeatherKit on a provisioned device.** The simulator cannot
+  exercise a real WeatherKit grant. On a device with the App ID's
+  WeatherKit capability enabled, confirm a real fetch populates the
+  weather dua line during actual rain/wind, and that revoking network
+  silently returns the idealized sky with no logged noise.
+- **The per-condition gates of Phase 3.** Each painted treatment
+  (partly veiled, overcast, rain, snow, storm) must be seen on device
+  in a day and a night state before it ships on by default; use
+  `-IhsanDebugSkyConditions <kind>` to stand under each sky. Rejected
+  conditions fall back along the approved chain — the map lives in
+  `SkyWeatherTreatment.resolvedAgainst(approved:)`'s call site.

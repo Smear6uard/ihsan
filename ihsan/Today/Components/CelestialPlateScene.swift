@@ -198,6 +198,32 @@ struct CelestialPlateScene: View {
                 .opacity(entrance)
                 .animation(glowEntranceAnimation, value: entrance)
 
+                if PlateCornerFiligree.isEnabled {
+                    VStack(spacing: 0) {
+                        PlateCornerFiligree(tokens: tokens)
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.top, plate.rect.minY)
+                    .opacity(entrance)
+                    .animation(glowEntranceAnimation, value: entrance)
+                }
+
+                sunRayCollar(
+                    plate: plate, tokens: tokens,
+                    sun: sun, apexAltitude: apexAltitude,
+                    beforeSunrise: date < solarEvents.sunrise
+                )
+                .opacity(entrance)
+                .mask {
+                    Rectangle()
+                        .scaleEffect(
+                            x: reduceMotion ? 1 : max(0.0001, entrance),
+                            y: 1,
+                            anchor: .leading
+                        )
+                }
+                .animation(arcEntranceAnimation, value: entrance)
+
                 engravedField(
                     plate: plate, tokens: tokens, date: date,
                     sun: sun, apexAltitude: apexAltitude,
@@ -533,6 +559,84 @@ struct CelestialPlateScene: View {
     /// over the base metal, the transition fading across the moment's
     /// position on the arc. Driven by the scene's `now`; it advances
     /// continuously with the screen's one-second timeline.
+    /// The sun's engraved ray collar (corrective H item 2, densified
+    /// to sixteen long and sixteen short in the seasoning pass) — the
+    /// Shamsa's construction around the real sun, cut by the same
+    /// knockouts as every other line on the plate. It belongs to
+    /// daylight and to the disc: it fades with the day field and with
+    /// the sun's own presence as it sets, so the collar can never
+    /// outlive the body it belongs to.
+    ///
+    /// Its own thin layer beneath the engraved field, for two reasons
+    /// the shared canvas could not carry: the radius breathes with the
+    /// ambient cycle (±2% at 20 fps, static under Reduce Motion), and
+    /// the rays warm slightly tip-ward — engraved metal shading toward
+    /// leaf gold through the segment mask. Ink warming, never a glow;
+    /// the collar stays darker than the field it sits on.
+    @ViewBuilder
+    private func sunRayCollar(
+        plate: PlateGeometry,
+        tokens: SkyPaletteTokens,
+        sun: SolarPosition,
+        apexAltitude: Double,
+        beforeSunrise: Bool
+    ) -> some View {
+        let rayOpacity = Self.sunRayOpacity
+            * tokens.daylightPresence
+            * sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise)
+
+        if rayOpacity > 0.01 {
+            let center = plate.bodyPosition(
+                altitudeDegrees: sun.altitude,
+                azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
+                apexAltitudeDegrees: apexAltitude
+            )
+            let knockouts = knockoutRects(plate: plate)
+            let tipWarmth = SRGBValue.mix(
+                tokens.metalValue, tokens.leafGoldValue, amount: 0.55
+            ).color
+            TimelineView(
+                .animation(minimumInterval: 1.0 / 20.0, paused: reduceMotion)
+            ) { timeline in
+                Canvas { context, _ in
+                    let t = reduceMotion
+                        ? 0.0
+                        : timeline.date.timeIntervalSinceReferenceDate
+                    let breath = t == 0 ? 1.0 : 1.0 + 0.02 * sin(t * 0.7)
+                    let segments = plate.sunRayFilamentSegments(
+                        around: center,
+                        bodyDiameter: Self.sunDiameter * breath,
+                        avoiding: knockouts,
+                        clearance: Self.filamentClearance
+                    )
+                    var clip = Path()
+                    for segment in segments { clip.addPath(Path(segment)) }
+                    var collar = context
+                    collar.clip(to: clip)
+                    let outer = Self.sunDiameter * breath * 0.9
+                    collar.fill(
+                        Path(CGRect(
+                            x: center.x - outer, y: center.y - outer,
+                            width: outer * 2, height: outer * 2
+                        )),
+                        with: .radialGradient(
+                            Gradient(stops: [
+                                .init(color: tokens.metal.opacity(rayOpacity), location: 0),
+                                .init(color: tokens.metal.opacity(rayOpacity), location: 0.72),
+                                .init(color: tipWarmth.opacity(rayOpacity), location: 1)
+                            ]),
+                            center: center,
+                            startRadius: 0,
+                            endRadius: outer
+                        )
+                    )
+                }
+            }
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
+    }
+
     private func engravedField(
         plate: PlateGeometry,
         tokens: SkyPaletteTokens,
@@ -571,42 +675,17 @@ struct CelestialPlateScene: View {
         // The almucantars used to sit at a flat 0.10 in every state,
         // which reads on the jewel grounds (metal clears 6:1 there)
         // and vanishes on the near-white days (~2.6:1). Corrective H
-        // item 3 buys the day states back their structure: the
-        // engraved field is what makes the sky read as an instrument
-        // plate, and it was only doing that after dark. Ramped on
-        // `daylightPresence` so nothing switches at the crossings, and
-        // still less than a third of the arc's own weight at half its
-        // ribbon thickness — the day arc stays the dominant line.
-        let almucantarOpacity = 0.10 + 0.12 * tokens.daylightPresence
-
-        // The sun's engraved ray collar (corrective H item 2) — the
-        // Shamsa's twelve-fold construction around the real sun, cut
-        // by the same knockouts as every other line on the plate. It
-        // belongs to daylight and to the disc: it fades out with the
-        // day field, and with the sun's own presence as it sets, so
-        // the collar can never outlive the body it belongs to.
-        let raySegments = plate.sunRayFilamentSegments(
-            around: plate.bodyPosition(
-                altitudeDegrees: sun.altitude,
-                azimuthUnit: azimuthUnit(hourAngle: sun.hourAngle),
-                apexAltitudeDegrees: apexAltitude
-            ),
-            bodyDiameter: Self.sunDiameter,
-            avoiding: knockouts,
-            clearance: Self.filamentClearance
-        )
-        let rayOpacity = Self.sunRayOpacity
-            * tokens.daylightPresence
-            * sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise)
+        // item 3 bought the day states back their structure; the
+        // seasoning pass raised the day term again after the honest
+        // test showed it still under arm's-length visibility. Ramped
+        // on `daylightPresence` so nothing switches at the crossings;
+        // at its 0.28 day maximum it stays under the arc's 0.34 at
+        // half the ribbon thickness — the day arc keeps the page.
+        let almucantarOpacity = 0.10 + 0.18 * tokens.daylightPresence
 
         return Canvas { context, size in
             for segment in almucantarSegments {
                 context.fill(Path(segment), with: .color(tokens.metal.opacity(almucantarOpacity)))
-            }
-            if rayOpacity > 0.01 {
-                for segment in raySegments {
-                    context.fill(Path(segment), with: .color(tokens.metal.opacity(rayOpacity)))
-                }
             }
             for segment in arcSegments {
                 context.fill(Path(segment), with: .color(tokens.metal.opacity(0.34)))
