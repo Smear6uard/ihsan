@@ -70,6 +70,16 @@ struct TodayHeader: View {
     /// The line carries its own dismiss mark, separate from its body,
     /// so putting it away is deliberate rather than a mis-tap.
     var onYesterdayDismiss: (() -> Void)? = nil
+    /// "IT IS RAINING · THE DUA OF RAIN" — the weather dua line,
+    /// present only while the matching weather is. Same register as
+    /// the other quiet lines, with its own dismiss mark; a dismissal
+    /// holds for the episode, so the same rain never asks twice.
+    var weatherInscription: String? = nil
+    var weatherSpokenLabel: String? = nil
+    /// Tapping the line opens the transmitted text in the reader.
+    var onWeatherTap: (() -> Void)? = nil
+    /// Puts the line away for this episode.
+    var onWeatherDismiss: (() -> Void)? = nil
 
     var body: some View {
         let foreground = tokens.ink
@@ -137,10 +147,29 @@ struct TodayHeader: View {
                     .accessibilityHint(significantDayHint ?? "Dismisses this note for today.")
                 }
 
+                if let weatherInscription {
+                    dismissibleLine(
+                        inscription: weatherInscription,
+                        spokenLabel: weatherSpokenLabel,
+                        openHint: "Opens the dua to read.",
+                        dismissLabel: "Dismiss the weather note",
+                        dismissHint: "Hides it while this weather lasts.",
+                        foreground: foregroundSecondary,
+                        onOpen: onWeatherTap,
+                        onDismiss: onWeatherDismiss
+                    )
+                }
+
                 if let yesterdayInscription {
-                    yesterdayLine(
+                    dismissibleLine(
                         inscription: yesterdayInscription,
-                        foreground: foregroundSecondary
+                        spokenLabel: yesterdaySpokenLabel,
+                        openHint: "Opens yesterday to fill in.",
+                        dismissLabel: "Dismiss yesterday's note",
+                        dismissHint: "Hides it until tomorrow.",
+                        foreground: foregroundSecondary,
+                        onOpen: onYesterdayTap,
+                        onDismiss: onYesterdayDismiss
                     )
                 }
             }
@@ -157,17 +186,24 @@ struct TodayHeader: View {
 
     /// The same inscription register as the significant-day line, with
     /// one difference: a dismiss mark of its own. The line's body opens
-    /// yesterday; the mark puts it away. Two targets, because an offer
-    /// you can only accept is not an offer.
+    /// its surface; the mark puts it away. Two targets, because an
+    /// offer you can only accept is not an offer. Shared by the
+    /// yesterday and weather lines.
     @ViewBuilder
-    private func yesterdayLine(
+    private func dismissibleLine(
         inscription: String,
-        foreground: Color
+        spokenLabel: String?,
+        openHint: String,
+        dismissLabel: String,
+        dismissHint: String,
+        foreground: Color,
+        onOpen: (() -> Void)?,
+        onDismiss: (() -> Void)?
     ) -> some View {
         HStack(spacing: 6) {
             Button {
                 Haptics.impact(.light)
-                onYesterdayTap?()
+                onOpen?()
             } label: {
                 HStack(spacing: 6) {
                     Rectangle()
@@ -184,12 +220,12 @@ struct TodayHeader: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(yesterdaySpokenLabel ?? inscription)
-            .accessibilityHint("Opens yesterday to fill in.")
+            .accessibilityLabel(spokenLabel ?? inscription)
+            .accessibilityHint(openHint)
 
             Button {
                 Haptics.impact(.light)
-                onYesterdayDismiss?()
+                onDismiss?()
             } label: {
                 DismissCross()
                     .stroke(
@@ -202,8 +238,8 @@ struct TodayHeader: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss yesterday's note")
-            .accessibilityHint("Hides it until tomorrow.")
+            .accessibilityLabel(dismissLabel)
+            .accessibilityHint(dismissHint)
         }
     }
 

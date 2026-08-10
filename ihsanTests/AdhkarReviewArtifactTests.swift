@@ -39,8 +39,10 @@ struct AdhkarReviewArtifactTests {
             let translation: String
             let source: Source
             let repetitions: Int
+            let addedIn: String?
         }
         let reviewStatus: String
+        let contentVersion: String
         let items: [Item]
     }
 
@@ -96,6 +98,27 @@ struct AdhkarReviewArtifactTests {
         #expect(
             markers == flagged.count,
             "\(markers) flags in the document for \(flagged.count) flagged references"
+        )
+    }
+
+    /// Items that arrived after the first review request went out are
+    /// flagged NEW, so a reviewer returning to the document sees at a
+    /// glance what was not there last time.
+    ///
+    /// When a review round completes and `contentVersion` moves on with
+    /// no newly stamped items, this first expectation fails — delete it
+    /// deliberately in the same commit, like the draft-status pin.
+    @Test("Items added in this draft are flagged NEW")
+    func newItemsAreFlagged() throws {
+        let document = try reviewDocument
+        let parsed = try content
+        let new = parsed.items.filter { $0.addedIn == parsed.contentVersion }
+        #expect(!new.isEmpty, "this draft round added items; none are stamped")
+
+        let markers = document.components(separatedBy: "NEW — PENDING REVIEW").count - 1
+        #expect(
+            markers == new.count,
+            "\(markers) NEW flags in the document for \(new.count) newly added items"
         )
     }
 

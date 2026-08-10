@@ -4,7 +4,7 @@
 
 This document is generated from the app's single content file,
 `Packages/IhsanCore/Sources/IhsanCore/Resources/adhkar-content.json`
-(schema 1, content 2026.08.02-draft.1). It is the complete set of
+(schema 1, content 2026.08.09-draft.1). It is the complete set of
 religious text Ihsan is able to display. There is no other source:
 no network fetch, no generated text, no fallback strings. The
 on-device model never touches any of it.
@@ -34,10 +34,15 @@ anything ships.
   no browse-all list, no library.
 - Items are counted on the app's existing dhikr instrument. Sessions
   are recorded as plain facts — no streaks, no scores, no percentages.
-- The occasioned duas at the end are carried in the file and reviewed
-  here, but **no surface in this build offers them**. They are
-  reviewed now so that a future occasioned surface starts from vetted
-  text.
+- Of the occasioned duas at the end, only the four weather ones
+  (rain, after rain, wind, thunder) have a surface: a quiet,
+  dismissible line on the Today screen while the matching weather is
+  actually happening, which opens the text to read. It is never a
+  notification. The remaining occasioned duas still have **no
+  surface in this build** and are reviewed now so that a future
+  occasioned surface starts from vetted text.
+- Items carrying a `NEW` flag were added after the first review
+  request went out and have never been in front of a reviewer.
 
 ## Editorial decisions taken (please confirm or correct)
 
@@ -76,9 +81,9 @@ changes that one field to `"reviewed"`.
 - **Evening set** — 16 items
 - **After each prayer** — 10 items
 - **Before sleep** — 7 items
-- **Occasioned duas (no surface in this build)** — 8 items
+- **Occasioned duas** — 12 items
 
-**Total: 57 items.** 23 carry a reference to verify.
+**Total: 61 items.** 25 carry a reference to verify.
 
 
 ## Morning set
@@ -781,7 +786,7 @@ changes that one field to `"reviewed"`.
 **Count.** ×34
 
 
-## Occasioned duas (no surface in this build)
+## Occasioned duas
 
 ### 1. `situational.waking`
 
@@ -910,6 +915,78 @@ changes that one field to `"reviewed"`.
 **Count.** once
 
 **Occasion.** On leaving the masjid.
+
+### 9. `situational.rain`
+
+**NEW — PENDING REVIEW** — added in this draft, never yet in front of a reviewer.
+
+- [ ] Arabic, translation, source, and count are all correct.
+
+> اللَّهُمَّ صَيِّبًا نَافِعًا
+
+**Transliteration.** Allāhumma ṣayyiban nāfiʿā.
+
+**Translation.** O Allah, (make it) a beneficial downpour.
+
+**Source.** al-Bukhārī — 1032
+
+**Count.** once
+
+**Occasion.** When rain falls.
+
+### 10. `situational.after-rain`
+
+**NEW — PENDING REVIEW** — added in this draft, never yet in front of a reviewer.
+
+- [ ] Arabic, translation, source, and count are all correct.
+
+> مُطِرْنَا بِفَضْلِ اللَّهِ وَرَحْمَتِهِ
+
+**Transliteration.** Muṭirnā bi-faḍli'llāhi wa raḥmatih.
+
+**Translation.** We have been given rain by the grace and mercy of Allah.
+
+**Source.** al-Bukhārī; Muslim — al-Bukhārī 846; Muslim 71  **⚠ verify reference**
+
+**Count.** once
+
+**Occasion.** After rainfall.
+
+### 11. `situational.wind`
+
+**NEW — PENDING REVIEW** — added in this draft, never yet in front of a reviewer.
+
+- [ ] Arabic, translation, source, and count are all correct.
+
+> اللَّهُمَّ إِنِّي أَسْأَلُكَ خَيْرَهَا، وَخَيْرَ مَا فِيهَا، وَخَيْرَ مَا أُرْسِلَتْ بِهِ، وَأَعُوذُ بِكَ مِنْ شَرِّهَا، وَشَرِّ مَا فِيهَا، وَشَرِّ مَا أُرْسِلَتْ بِهِ
+
+**Transliteration.** Allāhumma innī as'aluka khayrahā, wa khayra mā fīhā, wa khayra mā ursilat bih, wa aʿūdhu bika min sharrihā, wa sharri mā fīhā, wa sharri mā ursilat bih.
+
+**Translation.** O Allah, I ask You for its goodness, the good within it, and the good it was sent with; and I take refuge with You from its evil, the evil within it, and from the evil it was sent with.
+
+**Source.** Muslim — 899
+
+**Count.** once
+
+**Occasion.** When the wind blows hard.
+
+### 12. `situational.thunder`
+
+**NEW — PENDING REVIEW** — added in this draft, never yet in front of a reviewer.
+
+- [ ] Arabic, translation, source, and count are all correct.
+
+> سُبْحَانَ الَّذِي يُسَبِّحُ الرَّعْدُ بِحَمْدِهِ وَالْمَلَائِكَةُ مِنْ خِيفَتِهِ
+
+**Transliteration.** Subḥāna'lladhī yusabbiḥu'r-raʿdu bi-ḥamdihi wa'l-malā'ikatu min khīfatih.
+
+**Translation.** Glory be to the One Whom the thunder glorifies with His praise, and the angels out of awe of Him.
+
+**Source.** Mālik; al-Bukhārī (al-Adab al-Mufrad) — al-Muwaṭṭaʾ 56.26 (3641); al-Adab al-Mufrad 723  **⚠ verify reference**
+
+**Count.** once
+
+**Occasion.** On hearing thunder.
 
 
 ---

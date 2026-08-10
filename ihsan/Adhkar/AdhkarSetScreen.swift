@@ -43,15 +43,21 @@ struct AdhkarSetScreen: View {
     /// long enough to see the mark take, short enough not to be a wait.
     private static let advanceDelay: Duration = .milliseconds(450)
 
+    /// `itemIDs`, when given, narrows the set to those items in the
+    /// category's customary order — the weather dua line opens exactly
+    /// the text its moment named, on this same surface.
     init(
         category: AdhkarCategory,
+        itemIDs: [String]? = nil,
         showsTransliteration: Bool,
         onDismiss: @escaping () -> Void
     ) {
         self.category = category
         self.showsTransliteration = showsTransliteration
         self.onDismiss = onDismiss
-        _state = State(initialValue: AdhkarSetState(items: BundledAdhkar.items(in: category)))
+        let all = BundledAdhkar.items(in: category)
+        let items = itemIDs.map { ids in all.filter { ids.contains($0.id) } } ?? all
+        _state = State(initialValue: AdhkarSetState(items: items))
     }
 
     var body: some View {

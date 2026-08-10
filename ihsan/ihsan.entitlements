@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<!-- Maintainer: Apple Developer Portal must register group.com.sameerstudios.ihsan, iCloud.com.sameerstudios.ihsan, and Push Notifications for this App ID. Sign in with Apple must remain disabled for v1. -->
+<!-- Maintainer: Apple Developer Portal must register group.com.sameerstudios.ihsan, iCloud.com.sameerstudios.ihsan, Push Notifications, and WeatherKit for this App ID (WeatherKit needs the capability on both the App ID and in App Store Connect). Sign in with Apple must remain disabled for v1. -->
 <plist version="1.0">
 <dict>
 	<key>com.apple.security.application-groups</key>
@@ -20,6 +20,8 @@
 	<key>aps-environment</key>
 	<string>development</string>
 	<key>com.apple.developer.usernotifications.time-sensitive</key>
+	<true/>
+	<key>com.apple.developer.weatherkit</key>
 	<true/>
 </dict>
 </plist>

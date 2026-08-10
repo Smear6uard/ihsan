@@ -65,6 +65,11 @@ public struct CelestialSkyView: View {
     public let starSeed: UInt64
     /// Optional frame-time probe for the render loop.
     public let probe: FrameTimeProbe?
+    /// The living sky: which painted weather treatment lies on the
+    /// field. `.clear` — the default, the fallback, and the whole
+    /// story whenever weather is off, unknown, stale, or unapproved —
+    /// renders the idealized page byte for byte.
+    public let weather: SkyWeatherTreatment
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
@@ -82,7 +87,8 @@ public struct CelestialSkyView: View {
         horizonY: CGFloat? = nil,
         plateHeight: CGFloat? = nil,
         starSeed: UInt64 = 0x1A5F_0426,
-        probe: FrameTimeProbe? = nil
+        probe: FrameTimeProbe? = nil,
+        weather: SkyWeatherTreatment = .clear
     ) {
         self.phase = phase
         self.sunAltitudeDegrees = sunAltitudeDegrees
@@ -92,6 +98,7 @@ public struct CelestialSkyView: View {
         self.plateHeight = plateHeight
         self.starSeed = starSeed
         self.probe = probe
+        self.weather = weather
     }
 
     /// The only time-dependent term is the horizon glow's breathing;
@@ -120,7 +127,8 @@ public struct CelestialSkyView: View {
                     time: time,
                     flat: reduceTransparency,
                     seed: starSeed,
-                    dawnProgress: phase.dawnProgress
+                    dawnProgress: phase.dawnProgress,
+                    weather: weather
                 )
                 probe?.record(CFAbsoluteTimeGetCurrent() - start)
             }
@@ -151,10 +159,23 @@ public struct CelestialSkyView: View {
     /// groundBottom at the chord.
     nonisolated static let skyBreakpoint: Double = 0.55
     /// Samples above and below the breakpoint. The upper segment gets
-    /// far more because it carries the whole zenith→near-white
-    /// journey; the lower one crosses two near-identical near-whites.
-    nonisolated private static let zenithSegmentSamples = 11
-    nonisolated private static let horizonSegmentSamples = 5
+    /// far more because it carries the whole zenith→pearl journey;
+    /// the lower one drifts from the pearl into the horizon's warmth.
+    nonisolated private static let zenithSegmentSamples = 15
+    nonisolated private static let horizonSegmentSamples = 6
+    /// The seasoned middle band (corrective: "kill the washed middle
+    /// band"). The ramp used to run zenith → groundTop linearly and
+    /// had surrendered every trace of lapis by mid-sky, leaving a dead
+    /// cream zone between the blue and the warm horizon. Two small
+    /// moves re-grade it into one continuous breath: the descent holds
+    /// the zenith's chroma longer (`zenithHoldExponent` eases the mix),
+    /// and it lands not on bare groundTop but on a pearl carrying a
+    /// residue of the zenith (`breakpointZenithResidue`), which the
+    /// lower segment then walks into the warm groundBottom. Endpoints
+    /// stay exact: the zenith is the zenith, the horizon is the
+    /// horizon; only the journey between them keeps its color.
+    nonisolated private static let breakpointZenithResidue = 0.08
+    nonisolated private static let zenithHoldExponent = 1.35
 
     /// The sky's stop table: zenith → groundTop → groundBottom,
     /// sampled in OKLCH so the ramp keeps its chroma, with `groundTop`
@@ -169,9 +190,36 @@ public struct CelestialSkyView: View {
         1.0 - 0.85 * exp(-pow(sunAltitudeDegrees / 9.0, 2))
     }
 
-    nonisolated static func skyGradientStops(tokens: SkyPaletteTokens) -> [Gradient.Stop] {
-        skySamples(tokens: tokens).map {
+    nonisolated static func skyGradientStops(
+        tokens: SkyPaletteTokens,
+        weather: SkyWeatherTreatment = .clear
+    ) -> [Gradient.Stop] {
+        skySamples(tokens: tokens, weather: weather).map {
             .init(color: $0.value.color, location: $0.location)
+        }
+    }
+
+    /// The stop table with the living sky's value compression laid on:
+    /// the page on a gray day is the SAME page, its values gathered
+    /// toward the middle — hue and chroma untouched, so no new color
+    /// can enter through the weather.
+    nonisolated static func skySamples(
+        tokens: SkyPaletteTokens,
+        weather: SkyWeatherTreatment
+    ) -> [(location: Double, value: SRGBValue)] {
+        let base = skySamples(tokens: tokens)
+        let compression = weather.valueCompression
+        guard compression < 1.0 else { return base }
+        let lightnesses = base.map(\.value.oklab.l)
+        let middle = ((lightnesses.max() ?? 0) + (lightnesses.min() ?? 0)) / 2
+        let pivot = middle + weather.grayPivotShift
+        let calm = weather.chromaCalm
+        return base.map { sample in
+            var lab = sample.value.oklab
+            lab.l = pivot + (lab.l - pivot) * compression
+            lab.a *= calm
+            lab.b *= calm
+            return (sample.location, lab.srgb)
         }
     }
 
@@ -185,19 +233,22 @@ public struct CelestialSkyView: View {
         let zenith = tokens.skyZenithValue
         let upper = tokens.groundTopValue
         let lower = tokens.groundBottomValue
+        // The breakpoint pearl: groundTop with a residue of the zenith
+        // still in it, so the middle of the page never reads flavorless.
+        let pearl = SRGBValue.mixOKLCH(upper, zenith, amount: breakpointZenithResidue)
         var samples: [(location: Double, value: SRGBValue)] = []
         for i in 0...zenithSegmentSamples {
             let f = Double(i) / Double(zenithSegmentSamples)
             samples.append((
                 skyBreakpoint * f,
-                .mixOKLCH(zenith, upper, amount: f)
+                .mixOKLCH(zenith, pearl, amount: pow(f, zenithHoldExponent))
             ))
         }
         for i in 1...horizonSegmentSamples {
             let f = Double(i) / Double(horizonSegmentSamples)
             samples.append((
                 skyBreakpoint + (1 - skyBreakpoint) * f,
-                .mixOKLCH(upper, lower, amount: f)
+                .mixOKLCH(pearl, lower, amount: f)
             ))
         }
         return samples
@@ -213,8 +264,11 @@ public struct CelestialSkyView: View {
     /// flat fill that ignores it hands Reduce Transparency users a
     /// blank white page where everyone else sees a sky. The fallback
     /// cannot carry the gradient, but it can carry the sky's colour.
-    nonisolated static func skyFlatValue(tokens: SkyPaletteTokens) -> SRGBValue {
-        let samples = skySamples(tokens: tokens)
+    nonisolated static func skyFlatValue(
+        tokens: SkyPaletteTokens,
+        weather: SkyWeatherTreatment = .clear
+    ) -> SRGBValue {
+        let samples = skySamples(tokens: tokens, weather: weather)
         var red = 0.0, green = 0.0, blue = 0.0, weight = 0.0
         for (a, b) in zip(samples, samples.dropFirst()) {
             let span = b.location - a.location
@@ -266,7 +320,8 @@ public struct CelestialSkyView: View {
         time: TimeInterval,
         flat: Bool,
         seed: UInt64,
-        dawnProgress: Double = 0
+        dawnProgress: Double = 0,
+        weather: SkyWeatherTreatment = .clear
     ) {
         // The horizon band: ~8% of the *plate* height, inside the
         // spec's 6–10% window.
@@ -290,12 +345,15 @@ public struct CelestialSkyView: View {
         // gradient.
         let skyRect = CGRect(origin: .zero, size: size)
         if flat {
-            context.fill(Path(skyRect), with: .color(Self.skyFlatValue(tokens: tokens).color))
+            context.fill(
+                Path(skyRect),
+                with: .color(Self.skyFlatValue(tokens: tokens, weather: weather).color)
+            )
         } else {
             context.fill(
                 Path(skyRect),
                 with: .linearGradient(
-                    Gradient(stops: Self.skyGradientStops(tokens: tokens)),
+                    Gradient(stops: Self.skyGradientStops(tokens: tokens, weather: weather)),
                     startPoint: .zero,
                     endPoint: CGPoint(x: 0, y: max(horizonY, 1))
                 )
@@ -314,7 +372,7 @@ public struct CelestialSkyView: View {
                 tokens.horizonWashValue, tokens.glowValue, amount: 0.40
             ).color
             let radius = size.width * 0.55
-            let strength = 0.30 * dawnProgress
+            let strength = 0.30 * dawnProgress * weather.bloomDamping
             var wash = context
             wash.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: horizonY)))
             wash.fill(
@@ -357,6 +415,30 @@ public struct CelestialSkyView: View {
             )
         }
 
+        // The illuminator's rain: engraved diagonal hatching in the
+        // filament weight, denser toward the horizon, static. No
+        // falling animation, no droplets — strokes on a page.
+        if !flat, weather.showsRainHatching {
+            drawRainHatching(
+                into: &context,
+                size: size,
+                horizonY: horizonY,
+                tokens: tokens,
+                seed: seed
+            )
+        }
+
+        // Snow: the gold-dust field's discipline in cool white.
+        if !flat, weather.showsSnowDust {
+            drawSnowDust(
+                into: &context,
+                size: size,
+                belowLimit: horizonY - bandHeight * 0.6,
+                tokens: tokens,
+                seed: seed
+            )
+        }
+
         // Ground plane below the chord — its own token, deepening
         // smoothly away from the horizon so the focused card sits on
         // calm ground. Same material, one value step down; never a new
@@ -377,15 +459,22 @@ public struct CelestialSkyView: View {
             context.fill(Path(groundRect), with: .color(tokens.groundPlane))
         } else {
             let plane = tokens.groundPlaneValue
+            // Falling rain deepens the band a step further — the earth
+            // darker for being wet, same token, same family.
+            let deepening = weather.groundDeepening
             let stops: [Gradient.Stop] = onDarkGround
                 ? [
                     .init(color: plane.color, location: 0),
-                    .init(color: plane.scalingLightness(by: 0.78).color, location: 1)
+                    .init(color: plane.scalingLightness(by: 0.78 * deepening).color, location: 1)
                 ]
                 : [
+                    // Deepened in the seasoning pass: the old 0.925 →
+                    // 0.86 span read as a khaki strip rather than
+                    // worked ground. Same token, same front-loading,
+                    // a real value journey.
                     .init(color: plane.color, location: 0),
-                    .init(color: plane.scalingLightness(by: 0.925).color, location: 0.22),
-                    .init(color: plane.scalingLightness(by: 0.86).color, location: 1)
+                    .init(color: plane.scalingLightness(by: 0.915 * deepening).color, location: 0.22),
+                    .init(color: plane.scalingLightness(by: 0.82 * deepening).color, location: 1)
                 ]
             context.fill(
                 Path(groundRect),
@@ -419,9 +508,12 @@ public struct CelestialSkyView: View {
                     (21, 0.9, 0.24, 0.18)
                 ]
                 : [
-                    (7, 1.2, 0.11, 0.52),
-                    (14, 1.0, 0.17, 0.34),
-                    (21, 0.9, 0.24, 0.21)
+                    // Raised again in the seasoning pass — the H-item-3
+                    // weights still undershot arm's-length visibility
+                    // on the near-white field.
+                    (7, 1.2, 0.11, 0.62),
+                    (14, 1.0, 0.17, 0.42),
+                    (21, 0.9, 0.24, 0.28)
                 ]
         // The engraving yields to the light. Three parallel full-width
         // marks lit by the sun's own bloom read as rays off it — the
@@ -465,7 +557,10 @@ public struct CelestialSkyView: View {
             thickness: 0.9,
             insetFraction: 0.085
         )
-        context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.55)))
+        // 0.55 → 0.62 in the seasoning pass: the pair must read as a
+        // pair — gold AND lapis — at arm's length, not gold with a
+        // rumor beneath it.
+        context.fill(Path(lapisFilament), with: .color(tokens.lapisValue.color.opacity(0.62)))
 
         // The sun's horizon interaction — PAINTED light, strictly
         // local. No full-width band, no screen-center hotspot: a
@@ -481,7 +576,7 @@ public struct CelestialSkyView: View {
         if !flat, let sunX {
             let proximity = exp(-pow(sunAltitudeDegrees / 9.0, 2))
             let breathing = time == 0 ? 1.0 : 1.0 + 0.06 * sin(time * 0.7)
-            let strength = proximity * breathing
+            let strength = proximity * breathing * weather.bloomDamping
             if strength > 0.02 {
                 let bloomRadius = size.width * 0.35
                 let bloomCenter = CGPoint(x: sunX, y: horizonY)
@@ -591,11 +686,101 @@ public struct CelestialSkyView: View {
     /// field quiet — see `goldDustLaysLessInkThanTheGrain`, which pins
     /// the two densities against each other so neither can be retuned
     /// into a texture.
-    nonisolated static let goldDustPeakOpacity: Double = 0.13
+    /// Raised from 0.13/2 680 in the clear-day seasoning pass: the
+    /// specified arm's-length visibility had been undershot — the dust
+    /// registered only on close inspection. Brighter flecks, slightly
+    /// more of them, still two orders sparser than the grain and still
+    /// pinned under its total ink by `goldDustLaysLessInkThanTheGrain`.
+    /// 0.15 is the material-register ceiling's edge: at 0.17 the
+    /// brightest fleck crossed `skySpeckleStaysInTheMaterialRegister`,
+    /// which is the line between a caught glint and a sparkle artifact.
+    nonisolated static let goldDustPeakOpacity: Double = 0.15
 
-    /// One fleck per this many point² of sky. Two orders of magnitude
-    /// sparser than the grain's one-per-210.
-    nonisolated static let goldDustMarkArea: Double = 2_680
+    /// One fleck per this many point² of sky.
+    nonisolated static let goldDustMarkArea: Double = 2_300
+
+    /// Peak alpha of a rain hatch stroke, before the toward-horizon
+    /// ramp and per-stroke weighting — polarity-scaled like the
+    /// worked-ground filaments, because the same alpha buys far less
+    /// on a near-white field (metal ~2.6:1 by day, ~6:1 by night).
+    nonisolated static let rainHatchNightPeak: Double = 0.16
+    nonisolated static let rainHatchDayPeak: Double = 0.32
+
+    /// One hatch stroke per this many point² of sky.
+    nonisolated static let rainHatchMarkArea: Double = 950
+
+    /// The illuminator's rain: fine diagonal strokes in the engraving
+    /// metal, one fixed slant, denser and slightly more present toward
+    /// the horizon, clipped to the sky so nothing crosses the chord.
+    /// Static and seeded — the same rain in the same places for as
+    /// long as it rains. Nothing falls, nothing animates.
+    private static func drawRainHatching(
+        into context: inout GraphicsContext,
+        size: CGSize,
+        horizonY: CGFloat,
+        tokens: SkyPaletteTokens,
+        seed: UInt64
+    ) {
+        guard horizonY > 8 else { return }
+        let count = Int((size.width * horizonY / rainHatchMarkArea).rounded())
+        let peak = rainHatchNightPeak
+            + (rainHatchDayPeak - rainHatchNightPeak) * tokens.daylightPresence
+        let width = 0.7 + 0.2 * tokens.daylightPresence
+        var rng = SeededGenerator(state: seed ^ 0x8C4D_11E7_A3F0_559D)
+        var sky = context
+        sky.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: horizonY)))
+        for _ in 0..<count {
+            let x = rng.unit() * size.width
+            // pow biases the scatter toward the horizon, where the
+            // illuminator hatches densest.
+            let y = horizonY * pow(rng.unit(), 0.55)
+            let length = 9.0 + rng.unit() * 5.0
+            let presence = (0.35 + 0.65 * (y / horizonY)) * (0.7 + 0.3 * rng.unit())
+            var stroke = Path()
+            stroke.move(to: CGPoint(x: x, y: y))
+            // One consistent slant, steeper than diagonal: drawn rain,
+            // not a texture screen.
+            stroke.addLine(to: CGPoint(x: x - length * 0.28, y: y + length))
+            sky.stroke(
+                stroke,
+                with: .color(tokens.metalValue.color.opacity(peak * presence)),
+                lineWidth: width
+            )
+        }
+    }
+
+    /// Snow flecks: no brighter and no denser than the gold dust whose
+    /// discipline they borrow — pinned by `LivingSkyTreatmentTests`.
+    nonisolated static let snowDustPeakOpacity: Double = 0.15
+    nonisolated static let snowDustMarkArea: Double = 2_300
+
+    /// The gold-dust field's discipline in cool white: sparse static
+    /// flecks, fixed seed, no fall, no twinkle.
+    private static func drawSnowDust(
+        into context: inout GraphicsContext,
+        size: CGSize,
+        belowLimit: CGFloat,
+        tokens: SkyPaletteTokens,
+        seed: UInt64
+    ) {
+        guard belowLimit > 4 else { return }
+        let count = max(6, Int((size.width * belowLimit / snowDustMarkArea).rounded()))
+        let tint = SRGBValue(red: 0.93, green: 0.96, blue: 1.0).color
+        var rng = SeededGenerator(state: seed ^ 0x2E9B_63C1_0D84_FA77)
+        for _ in 0..<count {
+            let x = rng.unit() * size.width
+            let y = rng.unit() * belowLimit
+            let radius = 0.4 + rng.unit() * 0.6
+            let weight = 0.34 + 0.66 * pow(rng.unit(), 2.2)
+            context.fill(
+                Path(ellipseIn: CGRect(
+                    x: x - radius, y: y - radius,
+                    width: radius * 2, height: radius * 2
+                )),
+                with: .color(tint.opacity(snowDustPeakOpacity * weight))
+            )
+        }
+    }
 
     private static func drawStars(
         into context: inout GraphicsContext,
