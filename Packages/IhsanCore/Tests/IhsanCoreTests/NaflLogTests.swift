@@ -7,7 +7,7 @@ private let nightOf = Date(timeIntervalSinceReferenceDate: 700_000_000)
 
 @MainActor
 private func makeContext() throws -> ModelContext {
-    let schema = Schema(IhsanSchemaV9.models)
+    let schema = Schema(IhsanSchemaV10.models)
     // Unique store name per test — unnamed in-memory configurations share
     // one backing store within a process, which corrupts parallel runs.
     let configuration = ModelConfiguration(
