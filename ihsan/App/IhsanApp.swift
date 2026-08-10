@@ -219,7 +219,8 @@ private struct RootGate: View {
                 "IhsanYesterdayOfferDismissedDay",
                 "IhsanSunnahCardDismissed",
                 "IhsanAdhkarDismissedDay",
-                "IhsanWeatherDuaDismissedEpisodes"
+                "IhsanWeatherDuaDismissedEpisodes",
+                "IhsanLivingSkyEnabled"
             ] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
@@ -295,6 +296,13 @@ private struct RootGate: View {
                 settings.fastingWhiteDaysOfferEnabled = true
                 try? modelContext.save()
             }
+        }
+        // `-IhsanDebugLivingSky` switches the living sky on — the
+        // per-condition gate review and screenshot harness, composed
+        // with `-IhsanDebugSkyConditions <kind>` to stand under each
+        // treatment.
+        if arguments.contains("-IhsanDebugLivingSky") {
+            UserDefaults.standard.set(true, forKey: "IhsanLivingSkyEnabled")
         }
         // `-IhsanDebugEnableAdhkar` turns the remembrance layer and all
         // four sets on — including sleep, which remains opt-in in the

@@ -99,6 +99,15 @@ struct CelestialPlateScene: View {
     /// Optional render-loop instrumentation.
     var probe: FrameTimeProbe?
 
+    /// The living sky: which painted weather treatment lies on the
+    /// field. Always `.clear` unless the Living sky toggle is on, a
+    /// fresh reading exists, and the mapped treatment has passed its
+    /// per-condition gate. Weather renders BEHIND the instrument
+    /// layer, and celestial truth is never veiled into falsehood —
+    /// the sun, moon, markers, and labels are composed above it,
+    /// unmoved and legible.
+    var weather: SkyWeatherTreatment = .clear
+
     /// Entrance choreography flag: 0 before the scene has entered,
     /// 1 at rest. The owner flips it 0→1 once per cold open (and per
     /// foreground after a long absence); each layer animates toward
@@ -188,7 +197,8 @@ struct CelestialPlateScene: View {
                     ).x,
                     horizonY: plate.horizonY,
                     plateHeight: plate.rect.height,
-                    probe: probe
+                    probe: probe,
+                    weather: weather
                 )
 
                 atmosphere(
@@ -197,6 +207,15 @@ struct CelestialPlateScene: View {
                 )
                 .opacity(entrance)
                 .animation(glowEntranceAnimation, value: entrance)
+
+                // The cloud washes ride above the blooms — the sun
+                // warms a wash it sits behind — and below every
+                // engraved line.
+                if weather.showsCloudWashes {
+                    SkyCloudWashLayer(tokens: tokens, horizonY: plate.horizonY)
+                        .opacity(entrance)
+                        .animation(glowEntranceAnimation, value: entrance)
+                }
 
                 if PlateCornerFiligree.isEnabled {
                     VStack(spacing: 0) {
@@ -681,14 +700,18 @@ struct CelestialPlateScene: View {
         // on `daylightPresence` so nothing switches at the crossings;
         // at its 0.28 day maximum it stays under the arc's 0.34 at
         // half the ribbon thickness — the day arc keeps the page.
-        let almucantarOpacity = 0.10 + 0.18 * tokens.daylightPresence
+        // On the gray pages the engraving quiets a step with the sky;
+        // the terrain chord and the gilded traversed passage keep full
+        // presence — the horizon and the day's record do not dim.
+        let almucantarOpacity = (0.10 + 0.18 * tokens.daylightPresence) * weather.metalQuiet
+        let arcOpacity = 0.34 * weather.metalQuiet
 
         return Canvas { context, size in
             for segment in almucantarSegments {
                 context.fill(Path(segment), with: .color(tokens.metal.opacity(almucantarOpacity)))
             }
             for segment in arcSegments {
-                context.fill(Path(segment), with: .color(tokens.metal.opacity(0.34)))
+                context.fill(Path(segment), with: .color(tokens.metal.opacity(arcOpacity)))
             }
 
             // The gilded passage: the same run, heavier and warmer,

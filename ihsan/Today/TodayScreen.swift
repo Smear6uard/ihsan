@@ -250,6 +250,10 @@ private struct TodayReadyView: View {
     /// passes. Presentation state, never worship data.
     @AppStorage("IhsanWeatherDuaDismissedEpisodes")
     private var weatherDuaDismissedEpisodes: String = ""
+    /// The living sky toggle, Set → Display. Off by default until the
+    /// Phase 3 per-condition gates pass on device.
+    @AppStorage("IhsanLivingSkyEnabled")
+    private var livingSkyEnabled: Bool = false
     /// The tasbīḥ link asked which one; waiting on the answer.
     @State private var isChoosingPostPrayer = false
     /// The always-open door's hub. `-IhsanDebugPresentRemembrance`
@@ -382,6 +386,7 @@ private struct TodayReadyView: View {
                     horizonFraction: metrics.plateHorizonFraction,
                     night: snapshot.night,
                     onMarkerTap: handleMarkerTap,
+                    weather: plateWeather(at: now),
                     entrance: entranceProgress
                 )
                 .ignoresSafeArea()
@@ -844,6 +849,19 @@ private struct TodayReadyView: View {
                 isContentAvailable: AdhkarAvailability.isAvailable
             )
         )
+    }
+
+    /// The plate's weather, resolved through every gate in order: the
+    /// Living sky toggle, a reading fresh enough to serve, and the
+    /// per-condition maintainer approvals. Anything short of all
+    /// three is the idealized sky, silently.
+    /// `-IhsanDebugLivingSky` stands in for the toggle so the gate
+    /// review can stand under each treatment without touching Set.
+    private func plateWeather(at now: Date) -> SkyWeatherTreatment {
+        guard livingSkyEnabled || DebugLaunch.flag("-IhsanDebugLivingSky") else { return .clear }
+        guard let conditions = viewModel.skyWeather.current(at: now) else { return .clear }
+        return SkyWeatherTreatment.resolved(for: conditions)
+            .resolvedAgainst(approved: SkyWeatherTreatment.gateApproved)
     }
 
     /// The weather dua line, if this moment has one. Deliberately

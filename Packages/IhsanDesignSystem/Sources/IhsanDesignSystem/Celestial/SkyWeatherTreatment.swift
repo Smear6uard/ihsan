@@ -63,4 +63,87 @@ public enum SkyWeatherTreatment: String, CaseIterable, Codable, Sendable {
         }
         return current
     }
+
+    /// The maintainer's per-condition gate ledger. Every treatment
+    /// ships only after being seen on device in a day and a night
+    /// state; a condition the review rejects is CUT from this set and
+    /// falls back along its chain — it does not ship half-approved.
+    /// (`clear` needs no approval; it is the idealized page.)
+    public static let gateApproved: Set<SkyWeatherTreatment> = Set(allCases)
+}
+
+// MARK: - The painted dials
+
+/// Everything a treatment is allowed to do to the page, as numbers.
+/// Value shifts, engraved marks, and washes — nothing photographic,
+/// nothing animated beyond an imperceptible drift, nothing that
+/// flashes. The dials are pinned by `LivingSkyTreatmentTests`.
+public extension SkyWeatherTreatment {
+    /// Value compression of the sky ramp toward its (slightly lowered)
+    /// middle — the page on a gray day. Identity everywhere except the
+    /// two gray pages. First calibration (0.80/0.70) measured ±2
+    /// points of channel change on device frames — applied but
+    /// unreadable; a gray day must be seen at a glance.
+    var valueCompression: Double {
+        switch self {
+        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .overcast: 0.62
+        case .storm: 0.52
+        }
+    }
+
+    /// The gray pages pivot a touch below the ramp's middle: an
+    /// overcast day is not only flatter, it is a shade darker.
+    var grayPivotShift: Double {
+        switch self {
+        case .clear, .partlyVeiled, .rain, .snow: 0
+        case .overcast: -0.015
+        case .storm: -0.03
+        }
+    }
+
+    /// Chroma calms on the gray pages. Desaturation is not a new hue —
+    /// it is the same page with the color sky drawn through a veil.
+    var chromaCalm: Double {
+        switch self {
+        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .overcast: 0.55
+        case .storm: 0.45
+        }
+    }
+
+    /// How much the engraved metal quiets on the gray pages. The
+    /// terrain chord and the gilded traversed passage are exempt —
+    /// the horizon and the day's record stay at full presence.
+    var metalQuiet: Double {
+        switch self {
+        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .overcast: 0.85
+        case .storm: 0.78
+        }
+    }
+
+    /// Extra deepening of the ground band under falling rain.
+    var groundDeepening: Double {
+        switch self {
+        case .clear, .partlyVeiled, .overcast, .snow: 1.0
+        case .rain: 0.96
+        case .storm: 0.92
+        }
+    }
+
+    /// Damping of the sun's painted horizon bloom and dawn wash when
+    /// the sky is veiled gray. Partly veiled keeps the bloom whole —
+    /// it warms the wash it sits behind.
+    var bloomDamping: Double {
+        switch self {
+        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .overcast: 0.45
+        case .storm: 0.30
+        }
+    }
+
+    var showsRainHatching: Bool { self == .rain || self == .storm }
+    var showsSnowDust: Bool { self == .snow }
+    var showsCloudWashes: Bool { self == .partlyVeiled }
 }

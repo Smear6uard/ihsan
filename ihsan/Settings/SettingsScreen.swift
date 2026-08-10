@@ -102,7 +102,8 @@ struct SettingsScreen: View {
                             onOpenSystemSettings: openSystemNotificationSettings
                         )
                         FastingSection(settings: settings)
-                        DisplaySection(settings: settings)
+                        DisplaySection()
+                        CalendarSection(settings: settings)
                         if InsightAvailability.isAvailable {
                             OnDeviceInsightsSection(settings: settings)
                         }
@@ -1719,7 +1720,32 @@ private struct FastingSection: View {
     }
 }
 
+/// The plate's display privileges.
 private struct DisplaySection: View {
+    /// Presentation state, deliberately not a `UserSettings` column:
+    /// the living sky is a per-device rendering preference in the same
+    /// register as the dismissal keys, and it defaults to off until
+    /// the Phase 3 per-condition gates pass on device.
+    @AppStorage("IhsanLivingSkyEnabled") private var livingSkyEnabled = false
+
+    var body: some View {
+        SettingsSectionCard("Display") {
+            SettingsRow(
+                title: "Living sky",
+                subtitle: "Weather painted on the plate",
+                glyph: .sun
+            ) {
+                Toggle("", isOn: $livingSkyEnabled)
+                    .labelsHidden()
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                    .accessibilityLabel("Living sky")
+            }
+            SettingsDescriptionText("Paints the current weather onto the Today plate in the manuscript's own language — washes, engraved hatching, a grayer page — always behind the instrument. When the sky is unknown, the plate keeps its idealized day.")
+        }
+    }
+}
+
+private struct CalendarSection: View {
     let settings: UserSettings
 
     var body: some View {

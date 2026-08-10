@@ -91,6 +91,46 @@ final class WeatherCaptureUITests: XCTestCase {
         }
     }
 
+    /// The per-condition gate gallery: every living-sky treatment in a
+    /// day and a night state, staged with `-IhsanDebugSkyConditions` +
+    /// `-IhsanDebugLivingSky`. These are the frames each maintainer
+    /// gate is judged from before its condition ships.
+    @MainActor
+    func testCaptureLivingSkyTreatments() throws {
+        // Warm-up: the very first launch after an install can miss its
+        // launch arguments while the system finishes staging the app;
+        // burn that launch on no frame at all.
+        let warmup = XCUIApplication()
+        warmup.launchArguments = Self.baseArguments
+        warmup.launch()
+        _ = warmup.tabBars.firstMatch.waitForExistence(timeout: 20)
+        warmup.terminate()
+
+        let day = Self.chicagoAfternoon
+        let night = "2026-07-30T22:30:00"
+        let conditions: [(slug: String, kind: String)] = [
+            ("partly-veiled", "partlyCloudy"),
+            ("overcast", "cloudy"),
+            ("rain", "rain"),
+            ("snow", "snow"),
+            ("storm", "thunderstorms"),
+        ]
+        for condition in conditions {
+            for (phase, instant) in [("day", day), ("night", night)] {
+                capture(Frame(
+                    name: "living-sky-\(condition.slug)-\(phase)",
+                    arguments: [
+                        "-IhsanNowOverride", instant,
+                        "-IhsanDebugLivingSky",
+                        "-IhsanDebugSkyConditions", condition.kind
+                    ],
+                    settle: 4.0,
+                    waitLabelFragment: "Location: Chicago"
+                ))
+            }
+        }
+    }
+
     // MARK: - Capture
 
     @MainActor
