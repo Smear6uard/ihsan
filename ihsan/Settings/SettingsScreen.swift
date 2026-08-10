@@ -58,7 +58,12 @@ struct SettingsScreen: View {
                             automaticLocationMessage: automaticLocationMessage,
                             onCityTap: showCoordinatesIfAvailable,
                             onAutomaticLocationChanged: setAutomaticLocationUpdates(_:for:),
-                            onRefresh: { refreshLocation(for: settings) }
+                            onRefresh: { refreshLocation(for: settings) },
+                            myMasjidName: MyMasjid.fetchExisting(in: modelContext)?.name,
+                            onMyMasjid: {
+                                Haptics.impact(.light)
+                                path.append(.myMasjid)
+                            }
                         )
 
                         CalculationSection(settings: settings, path: $path)
@@ -294,6 +299,11 @@ struct SettingsScreen: View {
             DuhaWindowPicker(settings: settings)
         case .adhkarWindows:
             AdhkarWindowsPicker(settings: settings)
+        case .myMasjid:
+            MyMasjidEditorScreen(
+                masjid: (try? MyMasjid.fetchOrCreate(in: modelContext)) ?? MyMasjid(),
+                settings: settings
+            )
         }
     }
 
@@ -662,6 +672,7 @@ private enum SettingsRoute: Hashable {
     case rawatibCounts
     case duhaWindow
     case adhkarWindows
+    case myMasjid
 
     #if DEBUG
     init?(debugName: String) {
@@ -673,6 +684,7 @@ private enum SettingsRoute: Hashable {
         case "rawatibCounts": self = .rawatibCounts
         case "duhaWindow": self = .duhaWindow
         case "adhkarWindows": self = .adhkarWindows
+        case "myMasjid": self = .myMasjid
         default: return nil
         }
     }
@@ -735,6 +747,9 @@ private struct LocationSection: View {
     let onCityTap: () -> Void
     let onAutomaticLocationChanged: (Bool, UserSettings) -> Void
     let onRefresh: () -> Void
+    /// The masjid's name, or nil when none is set. The row says which.
+    let myMasjidName: String?
+    let onMyMasjid: () -> Void
 
     var body: some View {
             SettingsSectionCard("Location") {
@@ -752,6 +767,13 @@ private struct LocationSection: View {
                 glyph: .location
             ) { EmptyView() }
             #endif
+
+            SettingsRow(
+                title: "My Masjid",
+                subtitle: myMasjidName ?? "Not set",
+                glyph: .masjid,
+                action: onMyMasjid
+            )
 
             SettingsRow(
                 title: "Automatic location updates",
@@ -1583,11 +1605,15 @@ private struct DuhaWindowPicker: View {
     }
 }
 
-private extension View {
+extension View {
     /// The inset every direct child of a `SettingsSectionCard` owes the
     /// card. `SettingsRow` and `SettingsDescriptionText` apply it
     /// themselves; hand-built controls have to say so, or they hang off
     /// the panel's left edge and sit centred instead of aligned.
+    ///
+    /// Internal rather than file-private because the My Masjid editor
+    /// builds the same kind of hand-rolled control on the same kind of
+    /// panel, and two definitions of one inset drift.
     func settingsControlInset() -> some View {
         frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, IhsanSpacing.md)
@@ -1596,7 +1622,11 @@ private extension View {
 
 /// A compact −/+ count control in the settings idiom: quiet label above,
 /// two 28pt brass buttons around a monospaced value.
-private func miniCountControl(
+///
+/// Internal rather than file-private: the My Masjid editor needs the same
+/// stepper for its offsets and its reminder lead, and a second copy of a
+/// control is a second thing to keep in step.
+func miniCountControl(
     label: String,
     value: Int,
     step: Int = 1,
@@ -2556,7 +2586,9 @@ private extension AdhanSoundCatalog {
     }
 }
 
-private struct PickerScaffold<Content: View>: View {
+/// Internal rather than file-private: the My Masjid editor is one of these
+/// subscreens and owes the same tab-bar clearance and page ground.
+struct PickerScaffold<Content: View>: View {
     /// The floating tab bar's height plus the home indicator, with
     /// room to breathe. A subscreen inside a tab has to clear it
     /// itself: the bar floats over the scroll view rather than

@@ -9,6 +9,8 @@ import SwiftUI
 public enum SettingsGlyph: Sendable {
     /// Compass rose — location.
     case location
+    /// A mihrab arch on its base line — the user's own masjid.
+    case masjid
     /// A fine route arrow — directions handed to Maps.
     case directions
     /// Astrolabe quadrant — calculation method.
@@ -356,6 +358,19 @@ public struct SettingsGlyphShape: Shape {
             p.addCurve(to: pt(0.5, 0.24), control1: pt(0.76, 0.14), control2: pt(0.62, 0.16))
             p.move(to: pt(0.5, 0.24))
             p.addLine(to: pt(0.5, 0.84))
+
+        case .masjid:
+            // A pointed arch standing on a level base — the mihrab niche,
+            // in the same single-weight linework as its neighbours. It is
+            // deliberately not a dome-and-minaret pictogram: this row
+            // names the place a person prays, not a landmark.
+            p.move(to: pt(0.22, 0.82))
+            p.addLine(to: pt(0.22, 0.48))
+            p.addQuadCurve(to: pt(0.50, 0.18), control: pt(0.22, 0.26))
+            p.addQuadCurve(to: pt(0.78, 0.48), control: pt(0.78, 0.26))
+            p.addLine(to: pt(0.78, 0.82))
+            p.move(to: pt(0.10, 0.82))
+            p.addLine(to: pt(0.90, 0.82))
 
         case .remove:
             p.move(to: pt(0.22, 0.28))
