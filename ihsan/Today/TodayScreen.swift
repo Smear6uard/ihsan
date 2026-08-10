@@ -398,6 +398,15 @@ private struct TodayReadyView: View {
                 .ignoresSafeArea()
 
                 VStack(spacing: 0) {
+                    // Both offers are resolved once per render and read
+                    // from here. `now` ticks every second, and each of
+                    // these re-splits a stored dismissal string, so
+                    // asking twice for the line and again inside every
+                    // closure was work the second hand paid for. The
+                    // taps now act on exactly the offer that was drawn.
+                    let yesterday = yesterdayOffer(at: now)
+                    let weather = weatherDuaOffer(at: now)
+
                     TodayHeader(
                         cityName: snapshot.place.cityName ?? "Current Location",
                         now: now,
@@ -410,27 +419,27 @@ private struct TodayReadyView: View {
                         significantDayInscription: headerLineText(at: now),
                         significantDayHint: headerLineHint(at: now),
                         onSignificantDayTap: { handleHeaderLineTap(at: now) },
-                        yesterdayInscription: yesterdayOffer(at: now)?.inscription,
-                        yesterdaySpokenLabel: yesterdayOffer(at: now)?.spokenLabel,
+                        yesterdayInscription: yesterday?.inscription,
+                        yesterdaySpokenLabel: yesterday?.spokenLabel,
                         onYesterdayTap: { isYesterdaySheetPresented = true },
                         onYesterdayDismiss: {
                             yesterdayOfferDismissedDay = YesterdayAccount.civilDayKey(
                                 cycleDay(at: now), calendar: placeCalendar
                             )
                         },
-                        weatherInscription: weatherDuaOffer(at: now)?.kind.inscription,
-                        weatherSpokenLabel: weatherDuaOffer(at: now)?.kind.spokenLabel,
+                        weatherInscription: weather?.kind.inscription,
+                        weatherSpokenLabel: weather?.kind.spokenLabel,
                         onWeatherTap: {
-                            if let offer = weatherDuaOffer(at: now) {
+                            if let weather {
                                 adhkarSelection = AdhkarSelection(
                                     category: .situational,
-                                    itemIDs: [offer.kind.itemID]
+                                    itemIDs: [weather.kind.itemID]
                                 )
                             }
                         },
                         onWeatherDismiss: {
-                            if let offer = weatherDuaOffer(at: now) {
-                                dismissWeatherDua(offer)
+                            if let weather {
+                                dismissWeatherDua(weather)
                             }
                         }
                     )
