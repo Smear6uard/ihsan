@@ -252,7 +252,7 @@ private struct TodayReadyView: View {
     private var weatherDuaDismissedEpisodes: String = ""
     /// The living sky toggle, Set → Display. Off by default until the
     /// Phase 3 per-condition gates pass on device.
-    @AppStorage("IhsanLivingSkyEnabled")
+    @AppStorage(WeatherInterest.livingSkyDefaultsKey)
     private var livingSkyEnabled: Bool = false
     /// The tasbīḥ link asked which one; waiting on the answer.
     @State private var isChoosingPostPrayer = false

@@ -224,7 +224,7 @@ private struct RootGate: View {
                 "IhsanSunnahCardDismissed",
                 "IhsanAdhkarDismissedDay",
                 "IhsanWeatherDuaDismissedEpisodes",
-                "IhsanLivingSkyEnabled"
+                WeatherInterest.livingSkyDefaultsKey
             ] {
                 UserDefaults.standard.removeObject(forKey: key)
             }
@@ -306,7 +306,7 @@ private struct RootGate: View {
         // with `-IhsanDebugSkyConditions <kind>` to stand under each
         // treatment.
         if arguments.contains("-IhsanDebugLivingSky") {
-            UserDefaults.standard.set(true, forKey: "IhsanLivingSkyEnabled")
+            UserDefaults.standard.set(true, forKey: WeatherInterest.livingSkyDefaultsKey)
         }
         // `-IhsanDebugEnableAdhkar` turns the remembrance layer and all
         // four sets on — including sleep, which remains opt-in in the

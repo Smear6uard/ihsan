@@ -168,7 +168,7 @@ public enum SkyWeatherRefreshPolicy {
 /// kind and three bands. No coordinates, no place names, nothing that
 /// locates the reading.
 public enum SkyConditionsCacheStore {
-    public static let suiteName = "group.com.sameerstudios.ihsan"
+    public static let suiteName = IhsanModelContainerFactory.appGroupIdentifier
     public static let key = "ihsan.sky-conditions-cache.v1"
 
     public static func write(_ conditions: SkyConditions) {

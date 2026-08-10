@@ -25,7 +25,10 @@ truthfully:
 `NSPrivacyTrackingDomains` is empty. Nothing is passed to a data broker
 and no identifier is shared with anyone.
 
-## The two network calls the app makes
+## The three network calls the app makes
+
+Every one is to Apple. None of them reaches a server the developer owns,
+because there isn't one.
 
 1. **Reverse geocoding**, to Apple, via `CLGeocoder` — coordinates in,
    a city name out. Results are cached in memory only, keyed by
@@ -35,17 +38,31 @@ and no identifier is shared with anyone.
    JSON file of thresholds and reflection prompts. Sends nothing but
    the request. A bundled copy ships with the app and a test guarantees
    it parses, so the app is fully functional with the network off.
+3. **The weather reading**, to Apple Weather via WeatherKit — coordinates
+   in, the current conditions out. It happens only while something is
+   actually asking for weather: the Living sky toggle in Set → Display
+   (off by default), or the weather duas in the remembrance layer. With
+   both off, `WeatherInterest` reports no interested consumer and the
+   request is never made.
+
+   The coordinates are used to scope the one request and discarded with
+   it — `WeatherKitSkyProvider` retains, persists, and logs nothing. What
+   comes back is reduced immediately to a condition kind and three coarse
+   bands (wind, cloud, precipitation), and only that reduction is cached.
+   `SkyConditionsCacheStore` holds no coordinate, no place name, and
+   nothing else that could locate the reading. Readings expire after
+   three hours rather than painting stale weather.
 
 ## Permissions, and exactly what each is for
 
 | Permission | Used for | Not used for |
 | --- | --- | --- |
-| **Location** (when in use) | Prayer times, the qibla bearing, and the nearby-masjid search. | Anything else. Your coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, a file, or a network call. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. The one place a coordinate is stored is a masjid you deliberately set as your own — see below. |
+| **Location** (when in use) | Prayer times, the qibla bearing, and the nearby-masjid search. | Anything else. Your coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, a file, or a network call. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. Two requests to Apple carry coordinates and keep nothing: reverse geocoding, and the weather reading when you have asked for weather — see the three network calls above. The one place a coordinate is stored is a masjid you deliberately set as your own — see below. |
 | **Microphone** | Recording a voice reflection. | Nothing is uploaded. The `.m4a` stays in the App Group container and is deliberately excluded from CloudKit sync; only the transcript and metadata travel, and audio sync is opt-in (`adhanPlaysInSilentMode`'s neighbour, `autoSyncAudioMemos`, off by default). |
 | **Speech recognition** | Transcribing a voice reflection, on device. | No audio leaves the phone during transcription. |
 | **Motion** | One thing: `DeviceTiltMonitor` reads device pitch so the qibla dial can say "lay the phone flat" when it is held near-vertical and magnetic heading stops being reliable. It publishes a single boolean. | Not parallax, not analytics, not activity or step data. |
 | **Notifications** | One notification per prayer, at its time. Per-prayer sound and Focus behaviour are the person's choice, and every prayer can be silenced on its own. | Nothing is sent from a server; every notification is scheduled locally. |
-| **Alarms (AlarmKit)** | The optional gentle wake for the last third of the night, off by default. Requested only when someone turns that on. | — |
+| **Alarms (AlarmKit)** | The four optional wake anchors — the last third of the night, Fajr's start, sunrise, and Maghrib — every one off by default. Requested only when someone turns one on. | — |
 
 ## The one coordinate the app stores
 
@@ -112,11 +129,11 @@ content filter rejects prohibited terms, and when Apple Intelligence is
 unavailable the feature renders nothing at all — no greyed state, no
 upgrade prompt.
 
-**AlarmKit** is used only for the optional gentle wake for the last
-third of the night. It is off by default, the permission is requested
-at the moment someone enables it, and when alarms are unavailable or
-declined the app falls back to a time-sensitive notification and says
-so plainly in Settings.
+**AlarmKit** is used only for the optional wake anchors — the last third
+of the night, Fajr's start, sunrise, and Maghrib. Every one is off by
+default, the permission is requested at the moment someone enables one,
+and when alarms are unavailable or declined the app falls back to a
+time-sensitive notification and says so plainly in Settings.
 
 **Audio provenance.** The bundled chimes are synthesised from sine
 partials — see `docs/audio/generate-placeholders.py`, which is the

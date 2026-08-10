@@ -73,7 +73,7 @@ public struct PrayerTimesCache: Codable, Sendable, Equatable {
 }
 
 public enum PrayerTimesCacheStore {
-    public static let suiteName = "group.com.sameerstudios.ihsan"
+    public static let suiteName = IhsanModelContainerFactory.appGroupIdentifier
     public static let key = "ihsan.prayer-times-cache.v1"
 
     public static func write(_ cache: PrayerTimesCache) {

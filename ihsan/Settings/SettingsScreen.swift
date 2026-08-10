@@ -33,7 +33,7 @@ struct SettingsScreen: View {
     @State private var exportItem: ExportItem?
     @State private var exportError: String?
     @State private var showingRepairSetup = false
-    @State private var nightWakeUsesFallback = false
+    @State private var wakeUsesFallback = false
     @State private var notificationStatusMessage: String?
     @State private var notificationsBlockedBySystem = false
     @State private var notificationRebuildTask: Task<Void, Never>?
@@ -97,12 +97,12 @@ struct SettingsScreen: View {
                         SunnahSection(
                             settings: settings,
                             path: $path,
-                            onWakeSettingsChanged: { refreshNightWake(for: settings) }
+                            onWakeSettingsChanged: { refreshWakeAnchors(for: settings) }
                         )
                         WakesAndAlarmsSection(
                             settings: settings,
-                            fallbackNote: nightWakeFallbackNote,
-                            onWakeSettingsChanged: { refreshNightWake(for: settings) }
+                            fallbackNote: wakeFallbackNote,
+                            onWakeSettingsChanged: { refreshWakeAnchors(for: settings) }
                         )
                         AdhkarSection(
                             settings: settings,
@@ -147,7 +147,7 @@ struct SettingsScreen: View {
         .task {
             bootstrapSettings()
             latestPlace = locationCoordinator.mostRecentResolvedPlace()
-            nightWakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
+            wakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
             await loadFiqhFraming()
             #if DEBUG
             openDebugRoute()
@@ -312,23 +312,33 @@ struct SettingsScreen: View {
         }
     }
 
-    private var nightWakeFallbackNote: String? {
-        let anyEnabled = settings.map { settings in
-            WakeAnchor.allCases.contains { settings.wakeAnchorConfig(for: $0).isEnabled }
-        } ?? false
-        guard anyEnabled, nightWakeUsesFallback else { return nil }
+    /// Whether any of the four anchors is switched on. The one place that
+    /// question is asked, so the permission request and the fallback note
+    /// cannot answer it differently.
+    private func anyWakeAnchorEnabled(_ settings: UserSettings) -> Bool {
+        WakeAnchor.allCases.contains { settings.wakeAnchorConfig(for: $0).isEnabled }
+    }
+
+    private var wakeFallbackNote: String? {
+        guard let settings, anyWakeAnchorEnabled(settings), wakeUsesFallback else { return nil }
         return "Alarms aren't permitted on this device, so these arrive as time-sensitive notifications instead."
     }
 
-    /// Re-syncs the standing wake after any wake-related change in Set,
-    /// requesting alarm permission the moment the user turns it on.
-    private func refreshNightWake(for settings: UserSettings) {
+    /// Re-syncs the standing wakes after any wake-related change in Set,
+    /// requesting alarm permission the moment the user turns one on.
+    ///
+    /// Asks the anchors, never `nightWakeEnabled`: that column is
+    /// vestigial after the V9 → V10 migration and nothing writes it, so
+    /// gating here would mean no anchor ever prompts for permission and
+    /// every wake silently degrades to a notification — under a note
+    /// claiming alarms were refused.
+    private func refreshWakeAnchors(for settings: UserSettings) {
         Task {
-            if settings.nightWakeEnabled {
+            if anyWakeAnchorEnabled(settings) {
                 await WakeAnchorService.shared.requestAlarmAuthorizationIfNeeded()
             }
             await WakeAnchorService.shared.refresh(using: modelContext)
-            nightWakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
+            wakeUsesFallback = WakeAnchorService.shared.usesNotificationFallback
         }
     }
 
@@ -561,8 +571,8 @@ struct SettingsScreen: View {
     private func rebuildSchedulesAfterModeChange() {
         Task {
             try? await NotificationScheduler.shared.rebuildSchedule()
-            // The gentle wake honors the same pause the notification
-            // schedule does — re-sync it whenever the schedule rebuilds.
+            // The wake anchors honor the same pause the notification
+            // schedule does — re-sync them whenever the schedule rebuilds.
             await WakeAnchorService.shared.refresh(using: modelContext)
         }
         // Pause and travel transitions change what a widget may show
@@ -1874,7 +1884,7 @@ private struct DisplaySection: View {
     /// the living sky is a per-device rendering preference in the same
     /// register as the dismissal keys, and it defaults to off until
     /// the Phase 3 per-condition gates pass on device.
-    @AppStorage("IhsanLivingSkyEnabled") private var livingSkyEnabled = false
+    @AppStorage(WeatherInterest.livingSkyDefaultsKey) private var livingSkyEnabled = false
 
     var body: some View {
         SettingsSectionCard("Display") {

@@ -40,7 +40,7 @@ struct WeatherEpisodeLedger: Codable, Equatable, Sendable {
 /// survives a relaunch mid-rain rather than greeting the same rain as
 /// new.
 enum WeatherEpisodeLedgerStore {
-    static let suiteName = "group.com.sameerstudios.ihsan"
+    static let suiteName = IhsanModelContainerFactory.appGroupIdentifier
     static let key = "ihsan.weather-episodes.v1"
 
     static func write(_ ledger: WeatherEpisodeLedger) {

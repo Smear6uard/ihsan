@@ -380,8 +380,8 @@ final class TodayViewModel {
                 do {
                     try await self.refreshSnapshot()
                     // A travel update changes every derived schedule,
-                    // not only Today. Keep notifications and the last-
-                    // third wake on the same newly resolved place.
+                    // not only Today. Keep notifications and all four
+                    // wake anchors on the same newly resolved place.
                     try? await NotificationScheduler.shared.rebuildSchedule()
                     await WakeAnchorService.shared.refresh(using: self.modelContext)
                     // A new place can mean a new sky. Forced, because

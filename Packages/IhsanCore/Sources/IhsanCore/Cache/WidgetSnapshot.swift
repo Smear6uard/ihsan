@@ -407,7 +407,7 @@ public extension WidgetSnapshot {
 /// and the intent funnel's optimistic mirror; readers are widget
 /// timeline providers.
 public enum WidgetSnapshotStore {
-    public static let suiteName = "group.com.sameerstudios.ihsan"
+    public static let suiteName = IhsanModelContainerFactory.appGroupIdentifier
     public static let key = "ihsan.widget-snapshot.v2"
 
     public static func write(_ snapshot: WidgetSnapshot, defaults: UserDefaults? = nil) {
