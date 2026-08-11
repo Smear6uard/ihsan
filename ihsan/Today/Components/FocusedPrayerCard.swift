@@ -36,6 +36,16 @@ import SwiftUI
 /// `FocusedCardModel`, whose tests pin the no-resting-zero and
 /// atomic-boundary guarantees.
 struct FocusedPrayerCard: View {
+    struct KhatamMoment: Equatable {
+        let count: Int
+        let unit: KhatamUnit
+
+        var inscription: String {
+            let label = count == 1 ? unit.singularLabel : unit.pluralLabel
+            return "\(count.formatted()) \(label)".uppercased()
+        }
+    }
+
     /// The focused prayer's rawatib, present only when the user enabled
     /// the sunnah layer's rawatib component. `nil` renders the card
     /// exactly as it was before the layer existed.
@@ -115,7 +125,13 @@ struct FocusedPrayerCard: View {
     /// the natural post-prayer moment. `nil` renders no link.
     var onTasbih: (() -> Void)? = nil
 
+    /// A numeric handoff to the person's own mushaf. It shares the
+    /// post-prayer action rail and contains no reading content.
+    var khatamMoment: KhatamMoment? = nil
+    var onKhatam: (() -> Void)? = nil
+
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var mode: Mode = DebugLaunch.flag("-IhsanDebugExpandCard")
         ? .expanded : .collapsed
     @State private var jamaahPending: Bool = false
@@ -154,8 +170,14 @@ struct FocusedPrayerCard: View {
     /// The resting height for a card that may carry a congregation line.
     /// The scene above is measured against this same number, so the page
     /// stays one composition instead of the card quietly covering more sky.
-    static func cardHeight(hasIqamah: Bool) -> CGFloat {
-        hasIqamah ? cardHeight + iqamahLineHeight : cardHeight
+    static func cardHeight(
+        hasIqamah: Bool,
+        hasKhatam: Bool = false,
+        accessibilityLayout: Bool = false
+    ) -> CGFloat {
+        cardHeight
+            + (hasIqamah ? iqamahLineHeight : 0)
+            + (hasKhatam ? (accessibilityLayout ? 46 : 26) : 0)
     }
 
     static func expandedCardHeight(hasIqamah: Bool) -> CGFloat {
@@ -191,6 +213,10 @@ struct FocusedPrayerCard: View {
             status: currentStatus,
             isAvailable: onTasbih != nil
         )
+    }
+
+    private var showsKhatamOffer: Bool {
+        showsTasbihOffer && khatamMoment != nil && onKhatam != nil
     }
 
     private var phase: FocusedCardModel.Phase {
@@ -232,7 +258,11 @@ struct FocusedPrayerCard: View {
             .frame(
                 height: isExpandedLayout
                     ? Self.expandedCardHeight(hasIqamah: iqamahInscription != nil)
-                    : Self.cardHeight(hasIqamah: iqamahInscription != nil)
+                    : Self.cardHeight(
+                        hasIqamah: iqamahInscription != nil,
+                        hasKhatam: showsKhatamOffer,
+                        accessibilityLayout: dynamicTypeSize.isAccessibilitySize
+                    )
             )
             .celestialPanel(tokens: tokens, cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
@@ -842,33 +872,29 @@ struct FocusedPrayerCard: View {
 
                 Spacer()
 
-                if showsTasbihOffer, let onTasbih {
-                    Button {
-                        Haptics.impact(.light)
-                        onTasbih()
-                    } label: {
-                        HStack(spacing: 6) {
-                            Circle()
-                                .fill(tokens.leafGold)
-                                .frame(width: 5, height: 5)
-                            Text("TASBĪḤ")
-                                .font(IhsanFont.inscription)
-                                .tracking(1.5)
+                if showsTasbihOffer {
+                    VStack(alignment: .trailing, spacing: 5) {
+                        if let onTasbih {
+                            postPrayerButton(
+                                label: "TASBĪḤ",
+                                accessibilityLabel: "Continue with tasbīḥ",
+                                accessibilityHint: "Opens the tasbīḥ counter after this prayer."
+                            ) {
+                                onTasbih()
+                            }
                         }
-                        .foregroundStyle(tokens.ink)
-                        .padding(.horizontal, 11)
-                        .padding(.vertical, 7)
-                        .background(tokens.metal.opacity(0.11), in: Capsule())
-                        .overlay {
-                            Capsule().strokeBorder(
-                                tokens.metal.opacity(0.34), lineWidth: 0.7
-                            )
+                        if showsKhatamOffer,
+                           let khatamMoment,
+                           let onKhatam {
+                            postPrayerButton(
+                                label: khatamMoment.inscription,
+                                accessibilityLabel: "Log \(khatamMoment.count) \(khatamMoment.unit.pluralLabel) after \(prayer.displayNameEnglish)",
+                                accessibilityHint: "Opens the numeric Khatam stepper, prefilled with this amount."
+                            ) {
+                                onKhatam()
+                            }
                         }
-                        .contentShape(Capsule())
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Continue with tasbīḥ")
-                    .accessibilityHint("Opens the tasbīḥ counter after this prayer.")
                 }
             }
 
@@ -876,6 +902,42 @@ struct FocusedPrayerCard: View {
                 nightRow(nightSet)
             }
         }
+    }
+
+    private func postPrayerButton(
+        label: String,
+        accessibilityLabel: String,
+        accessibilityHint: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.impact(.light)
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(tokens.leafGold)
+                    .frame(width: 5, height: 5)
+                Text(label)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.35)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(tokens.ink)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
+            .background(tokens.metal.opacity(0.11), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(
+                    tokens.metal.opacity(0.34), lineWidth: 0.7
+                )
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
     }
 
     private var accessibilityLabelForLoggedState: String {

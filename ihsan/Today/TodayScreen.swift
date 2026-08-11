@@ -183,6 +183,8 @@ private struct TodayReadyView: View {
     /// Yesterday's prayer logs — the only day the account line ever
     /// speaks about.
     @Query private var yesterdaysLogs: [PrayerLog]
+    @Query(sort: \KhatamPlan.createdAt, order: .reverse) private var khatamPlans: [KhatamPlan]
+    @Query(sort: \KhatamEntry.entryDate) private var khatamEntries: [KhatamEntry]
 
     private var activePause: PauseInterval? {
         pauses.first(where: \.isActive)
@@ -225,6 +227,7 @@ private struct TodayReadyView: View {
     @State private var entranceProgress: Double = 0
     @State private var lastActiveAt: Date?
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var prayerNotificationRoute = PrayerNotificationRoute.shared
     @State private var adhkarNotificationRoute = AdhkarNotificationRoute.shared
     /// A nafl waiting on the rak'ah dialog — only ever set when the user
@@ -256,6 +259,8 @@ private struct TodayReadyView: View {
     private var livingSkyEnabled: Bool = false
     /// The tasbīḥ link asked which one; waiting on the answer.
     @State private var isChoosingPostPrayer = false
+    /// A numeric Khatam handoff from the logged focused card.
+    @State private var khatamLogRequest: KhatamPrayerLogRequest?
     /// The always-open door's hub. `-IhsanDebugPresentRemembrance`
     /// opens it directly for the capture harness.
     @State private var isRemembrancePresented =
@@ -374,7 +379,11 @@ private struct TodayReadyView: View {
                 cardHeight: FocusedPrayerCard.cardHeight(
                     hasIqamah: focusedIqamahInscription(
                         now: now, resolution: resolution
-                    ) != nil
+                    ) != nil,
+                    hasKhatam: focusedKhatamMoment(
+                        now: now, resolution: resolution
+                    ) != nil,
+                    accessibilityLayout: dynamicTypeSize.isAccessibilitySize
                 ),
                 hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
             )
@@ -506,6 +515,18 @@ private struct TodayReadyView: View {
                     now: now,
                     resolution: resolution
                 )
+            }
+            .sheet(item: $khatamLogRequest) { request in
+                KhatamLogSheet(
+                    plan: request.plan,
+                    suggested: request.suggested,
+                    perPrayer: request.perPrayer,
+                    prefill: request.prefill,
+                    initialDate: request.initialDate,
+                    prayer: request.prayer
+                ) { _ in }
+                .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
             }
             .sheet(isPresented: $isCelestialReferencePresented) {
                 QiblaScreen(
@@ -701,6 +722,7 @@ private struct TodayReadyView: View {
         let windowState = resolution.state(for: prayerTime)
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
         let log = log(for: prayer)
+        let khatamMoment = focusedKhatamMoment(now: now, resolution: resolution)
         FocusedPrayerCard(
             prayer: prayer,
             scheduledTime: prayerTime.scheduledTime,
@@ -735,7 +757,68 @@ private struct TodayReadyView: View {
                 } else {
                     openFreeTasbih()
                 }
+            },
+            khatamMoment: khatamMoment,
+            onKhatam: khatamMoment == nil ? nil : {
+                presentKhatamLog(after: prayer, at: now)
             }
+        )
+    }
+
+    private func focusedKhatamMoment(
+        now: Date,
+        resolution: PrayerResolution
+    ) -> FocusedPrayerCard.KhatamMoment? {
+        let prayer = effectiveFocusedPrayer(resolution: resolution)
+        let prayerTime = TodayDisplaySchedule.prayerTime(
+            for: prayer,
+            window: snapshot.scheduleWindow,
+            now: now
+        )
+        let windowState = resolution.state(for: prayerTime)
+            ?? .upcoming(opensAt: prayerTime.scheduledTime)
+        guard FocusedCardModel.offersPostPrayerTasbih(
+            windowState: windowState,
+            status: log(for: prayer)?.status,
+            isAvailable: true
+        ), let offer = khatamPrayerOffer(at: now) else {
+            return nil
+        }
+        return FocusedPrayerCard.KhatamMoment(count: offer.count, unit: offer.unit)
+    }
+
+    private func khatamPrayerOffer(at now: Date) -> KhatamPrayerOffer? {
+        guard let plan = KhatamSurfaceModel.activePlan(in: khatamPlans) else {
+            return nil
+        }
+        return KhatamSurfaceModel.prayerOffer(
+            for: plan,
+            entries: khatamEntries,
+            pauses: pauses,
+            today: now,
+            calendar: placeCalendar
+        )
+    }
+
+    private func presentKhatamLog(after prayer: Prayer, at now: Date) {
+        guard let plan = KhatamSurfaceModel.activePlan(in: khatamPlans),
+              let offer = khatamPrayerOffer(at: now) else {
+            return
+        }
+        let pace = KhatamSurfaceModel.pace(
+            for: plan,
+            entries: khatamEntries,
+            pauses: pauses,
+            today: now,
+            calendar: placeCalendar
+        )
+        khatamLogRequest = KhatamPrayerLogRequest(
+            plan: plan,
+            suggested: pace.suggestedToday,
+            perPrayer: pace.perPrayerSuggestion,
+            prefill: offer.count,
+            initialDate: now,
+            prayer: prayer
         )
     }
 
@@ -1630,6 +1713,16 @@ private struct TodayReadyView: View {
 private struct LogSheetSelection: Identifiable, Hashable {
     let prayer: Prayer
     var id: Prayer { prayer }
+}
+
+private struct KhatamPrayerLogRequest: Identifiable {
+    let id = UUID()
+    let plan: KhatamPlan
+    let suggested: Int
+    let perPrayer: Int
+    let prefill: Int
+    let initialDate: Date
+    let prayer: Prayer
 }
 
 /// A nafl waiting on the rak'ah-count dialog.

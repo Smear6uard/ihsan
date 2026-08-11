@@ -15,13 +15,13 @@ struct KhatamPacingTests {
         calendar.date(byAdding: .day, value: offset, to: Date(timeIntervalSince1970: 1_767_225_600))!
     }
 
-    @Test("604 pages over 30 days resolves to 21 daily and 5 per prayer")
+    @Test("604 pages over 30 days resolves to 21 daily and about 4 per prayer")
     func classicalArithmeticRoundsWithoutLosingPages() {
         let plan = KhatamPacingPlan(startDate: day(0), endDate: day(29), targetUnits: 604)
         let pace = KhatamPacing.resolve(plan: plan, entries: [], today: day(0), calendar: calendar)
         #expect(pace.remaining == 604)
         #expect(pace.suggestedToday == 21)
-        #expect(pace.perPrayerSuggestion == 5)
+        #expect(pace.perPrayerSuggestion == 4)
         #expect(pace.forecastCompletionDate == nil)
     }
 

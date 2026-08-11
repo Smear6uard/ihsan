@@ -1,6 +1,15 @@
 import Foundation
 import IhsanCore
 
+nonisolated struct KhatamPrayerOffer: Equatable, Sendable {
+    let count: Int
+    let unit: KhatamUnit
+
+    var inscription: String {
+        KhatamSurfaceModel.unitLine(count, unit: unit).uppercased()
+    }
+}
+
 enum KhatamSurfaceModel {
     static func activePlan(in plans: [KhatamPlan]) -> KhatamPlan? {
         plans.first(where: \.isActive)
@@ -79,4 +88,36 @@ enum KhatamSurfaceModel {
         return "\(count.formatted()) \(label)"
     }
 
+    /// The focused-card offer is presence-following-purpose: one quiet
+    /// amount while today's intention is still open, and nothing once it
+    /// has been met. A pause suppresses the offer only; the detail screen's
+    /// logging door remains available.
+    static func prayerOffer(
+        for plan: KhatamPlan,
+        entries: [KhatamEntry],
+        pauses: [PauseInterval],
+        today: Date,
+        calendar: Calendar = .current
+    ) -> KhatamPrayerOffer? {
+        guard plan.isActive, !isPaused(on: today, pauses: pauses, calendar: calendar) else {
+            return nil
+        }
+        let pace = pace(
+            for: plan,
+            entries: entries,
+            pauses: pauses,
+            today: today,
+            calendar: calendar
+        )
+        let read = readToday(
+            for: plan,
+            entries: entries,
+            today: today,
+            calendar: calendar
+        )
+        guard pace.perPrayerSuggestion > 0, read < pace.suggestedToday else {
+            return nil
+        }
+        return KhatamPrayerOffer(count: pace.perPrayerSuggestion, unit: plan.unit)
+    }
 }

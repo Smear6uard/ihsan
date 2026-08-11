@@ -139,7 +139,13 @@ public enum KhatamPacing {
         return KhatamPace(
             remaining: remaining,
             suggestedToday: suggestion,
-            perPrayerSuggestion: suggestion == 0 ? 0 : roundedUp(suggestion, by: 5),
+            // This is an invitation around the five prayers, not five
+            // mandatory equal installments. Nearest rounding preserves the
+            // familiar 604 / 30 ≈ 20 / day ≈ 4 after each prayer arithmetic;
+            // any remainder stays inside the day's flexible total.
+            perPrayerSuggestion: suggestion == 0
+                ? 0
+                : max(1, Int((Double(suggestion) / 5).rounded())),
             forecastCompletionDate: forecast,
             hasRecentPace: forecast != nil
         )

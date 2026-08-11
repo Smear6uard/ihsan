@@ -1,5 +1,6 @@
 import Foundation
 import IhsanCore
+import SwiftData
 import Testing
 @testable import ihsan
 
@@ -57,4 +58,54 @@ struct KhatamSurfaceModelTests {
         #expect(KhatamSurfaceModel.unitLine(1, unit: .juz) == "1 juz’")
     }
 
+    @Test("The prayer offer uses the recomputed pace and recedes when today's intention is met")
+    func prayerOfferPresence() {
+        let plan = KhatamPlan(
+            startDate: day(0), endDate: day(29), mushafPageTotal: 600
+        )
+        let sparse = [
+            KhatamEntry(planID: plan.id, entryDate: day(0), unitsRead: 10)
+        ]
+        let offer = KhatamSurfaceModel.prayerOffer(
+            for: plan, entries: sparse, pauses: [], today: day(9), calendar: calendar
+        )
+        #expect(offer == KhatamPrayerOffer(count: 6, unit: .pages))
+        #expect(offer?.inscription == "6 PAGES")
+
+        let met = sparse + [
+            KhatamEntry(planID: plan.id, entryDate: day(9), unitsRead: 29)
+        ]
+        #expect(KhatamSurfaceModel.prayerOffer(
+            for: plan, entries: met, pauses: [], today: day(9), calendar: calendar
+        ) == nil)
+    }
+
+    @Test("A pause silences the prayer offer without closing numeric logging")
+    @MainActor
+    func prayerOfferPause() throws {
+        let plan = KhatamPlan(
+            startDate: day(0), endDate: day(29), mushafPageTotal: 600
+        )
+        let pause = PauseInterval(
+            startDate: day(4),
+            endDate: day(5),
+            loggedTimeZoneIdentifier: "UTC"
+        )
+        #expect(KhatamSurfaceModel.prayerOffer(
+            for: plan, entries: [], pauses: [pause], today: day(4), calendar: calendar
+        ) == nil)
+
+        let container = try IhsanModelContainerFactory.makeContainer(inMemory: true)
+        let storedPlan = try KhatamPlanWriter().begin(
+            startDate: day(0), endDate: day(29), unit: .pages,
+            mushafPageTotal: 600, isRamadan: false,
+            now: day(0), in: container.mainContext
+        )
+        let entry = try KhatamPlanWriter().log(
+            units: 4, on: day(4), after: .dhuhr, for: storedPlan,
+            now: day(4), in: container.mainContext
+        )
+        #expect(entry.unitsRead == 4)
+        #expect(entry.afterPrayer == Prayer.dhuhr)
+    }
 }

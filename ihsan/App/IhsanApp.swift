@@ -187,6 +187,8 @@ private struct RootGate: View {
     ///   the standard intent funnel (dedup and idempotency hold).
     /// - `-IhsanDebugSeedVoluntary 30` fills the last 30 cycles with
     ///   voluntary prayers and tasbīḥ sittings.
+    /// - `-IhsanDebugSeedKhatam active|sparse|complete` stages a
+    ///   numeric plan for focused-card and Path verification.
     /// - `-IhsanDebugResetStore` empties the prayer/nafl/pause tables
     ///   so UI tests start hermetic regardless of prior runs.
     ///
@@ -292,6 +294,46 @@ private struct RootGate: View {
                !settings.hasCompletedOnboarding {
                 settings.hasCompletedOnboarding = true
                 try? modelContext.save()
+            }
+        }
+        // Numeric-only Khatam fixtures. `active` is a fresh 604-page
+        // month; `sparse` places two modest entries across ten elapsed
+        // days so the recomputed suggestion and factual forecast can be
+        // captured; `complete` reaches a five-page terminal for the
+        // one-time completion moment.
+        if let flagIndex = arguments.firstIndex(of: "-IhsanDebugSeedKhatam"),
+           arguments.indices.contains(flagIndex + 1) {
+            let mode = arguments[flagIndex + 1]
+            let now = NowProvider.active.now()
+            let calendar = Calendar.current
+            let startOffset = mode == "sparse" ? -9 : 0
+            let start = calendar.date(byAdding: .day, value: startOffset, to: now) ?? now
+            let end = calendar.date(byAdding: .day, value: 29, to: start) ?? start
+            let total = mode == "complete" ? 5 : (mode == "sparse" ? 600 : 604)
+            if let plan = try? KhatamPlanWriter().begin(
+                startDate: start,
+                endDate: end,
+                unit: .pages,
+                mushafPageTotal: total,
+                targetCount: 1,
+                isRamadan: false,
+                now: now,
+                in: modelContext
+            ) {
+                if mode == "sparse" {
+                    let first = calendar.date(byAdding: .day, value: -9, to: now) ?? now
+                    let second = calendar.date(byAdding: .day, value: -3, to: now) ?? now
+                    _ = try? KhatamPlanWriter().log(
+                        units: 10, on: first, for: plan, now: first, in: modelContext
+                    )
+                    _ = try? KhatamPlanWriter().log(
+                        units: 40, on: second, for: plan, now: second, in: modelContext
+                    )
+                } else if mode == "complete" {
+                    _ = try? KhatamPlanWriter().log(
+                        units: total, on: now, for: plan, now: now, in: modelContext
+                    )
+                }
             }
         }
         // `-IhsanDebugEnableFastingRhythms` turns both voluntary
