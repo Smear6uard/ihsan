@@ -63,7 +63,7 @@ enum KhatamSurfaceModel {
         let start = calendar.startOfDay(for: date)
         let end = calendar.date(byAdding: .day, value: 1, to: start) ?? start
         return pauses.contains {
-            $0.startDate < end && ($0.endDate ?? .distantFuture) >= start
+            $0.startDate < end && ($0.endDate ?? .distantFuture) > start
         }
     }
 
@@ -83,7 +83,7 @@ enum KhatamSurfaceModel {
         return "AT YOUR PACE · BY \(date.formatted(.dateTime.month(.abbreviated).day()).uppercased())"
     }
 
-    static func unitLine(_ count: Int, unit: KhatamUnit) -> String {
+    nonisolated static func unitLine(_ count: Int, unit: KhatamUnit) -> String {
         let label = count == 1 ? unit.singularLabel : unit.pluralLabel
         return "\(count.formatted()) \(label)"
     }

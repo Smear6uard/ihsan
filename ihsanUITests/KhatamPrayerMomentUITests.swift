@@ -37,6 +37,7 @@ final class KhatamPrayerMomentUITests: XCTestCase {
             offer.waitForExistence(timeout: 20),
             "A logged in-window prayer should carry the active plan's per-prayer amount."
         )
+        retainScreenshot(app, name: "khatam-per-prayer-offer")
         offer.tap()
 
         XCTAssertTrue(
@@ -63,6 +64,7 @@ final class KhatamPrayerMomentUITests: XCTestCase {
             app.staticTexts["AFTER DHUHR"].waitForExistence(timeout: 5),
             "The saved numeric entry should retain its prayer association."
         )
+        retainScreenshot(app, name: "khatam-per-prayer-associated-entry")
     }
 
     @MainActor
@@ -70,10 +72,13 @@ final class KhatamPrayerMomentUITests: XCTestCase {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
         let allow = springboard.buttons["Allow While Using App"]
         if allow.waitForExistence(timeout: 5) { allow.tap() }
-        let retry = app.buttons["Continue"]
-        if retry.waitForExistence(timeout: 2) {
-            retry.tap()
-            if allow.waitForExistence(timeout: 5) { allow.tap() }
-        }
+    }
+
+    @MainActor
+    private func retainScreenshot(_ app: XCUIApplication, name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.name = name
+        attachment.lifetime = .keepAlways
+        add(attachment)
     }
 }

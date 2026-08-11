@@ -84,12 +84,17 @@ public struct KhatamPlanWriter {
         in context: ModelContext
     ) throws {
         let planID = entry.planID
+        let affectedPlan = try plan(id: planID, in: context)
         context.delete(entry)
-        if let plan = try plan(id: planID, in: context) {
-            plan.completedAt = nil
-            plan.modifiedAt = now
-        }
+        // Settle against a fetch that no longer includes the deleted row.
+        // A correction should reopen a plan only when its numeric total is
+        // actually below the target; removing an extra row from an already
+        // complete plan must not make its state false.
         try context.save()
+        if let affectedPlan {
+            try settleCompletion(of: affectedPlan, now: now, in: context)
+            try context.save()
+        }
     }
 
     public func markCompletionMomentShown(

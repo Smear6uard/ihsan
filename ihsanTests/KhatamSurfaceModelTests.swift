@@ -5,6 +5,7 @@ import Testing
 @testable import ihsan
 
 @Suite("Khatam surfaces")
+@MainActor
 struct KhatamSurfaceModelTests {
     private let calendar: Calendar = {
         var value = Calendar(identifier: .gregorian)
@@ -51,6 +52,18 @@ struct KhatamSurfaceModelTests {
         ))
     }
 
+    @Test("A pause ending at midnight does not rest the next day")
+    func pauseEndBoundary() {
+        let pause = PauseInterval(
+            startDate: day(3),
+            endDate: day(4),
+            loggedTimeZoneIdentifier: "UTC"
+        )
+        #expect(!KhatamSurfaceModel.isPaused(
+            on: day(4), pauses: [pause], calendar: calendar
+        ))
+    }
+
     @Test("Unit lines pluralize without content")
     func unitLines() {
         #expect(KhatamSurfaceModel.unitLine(1, unit: .pages) == "1 page")
@@ -81,7 +94,6 @@ struct KhatamSurfaceModelTests {
     }
 
     @Test("A pause silences the prayer offer without closing numeric logging")
-    @MainActor
     func prayerOfferPause() throws {
         let plan = KhatamPlan(
             startDate: day(0), endDate: day(29), mushafPageTotal: 600

@@ -1,7 +1,11 @@
 import Foundation
 import IhsanCore
 
-public actor InsightGenerator {
+/// PeriodSummary is a SwiftData model, so all reads and cache writes stay on
+/// the main actor. The model client remains asynchronous and does not block
+/// the actor while Foundation Models is producing a response.
+@MainActor
+public final class InsightGenerator {
     public static let shared = InsightGenerator()
 
     public static let modelVersion = "foundationmodels-system-language-model-default-v1"

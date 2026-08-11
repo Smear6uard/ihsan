@@ -73,7 +73,23 @@ struct KhatamDetailScreen: View {
             if let completed = plans.first(where: {
                 $0.completedAt != nil && $0.completionMomentShownAt == nil
             }) {
-                KhatamCompletionMoment(plan: completed, tokens: tokens)
+                KhatamCompletionMoment(
+                    plan: completed,
+                    tokens: tokens,
+                    onUndo: latestEntry(for: completed).map { entry in
+                        {
+                            do {
+                                try KhatamPlanWriter().remove(
+                                    entry,
+                                    now: nowProvider.now(),
+                                    in: modelContext
+                                )
+                            } catch {
+                                actionError = error.localizedDescription
+                            }
+                        }
+                    }
+                )
                     .transition(.opacity)
             }
         }
@@ -123,6 +139,7 @@ struct KhatamDetailScreen: View {
                 KhatamThreadView(
                     read: read,
                     target: plan.targetUnits,
+                    unit: plan.unit,
                     tokens: tokens,
                     terminalSize: 24
                 )
@@ -194,7 +211,7 @@ struct KhatamDetailScreen: View {
                         .font(IhsanFont.bodyEnglish)
                     Spacer()
                     Image(systemName: "slider.horizontal.3")
-                        .foregroundStyle(tokens.metal)
+                        .foregroundStyle(tokens.inkSecondary)
                 }
                 .foregroundStyle(tokens.ink)
                 .frame(minHeight: 44)
@@ -218,7 +235,7 @@ struct KhatamDetailScreen: View {
             Text("READING LOG")
                 .font(IhsanFont.inscription)
                 .tracking(1.6)
-                .foregroundStyle(tokens.metal)
+                .foregroundStyle(tokens.inkSecondary)
 
             if planEntries.isEmpty {
                 Text("Your first numeric entry will rest here.")
@@ -252,7 +269,7 @@ struct KhatamDetailScreen: View {
                                 .font(.system(.body, design: .monospaced))
                             Image(systemName: "chevron.right")
                                 .font(.system(size: 11, weight: .semibold))
-                                .foregroundStyle(tokens.metal)
+                                .foregroundStyle(tokens.inkSecondary)
                         }
                         .foregroundStyle(tokens.ink)
                         .frame(minHeight: 52)
@@ -281,7 +298,7 @@ struct KhatamDetailScreen: View {
                 }
             }
             .font(IhsanFont.bodyEnglishBold)
-            .foregroundStyle(tokens.metal)
+            .foregroundStyle(tokens.inkSecondary)
             .frame(minWidth: 44, minHeight: 44)
         }
         .padding(.horizontal, IhsanSpacing.md)
@@ -297,13 +314,22 @@ struct KhatamDetailScreen: View {
                     Text("COMPLETED · \(completedAt.formatted(date: .long, time: .omitted).uppercased())")
                         .font(IhsanFont.inscription)
                         .tracking(1.3)
-                        .foregroundStyle(tokens.metal)
+                        .foregroundStyle(tokens.inkSecondary)
                     Text("A completed reading, held quietly.")
                         .font(IhsanFont.bodyEnglish)
                         .foregroundStyle(tokens.ink)
                 }
                 .padding(IhsanSpacing.md)
                 .celestialPanel(tokens: tokens, cornerRadius: 16)
+
+                let planEntries = KhatamSurfaceModel.entries(for: latest, from: entries)
+                let pace = KhatamSurfaceModel.pace(
+                    for: latest,
+                    entries: planEntries,
+                    pauses: pauses,
+                    today: nowProvider.now()
+                )
+                entryLedger(plan: latest, pace: pace, planEntries: planEntries)
             } else {
                 Text("Begin when the period feels right.")
                     .font(IhsanFont.bodyEnglish)
@@ -320,6 +346,10 @@ struct KhatamDetailScreen: View {
             .background(tokens.leafGold, in: Capsule())
             .buttonStyle(.plain)
         }
+    }
+
+    private func latestEntry(for plan: KhatamPlan) -> KhatamEntry? {
+        entries.first { $0.planID == plan.id }
     }
 }
 
@@ -358,41 +388,43 @@ private struct KhatamPlanSettingsSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-            Text("PLAN SETTINGS")
-                .font(IhsanFont.inscription)
-                .tracking(1.6)
-                .foregroundStyle(tokens.metal)
-            DatePicker("Horizon", selection: $endDate, in: plan.startDate..., displayedComponents: .date)
-            if plan.unit == .pages {
-                Stepper("Pages in your mushaf · \(pageTotal)", value: $pageTotal, in: 1...2_000)
-            }
-            Stepper("Completions · \(targetCount)", value: $targetCount, in: 1...10)
-            Button("Keep settings") {
-                Haptics.settle()
-                do {
-                    try KhatamPlanWriter().updatePlan(
-                        plan,
-                        endDate: endDate,
-                        mushafPageTotal: pageTotal,
-                        targetCount: targetCount,
-                        now: nowProvider.now(),
-                        in: modelContext
-                    )
-                    dismiss()
-                } catch {
-                    saveError = error.localizedDescription
+        ScrollView {
+            VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                Text("PLAN SETTINGS")
+                    .font(IhsanFont.inscription)
+                    .tracking(1.6)
+                    .foregroundStyle(tokens.inkSecondary)
+                DatePicker("Horizon", selection: $endDate, in: plan.startDate..., displayedComponents: .date)
+                if plan.unit == .pages {
+                    Stepper("Pages in your mushaf · \(pageTotal)", value: $pageTotal, in: 1...2_000)
                 }
+                Stepper("Completions · \(targetCount)", value: $targetCount, in: 1...10)
+                Button("Keep settings") {
+                    Haptics.settle()
+                    do {
+                        try KhatamPlanWriter().updatePlan(
+                            plan,
+                            endDate: endDate,
+                            mushafPageTotal: pageTotal,
+                            targetCount: targetCount,
+                            now: nowProvider.now(),
+                            in: modelContext
+                        )
+                        dismiss()
+                    } catch {
+                        saveError = error.localizedDescription
+                    }
+                }
+                .font(IhsanFont.bodyEnglishBold)
+                .foregroundStyle(tokens.keyline)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(tokens.leafGold, in: Capsule())
+                .buttonStyle(.plain)
             }
-            .font(IhsanFont.bodyEnglishBold)
-            .foregroundStyle(tokens.keyline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(tokens.leafGold, in: Capsule())
-            .buttonStyle(.plain)
+            .padding(IhsanSpacing.lg)
         }
         .font(IhsanFont.bodyEnglish)
         .foregroundStyle(tokens.ink)
-        .padding(IhsanSpacing.lg)
         .presentationBackground(.thinMaterial)
         .alert("The plan could not be saved", isPresented: Binding(
             get: { saveError != nil },
@@ -409,6 +441,7 @@ private struct KhatamPlanSettingsSheet: View {
 private struct KhatamCompletionMoment: View {
     let plan: KhatamPlan
     let tokens: SkyPaletteTokens
+    let onUndo: (() -> Void)?
 
     @Environment(\.modelContext) private var modelContext
 
@@ -420,6 +453,7 @@ private struct KhatamCompletionMoment: View {
                 KhatamThreadView(
                     read: plan.targetUnits,
                     target: plan.targetUnits,
+                    unit: plan.unit,
                     tokens: tokens,
                     terminalSize: 30
                 )
@@ -439,7 +473,16 @@ private struct KhatamCompletionMoment: View {
                 .font(IhsanFont.bodyEnglish)
                 .foregroundStyle(tokens.ink)
                 .frame(minWidth: 120, minHeight: 52)
-                .padding(.bottom, IhsanSpacing.xl)
+                if let onUndo {
+                    Button("Undo last entry") {
+                        Haptics.impact(.light)
+                        onUndo()
+                    }
+                    .font(IhsanFont.bodyEnglish)
+                    .foregroundStyle(tokens.inkSecondary)
+                    .frame(minWidth: 120, minHeight: 44)
+                }
+                Spacer().frame(height: IhsanSpacing.md)
             }
             .padding(IhsanSpacing.lg)
         }

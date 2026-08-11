@@ -67,7 +67,7 @@ struct TrajectoryScreen: View {
     @State private var showingRepairSetup = false
     @State private var showingRepairDetail = DebugLaunch.flag("-IhsanDebugPresentRepair")
     @State private var showingKhatamSetup = DebugLaunch.flag("-IhsanDebugPresentKhatamSetup")
-    @State private var showingKhatamDetail = DebugLaunch.flag("-IhsanDebugPresentKhatam")
+    @State private var showingKhatamDetail = false
     @AppStorage("IhsanKhatamOfferRamadanYear")
     private var khatamOfferRamadanYear: Int = 0
     /// A grid cell awaiting the retroactive log sheet.
@@ -256,6 +256,14 @@ struct TrajectoryScreen: View {
             if let trajectoryInsight = await currentFraming()?.trajectoryInsight {
                 fiqhInsight = trajectoryInsight
             }
+        }
+        .task {
+            guard DebugLaunch.flag("-IhsanDebugPresentKhatam") else { return }
+            // Presentation state set before the host enters the hierarchy is
+            // not reliably observed by SwiftUI. Yield one turn so evidence
+            // launches exercise the same sheet path as a real card tap.
+            await Task.yield()
+            showingKhatamDetail = true
         }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)

@@ -63,12 +63,12 @@ final class PrayerNotificationResponder: NSObject {
         settings?.sound(for: prayer) ?? .chime
     }
 
-    private func prayer(from userInfo: [AnyHashable: Any]) -> Prayer? {
+    nonisolated private func prayer(from userInfo: [AnyHashable: Any]) -> Prayer? {
         (userInfo[ScheduledNotificationUserInfoKey.prayer] as? String)
             .flatMap(Prayer.init(rawValue:))
     }
 
-    private func adhkarCategory(from userInfo: [AnyHashable: Any]) -> AdhkarCategory? {
+    nonisolated private func adhkarCategory(from userInfo: [AnyHashable: Any]) -> AdhkarCategory? {
         (userInfo[ScheduledNotificationUserInfoKey.adhkarCategory] as? String)
             .flatMap(AdhkarCategory.init(rawValue:))
     }
@@ -83,7 +83,7 @@ extension PrayerNotificationResponder: UNUserNotificationCenterDelegate {
         willPresent notification: UNNotification
     ) async -> UNNotificationPresentationOptions {
         let userInfo = notification.request.content.userInfo
-        guard let prayer = await prayer(from: userInfo) else {
+        guard let prayer = prayer(from: userInfo) else {
             return [.banner, .list]
         }
         let choice = await soundChoice(for: prayer)
@@ -95,14 +95,14 @@ extension PrayerNotificationResponder: UNUserNotificationCenterDelegate {
         didReceive response: UNNotificationResponse
     ) async {
         let userInfo = response.notification.request.content.userInfo
-        if let category = await adhkarCategory(from: userInfo) {
+        if let category = adhkarCategory(from: userInfo) {
             guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
             await MainActor.run {
                 AdhkarNotificationRoute.shared.pendingCategory = category
             }
             return
         }
-        guard let prayer = await prayer(from: userInfo) else { return }
+        guard let prayer = prayer(from: userInfo) else { return }
 
         switch response.actionIdentifier {
         case NotificationCategory.playAdhanAction:

@@ -130,7 +130,10 @@ public enum KhatamPacing {
             let pace = Double(recentUnits) / Double(recentActiveDays)
             let daysNeeded = max(1, Int(ceil(Double(remaining) / pace)))
             forecast = addingActiveDays(
-                daysNeeded - 1, from: day, excluding: excused, calendar: calendar
+                // Today's recorded units already contributed to the pace
+                // and were removed from `remaining`; every needed day is
+                // therefore a future active day.
+                daysNeeded, from: day, excluding: excused, calendar: calendar
             )
         } else {
             forecast = nil
@@ -204,7 +207,7 @@ public extension KhatamPacingPlan {
         while cursor <= end {
             let dayEnd = calendar.date(byAdding: .day, value: 1, to: cursor) ?? cursor
             if pauses.contains(where: {
-                $0.startDate < dayEnd && ($0.endDate ?? .distantFuture) >= cursor
+                $0.startDate < dayEnd && ($0.endDate ?? .distantFuture) > cursor
             }) {
                 dates.insert(cursor)
             }

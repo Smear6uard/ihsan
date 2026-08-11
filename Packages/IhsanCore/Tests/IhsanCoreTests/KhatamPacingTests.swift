@@ -44,7 +44,7 @@ struct KhatamPacingTests {
         let entries = (0..<10).map { KhatamPacingEntry(date: day($0), unitsRead: 30) }
         let pace = KhatamPacing.resolve(plan: plan, entries: entries, today: day(9), calendar: calendar)
         #expect(pace.suggestedToday == 20)
-        #expect(pace.forecastCompletionDate == day(18))
+        #expect(pace.forecastCompletionDate == day(19))
     }
 
     @Test("No recent reading produces no forecast")
@@ -53,6 +53,29 @@ struct KhatamPacingTests {
         let pace = KhatamPacing.resolve(plan: plan, entries: [], today: day(8), calendar: calendar)
         #expect(pace.forecastCompletionDate == nil)
         #expect(!pace.hasRecentPace)
+    }
+
+    @Test("A future plan is quiet until its first day")
+    func futurePlan() {
+        let plan = KhatamPacingPlan(startDate: day(4), endDate: day(33), targetUnits: 604)
+        let pace = KhatamPacing.resolve(
+            plan: plan, entries: [], today: day(3), calendar: calendar
+        )
+        #expect(pace.suggestedToday == 0)
+        #expect(pace.perPrayerSuggestion == 0)
+        #expect(pace.remaining == 604)
+    }
+
+    @Test("Forecast counts future reading days after today's recorded pace")
+    func forecastStartsTomorrow() {
+        let plan = KhatamPacingPlan(startDate: day(0), endDate: day(1), targetUnits: 20)
+        let pace = KhatamPacing.resolve(
+            plan: plan,
+            entries: [.init(date: day(0), unitsRead: 10)],
+            today: day(0),
+            calendar: calendar
+        )
+        #expect(pace.forecastCompletionDate == day(1))
     }
 
     @Test("An elapsed period continues at its original cadence")
@@ -131,6 +154,28 @@ struct KhatamPacingTests {
         #expect(plan.completionMomentShownAt == day(0))
 
         try writer.remove(entry, now: day(1), in: context)
+        #expect(plan.completedAt == nil)
+    }
+
+    @Test("Removing an extra entry preserves a still-complete plan")
+    @MainActor
+    func undoSettlesAgainstRemainingEntries() throws {
+        let container = try IhsanModelContainerFactory.makeContainer(inMemory: true)
+        let context = container.mainContext
+        let writer = KhatamPlanWriter()
+        let plan = try writer.begin(
+            startDate: day(0), endDate: day(1), unit: .pages,
+            mushafPageTotal: 10, isRamadan: false, now: day(0), in: context
+        )
+        let enough = try writer.log(
+            units: 10, on: day(0), for: plan, now: day(0), in: context
+        )
+        let extra = try writer.log(
+            units: 5, on: day(0), for: plan, now: day(0), in: context
+        )
+        try writer.remove(extra, now: day(1), in: context)
+        #expect(plan.completedAt != nil)
+        try writer.remove(enough, now: day(1), in: context)
         #expect(plan.completedAt == nil)
     }
 

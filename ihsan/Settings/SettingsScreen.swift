@@ -1016,7 +1016,7 @@ private struct NotificationsSection: View {
 private struct PauseModeSection: View {
     let activePause: PauseInterval?
     let description: String
-    let onToggle: (Bool) -> Void
+    let onToggle: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         SettingsSectionCard("Pause Mode") {
@@ -1082,7 +1082,7 @@ private struct PauseModeSection: View {
 private struct TravelModeSection: View {
     let activeTravel: TravelInterval?
     let description: String
-    let onToggle: (Bool) -> Void
+    let onToggle: @MainActor @Sendable (Bool) -> Void
 
     var body: some View {
         SettingsSectionCard("Travel Mode") {
@@ -1458,6 +1458,7 @@ private struct SunnahSection: View {
 /// While the bundled content is unreviewed, a release build has no
 /// adhkar at all and this section does not appear. A DEBUG build shows
 /// it, and says DRAFT plainly.
+@MainActor
 private struct AdhkarSection: View {
     let settings: UserSettings
     @Binding var path: [SettingsRoute]
@@ -1613,8 +1614,8 @@ private struct AdhkarSection: View {
 
     private func toggle(
         label: String,
-        get: @escaping () -> Bool,
-        set: @escaping (Bool) -> Void
+        get: @escaping @MainActor @Sendable () -> Bool,
+        set: @escaping @MainActor @Sendable (Bool) -> Void
     ) -> some View {
         Toggle("", isOn: Binding(
             get: get,

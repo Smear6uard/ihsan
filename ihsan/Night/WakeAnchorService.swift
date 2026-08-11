@@ -191,7 +191,7 @@ final class WakeAnchorService {
 /// One line per anchor, naming the moment rather than instructing the
 /// person. The last third keeps the words it has always had.
 enum WakeAnchorCopy {
-    static func alertTitle(for anchor: WakeAnchor) -> String {
+    nonisolated static func alertTitle(for anchor: WakeAnchor) -> String {
         switch anchor {
         case .lastThird: "The last third of the night"
         case .fajrStart: "Fajr begins soon"
@@ -200,7 +200,7 @@ enum WakeAnchorCopy {
         }
     }
 
-    static func notificationBody(for anchor: WakeAnchor) -> String {
+    nonisolated static func notificationBody(for anchor: WakeAnchor) -> String {
         switch anchor {
         case .lastThird: "The night's quietest hour has begun."
         case .fajrStart: "Suhoor ends when Fajr begins."
@@ -209,11 +209,11 @@ enum WakeAnchorCopy {
         }
     }
 
-    static func stopButtonTitle(for anchor: WakeAnchor) -> String {
+    nonisolated static func stopButtonTitle(for anchor: WakeAnchor) -> String {
         anchor == .lastThird ? "Rise" : "Stop"
     }
 
-    static func stopButtonImage(for anchor: WakeAnchor) -> String {
+    nonisolated static func stopButtonImage(for anchor: WakeAnchor) -> String {
         switch anchor {
         case .lastThird, .fajrStart: "moon.stars"
         case .sunrise: "sunrise"

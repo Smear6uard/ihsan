@@ -4,6 +4,7 @@ import Testing
 @testable import IhsanInsights
 
 @Test
+@MainActor
 func weeklyGeneratorRetriesRejectedModelOutputThenFallsBack() async throws {
     let summary = makeGeneratorSummary()
     let fixedNow = Date(timeIntervalSince1970: 10_000)
@@ -35,6 +36,7 @@ func weeklyGeneratorRetriesRejectedModelOutputThenFallsBack() async throws {
 }
 
 @Test
+@MainActor
 func weeklyGeneratorUsesSecondAcceptedModelOutput() async throws {
     let summary = makeGeneratorSummary()
     let client = MockInsightModelClient(
@@ -61,6 +63,7 @@ func weeklyGeneratorUsesSecondAcceptedModelOutput() async throws {
 }
 
 @Test
+@MainActor
 func generatorReturnsFreshCachedInsightWithoutModelCall() async throws {
     let generatedAt = Date(timeIntervalSince1970: 10_000)
     let summary = makeGeneratorSummary(
@@ -82,6 +85,7 @@ func generatorReturnsFreshCachedInsightWithoutModelCall() async throws {
 }
 
 @Test
+@MainActor
 func generatorThrowsTypedErrorWhenUnavailable() async throws {
     let generator = InsightGenerator(
         modelClient: MockInsightModelClient(),

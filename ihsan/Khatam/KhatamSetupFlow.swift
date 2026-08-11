@@ -34,7 +34,7 @@ struct KhatamSetupFlow: View {
                     Text("KHATAM · \(stage.rawValue + 1) OF 3")
                         .font(IhsanFont.inscription)
                         .tracking(1.6)
-                        .foregroundStyle(tokens.metal)
+                        .foregroundStyle(tokens.inkSecondary)
                     Spacer()
                     Button("Close") { dismiss() }
                         .font(IhsanFont.bodyEnglish)
@@ -140,7 +140,13 @@ struct KhatamSetupFlow: View {
 
         case .arithmetic:
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-                KhatamThreadView(read: 0, target: targetUnits, tokens: tokens, terminalSize: 24)
+                KhatamThreadView(
+                    read: 0,
+                    target: targetUnits,
+                    unit: unit,
+                    tokens: tokens,
+                    terminalSize: 24
+                )
                     .frame(height: 46)
 
                 Text(arithmeticLine)
@@ -151,7 +157,7 @@ struct KhatamSetupFlow: View {
                 Text(periodIsRamadan ? "RAMADAN · AT YOUR PACE" : "AT YOUR PACE · AROUND \(endDate.formatted(.dateTime.month(.wide).day()))")
                     .font(IhsanFont.inscription)
                     .tracking(1.4)
-                    .foregroundStyle(tokens.metal)
+                    .foregroundStyle(tokens.inkSecondary)
             }
             .padding(IhsanSpacing.md)
             .celestialPanel(tokens: tokens, cornerRadius: 18)
@@ -268,7 +274,7 @@ private struct KhatamChoiceRow: View {
         Button(action: action) {
             HStack(spacing: IhsanSpacing.md) {
                 ZStack {
-                    Circle().stroke(tokens.metal.opacity(0.7), lineWidth: 1)
+                    Circle().stroke(tokens.inkSecondary, lineWidth: 1)
                     if selected { Circle().fill(tokens.leafGold).padding(4) }
                 }
                 .frame(width: 24, height: 24)

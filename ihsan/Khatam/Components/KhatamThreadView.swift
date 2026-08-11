@@ -1,3 +1,4 @@
+import IhsanCore
 import IhsanDesignSystem
 import SwiftUI
 
@@ -6,6 +7,7 @@ import SwiftUI
 struct KhatamThreadView: View {
     let read: Int
     let target: Int
+    let unit: KhatamUnit
     let tokens: SkyPaletteTokens
     var terminalSize: CGFloat = 20
 
@@ -35,7 +37,7 @@ struct KhatamThreadView: View {
 
                 if progress > 0 {
                     KhatamFilament(endX: grownEnd, startX: startX)
-                        .fill(tokens.metal.opacity(0.88))
+                        .fill(tokens.inkSecondary)
                         .animation(reduceMotion ? nil : .snappy(duration: 0.35), value: progress)
                 }
 
@@ -43,7 +45,7 @@ struct KhatamThreadView: View {
                     EightPointedStar()
                         .fill(progress >= 1 ? tokens.leafGold : tokens.panelFill)
                     EightPointedStar()
-                        .stroke(tokens.metal, lineWidth: 1)
+                        .stroke(tokens.inkSecondary, lineWidth: 1)
                     FourPointedStar(innerRatio: 0.38)
                         .fill(tokens.keyline.opacity(progress >= 1 ? 0.75 : 0.28))
                         .padding(terminalSize * 0.28)
@@ -57,7 +59,9 @@ struct KhatamThreadView: View {
         }
         .frame(height: max(28, terminalSize + 8))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel("Khatam thread, \(min(read, target)) of \(target) units read")
+        .accessibilityLabel(
+            "Khatam thread, \(min(read, target)) of \(target) \(target == 1 ? unit.singularLabel : unit.pluralLabel) read"
+        )
     }
 }
 

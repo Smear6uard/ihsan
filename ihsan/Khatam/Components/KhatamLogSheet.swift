@@ -46,71 +46,73 @@ struct KhatamLogSheet: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(editing == nil ? "LOG READING" : "EDIT READING")
-                        .font(IhsanFont.inscription)
-                        .tracking(1.6)
-                        .foregroundStyle(tokens.metal)
-                    if let prayer {
-                        Text("After \(prayer.displayNameEnglish)")
-                            .font(IhsanFont.bodyEnglish)
+        ScrollView {
+            VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(editing == nil ? "LOG READING" : "EDIT READING")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.6)
+                            .foregroundStyle(tokens.inkSecondary)
+                        if let prayer {
+                            Text("After \(prayer.displayNameEnglish)")
+                                .font(IhsanFont.bodyEnglish)
+                                .foregroundStyle(tokens.inkSecondary)
+                        }
+                    }
+                    Spacer()
+                    Button("Close") { dismiss() }
+                        .font(IhsanFont.bodyEnglish)
+                        .foregroundStyle(tokens.inkSecondary)
+                        .frame(minWidth: 44, minHeight: 44)
+                }
+
+                HStack(spacing: IhsanSpacing.lg) {
+                    stepButton(systemName: "minus", label: "Subtract one") {
+                        count = max(1, count - 1)
+                    }
+                    VStack(spacing: 3) {
+                        Text(count.formatted())
+                            .font(.system(size: 52, weight: .light, design: .monospaced))
+                            .monospacedDigit()
+                            .foregroundStyle(tokens.ink)
+                            .contentTransition(.numericText())
+                        Text((count == 1 ? plan.unit.singularLabel : plan.unit.pluralLabel).uppercased())
+                            .font(IhsanFont.inscription)
+                            .tracking(1.5)
                             .foregroundStyle(tokens.inkSecondary)
                     }
+                    .frame(maxWidth: .infinity)
+                    stepButton(systemName: "plus", label: "Add one") {
+                        count += 1
+                    }
                 }
-                Spacer()
-                Button("Close") { dismiss() }
+
+                HStack(spacing: IhsanSpacing.sm) {
+                    if perPrayer > 0 {
+                        quickValue(perPrayer, label: "PER PRAYER")
+                    }
+                    if suggested > 0, suggested != perPrayer {
+                        quickValue(suggested, label: "TODAY")
+                    }
+                }
+
+                DatePicker("Date", selection: $entryDate, in: ...nowProvider.now(), displayedComponents: .date)
                     .font(IhsanFont.bodyEnglish)
-                    .foregroundStyle(tokens.inkSecondary)
-                    .frame(minWidth: 44, minHeight: 44)
-            }
+                    .foregroundStyle(tokens.ink)
 
-            HStack(spacing: IhsanSpacing.lg) {
-                stepButton(systemName: "minus", label: "Subtract one") {
-                    count = max(1, count - 1)
+                Button(editing == nil ? "Record" : "Keep changes") {
+                    save()
                 }
-                VStack(spacing: 3) {
-                    Text(count.formatted())
-                        .font(.system(size: 52, weight: .light, design: .monospaced))
-                        .monospacedDigit()
-                        .foregroundStyle(tokens.ink)
-                        .contentTransition(.numericText())
-                    Text((count == 1 ? plan.unit.singularLabel : plan.unit.pluralLabel).uppercased())
-                        .font(IhsanFont.inscription)
-                        .tracking(1.5)
-                        .foregroundStyle(tokens.inkSecondary)
-                }
-                .frame(maxWidth: .infinity)
-                stepButton(systemName: "plus", label: "Add one") {
-                    count += 1
-                }
+                .font(IhsanFont.bodyEnglishBold)
+                .foregroundStyle(tokens.keyline)
+                .frame(maxWidth: .infinity, minHeight: 52)
+                .background(tokens.leafGold, in: Capsule())
+                .buttonStyle(.plain)
+                .accessibilityHint("Records the numeric amount without opening reading content")
             }
-
-            HStack(spacing: IhsanSpacing.sm) {
-                if perPrayer > 0 {
-                    quickValue(perPrayer, label: "PER PRAYER")
-                }
-                if suggested > 0, suggested != perPrayer {
-                    quickValue(suggested, label: "TODAY")
-                }
-            }
-
-            DatePicker("Date", selection: $entryDate, in: ...nowProvider.now(), displayedComponents: .date)
-                .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(tokens.ink)
-
-            Button(editing == nil ? "Record" : "Keep changes") {
-                save()
-            }
-            .font(IhsanFont.bodyEnglishBold)
-            .foregroundStyle(tokens.keyline)
-            .frame(maxWidth: .infinity, minHeight: 52)
-            .background(tokens.leafGold, in: Capsule())
-            .buttonStyle(.plain)
-            .accessibilityHint("Records the numeric amount without opening reading content")
+            .padding(IhsanSpacing.lg)
         }
-        .padding(IhsanSpacing.lg)
         .presentationBackground(.thinMaterial)
         .alert("The entry could not be saved", isPresented: Binding(
             get: { saveError != nil },
@@ -136,7 +138,7 @@ struct KhatamLogSheet: View {
                 .foregroundStyle(tokens.ink)
                 .frame(width: 64, height: 64)
                 .background(tokens.panelFill, in: Circle())
-                .overlay { Circle().stroke(tokens.metal.opacity(0.6), lineWidth: 1) }
+                .overlay { Circle().stroke(tokens.inkSecondary, lineWidth: 1) }
         }
         .buttonStyle(.plain)
         .accessibilityLabel(label)

@@ -14,7 +14,7 @@ struct KhatamRamadanOfferCard: View {
             Text("RAMADAN")
                 .font(IhsanFont.inscription)
                 .tracking(1.6)
-                .foregroundStyle(tokens.metal)
+                .foregroundStyle(tokens.inkSecondary)
 
             Text("Ramadan is here — pace a reading of the Qur’an.")
                 .font(IhsanFont.bodyEnglish)
@@ -32,6 +32,7 @@ struct KhatamRamadanOfferCard: View {
                 .frame(minHeight: 44)
                 .background(tokens.leafGold, in: Capsule())
                 .buttonStyle(.plain)
+                .accessibilityIdentifier("khatam-ramadan-begin")
 
                 Button("Not now") {
                     Haptics.impact(.light)
@@ -92,11 +93,12 @@ struct KhatamSection: View {
                     Text("KHATAM")
                         .font(IhsanFont.inscription)
                         .tracking(1.6)
-                        .foregroundStyle(tokens.metal)
+                        .foregroundStyle(tokens.inkSecondary)
 
                     KhatamThreadView(
                         read: read,
                         target: plan.targetUnits,
+                        unit: plan.unit,
                         tokens: tokens,
                         terminalSize: 18
                     )
