@@ -1261,3 +1261,118 @@ system's half of each contract.
   `-IhsanDebugSkyConditions <kind>` to stand under each sky. Rejected
   conditions fall back along the approved chain — the map lives in
   `SkyWeatherTreatment.resolvedAgainst(approved:)`'s call site.
+
+## The day palette, modernized
+
+- **The day field is cool-tinted now — re-verify OLED banding on the
+  longer, more chromatic ramp.** The three day states' ground anchors
+  had OKLCH chroma 0.001–0.011: measurably near-white, which is why
+  the blue died around mid-plate and the bottom half read as paper
+  under a sky rather than as the same air. They now carry genuine cool
+  chroma on each state's own hue, and the zeniths gained saturation at
+  held luminance:
+
+  | state | token | was | now |
+  | --- | --- | --- | --- |
+  | firstLight | `skyZenith` | `#80BFFD` | `#6AC2FD` |
+  | firstLight | `groundTop` | `#F6F6F7` | `#E9F6FF` |
+  | firstLight | `groundBottom` | `#F2F1F1` | `#DFF1FF` |
+  | firstLight | `horizonWash` | `#F6DDB0` | `#F7DDAD` |
+  | morning | `skyZenith` | `#94BFFB` | `#84C2FD` |
+  | morning | `groundTop` | `#F5F7FA` | `#EAF5FF` |
+  | morning | `groundBottom` | `#EEF2F7` | `#E2F1FF` |
+  | morning | `horizonWash` | `#DCE7F4` | `#D6E8FB` |
+  | afternoon | `skyZenith` | `#A9BEF5` | `#9AC0FD` |
+  | afternoon | `groundTop` | `#FAF8F3` | `#EDF4FF` |
+  | afternoon | `groundBottom` | `#F5F1E9` | `#E6F0FF` |
+  | afternoon | `horizonWash` | `#F3EAD6` | `#F4EAD3` |
+
+  The source-side banding audits still pass with room —
+  `SkyRenderTests.dayRampDoesNotBand` measures worst row-mean steps of
+  0.0055 / 0.0049 / 0.0051 against a 0.015 bound — but those are
+  measured on a rendered bitmap in sRGB, not on an OLED with its own
+  dithering and its own gamma. The ramp is now longer in chroma as
+  well as in value, and a near-neutral field that bands invisibly can
+  band visibly once it carries a hue. Look at all three day states
+  full-screen on device, at low brightness, for stepping in the middle
+  band around the 0.55 breakpoint.
+
+- **"First light chrome reads tan at 06:15" — recheck; this may have
+  fixed it.** That finding stands against a firstLight page whose
+  ground was a neutral near-white, which left the warm gold
+  `horizonWash` (and the `chromeTint` / `sheetBackingValue` derived
+  from it) with nothing to be warm *against* — so the tab bar and log
+  sheet read as tan paper rather than as warm light. The field is now
+  a genuinely cool blue, and the wash was enriched only slightly
+  (OKLCH C 0.065 → 0.069, hue unmoved). The prediction is that the
+  same wash now reads as intentional golden-hour light on cool air.
+  Confirm at 06:15 on device before closing the older finding; if it
+  still reads tan, the wash itself is the lever, not the field.
+
+- **Afternoon's grounds changed family — check it still reads as
+  afternoon.** Afternoon's ground anchors used to sit on the yellow
+  side of neutral, and its identity ("air that has been standing in
+  the light all day") partly lived there. They are now cool, at the
+  gentlest chroma of the three day states, and the warmth was left to
+  carry entirely on the ivory `groundPlane` below the chord and the
+  cream `horizonWash` across it — both untouched. On device, confirm
+  afternoon still reads warmer than morning at a glance, and that the
+  cream wash over a cool field does not read as a stain.
+
+- **PRE-EXISTING, not from this pass: two widget snapshots re-record
+  non-deterministically.** Recording `__Snapshots__` twice in a row
+  from an unchanged tree produced `compact-plate-standby-night.png`
+  differing from itself by 158 px at up to 64/255, and
+  `compact-plate-large-afternoon.png` by 121 px at up to 51/255 —
+  both over the 0.1% pixel budget the comparison uses, while several
+  other faces flipped between identical and near-identical across
+  runs. The committed references pass; it is the recording path that
+  wanders. Anyone re-recording should diff each written PNG against
+  its predecessor and keep only the ones that genuinely moved, or the
+  noise lands in the repo as a fake palette change.
+
+## The Live Activity, rebuilt on the plate's sky
+
+- **The lock-screen activity now paints its own ground — verify it
+  reaches the shape's edges on device.** The presentation sits on the
+  same deepened 17-stop `WidgetSkyGround` ramp the widgets use
+  (deepen 0.10), drawn as the view's own background with the flat
+  `activityBackgroundTint` kept underneath as the fallback under the
+  system's corner mask. Simulator captures cannot answer whether the
+  system insets the content view on device; if a tinted border shows
+  around the ramp, the fix is `contentMarginsDisabled()`-style margin
+  removal, not a bigger padding.
+
+- **The window gauge is new — watch one full window on device.** While
+  a window is open the activity drains a thin gilded
+  `ProgressView(timerInterval:)` from the adhan to the window's end
+  (lock screen and expanded island both). The system advances it
+  without wakes, but its rendering cadence, tint fidelity against the
+  ramp, and behavior in Always-On dimming are device-only facts.
+
+- **The "I prayed" tap now confirms in place.** The intent funnel
+  gained an activity hook (`PrayerLogActivityHook`), so the tap flips
+  the activity to its gilded LOGGED state within a beat and the
+  activity dismisses ~5 s later — previously nothing changed until the
+  app was next foregrounded. Verify the confirmation actually lands on
+  a locked device (the intent runs in the app process; a terminated
+  app must cold-launch far enough for `IhsanApp.init` to register the
+  hook before the intent performs).
+
+- **The Dynamic Island minimal slot now shows the prayer's ornament
+  instead of a truncated timer.** Check legibility of the 14-pt
+  linework at the minimal slot's true size, next to another app's
+  activity, in both island states.
+
+## The crossing glow, warmed
+
+- **The caption backing now takes the sky's glow through sunrise and
+  maghrib.** `InkKeyline.backingValue` leans the panel's hue toward
+  `tokens.glow` (28% at crossing peak) at a lightness solved so WCAG
+  relative luminance equals the plain panel's — every audited contrast
+  ratio is unchanged by construction, and the 4,000-phase × 51-height
+  composite sweep stays green. What the math cannot answer: whether
+  the warmth reads as light catching the text or as a stain, at a real
+  sunrise and a real maghrib, on OLED at low brightness. Look at the
+  Today header and the marker labels through both crossings; the
+  lever, if it needs one, is the 0.28 in `InkKeyline.backingValue`.

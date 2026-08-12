@@ -49,6 +49,25 @@ struct CrossingLegibilityRenderTests {
         }
     }
 
+    /// The backing is the crossing's own light: on a plateau it is
+    /// exactly the panel, and through a crossing it leans toward the
+    /// glow — warmer, never a neutral card.
+    @Test
+    func captionBackingWarmsTowardTheCrossingGlow() {
+        let plateau = PaletteState.resolved(for: SkyPhase(unit: 0.400))
+        #expect(plateau.inkHaloStrength == 0)
+        #expect(InkKeyline.backingValue(for: plateau) == plateau.panelFillValue)
+
+        let crossing = PaletteState.resolved(for: SkyPhase(unit: 0.160))
+        #expect(crossing.inkHaloStrength > 0.9)
+        let backing = InkKeyline.backingValue(for: crossing)
+        #expect(backing != crossing.panelFillValue)
+        #expect(
+            backing.red - backing.blue
+                > crossing.panelFillValue.red - crossing.panelFillValue.blue
+        )
+    }
+
     @MainActor
     @Test
     func compatibilityModifierDoesNotChangeLayout() {
@@ -77,7 +96,7 @@ struct CrossingLegibilityRenderTests {
                     tokens: tokens
                 )
                 let backing = composited(
-                    tokens.panelFillValue,
+                    InkKeyline.backingValue(for: tokens),
                     over: sky,
                     opacity: opacity
                 )

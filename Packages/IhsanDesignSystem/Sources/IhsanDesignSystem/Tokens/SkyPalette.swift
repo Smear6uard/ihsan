@@ -534,10 +534,14 @@ extension SkyPaletteTokens {
     /// What makes it its own page is therefore atmosphere only: the
     /// deepest and most saturated of the three day zeniths, a warm
     /// gold horizon wash where morning's is cool blue, the day's
-    /// richest gold, and a warmer ground band. The ground itself stays
-    /// a cool-neutral near-white — palette v2's thesis is that all
-    /// saturation lives in the ink, the metal, and the glow, and
-    /// golden-hour warmth is exactly the pressure that would break it.
+    /// richest gold, and a warmer ground band. The field the wash sits
+    /// on is COOL — that opposition is the whole effect, and it is why
+    /// the ground here carries the day's strongest cool tint (OKLCH
+    /// C 0.027 at the horizon anchor). Palette v2's thesis is that the
+    /// deep saturation lives in the ink, the metal, and the glow; a
+    /// tinted atmosphere is not deep saturation, and a field with no
+    /// tint at all is what made these three states read as prints of a
+    /// sky rather than a sky.
     ///
     /// The zenith is at a FLOOR, not a taste value, and the floor is
     /// contrast. A first-light sky wants to be deeper still, but the
@@ -548,20 +552,29 @@ extension SkyPaletteTokens {
     /// both of which read the zenith as a text ground because the
     /// plate's header sits on it. Morning's own zenith already sits
     /// near that floor, so the DEPTH available to any day state is a
-    /// thin band: this ships at OKLab L 0.786 against morning's 0.796.
+    /// thin band: this ships at OKLab L 0.783 against morning's 0.795.
     /// The separation the eye actually reads is chroma and hue —
-    /// C 0.110 against morning's 0.098, and OKLCH hue 249° extending
-    /// the existing 257° → 268° warming progression back one step, so
-    /// the sky warms monotonically from first light to afternoon.
+    /// C 0.120 against morning's 0.106, and OKLCH hue 240° extending
+    /// the 248° → 260° warming progression back one step, so the sky
+    /// warms monotonically from first light to afternoon.
     /// Going deeper means darkening this state's ink pair, which would
     /// re-open the firstLight → morning figure crossing the state is
     /// built to avoid.
+    ///
+    /// The zeniths also sit against a second wall, and it is the
+    /// display's rather than the design's: at these luminances sRGB
+    /// simply runs out of blue. All three ship within ~3% of the gamut
+    /// boundary for their lightness and hue, which is why the chroma
+    /// rise came partly from rotating the whole progression ~8° toward
+    /// cerulean — the direction where the gamut is wider — rather than
+    /// from pushing chroma at the old hues, where there was nothing
+    /// left to push into.
     static let firstLight = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0x80BFFD),
-        groundTop: SRGBValue(hex: 0xF6F6F7),
-        groundBottom: SRGBValue(hex: 0xF2F1F1),
+        skyZenith: SRGBValue(hex: 0x6AC2FD),
+        groundTop: SRGBValue(hex: 0xE9F6FF),
+        groundBottom: SRGBValue(hex: 0xDFF1FF),
         groundPlane: SRGBValue(hex: 0xEBDDB8),
-        horizonWash: SRGBValue(hex: 0xF6DDB0),
+        horizonWash: SRGBValue(hex: 0xF7DDAD),
         ink: SRGBValue(hex: 0x1B2350),
         inkSecondary: SRGBValue(hex: 0x3E476B),
         metal: SRGBValue(hex: 0xA07F45),
@@ -606,21 +619,31 @@ extension SkyPaletteTokens {
     )
 
     /// Morning (sunrise → solar noon). THE corrected state: luminous
-    /// cool near-white with a faint cool-blue horizon wash — early
-    /// light on cool air, not antique paper. Saturation sits in the
-    /// deep-indigo ink and the warm sun glow, never in the ground.
+    /// cool field under a cool-blue horizon wash — early light on cool
+    /// air, not antique paper. The deep saturation sits in the
+    /// indigo ink and the warm sun glow, never in the ground.
     ///
-    /// The zenith is a real sky (corrective H item 1): a lapis-leaning
-    /// blue at the top of the plate grading down to the pale luminous
+    /// The zenith is a real sky (corrective H item 1): a cerulean blue
+    /// at the top of the plate grading down to the pale luminous
     /// horizon, because real skies are deepest overhead. Morning is
-    /// the COOLER of the two day zeniths — OKLCH hue ≈ 257°, a step
-    /// toward cyan from afternoon's 268°.
+    /// the coolest and clearest of the three day states — OKLCH hue
+    /// ≈ 248°, a step toward cyan from afternoon's 260°.
+    ///
+    /// And the grade no longer ends in a colourless field. The two
+    /// ground anchors used to sit at OKLCH C 0.005 / 0.008 — inside
+    /// the noise, a near-white by any measurement — so the sky's blue
+    /// died somewhere around the middle of the plate and the bottom
+    /// half was paper. They now carry C 0.018 / 0.025 on morning's own
+    /// hue, which is what makes the whole page read as one body of lit
+    /// air rather than a blue vignette printed on white. Lightness is
+    /// the price: real chroma this close to white does not exist in
+    /// sRGB, so each anchor gave up ~0.01 OKLab L to buy it.
     static let morning = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0x94BFFB),
-        groundTop: SRGBValue(hex: 0xF5F7FA),
-        groundBottom: SRGBValue(hex: 0xEEF2F7),
+        skyZenith: SRGBValue(hex: 0x84C2FD),
+        groundTop: SRGBValue(hex: 0xEAF5FF),
+        groundBottom: SRGBValue(hex: 0xE2F1FF),
         groundPlane: SRGBValue(hex: 0xE8E0CB),
-        horizonWash: SRGBValue(hex: 0xDCE7F4),
+        horizonWash: SRGBValue(hex: 0xD6E8FB),
         ink: SRGBValue(hex: 0x1B2350),
         // One value step down from the pre-H #4A5378. The zenith is
         // now a genuine blue field rather than a near-white, and the
@@ -645,21 +668,32 @@ extension SkyPaletteTokens {
         inkHalo: SRGBValue(hex: 0xF7F9FC)
     )
 
-    /// Afternoon (solar noon → maghrib). A HINT of warmth in a
-    /// near-white — deliberately one step from morning, nowhere near
-    /// beige. Ink stays in the indigo family for continuity.
+    /// Afternoon (solar noon → maghrib). Air that has been standing in
+    /// the light all day: the warmest of the three day states, and
+    /// still nowhere near beige. Ink stays in the indigo family for
+    /// continuity.
     ///
-    /// The WARMER of the two day zeniths (corrective H item 1): OKLCH
-    /// hue ≈ 268°, a step toward violet from morning's 257°, and
-    /// slightly hazier — a shade lighter and less chromatic — so the
-    /// afternoon sky reads as air that has been standing in the light
-    /// all day rather than the cool clarity of morning.
+    /// The WARMEST of the day zeniths (corrective H item 1): OKLCH hue
+    /// ≈ 260°, a step toward violet from morning's 248°, and slightly
+    /// hazier — a shade lighter and less chromatic — so the afternoon
+    /// sky reads as long-lit air rather than morning's cool clarity.
+    ///
+    /// The warmth used to live in the ground anchors, which sat on the
+    /// yellow side of neutral at almost no chroma — the honest reading
+    /// of that pairing was a blue sky printed on cream paper, not one
+    /// atmosphere. The warmth now lives where it can be seen without
+    /// breaking the field: the ivory `groundPlane` below the chord and
+    /// the cream `horizonWash` laid across it, both left as they were.
+    /// The anchors themselves went cool, on afternoon's own hue and at
+    /// the gentlest chroma of the three day states (C 0.017 / 0.023),
+    /// so the wash reads as warm light ON air rather than as the
+    /// colour of the paper.
     static let afternoon = SkyPaletteTokens(
-        skyZenith: SRGBValue(hex: 0xA9BEF5),
-        groundTop: SRGBValue(hex: 0xFAF8F3),
-        groundBottom: SRGBValue(hex: 0xF5F1E9),
+        skyZenith: SRGBValue(hex: 0x9AC0FD),
+        groundTop: SRGBValue(hex: 0xEDF4FF),
+        groundBottom: SRGBValue(hex: 0xE6F0FF),
         groundPlane: SRGBValue(hex: 0xE9DFC2),
-        horizonWash: SRGBValue(hex: 0xF3EAD6),
+        horizonWash: SRGBValue(hex: 0xF4EAD3),
         ink: SRGBValue(hex: 0x231F3D),
         // See morning's note — the same step, for the same reason.
         inkSecondary: SRGBValue(hex: 0x494365),

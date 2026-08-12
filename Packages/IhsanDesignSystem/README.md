@@ -82,19 +82,36 @@ Ihsan is a private personal ibadah ledger for practicing Muslims. The
 visual identity is "Apple-native expression of Islamic ibadah" —
 restrained, considered, never decorative for its own sake.
 
-**The single most important rule: the ground stays constant; the glass
-refracts time of day.** A consistent deep ultramarine-near-black ground
-(`#0E1428`) is used across every screen at every time of day. There is
-NO time-of-day background color shift. Time of day is expressed only
-through how Liquid Glass cards refract light — at Fajr, glass cards
-pick up cool violet specular highlights; at Asr, warm honey-gold; at
-Maghrib, rose-gold; at Isha, deep blue-magenta. The ground stays the
-same; the glass shimmers differently across hours.
+**The single most important rule: the page is the sky at this hour.**
+Six canonical states — night, dawn, firstLight, morning, afternoon,
+sunset — carry every surface colour, and `SkyPhase` blends between them
+continuously, so there is no hour at which the page snaps. The three
+JEWEL states (night, dawn, sunset) are deep chromatic grounds that hold
+their colour from zenith to horizon. The three DAY states are the
+opposite polarity and the harder problem: a luminous COOL FIELD, tinted
+all the way down rather than a blue zenith fading into paper, with the
+deep saturation living in the indigo ink, the burnished metal and the
+sun glow — never in the field itself. Both halves of that sentence are
+load-bearing. A day ground with no tint reads as a print of a sky
+instead of a sky; a day ground with real pigment in it stops being a
+page you can read ink on.
 
-This is the iOS 26 Liquid Glass principle applied to ibadah: identity
-through material, not through background color. Future contributors,
-do not reinstate full-bleed colored backgrounds — that's the change
-this package was built to prevent.
+This is palette v2, and it replaced a v1 doctrine that said the exact
+opposite — one constant near-black ground under every hour, with time
+of day expressed only in how Liquid Glass refracted across it. That
+version is gone; nothing in the package still resolves to a single
+fixed ground. What survives from it is the discipline, not the rule:
+colour arrives as painted atmosphere and worked metal, never as a
+decorative full-bleed fill dropped behind a screen.
+
+The contracts that keep this honest are in the test suite rather than
+in prose — `PaletteV2ContrastTests`, `IlluminationTokenTests`,
+`SkyFieldContrastTests`, `GroundPlaneTests`, `ClearDaySeasoningTests` —
+and they are written as floors on measurable quantities (contrast at
+every height of the painted field, chroma at every step down the day
+ramp, the lightness step from sky to ground plane). Retune a state by
+moving it and re-running them; if a floor is in the way, it is usually
+naming a real constraint.
 
 ## How to compose a screen
 

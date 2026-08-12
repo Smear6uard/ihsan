@@ -16,6 +16,16 @@ struct ClearDaySeasoningTests {
     /// near-white on near-white. The re-graded ramp holds residual
     /// color through the entire span: lapis surrendering to warmth
     /// gradually, one continuous breath.
+    ///
+    /// The floor was 0.0055 while the ground anchors were near-whites
+    /// and the ramp's colour was on loan from the zenith — it caught a
+    /// ramp that went flavorless, which was all it could do. Now that
+    /// the day grounds carry their own cool chroma the whole field is
+    /// tinted air, the flattest point measures 0.023, and the floor
+    /// rises to 0.018 so that a future edit cannot quietly hand the
+    /// day back its colourless bottom half. It is a floor on the
+    /// modernization, not a target: passing it is not evidence of a
+    /// well-graded sky, only of a sky that still has colour in it.
     @Test("The day ramp never goes flavorless on its way down")
     func middleBandKeepsChroma() {
         for state in [PaletteState.morning, PaletteState.afternoon] {
@@ -34,7 +44,7 @@ struct ClearDaySeasoningTests {
                 }
             }
             #expect(
-                minimum >= 0.0055,
+                minimum >= 0.018,
                 "\(state) sky drops to chroma \(minimum) at \(flattest) of the span"
             )
         }
