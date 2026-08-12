@@ -2122,7 +2122,7 @@ private struct AboutSection: View {
                 EmptyView()
             }
             SettingsRow(title: "Photography credits", subtitle: "Sunrise and Maghrib wallpaper sources pending", glyph: .info) { EmptyView() }
-            SettingsRow(title: "Audio credits", subtitle: "Adhan recording credits pending", glyph: .voiceWaves) { EmptyView() }
+            SettingsRow(title: "Audio credits", subtitle: "Adhan recited by Hisham Mohammed Rahmath", glyph: .voiceWaves) { EmptyView() }
             SettingsRow(
                 title: "Fiqh content credits",
                 subtitle: "ihsan-fiqh-config public repo",

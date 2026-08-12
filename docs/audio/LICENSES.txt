@@ -1,0 +1,15 @@
+# Audio provenance
+
+Adhan recitation: Hisham Mohammed Rahmath.
+The in-app credit (Settings → About → Audio credits) names him as the
+muezzin for the Ihsan adhan recording.
+
+Bundled files in this build:
+- ihsan-chime.caf                    synthesized by generate-placeholders.py; no external license
+- ihsan-chime-dawn.caf               synthesized by generate-placeholders.py; no external license
+- ihsan-adhan-full-placeholder.m4a   synthesized by generate-placeholders.py; no external license
+
+When the real recording replaces a placeholder in ihsan/Resources/Adhans/,
+append below: file name, recording date, source, and the license terms —
+which must cover redistribution inside an app, not just personal use
+(App Review spot-checks audio provenance; see SHIP.md section 1).
