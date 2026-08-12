@@ -39,6 +39,10 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     /// not remembrance. Keeping this separate from the global switch
     /// prevents an excused pause from accidentally muting adhkār too.
     public let prayerNotificationsSuppressed: Bool
+    /// Whether this device stages prayer Live Activities at all —
+    /// independent of notifications, so someone can keep the banner
+    /// and adhan while declining the standing lock-screen countdown.
+    public let prayerLiveActivitiesEnabled: Bool
     public let morningAdhkarReminderEnabled: Bool
     public let eveningAdhkarReminderEnabled: Bool
     public let calculationMethod: CalculationMethodChoice
@@ -60,6 +64,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     public init(
         notificationsEnabled: Bool = true,
         prayerNotificationsSuppressed: Bool = false,
+        prayerLiveActivitiesEnabled: Bool = true,
         morningAdhkarReminderEnabled: Bool = false,
         eveningAdhkarReminderEnabled: Bool = false,
         calculationMethod: CalculationMethodChoice = .isna,
@@ -74,6 +79,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         self.loggedPrayerKeys = loggedPrayerKeys
         self.notificationsEnabled = notificationsEnabled
         self.prayerNotificationsSuppressed = prayerNotificationsSuppressed
+        self.prayerLiveActivitiesEnabled = prayerLiveActivitiesEnabled
         self.morningAdhkarReminderEnabled = morningAdhkarReminderEnabled
         self.eveningAdhkarReminderEnabled = eveningAdhkarReminderEnabled
         self.calculationMethod = calculationMethod
@@ -95,6 +101,7 @@ extension NotificationScheduleSettings {
     init(
         userSettings: UserSettings,
         isPaused: Bool = false,
+        liveActivitiesEnabled: Bool = true,
         adhkarRemindersEnabled: Bool = false,
         myMasjid: MyMasjidSnapshot? = nil,
         loggedPrayerKeys: Set<String> = []
@@ -107,6 +114,7 @@ extension NotificationScheduleSettings {
         self.init(
             notificationsEnabled: userSettings.notificationsEnabled,
             prayerNotificationsSuppressed: isPaused,
+            prayerLiveActivitiesEnabled: liveActivitiesEnabled,
             morningAdhkarReminderEnabled: adhkarRemindersEnabled
                 && AdhkarAvailability.isAvailable
                 && userSettings.adhkarLayerEnabled
@@ -206,6 +214,7 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
         return NotificationScheduleSettings(
             userSettings: settings,
             isPaused: !activePauses.isEmpty,
+            liveActivitiesEnabled: PrayerLiveActivityPreferenceStore.isEnabled,
             adhkarRemindersEnabled: AdhkarReminderPreferenceStore.isEnabled,
             myMasjid: MyMasjid.fetchExisting(in: context)?.snapshot,
             loggedPrayerKeys: loggedKeys
@@ -225,6 +234,25 @@ public enum AdhkarReminderPreferenceStore {
 
     public static var isEnabled: Bool {
         get { defaults.bool(forKey: key) }
+        set { defaults.set(newValue, forKey: key) }
+    }
+}
+
+/// Prayer Live Activities are device-local for the same reason the
+/// adhkār reminders are: whether this phone stages a standing countdown
+/// on its own lock screen is not a preference another device should
+/// inherit through sync.
+public enum PrayerLiveActivityPreferenceStore {
+    public static let key = "IhsanPrayerLiveActivitiesEnabled"
+
+    private static var defaults: UserDefaults {
+        UserDefaults(suiteName: IhsanModelContainerFactory.appGroupIdentifier) ?? .standard
+    }
+
+    /// Defaults to on: the activity predates this switch, so an absent
+    /// key must mean the shipped behavior, not a silent opt-out.
+    public static var isEnabled: Bool {
+        get { (defaults.object(forKey: key) as? Bool) ?? true }
         set { defaults.set(newValue, forKey: key) }
     }
 }
@@ -312,7 +340,9 @@ public actor NotificationScheduler {
             return
         }
 
-        if !settings.notificationsEnabled || settings.prayerNotificationsSuppressed {
+        if !settings.notificationsEnabled
+            || settings.prayerNotificationsSuppressed
+            || !settings.prayerLiveActivitiesEnabled {
             await prayerActivityScheduler.cancelAllPrayerActivities()
         }
 
@@ -371,14 +401,8 @@ public actor NotificationScheduler {
                         for: prayerTime.prayer,
                         nextFajr: days[dayIndex + 1].fajr.scheduledTime
                     )
-                    if activityStartDate > referenceDate {
-                        try await prayerActivityScheduler.schedulePrayerActivityStart(
-                            for: prayerTime,
-                            in: day,
-                            windowEnd: windowEnd,
-                            startDate: activityStartDate
-                        )
-                    } else if windowEnd > referenceDate {
+                    if settings.prayerLiveActivitiesEnabled,
+                       activityStartDate > referenceDate || windowEnd > referenceDate {
                         try await prayerActivityScheduler.schedulePrayerActivityStart(
                             for: prayerTime,
                             in: day,

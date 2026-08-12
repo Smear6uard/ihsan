@@ -56,6 +56,7 @@ public struct ToggleJamaahIntent: AppIntent {
         )
 
         WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+        await PrayerLogActivityHook.shared.notify(prayer: prayer, prayerDate: log.prayerDate)
 
         let dialog = log.withJamaah
             ? "\(prayer.displayNameEnglish) marked as jamāʿah."

@@ -943,6 +943,9 @@ private struct NotificationsSection: View {
     let isBlockedBySystem: Bool
     let onToggleNotifications: (Bool, UserSettings) -> Void
     let onOpenSystemSettings: () -> Void
+    /// Device-local, like the adhkār reminders: whether this phone
+    /// stages the lock-screen countdown is not a synced preference.
+    @State private var liveActivitiesEnabled = PrayerLiveActivityPreferenceStore.isEnabled
 
     var body: some View {
         SettingsSectionCard("Notifications") {
@@ -973,6 +976,22 @@ private struct NotificationsSection: View {
 
             if settings.notificationsEnabled {
                 SettingsRow(
+                    title: "Live Activity",
+                    subtitle: liveActivitiesEnabled
+                        ? "The window on the Lock Screen as each prayer approaches"
+                        : "Off",
+                    glyph: .clock
+                ) {
+                    Toggle("", isOn: Binding(
+                        get: { liveActivitiesEnabled },
+                        set: { setLiveActivitiesEnabled($0) }
+                    ))
+                    .labelsHidden()
+                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                    .accessibilityLabel("Prayer Live Activity")
+                }
+
+                SettingsRow(
                     title: "Notification sound",
                     subtitle: soundSummary,
                     glyph: .adhan,
@@ -992,6 +1011,18 @@ private struct NotificationsSection: View {
                 }
             }
         }
+        .onAppear {
+            liveActivitiesEnabled = PrayerLiveActivityPreferenceStore.isEnabled
+        }
+    }
+
+    private func setLiveActivitiesEnabled(_ enabled: Bool) {
+        liveActivitiesEnabled = enabled
+        PrayerLiveActivityPreferenceStore.isEnabled = enabled
+        // One rebuild covers both directions: its gate withdraws every
+        // standing activity and parked start when this turns off, and
+        // stages the next start when it turns on.
+        Task { try? await NotificationScheduler.shared.rebuildSchedule() }
     }
 
     /// "Chime" when every prayer agrees, "Mixed" when they do not — so

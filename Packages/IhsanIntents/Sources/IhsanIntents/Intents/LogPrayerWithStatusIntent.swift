@@ -58,7 +58,7 @@ public struct LogPrayerWithStatusIntent: AppIntent {
         let context = ModelContext(container)
         let service = PrayerLogService()
 
-        _ = try service.logPrayer(
+        let log = try service.logPrayer(
             prayer,
             status: status,
             prayerDate: date,
@@ -67,6 +67,7 @@ public struct LogPrayerWithStatusIntent: AppIntent {
         )
 
         WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+        await PrayerLogActivityHook.shared.notify(prayer: prayer, prayerDate: log.prayerDate)
 
         let dialogText: String = {
             switch status {

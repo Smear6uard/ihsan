@@ -280,6 +280,29 @@ func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     #expect(!activityScheduler.requests.contains { $0.prayer == .asr })
 }
 
+/// The device-local Live Activity switch: off must withdraw every
+/// standing activity and parked start while leaving the notification
+/// schedule itself untouched — the banner and the lock-screen
+/// countdown are separate choices.
+@Test
+func liveActivitySwitchOffKeepsNotificationsAndWithdrawsActivities() async throws {
+    let center = MockNotificationCenter()
+    let activityScheduler = MockPrayerActivityScheduler()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(prayerLiveActivitiesEnabled: false),
+        activityScheduler: activityScheduler
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    let scheduled = await scheduler.scheduledNotifications()
+    #expect(!scheduled.isEmpty)
+    #expect(activityScheduler.requests.isEmpty)
+    #expect(activityScheduler.cancelCount == 1)
+}
+
 @Test
 func rebuildScheduleClearsIhsanRequestsWhenNotificationPermissionIsDenied() async throws {
     let center = MockNotificationCenter(

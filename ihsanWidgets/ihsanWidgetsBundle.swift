@@ -28,9 +28,7 @@ struct IhsanWidgetsBundle: WidgetBundle {
         // Control Center
         RepairMakeupControl()
         #if canImport(ActivityKit) && os(iOS)
-        if #available(iOSApplicationExtension 16.2, *) {
-            PrayerActivityWidget()
-        }
+        PrayerActivityWidget()
         #endif
     }
 }

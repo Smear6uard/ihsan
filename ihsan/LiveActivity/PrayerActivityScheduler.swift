@@ -378,6 +378,13 @@ nonisolated struct SystemPrayerActivityClient: PrayerActivityClient {
         }
     }
 
+    /// How the system should rank Ihsan against other apps' activities
+    /// when several compete for the Dynamic Island. The open window
+    /// outranks a countdown to one that has not begun.
+    private func relevance(for state: PrayerActivityAttributes.ContentState) -> Double {
+        state.countdownPhase == .adhanWindow ? 100 : 50
+    }
+
     func request(
         attributes: PrayerActivityAttributes,
         state: PrayerActivityAttributes.ContentState,
@@ -385,7 +392,11 @@ nonisolated struct SystemPrayerActivityClient: PrayerActivityClient {
     ) async throws -> String {
         let activity = try Activity.request(
             attributes: attributes,
-            content: ActivityContent(state: state, staleDate: staleDate),
+            content: ActivityContent(
+                state: state,
+                staleDate: staleDate,
+                relevanceScore: relevance(for: state)
+            ),
             pushType: nil
         )
         return activity.id
@@ -399,7 +410,11 @@ nonisolated struct SystemPrayerActivityClient: PrayerActivityClient {
         guard let activity = Activity<PrayerActivityAttributes>.activities.first(where: { $0.id == activityId }) else {
             return
         }
-        await activity.update(ActivityContent(state: state, staleDate: staleDate))
+        await activity.update(ActivityContent(
+            state: state,
+            staleDate: staleDate,
+            relevanceScore: relevance(for: state)
+        ))
     }
 
     func end(

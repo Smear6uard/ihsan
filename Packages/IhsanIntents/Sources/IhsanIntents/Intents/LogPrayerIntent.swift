@@ -54,7 +54,7 @@ public struct LogPrayerIntent: AppIntent {
         let context = ModelContext(container)
         let service = PrayerLogService()
 
-        _ = try service.logPrayer(
+        let log = try service.logPrayer(
             prayer,
             status: .onTime,
             sourceSurface: .siri,
@@ -62,6 +62,7 @@ public struct LogPrayerIntent: AppIntent {
         )
 
         WidgetSnapshotMirror.reflectPrayerLogs(in: context)
+        await PrayerLogActivityHook.shared.notify(prayer: prayer, prayerDate: log.prayerDate)
 
         return .result(dialog: IntentDialog("\(prayer.displayNameEnglish) logged."))
     }

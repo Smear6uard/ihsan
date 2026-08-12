@@ -55,6 +55,17 @@ struct IhsanApp: App {
         #if canImport(ActivityKit) && os(iOS)
         Task {
             await NotificationScheduler.shared.setPrayerActivityScheduler(PrayerActivityScheduler.shared)
+            // The lock-screen "I prayed" button performs its intent in
+            // this process but never evaluates the scene, so RootGate's
+            // log watcher cannot answer it. This seam lets the funnel
+            // itself flip the activity to its logged confirmation.
+            await PrayerLogActivityHook.shared.register { prayer, prayerDate in
+                await PrayerActivityScheduler.shared.endActivity(
+                    for: prayer,
+                    on: prayerDate,
+                    reason: .logged
+                )
+            }
         }
         #endif
     }
