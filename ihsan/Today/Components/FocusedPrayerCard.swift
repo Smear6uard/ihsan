@@ -670,7 +670,9 @@ struct FocusedPrayerCard: View {
             Spacer(minLength: IhsanSpacing.xxs)
 
             HStack(spacing: IhsanSpacing.sm) {
-                if let rawatib, rawatib.hasAnySlot {
+                if let rawatib, FocusedCardModel.showsRawatibChips(
+                    phase: phase, hasConfiguredSlot: rawatib.hasAnySlot
+                ) {
                     rawatibStrip(rawatib)
                 }
                 Spacer(minLength: 0)
@@ -722,22 +724,7 @@ struct FocusedPrayerCard: View {
     private func rawatibStrip(_ rawatib: RawatibChips) -> some View {
         HStack(spacing: IhsanSpacing.sm) {
             if rawatibRevealed {
-                if rawatib.beforeCount > 0 {
-                    naflChip(
-                        kind: .rawatibBefore(prayer),
-                        ornament: prayer,
-                        logged: rawatib.beforeLogged,
-                        caption: "\(rawatib.beforeCount) BEFORE"
-                    )
-                }
-                if rawatib.afterCount > 0 {
-                    naflChip(
-                        kind: .rawatibAfter(prayer),
-                        ornament: prayer,
-                        logged: rawatib.afterLogged,
-                        caption: "\(rawatib.afterCount) AFTER"
-                    )
-                }
+                rawatibChipSet(rawatib)
             } else {
                 Button {
                     Haptics.impact(.light)
@@ -760,40 +747,67 @@ struct FocusedPrayerCard: View {
         }
     }
 
+    /// The before/after chips alone — shared by the expanded strip's
+    /// revealed state and the logged card's nafl row.
+    @ViewBuilder
+    private func rawatibChipSet(_ rawatib: RawatibChips) -> some View {
+        if rawatib.beforeCount > 0 {
+            naflChip(
+                kind: .rawatibBefore(prayer),
+                ornament: prayer,
+                logged: rawatib.beforeLogged,
+                caption: "\(rawatib.beforeCount) BEFORE"
+            )
+        }
+        if rawatib.afterCount > 0 {
+            naflChip(
+                kind: .rawatibAfter(prayer),
+                ornament: prayer,
+                logged: rawatib.afterLogged,
+                caption: "\(rawatib.afterCount) AFTER"
+            )
+        }
+    }
+
     @ViewBuilder
     private func nightRow(_ nightSet: NightChips) -> some View {
         HStack(spacing: IhsanSpacing.sm) {
-            naflChip(
-                kind: .qiyam,
-                ornament: .isha,
-                logged: nightSet.qiyamLogged,
-                caption: "QIYAM"
-            )
-            naflChip(
-                kind: .witr,
-                ornament: .maghrib,
-                logged: nightSet.witrLogged,
-                caption: "WITR"
-            )
-            if let tarawihLogged = nightSet.tarawihLogged {
-                naflChip(
-                    kind: .tarawih,
-                    ornament: .isha,
-                    logged: tarawihLogged,
-                    caption: "TARĀWĪḤ"
-                )
-            }
-            if nightSet.witrBridge == .current {
-                Text("TONIGHT'S WITR · CURRENT")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.2)
-                    .foregroundStyle(tokens.inkSecondary.opacity(0.75))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-            }
+            nightChipSet(nightSet)
             Spacer(minLength: 0)
         }
         .frame(height: 20)
+    }
+
+    @ViewBuilder
+    private func nightChipSet(_ nightSet: NightChips) -> some View {
+        naflChip(
+            kind: .qiyam,
+            ornament: .isha,
+            logged: nightSet.qiyamLogged,
+            caption: "QIYAM"
+        )
+        naflChip(
+            kind: .witr,
+            ornament: .maghrib,
+            logged: nightSet.witrLogged,
+            caption: "WITR"
+        )
+        if let tarawihLogged = nightSet.tarawihLogged {
+            naflChip(
+                kind: .tarawih,
+                ornament: .isha,
+                logged: tarawihLogged,
+                caption: "TARĀWĪḤ"
+            )
+        }
+        if nightSet.witrBridge == .current {
+            Text("TONIGHT'S WITR · CURRENT")
+                .font(IhsanFont.inscription)
+                .tracking(1.2)
+                .foregroundStyle(tokens.inkSecondary.opacity(0.75))
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+        }
     }
 
     @ViewBuilder
@@ -898,10 +912,30 @@ struct FocusedPrayerCard: View {
                 }
             }
 
-            if let nightSet {
-                nightRow(nightSet)
+            // The sunnah stays reachable after the fard is recorded —
+            // the after-rawatib is prayed exactly then. One shared row
+            // so an Isha card carries its rawatib and the night set
+            // within the same 20-point band.
+            if showsLoggedRawatib || nightSet != nil {
+                HStack(spacing: IhsanSpacing.sm) {
+                    if showsLoggedRawatib, let rawatib {
+                        rawatibChipSet(rawatib)
+                    }
+                    if let nightSet {
+                        nightChipSet(nightSet)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(height: 20)
             }
         }
+    }
+
+    private var showsLoggedRawatib: Bool {
+        guard let rawatib else { return false }
+        return FocusedCardModel.showsRawatibChips(
+            phase: phase, hasConfiguredSlot: rawatib.hasAnySlot
+        )
     }
 
     private func postPrayerButton(

@@ -84,6 +84,29 @@ struct FocusedCardModelTests {
         ))
     }
 
+    /// The regression this pins: the rawatib chips once lived only in
+    /// the expanded pre-log layout, so recording the fard removed the
+    /// sunnah's controls at the exact moment the after-rawatib is
+    /// prayed. `.logged` is the load-bearing row of the table.
+    @Test
+    func rawatibChipsSurviveLoggingTheFard() {
+        #expect(FocusedCardModel.showsRawatibChips(
+            phase: .logged, hasConfiguredSlot: true
+        ))
+        #expect(FocusedCardModel.showsRawatibChips(
+            phase: .active(until: windowEnd), hasConfiguredSlot: true
+        ))
+        #expect(!FocusedCardModel.showsRawatibChips(
+            phase: .upcoming(opensAt: scheduled), hasConfiguredSlot: true
+        ))
+        #expect(!FocusedCardModel.showsRawatibChips(
+            phase: .windowClosed(at: windowEnd), hasConfiguredSlot: true
+        ))
+        #expect(!FocusedCardModel.showsRawatibChips(
+            phase: .logged, hasConfiguredSlot: false
+        ))
+    }
+
     /// Corrective G, phase 1: the never-early property at the card.
     /// For ANY now earlier than the prayer's start, the resolved
     /// phase is `.upcoming` — across every combination of the other

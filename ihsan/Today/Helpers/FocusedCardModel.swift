@@ -31,6 +31,24 @@ enum FocusedCardModel {
         return true
     }
 
+    /// Which phases carry the rawatib chips. `.logged` is the
+    /// load-bearing row: the after-rawatib follows the fard, so
+    /// recording the fard must never take the sunnah's controls away —
+    /// the chips once lived only in the expanded pre-log layout, and
+    /// logging made them unreachable. `.upcoming` precedes the window;
+    /// a closed, unlogged window routes to the sheet instead of
+    /// carrying chips.
+    static func showsRawatibChips(
+        phase: Phase,
+        hasConfiguredSlot: Bool
+    ) -> Bool {
+        guard hasConfiguredSlot else { return false }
+        switch phase {
+        case .active, .logged: return true
+        case .upcoming, .windowClosed: return false
+        }
+    }
+
     /// The tasbih handoff belongs only to an in-window prayer that was
     /// just recorded as completed. Historical, missed, and makeup logs
     /// never surface a misleading post-prayer action.
