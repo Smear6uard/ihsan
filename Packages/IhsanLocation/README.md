@@ -6,7 +6,7 @@ IhsanLocation is the CoreLocation wrapper for Ihsan. App features depend on the 
 
 Coordinates are transient. `LocatedPlace.coordinates` exists only in memory for prayer-time calculation, qibla bearing, masjid search, and similar immediate work. IhsanLocation never writes coordinates to SwiftData, UserDefaults, files, or any other storage.
 
-Only `cityName` and `countryCode` are safe to persist in app settings. Reverse geocoding is cached in memory only, keyed by rounded coordinates, with roughly 100m precision, a 24-hour TTL, and a 100-entry cap to stay well under CLGeocoder rate limits.
+Only `cityName` and `countryCode` are safe to persist in app settings. Reverse geocoding is cached in memory only, keyed by rounded coordinates, with roughly 100m precision, a 24-hour TTL, and a 100-entry cap to stay well under MapKit's reverse-geocoding (`MKReverseGeocodingRequest`) usage limits.
 
 `CoreLocationCoordinator.swift` is the only file in this package that imports CoreLocation. The public API exposes only Foundation types, AsyncStream, and Ihsan domain types.
 
@@ -30,9 +30,9 @@ Tests can use an actor or value-backed mock that returns scripted `LocatedPlace`
 
 Add these Info.plist keys to the consuming app target:
 
-- `NSLocationWhenInUseUsageDescription`: `Ihsan uses your location to calculate accurate prayer times. Your coordinates are never stored or shared - only your city name is saved for display.`
-- `NSLocationAlwaysAndWhenInUseUsageDescription`: `Ihsan uses your location to automatically update prayer times when you travel. Coordinates are never stored or shared.`
+- `NSLocationWhenInUseUsageDescription`: `Ihsan calculates accurate prayer times for your current location. Your coordinates are used in the moment and never stored or shared. Only your city and country are saved for display.`
 
-Enable the Location Updates background mode for significant-change monitoring while the app is running.
-
-v1 uses when-in-use authorization. Always authorization for background wake from a terminated state is deferred to v1.1.
+Do not add an Always usage string or a location background mode. v1 uses
+when-in-use authorization only; significant-change monitoring runs on
+that grant while the app is open, and the app's privacy statement
+(`docs/app-privacy.md`) promises exactly that.

@@ -1376,3 +1376,73 @@ system's half of each contract.
   sunrise and a real maghrib, on OLED at low brightness. Look at the
   Today header and the marker labels through both crossings; the
   lever, if it needs one, is the 0.28 in `InkKeyline.backingValue`.
+
+## Launch sweep, 5 September 2026
+
+Source-only; each of these wants a device.
+
+- **App icon.** `AppIcon-1024.png` (iOS) and `AppIcon-watch-1024.png`
+  are rendered by `docs/app-icon/generate-icon.swift` from the plate's
+  night tokens: sky, gilded day-arc, horizon filament, Fajr's rosette
+  at the crest. Seen at 1024 and 120 px in a viewer only. Check the
+  home screen at 60 pt, the system-derived dark and tinted variants,
+  the watch's circular mask (the composition is pulled inward for it),
+  and the App Store 1024 against a white page.
+- **iPhone-only, portrait.** `TARGETED_DEVICE_FAMILY = 1` and a single
+  supported orientation. Confirm the compatibility-mode window on an
+  iPad and on an Apple Silicon Mac does not expose anything odd, or
+  untick those platforms in App Store Connect.
+- **"Update as I travel".** Now rides on when-in-use. Take a real
+  significant-change hop with the app in the foreground and confirm
+  the plate and the pending notifications follow; confirm nothing
+  fires with the app closed.
+- **Privacy policy screen.** Set → About → Privacy policy. Walk it at
+  the largest accessibility size and with VoiceOver; the cards are
+  `SettingsDescriptionText` paragraphs and should read as prose, not
+  as a list of controls.
+- **Dynamic Type at the token level.** `IhsanFont` is built from
+  `Font.system(size:)` literals, which do not scale with the system
+  text size; the surfaces that do scale use text styles directly. The
+  a5 gallery is the truth here — walk it on a device and decide whether
+  the tokens move to `relativeTo:` text styles in 1.1. Not changed in
+  the launch sweep: a typography-wide change wants a device pass.
+- **Widget cold launch.** Tap a widget with the app terminated and
+  confirm the qibla / Hijri / log sheet opens (the router now holds
+  the destination until Today appears).
+- **Adhan section with no recording.** Set → Adhan shows two
+  options per prayer (Chime, Silent; Fajr adds Chime rising) and no
+  "The full call" card. When
+  the muezzin's files land, confirm the row, the card, the Play
+  notification action, and the About credit all appear without a code
+  change.
+
+
+### Handoff review closure — 6 September 2026
+
+Confirmed findings from the saved six-lens review journal have been resolved:
+notification summaries use the effective bundled sound; deletion copy names the
+saved masjid and pending reminders; pause copy no longer promises a fixed date;
+Today carries the latest permission status in its state; watch permission
+screens name the Settings path and qibla requests when-in-use authorization.
+The unused Always-authorization API and both mock implementations are removed.
+Privacy, audio, shortcut integration, and verification documentation agree with
+the implementation. New policy and shortcut sources join the language sweep;
+the optional full-adhan check detects an asset placed only in the test bundle.
+
+Device follow-up: verify the longer location-recovery text fits the smallest
+supported watch, and test deny → Settings → allow → retry on both devices.
+The coordinator's initial not-determined callback may still complete an
+in-flight authorization request before the user answers; the Today state fix
+ensures a retry reflects the current permission. Coordinator callback semantics
+remain a separate follow-up affecting onboarding and Settings as well.
+
+The granted-location UI comparison completed: three RetroactiveLog tests pass
+on both trees; both PrayerLogCommit tests fail at the same assertions on baseline
+and changed trees. This establishes pre-existing failures, not their cause.
+Do not treat the simulator UI suite as fully green or device acceptance as done.
+
+Final verification on 6 September: ihsanTests 312/312 in 51 suites passed;
+IhsanLocation 18/18 and IhsanNotifications 45/45 passed; ihsanWatch simulator
+build succeeded. Both icons are 1024 × 1024 with no alpha, and all four privacy
+manifests plus the app/watch plists pass syntax validation. Local verification
+logs are retained in build/launch-verification/ (ignored by git).

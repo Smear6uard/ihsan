@@ -4,13 +4,13 @@ IhsanIntents is the App Intents layer for Ihsan. It exposes prayer actions to wi
 
 All prayer-logging paths should go through these intents. The Today screen, widgets, watch app, Siri, and Shortcuts share the same `LogPrayerIntent`, `LogPrayerWithStatusIntent`, `ToggleJamaahIntent`, and `MarkAsQadaIntent` behavior so logging stays idempotent and consistent.
 
-To wire shortcuts into the consuming app target, import the package from the `@main` app file:
+Import the package to use its intents in the consuming app target:
 
 ```swift
 import IhsanIntents
 ```
 
-`IhsanAppShortcuts` conforms to `AppShortcutsProvider`; once the framework is loaded by the app target, the system can register its curated shortcuts.
+Register shortcut phrases with an app-target `AppShortcutsProvider`; importing the package alone does not register them. The provider (`IhsanAppShortcuts`) lives in the app target at `ihsan/App/IhsanAppShortcuts.swift`, not here: App Shortcut phrases are extracted from the app's own binary at build time, and a provider declared in this package produced a metadata file with no phrases. The intents it names are all defined in this package.
 
 ## Coordinates Placeholder
 

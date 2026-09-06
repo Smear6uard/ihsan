@@ -25,19 +25,20 @@ truthfully:
 `NSPrivacyTrackingDomains` is empty. Nothing is passed to a data broker
 and no identifier is shared with anyone.
 
-## The three network calls the app makes
+## The four network calls the app makes
 
-Every one is to Apple. None of them reaches a server the developer owns,
-because there isn't one.
+Three are to Apple and one is to GitHub. None of them reaches a server
+the developer runs, because there isn't one.
 
-1. **Reverse geocoding**, to Apple, via `CLGeocoder` — coordinates in,
-   a city name out. Results are cached in memory only, keyed by
-   coordinates rounded to roughly 100 m, with a 24-hour lifetime and a
-   100-entry cap.
-2. **The fiqh configuration fetch** in `IhsanFiqhConfig` — a static
-   JSON file of thresholds and reflection prompts. Sends nothing but
-   the request. A bundled copy ships with the app and a test guarantees
-   it parses, so the app is fully functional with the network off.
+1. **Reverse geocoding**, to Apple, via MapKit's
+   `MKReverseGeocodingRequest` — coordinates in, a city name out.
+   Results are cached in memory only, keyed by coordinates rounded to
+   roughly 100 m, with a 24-hour lifetime and a 100-entry cap.
+2. **The nearby-masjid search**, to Apple Maps via `MKLocalSearch` —
+   the current coordinate in, a list of places out, only while the
+   Nearby sheet is open. Nothing from it is cached beyond the sheet;
+   the one thing that can persist is a masjid the person adopts (see
+   below).
 3. **The weather reading**, to Apple Weather via WeatherKit — coordinates
    in, the current conditions out. It happens only while something is
    actually asking for weather: the Living sky toggle in Set → Display
@@ -52,15 +53,21 @@ because there isn't one.
    `SkyConditionsCacheStore` holds no coordinate, no place name, and
    nothing else that could locate the reading. Readings expire after
    three hours rather than painting stale weather.
+4. **The fiqh configuration fetch** in `IhsanFiqhConfig` — a static
+   JSON file of thresholds and reflection prompts, read from the
+   developer's public repository on `raw.githubusercontent.com`. This is
+   the one request that is not to Apple. It sends nothing but the
+   request. A bundled copy ships with the app and a test guarantees it
+   parses, so the app is fully functional with the network off.
 
 ## Permissions, and exactly what each is for
 
 | Permission | Used for | Not used for |
 | --- | --- | --- |
-| **Location** (when in use) | Prayer times, the qibla bearing, and the nearby-masjid search. | Anything else. Your coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, a file, or a network call. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. Two requests to Apple carry coordinates and keep nothing: reverse geocoding, and the weather reading when you have asked for weather — see the three network calls above. The one place a coordinate is stored is a masjid you deliberately set as your own — see below. |
-| **Microphone** | Recording a voice reflection. | Nothing is uploaded. The `.m4a` stays in the App Group container and is deliberately excluded from CloudKit sync; only the transcript and metadata travel, and audio sync is opt-in (`adhanPlaysInSilentMode`'s neighbour, `autoSyncAudioMemos`, off by default). |
+| **Location** (when in use) | Prayer times, the qibla bearing, and the nearby-masjid search. | Anything else. Your coordinates exist in memory for the length of a calculation and are never written to SwiftData, UserDefaults, or a file. Only the city name and country code persist, and the city name is `@Attribute(.allowsCloudEncryption)`. Three requests to Apple carry coordinates and keep nothing: reverse geocoding, the nearby-masjid search, and the weather reading when you have asked for weather — see the four network calls above. The one place a coordinate is stored is a masjid you deliberately set as your own — see below. |
+| **Microphone** | Recording a voice reflection. | Nothing is uploaded. The `.m4a` stays in the App Group container and is deliberately excluded from CloudKit sync; only the transcript and metadata travel. `UserSettings.autoSyncAudioMemos` exists in the model for a later version but no control exposes it in 1.0, so audio never syncs. |
 | **Speech recognition** | Transcribing a voice reflection, on device. | No audio leaves the phone during transcription. |
-| **Motion** | One thing: `DeviceTiltMonitor` reads device pitch so the qibla dial can say "lay the phone flat" when it is held near-vertical and magnetic heading stops being reliable. It publishes a single boolean. | Not parallax, not analytics, not activity or step data. |
+| **Motion** (no prompt — `CMMotionManager` attitude needs no usage description, and none is declared) | One thing: `DeviceTiltMonitor` reads device pitch so the qibla dial can say "lay the phone flat" when it is held near-vertical and magnetic heading stops being reliable. It publishes a single boolean. | Not parallax, not analytics, not activity or step data. |
 | **Notifications** | One notification per prayer, at its time. Per-prayer sound and Focus behaviour are the person's choice, and every prayer can be silenced on its own. | Nothing is sent from a server; every notification is scheduled locally. |
 | **Alarms (AlarmKit)** | The four optional wake anchors — the last third of the night, Fajr's start, sunrise, and Maghrib — every one off by default. Requested only when someone turns one on. | — |
 
@@ -87,23 +94,37 @@ Removing your masjid removes all of it.
 `fetch` and `remote-notification`, plus the BGTaskScheduler identifier
 `com.sameerstudios.ihsan.refresh-notifications`.
 
-These exist to rebuild the rolling notification window: prayer times
+`fetch` exists to rebuild the rolling notification window: prayer times
 move every day, and iOS caps pending local notifications at 64. The
 background refresh recomputes the next window from the same schedule
-the plate draws. It does no networking.
+the plate draws. `remote-notification` is CloudKit's: it lets SwiftData's
+mirror wake when a record changes on another of the person's devices.
+Neither performs any networking of the app's own.
 
-**Background location: not used.** The app requests *when in use* only.
-`startMonitoringSignificantLocationChanges` runs while the app is
-foreground-active so a traveller's times follow them; the app does not
-hold a background location entitlement and does not track anyone
-between sessions.
+**Background location: not used.** The app requests *when in use* only
+— there is no `NSLocationAlwaysAndWhenInUseUsageDescription` in the
+Info.plist and no code path calls `requestAlwaysAuthorization`. The
+"Update as I travel" switch in Set → Location runs
+`startMonitoringSignificantLocationChanges` on that same when-in-use
+grant, so a traveller's times follow them while the app is open; the
+app holds no background location mode on iPhone or on the watch and
+does not track anyone between sessions.
 
 ## Accessed API reasons
 
-`ihsan/PrivacyInfo.xcprivacy` declares `NSPrivacyAccessedAPICategoryUserDefaults`
-with reason `CA92.1` — access limited to the app group the app,
-widgets, and watch app share. No file-timestamp, disk-space, or
-system-boot-time APIs are used.
+Every bundle carries its own `PrivacyInfo.xcprivacy` — the app, the
+widget extension, the watch app, and the watch complications — because
+each reads the shared App Group defaults through `IhsanCore`:
+
+- `NSPrivacyAccessedAPICategoryUserDefaults`, reason `CA92.1` (all four
+  bundles): access limited to the app group they share.
+- `NSPrivacyAccessedAPICategoryFileTimestamp`, reason `C617.1` (app
+  only): `ReflectionAudioPaths.cleanupOrphans` reads the modification
+  date of `.m4a` files inside the App Group container to avoid deleting
+  a memo that is still being written. It never reads a timestamp
+  outside the container.
+
+No disk-space or system-boot-time APIs are used.
 
 ## Notes for App Review
 
@@ -135,9 +156,19 @@ default, the permission is requested at the moment someone enables one,
 and when alarms are unavailable or declined the app falls back to a
 time-sensitive notification and says so plainly in Settings.
 
-**Audio provenance.** The bundled chimes are synthesised from sine
+**Audio provenance.** The two bundled chimes are synthesised from sine
 partials — see `docs/audio/generate-placeholders.py`, which is the
 complete source of every audio file in the build. No recording,
-sampled or otherwise, ships today. When a muezzin's recording is added
+sampled or otherwise, ships today, and the interface offers none: the
+takbīrāt option, the in-app player, and the muezzin's credit line each
+appear only when their file is in the bundle. When a recording is added
 its license must be recorded in `docs/audio/LICENSES.txt` before
 submission.
+
+**Platforms.** iPhone only, portrait. The build runs in compatibility
+mode on iPad, Mac, and Vision Pro if those are left enabled in App
+Store Connect; nothing in the app is iPad-specific.
+
+**The privacy policy** is inside the app at Set → About → Privacy
+policy (`PrivacyPolicyScreen`), and the same text is in
+`docs/privacy-policy.md` for the App Store Connect field.
