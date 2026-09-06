@@ -52,7 +52,7 @@ final class AdhanPlayer: NSObject {
         stop()
 
         guard let url = Self.assetURL else {
-            lastFailure = "The adhan recording is not in this build yet."
+            lastFailure = "The adhan recording is not available."
             logger.error("Full adhan asset missing: \(AdhanAsset.fullAdhan, privacy: .public)")
             return
         }

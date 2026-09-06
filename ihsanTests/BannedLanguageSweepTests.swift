@@ -102,6 +102,8 @@ struct BannedLanguageSweepTests {
         "ihsan/Today/Helpers/IqamahInscription.swift",
         "ihsan/Night/WakeAnchorService.swift",
         "ihsan/Settings/SettingsScreen.swift",
+        "ihsan/Settings/PrivacyPolicyScreen.swift",
+        "ihsan/App/IhsanAppShortcuts.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Masjid/IqamahEntry.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Masjid/IqamahSchedule.swift",
         "Packages/IhsanCore/Sources/IhsanCore/Masjid/IqamahResolver.swift",

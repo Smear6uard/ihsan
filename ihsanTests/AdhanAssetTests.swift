@@ -40,7 +40,7 @@ struct AdhanAssetTests {
         let resolver = AdhanSoundFileResolver { [self] in url(for: $0) != nil }
 
         for prayer in Prayer.allCases {
-            for option in AdhanSoundCatalog.options(for: prayer) {
+            for option in AdhanSoundCatalog.options(for: prayer, using: resolver) {
                 let resolved = option.resolvedFileName(using: resolver)
                 if option == .silent {
                     #expect(resolved == nil, "Silent must resolve to no file.")
@@ -84,14 +84,16 @@ struct AdhanAssetTests {
         #expect(AdhanAsset.nightWake == AdhanAsset.chime)
     }
 
-    @Test("The full-adhan asset is readable and longer than a notification tone")
+    @Test("The full adhan, when bundled, is readable and longer than a notification tone")
     @MainActor
     func theFullAdhanIsPlayable() throws {
-        // Its whole reason to exist is being longer than iOS will play.
-        let url = try #require(
-            AdhanPlayer.assetURL,
-            "The in-app recording is missing; Set → Adhan's Play would do nothing."
-        )
+        // Until the muezzin's recording lands there is nothing to
+        // measure, and Set hides the player rather than offering a
+        // Play that does nothing.
+        guard let url = AdhanPlayer.assetURL else {
+            #expect(url(for: AdhanAsset.fullAdhan) == nil, "The recording must be in the app bundle, not only the test bundle.")
+            return
+        }
         let seconds = try duration(of: url)
         // A recording shorter than the notification limit would have no
         // reason to need the in-app path at all.
@@ -99,17 +101,23 @@ struct AdhanAssetTests {
         #expect(AVAudioPlayer.canRead(url), "AVAudioPlayer cannot read \(url.lastPathComponent).")
     }
 
-    @Test("The takbīrāt option describes itself honestly while unrecorded")
-    func theUnrecordedOptionSaysSo() {
+    @Test("The takbīrāt option is offered only once its recording is in the bundle")
+    func theUnrecordedOptionIsNotOffered() {
         let resolver = AdhanSoundFileResolver { [self] in url(for: $0) != nil }
         let recorded = url(for: AdhanAsset.takbirat) != nil
 
-        #expect(
-            AdhanSoundCatalog.takbirat.awaitsRecording(using: resolver) == !recorded,
-            "The row's 'recording not in this build yet' note must track the bundle."
-        )
-        // Recorded or not, choosing it never yields silence.
+        for prayer in Prayer.allCases {
+            #expect(
+                AdhanSoundCatalog.options(for: prayer, using: resolver).contains(.takbirat) == recorded,
+                "Set → Adhan must offer takbīrāt exactly when the file is present."
+            )
+        }
+        // A choice stored by an earlier build still plays something, and
+        // reads as what it plays.
         #expect(AdhanSoundCatalog.takbirat.resolvedFileName(using: resolver) != nil)
+        #expect(
+            AdhanSoundCatalog.takbirat.effectiveChoice(using: resolver) == (recorded ? .takbirat : .chime)
+        )
     }
 }
 

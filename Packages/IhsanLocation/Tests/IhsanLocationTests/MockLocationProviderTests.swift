@@ -23,10 +23,6 @@ actor MockLocationProvider: LocationProviding {
         scriptedAuth
     }
 
-    nonisolated func requestAlwaysAuthorization() async throws -> LocationAuthorization {
-        scriptedAuth
-    }
-
     nonisolated func authorizationUpdates() -> AsyncStream<LocationAuthorization> {
         AsyncStream { continuation in
             continuation.yield(scriptedAuth)

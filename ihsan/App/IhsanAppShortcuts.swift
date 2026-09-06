@@ -1,9 +1,17 @@
 import AppIntents
+import IhsanIntents
 
-/// The consuming app target should import IhsanIntents from its @main file so
-/// this AppShortcutsProvider is loaded and registered by the system.
-public struct IhsanAppShortcuts: AppShortcutsProvider {
-    public static var appShortcuts: [AppShortcut] {
+/// The app's App Shortcuts — the phrases Siri and the Shortcuts app
+/// offer without setup.
+///
+/// This lives in the app target on purpose. The intents themselves are
+/// defined in `IhsanIntents` and are extracted from that package just
+/// fine, but App Shortcut phrases are read from the app's own binary
+/// at build time: a provider that lives only in a package yields a
+/// metadata file with no phrases at all, and nothing warns. Every
+/// intent named here is one of the package's single-funnel intents.
+struct IhsanAppShortcuts: AppShortcutsProvider {
+    static var appShortcuts: [AppShortcut] {
         AppShortcut(
             intent: LogPrayerIntent(),
             phrases: [
@@ -55,5 +63,5 @@ public struct IhsanAppShortcuts: AppShortcutsProvider {
         )
     }
 
-    public static let shortcutTileColor: ShortcutTileColor = .grayBlue
+    static let shortcutTileColor: ShortcutTileColor = .grayBlue
 }

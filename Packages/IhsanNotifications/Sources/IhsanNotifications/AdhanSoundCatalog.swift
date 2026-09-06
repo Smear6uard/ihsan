@@ -15,13 +15,13 @@ import IhsanCore
 //     app through AVAudioPlayer, which is the only way to hear a full
 //     adhan.
 //
-// Nothing here is a real recording yet. `ihsan-chime*.caf` are
-// synthesised from sine partials (see `generate-placeholders.py` beside
-// the assets) so there is no license question, and the full-adhan file
-// is a placeholder of the same material. `takbirat` deliberately names
-// a file that does not exist: the catalog checks the bundle, so the
-// option describes itself honestly until the muezzin's recording
-// arrives.
+// The two chimes are synthesised from sine partials (see
+// `generate-placeholders.py` beside the assets) so there is no license
+// question. `takbirat` and `fullAdhan` name the muezzin's files, which
+// are not in the bundle yet: the catalog checks the bundle, so an
+// option whose recording has not landed is simply not offered, and the
+// in-app player stays out of Set until the full call is there. Nothing
+// in the interface points at a file that cannot play.
 
 public enum AdhanAsset {
     // MARK: Notification tones (bundled .caf, ≤ 30s)
@@ -40,10 +40,10 @@ public enum AdhanAsset {
 
     // MARK: In-app playback (any length)
 
-    /// The full call to prayer, played by the app on request. Currently
-    /// a placeholder built from the same synthesised material; replace
-    /// with the recording and rename here.
-    public static let fullAdhan = "ihsan-adhan-full-placeholder.m4a"
+    /// The full call to prayer, played by the app on request. **Not yet
+    /// recorded** — drop the file in and Set → Adhan's "The full call"
+    /// section and the notification's Play action appear on their own.
+    public static let fullAdhan = "ihsan-adhan-full.m4a"
 
     /// The gentle wake plays the chime. One tone, one constant — the
     /// wake and the notification can never drift apart.
@@ -97,11 +97,17 @@ public enum AdhanSoundCatalog: String, CaseIterable, Codable, Sendable {
 
     /// The choices offered for a given prayer. The dawn variant is
     /// Fajr's alone; offering a rising wake to someone already awake
-    /// would be offering them nothing.
-    public static func options(for prayer: Prayer) -> [AdhanSoundCatalog] {
-        prayer == .fajr
+    /// would be offering them nothing. An option whose recording is not
+    /// in the bundle is left out entirely — a row that promises a
+    /// muezzin and plays a bowl is not a choice.
+    public static func options(
+        for prayer: Prayer,
+        using resolver: AdhanSoundFileResolver = .mainBundle
+    ) -> [AdhanSoundCatalog] {
+        let all: [AdhanSoundCatalog] = prayer == .fajr
             ? [.chime, .chimeDawn, .takbirat, .silent]
             : [.chime, .takbirat, .silent]
+        return all.filter { !$0.awaitsRecording(using: resolver) }
     }
 
     /// The file this choice wants, or `nil` when it wants none.
@@ -116,9 +122,10 @@ public enum AdhanSoundCatalog: String, CaseIterable, Codable, Sendable {
 
     /// What actually plays, given which files are present.
     ///
-    /// A choice whose recording has not landed falls back to the chime
-    /// rather than to silence or to the system tone — and the settings
-    /// row says so, so the fallback is never a surprise.
+    /// A stored choice whose recording has not landed (an earlier build
+    /// may have offered it) falls back to the chime rather than to
+    /// silence or to the system tone, and `effectiveChoice(using:)` is
+    /// what Set shows for it.
     public func resolvedFileName(using resolver: AdhanSoundFileResolver) -> String? {
         guard let preferred = preferredFileName else { return nil }
         if resolver.fileExists(preferred) { return preferred }
@@ -131,6 +138,13 @@ public enum AdhanSoundCatalog: String, CaseIterable, Codable, Sendable {
     public func awaitsRecording(using resolver: AdhanSoundFileResolver) -> Bool {
         guard let preferred = preferredFileName else { return false }
         return !resolver.fileExists(preferred)
+    }
+
+    /// The choice as it should be displayed: itself when its recording
+    /// is present, the chime when the file it names is not in the
+    /// bundle. Silence is always itself.
+    public func effectiveChoice(using resolver: AdhanSoundFileResolver) -> AdhanSoundCatalog {
+        awaitsRecording(using: resolver) ? .chime : self
     }
 }
 

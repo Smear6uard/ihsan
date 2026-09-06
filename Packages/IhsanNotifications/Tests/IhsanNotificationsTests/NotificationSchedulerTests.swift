@@ -31,15 +31,35 @@ func rebuildScheduleCancelsExistingIhsanRequestsThenSchedulesRollingWindow() asy
 }
 
 @Test
+func aRefusedLiveActivityNeverCostsTheNotificationBesideIt() async throws {
+    // Live Activities off in iOS Settings makes ActivityKit throw on
+    // every start. The rebuild has already withdrawn the old schedule
+    // by then, so an abort here would leave the person with no prayer
+    // notifications at all.
+    let now = fixedDate()
+    let center = MockNotificationCenter(existingRequests: [
+        makeExistingRequest(identifier: "ihsan.prayer.fajr.1")
+    ])
+    let activityScheduler = MockPrayerActivityScheduler()
+    activityScheduler.refusesEveryStart = true
+    let scheduler = makeScheduler(now: now, center: center, activityScheduler: activityScheduler)
+
+    try await scheduler.rebuildSchedule()
+
+    #expect(activityScheduler.requests.isEmpty)
+    #expect(center.events.filter(\.isAdd).count == 70)
+}
+
+@Test
 func theDawnVariantIsOfferedForFajrAndNowhereElse() {
-    #expect(AdhanSoundCatalog.options(for: .fajr).contains(.chimeDawn))
+    #expect(AdhanSoundCatalog.options(for: .fajr, using: .allPresent).contains(.chimeDawn))
     for prayer in Prayer.allCases where prayer != .fajr {
-        #expect(!AdhanSoundCatalog.options(for: prayer).contains(.chimeDawn))
+        #expect(!AdhanSoundCatalog.options(for: prayer, using: .allPresent).contains(.chimeDawn))
     }
     // Every prayer can always be chimed or silenced.
     for prayer in Prayer.allCases {
-        #expect(AdhanSoundCatalog.options(for: prayer).contains(.chime))
-        #expect(AdhanSoundCatalog.options(for: prayer).contains(.silent))
+        #expect(AdhanSoundCatalog.options(for: prayer, using: .allPresent).contains(.chime))
+        #expect(AdhanSoundCatalog.options(for: prayer, using: .allPresent).contains(.silent))
     }
 }
 
@@ -451,10 +471,6 @@ private struct MockLocationProvider: LocationProviding {
         .authorizedWhenInUse
     }
 
-    func requestAlwaysAuthorization() async throws -> LocationAuthorization {
-        .authorizedAlways
-    }
-
     func authorizationUpdates() -> AsyncStream<LocationAuthorization> {
         AsyncStream { continuation in
             continuation.finish()
@@ -559,6 +575,11 @@ private final class MockPrayerActivityScheduler: PrayerActivityScheduling, @unch
     private var recordedCancelCount = 0
     private let lock = NSLock()
 
+    /// When set, every start request is refused the way ActivityKit
+    /// refuses one with Live Activities switched off in iOS Settings.
+    var refusesEveryStart = false
+    struct Refused: Error {}
+
     var requests: [Request] {
         lock.withLock { recordedRequests }
     }
@@ -573,6 +594,8 @@ private final class MockPrayerActivityScheduler: PrayerActivityScheduling, @unch
         windowEnd: Date,
         startDate: Date
     ) async throws {
+        _ = dayTimes
+        if lock.withLock({ refusesEveryStart }) { throw Refused() }
         lock.withLock {
             recordedRequests.append(Request(
                 prayer: prayerTime.prayer,
@@ -581,7 +604,6 @@ private final class MockPrayerActivityScheduler: PrayerActivityScheduling, @unch
                 startDate: startDate
             ))
         }
-        _ = dayTimes
     }
 
     func cancelAllPrayerActivities() async {
@@ -888,4 +910,27 @@ func iqamahReminderNeverSchedulesAMomentAlreadyPast() async throws {
 
     let reference = fixedDate().addingTimeInterval(13 * 3_600)
     #expect((await iqamahFireDates(center)).allSatisfy { $0 > reference })
+}
+
+@Test
+func anOptionWhoseRecordingIsAbsentIsNotOffered() {
+    let chimesOnly = AdhanSoundFileResolver { $0 == AdhanAsset.chime || $0 == AdhanAsset.chimeDawn }
+    for prayer in Prayer.allCases {
+        let offered = AdhanSoundCatalog.options(for: prayer, using: chimesOnly)
+        #expect(!offered.contains(.takbirat), "\(prayer.rawValue) offered a takbīrāt row with no recording behind it")
+        #expect(offered.contains(.chime))
+        #expect(offered.contains(.silent))
+    }
+    #expect(AdhanSoundCatalog.options(for: .fajr, using: chimesOnly).contains(.chimeDawn))
+    // Once the file lands the option returns with no other change.
+    #expect(AdhanSoundCatalog.options(for: .dhuhr, using: .allPresent).contains(.takbirat))
+}
+
+@Test
+func aStoredChoiceForAMissingRecordingReadsAsTheChime() {
+    let chimesOnly = AdhanSoundFileResolver { $0 == AdhanAsset.chime || $0 == AdhanAsset.chimeDawn }
+    #expect(AdhanSoundCatalog.takbirat.effectiveChoice(using: chimesOnly) == .chime)
+    #expect(AdhanSoundCatalog.takbirat.effectiveChoice(using: .allPresent) == .takbirat)
+    #expect(AdhanSoundCatalog.silent.effectiveChoice(using: chimesOnly) == .silent)
+    #expect(AdhanSoundCatalog.chimeDawn.effectiveChoice(using: chimesOnly) == .chimeDawn)
 }

@@ -180,11 +180,13 @@ struct ComplicationProvider: TimelineProvider {
         at date: Date,
         timeZoneIdentifier: String
     ) throws -> [Prayer: PrayerStatus] {
-        // Spin up the same App-Group + CloudKit container the host
-        // app uses. Widget extensions can open SwiftData containers;
-        // the cost is real but bounded, and prayer log volume is
-        // tiny (single-digit rows per day).
-        let container = try IhsanModelContainerFactory.makeContainer(inMemory: false)
+        // Open the same App-Group store the watch app uses, WITHOUT
+        // CloudKit mirroring: the app already mirrors this file, a
+        // second mirror from an extension is exactly the CoreData
+        // 134422 collision the iOS side once had, and a complication
+        // only reads. Widget extensions can open SwiftData containers;
+        // the cost is bounded, and prayer log volume is tiny.
+        let container = try IhsanModelContainerFactory.makeContainer(inMemory: false, cloudSync: false)
         let context = ModelContext(container)
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: timeZoneIdentifier) ?? .current

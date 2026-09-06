@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import UIKit
 import IhsanCore
 import IhsanDesignSystem
 import IhsanIntents
@@ -44,8 +45,8 @@ struct TodayScreen: View {
         case .loading, nil:
             TodayLoadingView(tokens: chromeTokens)
                 .ihsanManuscriptPage()
-        case .needsLocationPermission:
-            TodayNeedsLocationView(tokens: chromeTokens) { Task { await viewModel?.bootstrap() } }
+        case .needsLocationPermission(let authorization):
+            TodayNeedsLocationView(tokens: chromeTokens, authorization: authorization) { Task { await viewModel?.bootstrap() } }
                 .ihsanManuscriptPage()
         case .ready(let snapshot):
             if let viewModel {
@@ -83,34 +84,61 @@ private struct TodayLoadingView: View {
     }
 }
 
+/// The plate cannot draw without a place. This screen says so once,
+/// and its one button always does something: it asks, when the system
+/// has not asked yet, and it opens iOS Settings when the answer there
+/// was no — a "Continue" that re-asked a question iOS will not repeat
+/// did nothing at all.
 private struct TodayNeedsLocationView: View {
     let tokens: SkyPaletteTokens
+    let authorization: LocationAuthorization
     let onRetry: () -> Void
 
+    @Environment(\.openURL) private var openURL
+
+    private var isDeclined: Bool {
+        authorization == .denied || authorization == .restricted
+    }
+
     var body: some View {
-        let foreground = tokens.ink
-        let foregroundSecondary = tokens.inkSecondary
-        let foregroundMuted = tokens.inkSecondary.opacity(0.7)
-        let accent = tokens.leafGold
         VStack(spacing: IhsanSpacing.lg) {
             Image(systemName: "location.slash.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(foregroundMuted)
+                .foregroundStyle(tokens.inkSecondary.opacity(0.7))
+                .accessibilityHidden(true)
             Text("Location access is needed")
                 .font(IhsanFont.subtitle)
-                .foregroundStyle(foreground)
-            Text("Ihsan calculates prayer times from your current location. Coordinates are never stored or shared.")
+                .foregroundStyle(tokens.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text(isDeclined
+                ? "Ihsan computes prayer times from where you are, and location is off for Ihsan in iOS Settings. Coordinates are used in the moment and never stored."
+                : "Ihsan computes prayer times from where you are. Coordinates are used in the moment and never stored.")
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(foregroundSecondary)
+                .foregroundStyle(tokens.inkSecondary)
                 .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
                 .padding(.horizontal, IhsanSpacing.xl)
-            Button("Continue") {
-                Haptics.impact(.light)
-                onRetry()
+
+            VStack(spacing: IhsanSpacing.sm) {
+                if isDeclined {
+                    OnboardingPrimaryButton("Open iOS Settings") {
+                        Haptics.impact(.light)
+                        if let url = URL(string: UIApplication.openSettingsURLString) {
+                            openURL(url)
+                        }
+                    }
+                    OnboardingGhostButton("Try again") {
+                        Haptics.impact(.light)
+                        onRetry()
+                    }
+                } else {
+                    OnboardingPrimaryButton("Allow location") {
+                        Haptics.impact(.light)
+                        onRetry()
+                    }
+                }
             }
-                .buttonStyle(.borderedProminent)
-                .tint(accent.opacity(0.30))
-                .foregroundStyle(foreground)
+            .padding(.horizontal, IhsanSpacing.lg)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -210,6 +238,19 @@ private struct TodayReadyView: View {
     @State private var revertFocusTask: Task<Void, Never>?
     @State private var isCelestialReferencePresented = DebugLaunch.flag("-IhsanDebugPresentQibla")
     @State private var isHijriSheetPresented = DebugLaunch.flag("-IhsanDebugPresentHijriSheet")
+
+    private func present(widgetDestination destination: WidgetDeeplinkRouter.Destination) {
+        switch destination {
+        case .today:
+            break
+        case .qibla:
+            isCelestialReferencePresented = true
+        case .hijri:
+            isHijriSheetPresented = true
+        case .logSheet(let prayer):
+            sheetSelection = LogSheetSelection(prayer: prayer)
+        }
+    }
     @State private var isMasjidFinderPresented = DebugLaunch.flag("-IhsanDebugPresentMasjids")
     /// Civil-day key ("2026-07-30") of the day the user dismissed the
     /// significant-day line — presentation state, not worship data.
@@ -574,15 +615,15 @@ private struct TodayReadyView: View {
                 guard let destination = notification.userInfo?[
                     WidgetDeeplinkRouter.destinationKey
                 ] as? WidgetDeeplinkRouter.Destination else { return }
-                switch destination {
-                case .today:
-                    break
-                case .qibla:
-                    isCelestialReferencePresented = true
-                case .hijri:
-                    isHijriSheetPresented = true
-                case .logSheet(let prayer):
-                    sheetSelection = LogSheetSelection(prayer: prayer)
+                _ = WidgetDeeplinkRouter.takePending()
+                present(widgetDestination: destination)
+            }
+            // A cold launch from a widget posts before this screen
+            // exists to hear it; the router holds that one tap until
+            // now, so the sheet the person asked for still opens.
+            .onAppear {
+                if let destination = WidgetDeeplinkRouter.takePending() {
+                    present(widgetDestination: destination)
                 }
             }
             // The reading surface rides over everything, like the

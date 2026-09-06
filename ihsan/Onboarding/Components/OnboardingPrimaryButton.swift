@@ -1,16 +1,22 @@
+import IhsanCore
 import SwiftUI
 import IhsanDesignSystem
 
 /// The "Continue" capsule used as the primary affordance on every
-/// onboarding step. Glass-capsule styling — the iridescent tint is
-/// supplied by the shared `.ihsanGlass(...)` modifier so the button
-/// feels of-a-piece with the rest of the app's surfaces.
+/// onboarding step, and on Today's location gate. Glass-capsule
+/// styling — the iridescent tint is supplied by the shared
+/// `.ihsanGlass(...)` modifier so the button feels of-a-piece with the
+/// rest of the app's surfaces.
+///
+/// Its ink is the page's, not a fixed white: the manuscript page is
+/// luminous by day, and white on a day-lit glass capsule vanishes.
 struct OnboardingPrimaryButton: View {
     let title: String
     let isLoading: Bool
     let action: () -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.nowProvider) private var nowProvider
 
     init(_ title: String, isLoading: Bool = false, action: @escaping () -> Void) {
         self.title = title
@@ -19,17 +25,18 @@ struct OnboardingPrimaryButton: View {
     }
 
     var body: some View {
+        let tokens = IhsanPageChrome.tokens(at: nowProvider.now())
         Button(action: action) {
             ZStack {
                 Text(title)
                     .font(IhsanFont.bodyEnglishBold)
-                    .foregroundStyle(IhsanColor.textPrimary)
+                    .foregroundStyle(tokens.ink)
                     .opacity(isLoading ? 0 : 1)
 
                 if isLoading {
                     ProgressView()
                         .progressViewStyle(.circular)
-                        .tint(IhsanColor.textPrimary)
+                        .tint(tokens.ink)
                 }
             }
             .frame(maxWidth: .infinity)
@@ -37,7 +44,7 @@ struct OnboardingPrimaryButton: View {
             .ihsanGlass(in: Capsule(style: .continuous), intensity: .hero)
             .overlay {
                 Capsule(style: .continuous)
-                    .strokeBorder(IhsanColor.atmospheric, lineWidth: 0.5)
+                    .strokeBorder(tokens.metal.opacity(0.55), lineWidth: 0.8)
             }
             .contentShape(Capsule(style: .continuous))
         }

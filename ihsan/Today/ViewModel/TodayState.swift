@@ -5,7 +5,7 @@ import IhsanPrayerTimes
 
 enum TodayState {
     case loading
-    case needsLocationPermission
+    case needsLocationPermission(LocationAuthorization)
     case ready(Snapshot)
     case error(String)
 

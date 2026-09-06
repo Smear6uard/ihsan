@@ -10,12 +10,6 @@ public protocol LocationProviding: Sendable {
     @discardableResult
     func requestWhenInUseAuthorization() async throws -> LocationAuthorization
 
-    /// Request always authorization. Only use this after the user
-    /// explicitly enables auto-location updates in Settings.
-    /// Throws `LocationError.permissionRestricted` if restricted.
-    @discardableResult
-    func requestAlwaysAuthorization() async throws -> LocationAuthorization
-
     /// Stream of authorization status changes.
     func authorizationUpdates() -> AsyncStream<LocationAuthorization>
 

@@ -56,6 +56,7 @@ struct OnboardingCalculationStep: View {
                             ) {
                                 SettingsSelectionRing(isSelected: viewModel.draftMadhab == madhab)
                             }
+                            .accessibilityAddTraits(viewModel.draftMadhab == madhab ? .isSelected : [])
                             .accessibilityValue(madhab.onboardingDetail)
                             SettingsDescriptionText(madhab.onboardingDetail)
                         }
@@ -148,6 +149,7 @@ struct OnboardingMethodRow: View {
             .buttonStyle(.plain)
         }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .accessibilityAddTraits(.isButton)
         .accessibilityLabel("\(method.shortName), \(method.provenance)")
         .accessibilityValue(

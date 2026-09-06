@@ -1,3 +1,4 @@
+import IhsanCore
 import SwiftUI
 import IhsanDesignSystem
 
@@ -9,6 +10,8 @@ struct OnboardingGhostButton: View {
     let title: String
     let action: () -> Void
 
+    @Environment(\.nowProvider) private var nowProvider
+
     init(_ title: String, action: @escaping () -> Void) {
         self.title = title
         self.action = action
@@ -18,7 +21,7 @@ struct OnboardingGhostButton: View {
         Button(action: action) {
             Text(title)
                 .font(IhsanFont.bodyEnglish)
-                .foregroundStyle(IhsanColor.textSecondary)
+                .foregroundStyle(IhsanPageChrome.tokens(at: nowProvider.now()).inkSecondary)
                 .frame(maxWidth: .infinity)
                 .frame(height: 44)
                 .contentShape(Rectangle())

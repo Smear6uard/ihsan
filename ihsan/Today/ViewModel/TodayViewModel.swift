@@ -56,7 +56,7 @@ final class TodayViewModel {
                 if auth == .denied || auth == .restricted {
                     Haptics.notification(.warning)
                 }
-                state = .needsLocationPermission
+                state = .needsLocationPermission(auth)
                 return
             }
 
@@ -68,18 +68,14 @@ final class TodayViewModel {
             // fetch that fails changes nothing on screen.
             Task { [weak self] in await self?.refreshWeather() }
 
-            if settings?.automaticLocationUpdatesEnabled == true,
-               auth == .authorizedAlways {
-                try await locationProvider.startMonitoringSignificantChanges()
+            // "Update as I travel" rides on the when-in-use grant the
+            // plate already holds: significant-change updates arrive
+            // while the app is open, and nothing runs between sessions.
+            // Monitoring that cannot start must never cost the plate.
+            if settings?.automaticLocationUpdatesEnabled == true {
+                try? await locationProvider.startMonitoringSignificantChanges()
                 startObservingLocationChanges()
             } else {
-                // Significant-change relaunches require explicit Always
-                // access. Keep the stored control honest if an older
-                // install only has foreground permission.
-                if settings?.automaticLocationUpdatesEnabled == true {
-                    settings?.automaticLocationUpdatesEnabled = false
-                    settings?.modifiedAt = nowProvider.now()
-                }
                 await locationProvider.stopMonitoringSignificantChanges()
                 significantChangesTask?.cancel()
             }
@@ -273,9 +269,11 @@ final class TodayViewModel {
         }
     }
 
+    /// The view model's one logger: reattribution reports and the
+    /// failures of the three logging funnels.
     private static let logger = Logger(
         subsystem: "com.sameerstudios.ihsan",
-        category: "CycleReattribution"
+        category: "TodayViewModel"
     )
 
     /// The night the plate should know about: before Fajr that is the
@@ -314,7 +312,7 @@ final class TodayViewModel {
             _ = try await intent.perform()
             Haptics.settle()
         } catch {
-            print("setStatus failed: \(error)")
+            Self.logger.error("setStatus failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -326,7 +324,7 @@ final class TodayViewModel {
             let intent = LogNaflIntent(kind: kind, naflDate: naflDate, rakahCount: rakahCount)
             _ = try await intent.perform()
         } catch {
-            print("toggleNafl failed: \(error)")
+            Self.logger.error("toggleNafl failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -336,7 +334,7 @@ final class TodayViewModel {
             _ = try await intent.perform()
             Haptics.impact(.light)
         } catch {
-            print("toggleJamaah failed: \(error)")
+            Self.logger.error("toggleJamaah failed: \(String(describing: error), privacy: .public)")
         }
     }
 

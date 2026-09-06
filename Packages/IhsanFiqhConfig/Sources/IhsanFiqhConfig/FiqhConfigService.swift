@@ -1,7 +1,9 @@
 import Foundation
 import IhsanCore
+import OSLog
 
 public actor FiqhConfigService {
+    private static let logger = Logger(subsystem: "com.sameerstudios.ihsan", category: "FiqhConfig")
     public static let shared = FiqhConfigService()
 
     public static let remoteConfigURL = URL(
@@ -125,7 +127,7 @@ public actor FiqhConfigService {
         } catch {
             // Silent failure — bundled or cached config continues to serve.
             // Logged for diagnostics; never surfaced to the user.
-            print("[FiqhConfigService] Background refresh failed: \(error)")
+            Self.logger.info("Background refresh did not complete: \(String(describing: error), privacy: .public)")
         }
     }
 

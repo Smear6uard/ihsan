@@ -403,12 +403,20 @@ public actor NotificationScheduler {
                     )
                     if settings.prayerLiveActivitiesEnabled,
                        activityStartDate > referenceDate || windowEnd > referenceDate {
-                        try await prayerActivityScheduler.schedulePrayerActivityStart(
-                            for: prayerTime,
-                            in: day,
-                            windowEnd: windowEnd,
-                            startDate: activityStartDate
-                        )
+                        // A refused activity — Live Activities switched
+                        // off in iOS Settings, or ActivityKit's own
+                        // ceiling — must never cost the notification
+                        // beside it: the old schedule is already gone.
+                        do {
+                            try await prayerActivityScheduler.schedulePrayerActivityStart(
+                                for: prayerTime,
+                                in: day,
+                                windowEnd: windowEnd,
+                                startDate: activityStartDate
+                            )
+                        } catch {
+                            logger.error("Live Activity for \(prayerTime.prayer.rawValue, privacy: .public) was refused: \(String(describing: error), privacy: .public)")
+                        }
                     }
 
                     guard notificationDate > referenceDate else {

@@ -179,14 +179,14 @@ extension PathFinding {
 
         let isOne = outstanding.count == 1
         let headline = "\(outstanding.count) \(isOne ? "prayer is" : "prayers are") "
-            + "recorded missed in this period with no make-up logged against "
+            + "recorded missed in this period with no makeup logged against "
             + "\(isOne ? "it" : "them") yet."
 
         return PathFinding(
             kind: .outstandingMakeups,
             headline: headline,
             action: .openMakeupLedger,
-            actionTitle: "Open the make-up ledger"
+            actionTitle: "Open the makeup ledger"
         )
     }
 

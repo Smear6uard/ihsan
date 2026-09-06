@@ -62,7 +62,7 @@ struct RepairInviteCard: View {
                         .frame(minHeight: 40)
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("Puts this invitation away. You can begin any time from Settings.")
+                .accessibilityHint("Puts this invitation away. You can begin any time from Set.")
             }
         }
         .padding(IhsanSpacing.md)

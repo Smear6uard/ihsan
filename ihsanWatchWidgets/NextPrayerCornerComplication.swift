@@ -27,7 +27,9 @@ struct NextPrayerCornerView: View {
     let entry: ComplicationEntry
 
     var body: some View {
-        if let prayer = entry.nextPrayer, let time = entry.nextPrayerTime {
+        // A cached schedule that has run out leaves a "next" prayer in
+        // the past; counting toward it would read as a live countdown.
+        if let prayer = entry.nextPrayer, let time = entry.nextPrayerTime, time > entry.date {
             content(prayer: prayer, time: time)
         } else {
             Image(systemName: "moon.stars")

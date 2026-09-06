@@ -54,27 +54,6 @@ public final class CoreLocationCoordinator: NSObject, LocationProviding, @unchec
         }
     }
 
-    @discardableResult
-    public func requestAlwaysAuthorization() async throws -> LocationAuthorization {
-        let current = manager.authorizationStatus
-        if current == .restricted {
-            throw LocationError.permissionRestricted
-        }
-        if current == .denied {
-            return .denied
-        }
-        if current == .authorizedAlways {
-            return .authorizedAlways
-        }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            lock.withLock {
-                pendingAuthContinuations.append(continuation)
-            }
-            manager.requestAlwaysAuthorization()
-        }
-    }
-
     public func authorizationUpdates() -> AsyncStream<LocationAuthorization> {
         AsyncStream { continuation in
             let id = UUID()

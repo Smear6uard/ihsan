@@ -118,7 +118,8 @@ final class RepairViewModel {
 
     // MARK: - Private
 
-    private static let intentionReminderIdentifier = "ihsan.repair.intention"
+    /// Internal so Set's master switch and Delete all data can name it.
+    static let intentionReminderIdentifier = "ihsan.repair.intention"
 
     private func scheduleIntentionReminder() {
         let content = UNMutableNotificationContent()

@@ -49,12 +49,26 @@ enum WidgetDeeplinkRouter {
         return .today
     }
 
+    /// The destination of a tap that arrived before Today was on
+    /// screen — a cold launch from a widget. Today takes it on appear;
+    /// a warm launch is served by the notification and leaves this nil.
+    @MainActor
+    private(set) static var pending: Destination?
+
     @MainActor
     static func post(_ destination: Destination) {
+        pending = destination
         NotificationCenter.default.post(
             name: notificationName,
             object: nil,
             userInfo: [destinationKey: destination]
         )
+    }
+
+    /// Hands over and clears whatever a cold launch left behind.
+    @MainActor
+    static func takePending() -> Destination? {
+        defer { pending = nil }
+        return pending
     }
 }

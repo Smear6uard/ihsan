@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import SwiftData
 import IhsanCore
@@ -26,7 +27,8 @@ struct IhsanApp: App {
                 cloudSync: CloudAccountGate.shouldEnableCloudSync()
             )
         } catch {
-            print("Falling back to in-memory ModelContainer: \(error)")
+            Logger(subsystem: "com.sameerstudios.ihsan", category: "Launch")
+                .error("Falling back to in-memory ModelContainer: \(String(describing: error), privacy: .public)")
             do {
                 modelContainer = try IhsanModelContainerFactory.makeContainer(inMemory: true)
             } catch {
@@ -42,10 +44,11 @@ struct IhsanApp: App {
         IhsanSharedModelContainer.shared.register(modelContainer)
 
         // Before any notification can be delivered, so a cold launch
-        // from a tapped banner behaves exactly like a warm one.
-        Task { @MainActor in
-            PrayerNotificationResponder.shared.install()
-        }
+        // from a tapped banner behaves exactly like a warm one. This
+        // has to happen inside launch, not one executor hop later: the
+        // response for the banner that launched the process is handed
+        // to whichever delegate is set when launch completes.
+        PrayerNotificationResponder.shared.install()
 
         // Register while the process is launching; BGTaskScheduler
         // rejects late registration. The task keeps the rolling

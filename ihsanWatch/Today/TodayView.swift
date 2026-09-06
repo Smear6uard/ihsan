@@ -87,7 +87,7 @@ struct TodayView: View {
             Image(systemName: "location.slash.fill")
                 .font(.system(size: 30, weight: .light))
                 .foregroundStyle(IhsanColor.textMuted)
-            Text("Location is needed to show prayer times")
+            Text("Allow Ihsan in Settings → Privacy & Security → Location Services, then try again.")
                 .font(.system(size: 13))
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
@@ -110,7 +110,7 @@ struct TodayView: View {
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(3)
-            Button("Retry") {
+            Button("Try again") {
                 Task { await viewModel?.bootstrap() }
             }
             .font(.system(size: 12, weight: .medium))

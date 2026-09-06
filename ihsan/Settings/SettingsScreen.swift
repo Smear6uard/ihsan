@@ -138,7 +138,13 @@ struct SettingsScreen: View {
                                 confirmingDeleteAllData = true
                             }
                         )
-                        AboutSection(openURL: openURL)
+                        AboutSection(
+                            openURL: openURL,
+                            onPrivacyPolicy: {
+                                Haptics.impact(.light)
+                                path.append(.privacyPolicy)
+                            }
+                        )
                     } else {
                         ProgressView()
                             .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
@@ -209,7 +215,7 @@ struct SettingsScreen: View {
                 .presentationDragIndicator(.visible)
         }
         .confirmationDialog(
-            "Pause prayer tracking?",
+            "Enable Pause Mode?",
             isPresented: $confirmingPauseEnable,
             titleVisibility: .visible
         ) {
@@ -236,7 +242,7 @@ struct SettingsScreen: View {
             Button("Delete All Data", role: .destructive, action: deleteAllData)
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("This removes prayer, remembrance, fasting, Khatam, reflection, pause, travel, and makeup records; local voice memos; summaries; and preferences from this device.")
+            Text("This removes prayer, remembrance, fasting, Khatam, reflection, pause, travel, and makeup records; local voice memos; summaries; your saved masjid and its prayer times; and preferences from this device. It also cancels all pending reminders.")
         }
         .sheet(item: $exportItem) { item in
             ActivityView(activityItems: [item.url])
@@ -332,6 +338,8 @@ struct SettingsScreen: View {
                 masjid: (try? MyMasjid.fetchOrCreate(in: modelContext)) ?? MyMasjid(),
                 settings: settings
             )
+        case .privacyPolicy:
+            PrivacyPolicyScreen()
         }
     }
 
@@ -401,21 +409,24 @@ struct SettingsScreen: View {
             return
         }
 
-        automaticLocationMessage = "Requesting Always Location Access…"
+        automaticLocationMessage = "Asking for location access…"
         Task {
             do {
-                let authorization = try await locationCoordinator.requestAlwaysAuthorization()
-                guard authorization == .authorizedAlways else {
+                // The same when-in-use grant the plate holds. Updates
+                // arrive while the app is open; nothing runs between
+                // sessions, and the app never asks for Always.
+                let authorization = try await locationCoordinator.requestWhenInUseAuthorization()
+                guard authorization.isAuthorized else {
                     settings.automaticLocationUpdatesEnabled = false
                     settings.modifiedAt = .now
-                    automaticLocationMessage = "Allow Always Location Access to update while you travel"
+                    automaticLocationMessage = "Allow location access in iOS Settings"
                     Haptics.notification(.warning)
                     return
                 }
                 try await locationCoordinator.startMonitoringSignificantChanges()
                 settings.automaticLocationUpdatesEnabled = true
                 settings.modifiedAt = .now
-                automaticLocationMessage = "Updates when your location changes"
+                automaticLocationMessage = "While Ihsan is open"
             } catch let error as LocationError {
                 settings.automaticLocationUpdatesEnabled = false
                 settings.modifiedAt = .now
@@ -433,7 +444,7 @@ struct SettingsScreen: View {
 
     private func refreshLocation(for settings: UserSettings) {
         Haptics.impact(.light)
-        refreshMessage = "Refreshing location..."
+        refreshMessage = "Refreshing location…"
         Task {
             do {
                 _ = try await locationCoordinator.requestWhenInUseAuthorization()
@@ -462,6 +473,14 @@ struct SettingsScreen: View {
             settings.notificationsEnabled = false
             settings.modifiedAt = .now
             notificationStatusMessage = "Prayer notifications are off"
+            // Repair's nightly intention line is scheduled outside the
+            // prayer scheduler; the master switch withdraws it too.
+            if settings.qadaDailyIntentionEnabled {
+                settings.qadaDailyIntentionEnabled = false
+                UNUserNotificationCenter.current().removePendingNotificationRequests(
+                    withIdentifiers: [RepairViewModel.intentionReminderIdentifier]
+                )
+            }
             return
         }
 
@@ -521,10 +540,10 @@ struct SettingsScreen: View {
 
         let locationAuthorization = await locationCoordinator.currentAuthorization()
         if settings.automaticLocationUpdatesEnabled,
-           locationAuthorization != .authorizedAlways {
+           !locationAuthorization.isAuthorized {
             settings.automaticLocationUpdatesEnabled = false
             settings.modifiedAt = .now
-            automaticLocationMessage = "Allow Always Location Access for automatic updates"
+            automaticLocationMessage = "Allow location access in iOS Settings"
             await locationCoordinator.stopMonitoringSignificantChanges()
         }
     }
@@ -674,11 +693,17 @@ struct SettingsScreen: View {
             try deleteAll(AdhkarSession.self)
             try deleteAll(KhatamEntry.self)
             try deleteAll(KhatamPlan.self)
+            // The one stored coordinate goes with everything else.
+            try deleteAll(MyMasjid.self)
             try deleteAll(UserSettings.self)
             _ = try UserSettings.fetchOrCreate(in: modelContext)
             try modelContext.save()
             ReflectionAudioPaths.deleteAllVoiceMemos()
             AdhkarReminderPreferenceStore.isEnabled = false
+            // Everything this app ever scheduled, not only what the
+            // prayer scheduler knows about — Repair's intention line
+            // and the wake fallbacks included.
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
             Task {
                 await NotificationScheduler.shared.cancelAllScheduledNotifications()
                 await WakeAnchorService.shared.refresh(using: modelContext)
@@ -716,6 +741,7 @@ private enum SettingsRoute: Hashable {
     case duhaWindow
     case adhkarWindows
     case myMasjid
+    case privacyPolicy
 
     #if DEBUG
     init?(debugName: String) {
@@ -728,6 +754,7 @@ private enum SettingsRoute: Hashable {
         case "duhaWindow": self = .duhaWindow
         case "adhkarWindows": self = .adhkarWindows
         case "myMasjid": self = .myMasjid
+        case "privacyPolicy": self = .privacyPolicy
         default: return nil
         }
     }
@@ -819,10 +846,10 @@ private struct LocationSection: View {
             )
 
             SettingsRow(
-                title: "Automatic location updates",
+                title: "Update as I travel",
                 subtitle: automaticLocationMessage
                     ?? (settings.automaticLocationUpdatesEnabled
-                        ? "Updates when your location changes"
+                        ? "While Ihsan is open"
                         : "Off"),
                 glyph: .location
             ) {
@@ -832,7 +859,7 @@ private struct LocationSection: View {
                 ))
                 .labelsHidden()
                 .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                .accessibilityLabel("Automatic location updates")
+                .accessibilityLabel("Update prayer times as I travel, while Ihsan is open")
             }
 
             SettingsRow(
@@ -849,7 +876,7 @@ private struct LocationSection: View {
     }
 
     private var currentCitySubtitle: String {
-        latestPlace?.countryCode ?? settings.lastResolvedCountryCode ?? "City resolves after location refresh"
+        latestPlace?.countryCode ?? settings.lastResolvedCountryCode ?? "Not yet resolved"
     }
 }
 
@@ -992,7 +1019,7 @@ private struct NotificationsSection: View {
                 }
 
                 SettingsRow(
-                    title: "Notification sound",
+                    title: "Adhan",
                     subtitle: soundSummary,
                     glyph: .adhan,
                     action: {
@@ -1028,7 +1055,7 @@ private struct NotificationsSection: View {
     /// "Chime" when every prayer agrees, "Mixed" when they do not — so
     /// the row never claims a single answer that isn't true.
     private var soundSummary: String {
-        let sounds = Set(Prayer.allCases.map { settings.sound(for: $0) })
+        let sounds = Set(Prayer.allCases.map { settings.sound(for: $0).effectiveChoice(using: .mainBundle) })
         guard sounds.count == 1, let only = sounds.first else { return "Mixed" }
         return only.displayName
     }
@@ -1068,7 +1095,7 @@ private struct PauseModeSection: View {
             if let activePause {
                 SettingsRow(
                     title: "Expected end",
-                    subtitle: "Nothing ends without you",
+                    subtitle: "A marker only; your pause ends when you end it",
                     glyph: .calendar
                 ) {
                     Toggle("", isOn: Binding(
@@ -2090,7 +2117,7 @@ private struct PrivacySection: View {
 
     var body: some View {
         SettingsSectionCard("Privacy") {
-            SettingsDescriptionText("Ihsan stores your prayer log on this device and syncs eligible records only across your own Apple devices through your private iCloud database. No analytics, no third-party services, no accounts. Your location is used to calculate prayer times and is never stored — only your city name is saved for display. Voice recordings stay on this device.")
+            SettingsDescriptionText("Ihsan stores your prayer log on this device and syncs eligible records only across your own Apple devices through your private iCloud database. No analytics, no accounts, no third-party SDKs. Your location is used to calculate prayer times and is never stored — only your city and country are saved for display, and a masjid you set as yours keeps its position. Voice recordings stay on this device.")
 
             SettingsRow(
                 title: "Export prayer & reflection data",
@@ -2111,6 +2138,14 @@ private struct PrivacySection: View {
 
 private struct AboutSection: View {
     let openURL: OpenURLAction
+    let onPrivacyPolicy: () -> Void
+
+    /// The muezzin is credited once his recording is actually in the
+    /// build — either the notification takbīrāt or the full call.
+    private var adhanRecordingShips: Bool {
+        AdhanPlayer.isAvailable
+            || AdhanSoundFileResolver.mainBundle.fileExists(AdhanAsset.takbirat)
+    }
 
     var body: some View {
         SettingsSectionCard("About") {
@@ -2121,13 +2156,14 @@ private struct AboutSection: View {
             ) {
                 EmptyView()
             }
-            SettingsRow(title: "Photography credits", subtitle: "Sunrise and Maghrib wallpaper sources pending", glyph: .info) { EmptyView() }
-            SettingsRow(title: "Audio credits", subtitle: "Adhan recited by Hisham Mohammed Rahmath", glyph: .voiceWaves) { EmptyView() }
+            if adhanRecordingShips {
+                SettingsRow(title: "Audio credits", subtitle: "Adhan recited by Hisham Mohammed Rahmath", glyph: .voiceWaves) { EmptyView() }
+            }
             SettingsRow(
                 title: "Fiqh content credits",
-                subtitle: "ihsan-fiqh-config public repo",
+                subtitle: "Sources on GitHub",
                 glyph: .book,
-                action: { openURL(URL(string: "https://github.com/sameerstudios/ihsan-fiqh-config")!) }
+                action: { openURL(URL(string: "https://github.com/Smear6uard/ihsan-fiqh-config")!) }
             )
             // Required Apple Weather attribution: the trademark line
             // and the legal link, quiet in the inscription register.
@@ -2140,10 +2176,10 @@ private struct AboutSection: View {
             SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", glyph: .heart) { EmptyView() }
             SettingsRow(
                 title: "Privacy policy",
-                subtitle: "Hosted policy URL pending before App Store submission",
                 glyph: .privacy,
-                action: { openURL(URL(string: "https://sameerstudios.github.io/ihsan/privacy")!) }
+                action: onPrivacyPolicy
             )
+            .accessibilityHint("Opens the policy inside the app.")
         }
     }
 }
@@ -2691,11 +2727,11 @@ private struct AdhanSoundPicker: View {
                     prayerRow(prayer)
 
                     if expandedPrayer == prayer {
-                        ForEach(AdhanSoundCatalog.options(for: prayer), id: \.self) { option in
+                        ForEach(AdhanSoundCatalog.options(for: prayer, using: resolver), id: \.self) { option in
                             optionRow(
                                 title: option.displayName,
-                                subtitle: subtitle(for: option),
-                                isSelected: settings.sound(for: prayer) == option
+                                subtitle: option.settingsDescription,
+                                isSelected: settings.sound(for: prayer).effectiveChoice(using: resolver) == option
                             ) {
                                 settings.setSound(option, for: prayer)
                                 settings.modifiedAt = .now
@@ -2706,40 +2742,46 @@ private struct AdhanSoundPicker: View {
                 }
             }
 
-            SettingsSectionCard("The full call") {
-                SettingsDescriptionText(fullAdhanDescription)
+            // The in-app player exists only once the full recording is
+            // in the bundle. Until then the section is absent — not
+            // greyed, not explained — so nothing in Set promises a call
+            // the app cannot make.
+            if AdhanPlayer.isAvailable {
+                SettingsSectionCard("The full call") {
+                    SettingsDescriptionText("A notification tone can only be thirty seconds long, so the whole adhan plays here in the app — and from the notification, if you tap Play the adhan.")
 
-                SettingsRow(
-                    title: player.isPlaying ? "Stop" : "Play",
-                    glyph: .adhan,
-                    action: {
-                        Haptics.impact(.light)
-                        if player.isPlaying {
-                            player.stop()
-                        } else {
-                            player.play(overridesSilentSwitch: settings.adhanPlaysInSilentMode)
+                    SettingsRow(
+                        title: player.isPlaying ? "Stop" : "Play",
+                        glyph: .adhan,
+                        action: {
+                            Haptics.impact(.light)
+                            if player.isPlaying {
+                                player.stop()
+                            } else {
+                                player.play(overridesSilentSwitch: settings.adhanPlaysInSilentMode)
+                            }
                         }
+                    )
+
+                    if let failure = player.lastFailure {
+                        SettingsDescriptionText(failure)
                     }
-                )
 
-                if let failure = player.lastFailure {
-                    SettingsDescriptionText(failure)
+                    SettingsRow(title: "Play adhan even in silent mode", glyph: .adhan) {
+                        Toggle("", isOn: Binding(
+                            get: { settings.adhanPlaysInSilentMode },
+                            set: {
+                                settings.adhanPlaysInSilentMode = $0
+                                settings.modifiedAt = .now
+                            }
+                        ))
+                        .labelsHidden()
+                        .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
+                        .accessibilityLabel("Play adhan even in silent mode")
+                    }
+
+                    SettingsDescriptionText("Off by default. When the ringer switch is off, the adhan stays quiet like everything else.")
                 }
-
-                SettingsRow(title: "Play adhan even in silent mode", glyph: .adhan) {
-                    Toggle("", isOn: Binding(
-                        get: { settings.adhanPlaysInSilentMode },
-                        set: {
-                            settings.adhanPlaysInSilentMode = $0
-                            settings.modifiedAt = .now
-                        }
-                    ))
-                    .labelsHidden()
-                    .tint(IhsanPageChrome.tokens(at: NowProvider.active.now()).leafGold)
-                    .accessibilityLabel("Play adhan even in silent mode")
-                }
-
-                SettingsDescriptionText("Off by default. When the ringer switch is off, the adhan stays quiet like everything else.")
             }
 
             SettingsSectionCard("Focus") {
@@ -2768,7 +2810,7 @@ private struct AdhanSoundPicker: View {
     private func prayerRow(_ prayer: Prayer) -> some View {
         SettingsRow(
             title: prayer.displayNameEnglish,
-            subtitle: settings.sound(for: prayer).displayName,
+            subtitle: settings.sound(for: prayer).effectiveChoice(using: resolver).displayName,
             glyph: .adhan,
             action: {
                 Haptics.impact(.light)
@@ -2778,24 +2820,6 @@ private struct AdhanSoundPicker: View {
             }
         )
         .accessibilityHint(expandedPrayer == prayer ? "Collapses the choices" : "Shows the choices")
-    }
-
-    /// Says plainly when an option is standing in for a recording that
-    /// has not landed, rather than letting two rows sound identical
-    /// with no explanation.
-    private func subtitle(for option: AdhanSoundCatalog) -> String {
-        if option.awaitsRecording(using: resolver) {
-            return "Recording not in this build yet — plays the chime"
-        }
-        return option.settingsDescription
-    }
-
-    private var fullAdhanDescription: String {
-        let base = "A notification tone can only be thirty seconds long, so the whole adhan plays here in the app — and from the notification, if you tap Play the adhan."
-        guard AdhanPlayer.isAvailable else {
-            return base + " The recording is not in this build yet."
-        }
-        return base
     }
 
     private func rebuildSchedule() {
@@ -2876,6 +2900,7 @@ private func optionRow(
     }) {
         SettingsSelectionRing(isSelected: isSelected)
     }
+    .accessibilityAddTraits(isSelected ? .isSelected : [])
     .accessibilityHint(isSelected ? "Selected" : "Double tap to select")
 }
 

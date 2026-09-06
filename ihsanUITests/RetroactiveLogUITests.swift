@@ -38,7 +38,11 @@ final class RetroactiveLogUITests: XCTestCase {
         if allow.waitForExistence(timeout: 4) {
             allow.tap()
         }
-        let retry = app.buttons["Continue"]
+        // Today's location gate asks with "Allow location" while the
+        // system has not asked yet ("Continue" was its old label).
+        let retry = app.buttons.matching(
+            NSPredicate(format: "label == 'Allow location' OR label == 'Continue'")
+        ).firstMatch
         if retry.waitForExistence(timeout: 2) {
             retry.tap()
             if allow.waitForExistence(timeout: 4) {

@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 import SwiftData
 import IhsanCore
 import IhsanIntents
@@ -9,6 +10,8 @@ import IhsanPrayerTimes
 @MainActor
 @Observable
 final class TodayViewModel {
+    private static let logger = Logger(subsystem: "com.sameerstudios.ihsan.watchkitapp", category: "TodayViewModel")
+
     var state: TodayState = .loading
 
     private let locationProvider: LocationProviding
@@ -140,7 +143,7 @@ final class TodayViewModel {
             try? await refreshSnapshot()
         } catch {
             WatchHaptics.failure()
-            print("setStatus failed on watch: \(error)")
+            Self.logger.error("setStatus failed on watch: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -152,7 +155,7 @@ final class TodayViewModel {
             try? await refreshSnapshot()
         } catch {
             WatchHaptics.failure()
-            print("toggleJamaah failed on watch: \(error)")
+            Self.logger.error("toggleJamaah failed on watch: \(String(describing: error), privacy: .public)")
         }
     }
 

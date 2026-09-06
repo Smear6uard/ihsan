@@ -13,7 +13,7 @@ public enum LocationError: Error, Sendable, Equatable {
         case .permissionNotDetermined:
             return "Location access has not been set up yet."
         case .permissionDenied:
-            return "Location access is denied. Enable it in Settings."
+            return "Location access is off for Ihsan. Allow it in iOS Settings."
         case .permissionRestricted:
             return "Location access is restricted on this device."
         case .locationUnavailable:

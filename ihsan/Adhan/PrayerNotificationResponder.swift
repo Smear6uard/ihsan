@@ -10,10 +10,10 @@ import UserNotifications
 ///
 /// Two jobs:
 ///
-///   * register the prayer category so every prayer notification
-///     carries a "Play the adhan" action — the full recording is longer
-///     than a notification tone may be, so hearing it always means the
-///     app running;
+///   * register the prayer category — carrying a "Play the adhan"
+///     action once the full recording is in the bundle, since the full
+///     call is longer than a notification tone may be and hearing it
+///     always means the app running;
 ///   * honour the person's per-prayer sound choice when a notification
 ///     lands while the app is already open, instead of letting iOS
 ///     decide.
@@ -30,14 +30,20 @@ final class PrayerNotificationResponder: NSObject {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
 
-        let play = UNNotificationAction(
-            identifier: NotificationCategory.playAdhanAction,
-            title: "Play the adhan",
-            options: [.foreground]
-        )
+        // The Play action exists only while the full recording is in the
+        // bundle; an action that opens the app to silence is worse than
+        // no action.
+        var actions: [UNNotificationAction] = []
+        if AdhanPlayer.isAvailable {
+            actions.append(UNNotificationAction(
+                identifier: NotificationCategory.playAdhanAction,
+                title: "Play the adhan",
+                options: [.foreground]
+            ))
+        }
         let prayer = UNNotificationCategory(
             identifier: NotificationCategory.prayer,
-            actions: [play],
+            actions: actions,
             intentIdentifiers: [],
             options: []
         )

@@ -71,10 +71,14 @@ struct QiblaView: View {
             Image(systemName: "location.slash")
                 .font(.system(size: 24, weight: .light))
                 .foregroundStyle(IhsanColor.textMuted)
-            Text("Location is needed to compute qibla")
+            Text("Allow Ihsan in Settings → Privacy & Security → Location Services, then try again.")
                 .font(.system(size: 12))
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
+            Button("Try again") {
+                Task { await viewModel.bootstrap() }
+            }
+            .font(.system(size: 12, weight: .medium))
         }
         .padding(.horizontal, 8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -90,6 +94,10 @@ struct QiblaView: View {
                 .foregroundStyle(IhsanColor.textSecondary)
                 .multilineTextAlignment(.center)
                 .lineLimit(4)
+            Button("Try again") {
+                Task { await viewModel.bootstrap() }
+            }
+            .font(.system(size: 11, weight: .medium))
         }
         .padding(8)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

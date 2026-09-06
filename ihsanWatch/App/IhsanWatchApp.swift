@@ -1,3 +1,4 @@
+import OSLog
 import SwiftUI
 import SwiftData
 import IhsanCore
@@ -15,7 +16,8 @@ struct IhsanWatchApp: App {
         do {
             modelContainer = try IhsanModelContainerFactory.makeContainer()
         } catch {
-            print("Falling back to in-memory ModelContainer on watch: \(error)")
+            Logger(subsystem: "com.sameerstudios.ihsan.watchkitapp", category: "Launch")
+                .error("Falling back to in-memory ModelContainer on watch: \(String(describing: error), privacy: .public)")
             do {
                 modelContainer = try IhsanModelContainerFactory.makeContainer(inMemory: true)
             } catch {

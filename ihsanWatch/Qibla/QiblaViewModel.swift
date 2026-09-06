@@ -23,7 +23,7 @@ final class QiblaViewModel {
 
     func bootstrap() async {
         do {
-            let auth = await locationProvider.currentAuthorization()
+            let auth = try await locationProvider.requestWhenInUseAuthorization()
             guard auth.isAuthorized else {
                 state = .needsLocationPermission
                 return
