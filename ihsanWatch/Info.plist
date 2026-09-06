@@ -20,6 +20,8 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>Ihsan calculates your prayer times and qibla direction from your current location. Coordinates are never stored or shared.</string>
 	<key>WKApplication</key>
@@ -28,11 +30,5 @@
 	<string>com.sameerstudios.ihsan</string>
 	<key>WKWatchOnly</key>
 	<false/>
-	<key>WKBackgroundModes</key>
-	<array>
-		<string>location</string>
-	</array>
-	<key>WKSupportsLocationTracking</key>
-	<true/>
 </dict>
 </plist>
