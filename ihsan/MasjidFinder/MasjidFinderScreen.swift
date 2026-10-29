@@ -54,12 +54,15 @@ struct MasjidFinderScreen: View {
             Text(replacementMessage)
         }
         .sheet(isPresented: $isEditingTimes) {
-            if let masjid = MyMasjid.fetchExisting(in: modelContext),
-               let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
-                NavigationStack {
-                    MyMasjidEditorScreen(masjid: masjid, settings: settings)
+            Group {
+                if let masjid = MyMasjid.fetchExisting(in: modelContext),
+                   let settings = try? UserSettings.fetchOrCreate(in: modelContext) {
+                    NavigationStack {
+                        MyMasjidEditorScreen(masjid: masjid, settings: settings)
+                    }
                 }
             }
+            .preferredColorScheme(.dark)
         }
     }
 

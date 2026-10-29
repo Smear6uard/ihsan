@@ -154,13 +154,16 @@ struct RootTabView: View {
                 isDhikrPresented = false
                 clearDeeplink(forKey: StartTasbihIntent.deeplinkUserDefaultsKey)
             })
+            .preferredColorScheme(.dark)
         }
         #if DEBUG
         .fullScreenCover(isPresented: $isWidgetGalleryPresented) {
             WidgetFaceGallery()
+                .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $isAdhkarTypeGalleryPresented) {
             AdhkarTypeGalleryScreen(onDismiss: { isAdhkarTypeGalleryPresented = false })
+                .preferredColorScheme(.dark)
         }
         #endif
     }

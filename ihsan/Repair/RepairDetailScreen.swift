@@ -112,39 +112,49 @@ struct RepairDetailScreen: View {
             }
         }
         .sheet(isPresented: $showingMultiAdd) {
-            if let viewModel {
-                RepairMultiAddSheet(
-                    viewModel: viewModel,
-                    categories: openLedgers.compactMap(\.category),
-                    tokens: tokens
-                )
-                .presentationDetents([.medium])
-                .presentationDragIndicator(.visible)
-            }
-        }
-        .sheet(isPresented: $showingAdjust) {
-            if let viewModel {
-                RepairAdjustSheet(
-                    viewModel: viewModel,
-                    ledgers: orderedLedgers,
-                    tokens: tokens
-                )
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-            }
-        }
-        .sheet(isPresented: $showingFastingEstimator) {
-            if let viewModel {
-                RepairFastingEstimatorSheet(viewModel: viewModel, tokens: tokens)
+            Group {
+                if let viewModel {
+                    RepairMultiAddSheet(
+                        viewModel: viewModel,
+                        categories: openLedgers.compactMap(\.category),
+                        tokens: tokens
+                    )
                     .presentationDetents([.medium])
                     .presentationDragIndicator(.visible)
+                }
             }
+            .preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $showingAdjust) {
+            Group {
+                if let viewModel {
+                    RepairAdjustSheet(
+                        viewModel: viewModel,
+                        ledgers: orderedLedgers,
+                        tokens: tokens
+                    )
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                }
+            }
+            .preferredColorScheme(.dark)
+        }
+        .sheet(isPresented: $showingFastingEstimator) {
+            Group {
+                if let viewModel {
+                    RepairFastingEstimatorSheet(viewModel: viewModel, tokens: tokens)
+                        .presentationDetents([.medium])
+                        .presentationDragIndicator(.visible)
+                }
+            }
+            .preferredColorScheme(.dark)
         }
         .fullScreenCover(item: Binding(
             get: { viewModel?.zeroEvent },
             set: { viewModel?.zeroEvent = $0 }
         )) { event in
             RepairZeroMoment(event: event, tokens: tokens)
+                .preferredColorScheme(.dark)
         }
         .environment(\.colorScheme, tokens.prefersDarkChrome ? .dark : .light)
     }
