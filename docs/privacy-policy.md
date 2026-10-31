@@ -42,8 +42,9 @@ masjid removes it.
 Ihsan makes four kinds of requests. Three go to Apple: reverse
 geocoding turns coordinates into a city name; the nearby-masjid search
 sends your position to Apple Maps only while that sheet is open; a
-weather reading paints the living sky, only while it is switched on in
-Set → Display. The fourth fetches a small file of prayer thresholds and
+weather reading, only while something in the app uses it: the living
+sky (Set → Display, off by default) or the weather duas (Set → Adhkār,
+on by default). The fourth fetches a small file of prayer thresholds and
 reflection prompts from the developer's public GitHub repository; the
 same file ships inside the app, so nothing depends on it.
 

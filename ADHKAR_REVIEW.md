@@ -1,6 +1,10 @@
 # ADHKĀR — REVIEW REQUEST
 
-**Status: DRAFT — PENDING SCHOLAR REVIEW.**
+**Status: RELEASED AHEAD OF SIGN-OFF.** On 28 Oct 2026 the maintainer
+set `"reviewStatus": "reviewed"` on the reviewer's commitment to sign,
+so release builds now show every text below. The sign-off at the end
+of this document is still owed, and each of the 25 references flagged
+for verification still needs checking against a printed copy.
 
 This document is generated from the app's single content file,
 `Packages/IhsanCore/Sources/IhsanCore/Resources/adhkar-content.json`
@@ -68,9 +72,11 @@ anything ships.
 
 The app will not show any of this in a release build while the
 content file reads `"reviewStatus": "draft"`. `AdhkarAvailability`
-enforces it in code, and `AdhkarReviewGateTests` enforces that the
-enforcement exists. When this document is signed, the maintainer
-changes that one field to `"reviewed"`.
+enforces it in code. The field now reads `"reviewed"`: it was opened
+ahead of the signature below, and `AdhkarReviewGateTests` pins that
+state. Setting it back to `"draft"` closes the gate again. When this
+document is signed, bump `contentVersion` and rewrite the content
+file's `reviewNote` to say so.
 
 ---
 

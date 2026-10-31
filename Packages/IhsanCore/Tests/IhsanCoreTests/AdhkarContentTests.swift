@@ -150,34 +150,33 @@ struct AdhkarContentTests {
     }
 }
 
-/// The scholar-review gate. Its whole value is that it cannot be
-/// forgotten, so it is asserted from both ends: the file is draft, and
-/// a draft file is invisible to a release build.
+/// The scholar-review gate, opened. The maintainer cleared it on
+/// 28 Oct 2026 on the reviewer's commitment to sign, ahead of the
+/// signature itself, so the file says so rather than claiming a review
+/// that has not been recorded. Setting `reviewStatus` back to `draft`
+/// closes the gate again; these expectations then fail and point here.
 @Suite("Adhkar review gate")
 struct AdhkarReviewGateTests {
 
-    @Test("The shipped content is still marked draft")
-    func contentIsDraft() throws {
+    @Test("The shipped content is open, and says it is ahead of sign-off")
+    func contentIsReleasedAheadOfSignOff() throws {
         let content = try #require(BundledAdhkar.content)
         #expect(
-            content.reviewStatus == .draft,
-            "The content file claims review is complete. If a scholar has signed ADHKAR_REVIEW.md, delete this expectation deliberately in the same commit."
+            content.reviewStatus == .reviewed,
+            "The content file is back to draft. If that was deliberate, restore the draft expectations in the same commit."
         )
-        #expect(content.reviewNote.contains("PENDING SCHOLAR REVIEW"))
+        #expect(
+            content.reviewNote.contains("ahead of the signed review"),
+            "Once ADHKAR_REVIEW.md is signed, rewrite the note and this expectation together."
+        )
     }
 
-    /// The gate, exercised. A DEBUG build keeps the surfaces so the
-    /// maintainer can review them on device; a release build has no
-    /// adhkar at all while the file is draft.
-    @Test("Draft content is unavailable in a release build")
-    func draftIsGated() {
-        #if DEBUG
+    /// Reviewed content is offered in every build, and nothing anywhere
+    /// says DRAFT.
+    @Test("Reviewed content is available in every build")
+    func reviewedIsAvailable() {
         #expect(AdhkarAvailability.isAvailable)
-        #expect(AdhkarAvailability.isShowingDraftContent)
-        #else
-        #expect(!AdhkarAvailability.isAvailable)
         #expect(!AdhkarAvailability.isShowingDraftContent)
-        #endif
     }
 }
 

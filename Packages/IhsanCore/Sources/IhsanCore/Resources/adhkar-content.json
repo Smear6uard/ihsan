@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contentVersion": "2026.08.09-draft.1",
-  "reviewStatus": "draft",
-  "reviewNote": "DRAFT — PENDING SCHOLAR REVIEW. Every text in this file was transcribed from the well-known authentic morning/evening, post-prayer, sleep, and occasioned adhkar (including the weather supplications for rain, after rain, wind, and thunder) as attested in al-Bukhari, Muslim, Abu Dawud, al-Tirmidhi, Malik's Muwatta and gathered in Hisn al-Muslim. Nothing here was composed, paraphrased, shortened, or reworded by software. It has NOT yet been read by a scholar. While this field reads 'draft' the app shows none of it in a release build. The review request, item by item, is ADHKAR_REVIEW.md at the repository root. Clear this gate only after a qualified reviewer has signed that document.",
+  "reviewStatus": "reviewed",
+  "reviewNote": "Released ahead of the signed review: on 28 Oct 2026 the maintainer opened the gate on the reviewer's commitment to sign ADHKAR_REVIEW.md. Every text in this file was transcribed from the well-known authentic morning/evening, post-prayer, sleep, and occasioned adhkar (including the weather supplications for rain, after rain, wind, and thunder) as attested in al-Bukhari, Muslim, Abu Dawud, al-Tirmidhi, Malik's Muwatta and gathered in Hisn al-Muslim. Nothing here was composed, paraphrased, shortened, or reworded by software. The sign-off block in ADHKAR_REVIEW.md is still owed, and every reference marked needsVerification still needs checking against a printed copy. Setting this field back to 'draft' hides all of it from a release build again.",
   "items": [
     {
       "id": "morning.ayat-al-kursi",

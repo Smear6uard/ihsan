@@ -122,12 +122,14 @@ struct AdhkarReviewArtifactTests {
         )
     }
 
-    @Test("The document says the content is draft, because it is")
-    func documentCarriesTheDraftStatus() throws {
+    /// The gate is open ahead of the signature. The document says
+    /// exactly that, so nobody reads an open gate as a finished review.
+    @Test("The document says the gate opened ahead of sign-off, because it did")
+    func documentCarriesTheReleaseStatus() throws {
         let document = try reviewDocument
         let status = try content.reviewStatus
-        #expect(document.contains("DRAFT — PENDING SCHOLAR REVIEW"))
-        #expect(status == "draft")
+        #expect(document.contains("RELEASED AHEAD OF SIGN-OFF"))
+        #expect(status == "reviewed")
     }
 
     /// The document explains the gate and names the code that enforces

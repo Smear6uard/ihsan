@@ -42,9 +42,10 @@ the developer runs, because there isn't one.
 3. **The weather reading**, to Apple Weather via WeatherKit — coordinates
    in, the current conditions out. It happens only while something is
    actually asking for weather: the Living sky toggle in Set → Display
-   (off by default), or the weather duas in the remembrance layer. With
-   both off, `WeatherInterest` reports no interested consumer and the
-   request is never made.
+   (off by default), or the weather duas in the remembrance layer (on by
+   default since the adhkār gate opened on 28 Oct 2026, so a fresh
+   install does make this request). With both off, `WeatherInterest`
+   reports no interested consumer and the request is never made.
 
    The coordinates are used to scope the one request and discarded with
    it — `WeatherKitSkyProvider` retains, persists, and logs nothing. What

@@ -20,16 +20,27 @@ final class AppStoreShotsUITests: XCTestCase {
     private static let afternoon = "2026-07-30T15:10:00"
 
     /// A month of logged days, so Path and Repair show a life rather
-    /// than an empty grid.
-    private static let seededMonth = [
-        "fajr:onTime:-1", "dhuhr:onTime:-1", "asr:late:-1", "maghrib:onTime:-1", "isha:onTime:-1",
-        "fajr:onTime:-2", "dhuhr:onTime:-2", "asr:onTime:-2", "maghrib:onTime:-2", "isha:late:-2",
-        "fajr:late:-3", "dhuhr:onTime:-3", "asr:onTime:-3", "maghrib:onTime:-3", "isha:onTime:-3",
-        "fajr:onTime:-4", "dhuhr:onTime:-4", "asr:onTime:-4", "maghrib:onTime:-4", "isha:onTime:-4",
-        "fajr:onTime:-5", "dhuhr:late:-5", "asr:onTime:-5", "maghrib:onTime:-5", "isha:onTime:-5",
-        "fajr:onTime:-6", "dhuhr:onTime:-6", "asr:onTime:-6", "maghrib:onTime:-6", "isha:onTime:-6",
-        "fajr:onTime:0", "dhuhr:onTime:0", "asr:onTime:0"
-    ].joined(separator: ";")
+    /// than an empty grid: four weeks, mostly on time, a few delayed,
+    /// and a few left unrecorded the way a real month is.
+    private static let seededMonth: String = {
+        let prayers = ["fajr", "dhuhr", "asr", "maghrib", "isha"]
+        var specs: [String] = []
+        for day in 1...27 {
+            for (index, prayer) in prayers.enumerated() {
+                let roll = (day * 7 + index * 3) % 23
+                if roll == 0 { continue }
+                specs.append("\(prayer):\(roll < 3 ? "late" : "onTime"):-\(day)")
+            }
+        }
+        specs += ["fajr:onTime:0", "dhuhr:onTime:0", "asr:onTime:0"]
+        return specs.joined(separator: ";")
+    }()
+
+    /// The same month with today's Dhuhr and Asr still open.
+    private static let seededMonthBeforeDhuhr = seededMonth
+        .split(separator: ";")
+        .filter { !$0.hasPrefix("dhuhr:onTime:0") && !$0.hasPrefix("asr:onTime:0") }
+        .joined(separator: ";")
 
     private let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
 
@@ -53,12 +64,15 @@ final class AppStoreShotsUITests: XCTestCase {
             "-IhsanDebugLogPrayer", Self.seededMonth
         ])
 
-        // 3. Logging: the two axes, with an open window.
+        // 3. Logging: the two axes, with an open window and the
+        // answer being given. Dhuhr is left unlogged so the sheet opens
+        // fresh — a seeded log lands after the sheet has read its
+        // state, which framed "Save Changes" over an empty choice.
         capture("store-3-logging", arguments: [
             "-IhsanNowOverride", Self.afternoon,
-            "-IhsanDebugLogPrayer", Self.seededMonth,
+            "-IhsanDebugLogPrayer", Self.seededMonthBeforeDhuhr,
             "-IhsanDebugPresentLogSheet", "dhuhr"
-        ], settle: 3.5)
+        ], settle: 3.5, tapLabelPrefix: "On Time")
 
         // 4. Repair — the makeup thread.
         capture("store-4-repair", arguments: [
@@ -75,12 +89,14 @@ final class AppStoreShotsUITests: XCTestCase {
             "-IhsanDebugPresentQibla"
         ], settle: 3.5)
 
-        // 6. The nightstand face.
-        capture("store-6-standby", arguments: [
+        // 6. Path — the month as a pattern, not a score. (This frame
+        // used to be the debug widget gallery, scrolled until one of
+        // its section labels sat under the status bar clock.)
+        capture("store-6-path", arguments: [
             "-IhsanNowOverride", Self.night,
             "-IhsanDebugLogPrayer", Self.seededMonth,
-            "-IhsanDebugWidgetGallery"
-        ], settle: 3.5, scrollsToBottom: true)
+            "-IhsanDebugTab", "trajectory"
+        ], settle: 3.5)
     }
 
     @MainActor
@@ -88,12 +104,16 @@ final class AppStoreShotsUITests: XCTestCase {
         _ name: String,
         arguments: [String],
         settle: TimeInterval = 3.0,
-        scrollsToBottom: Bool = false
+        tapLabelPrefix: String? = nil
     ) {
         let app = XCUIApplication()
         app.launchArguments = [
             "-IhsanDebugCompletedOnboarding",
-            "-IhsanDebugResetStore"
+            "-IhsanDebugResetStore",
+            // The store shows what ships: no layer still behind its
+            // review gate (the adhkār texts, and with them the weather
+            // duas) may appear in a frame.
+            "-IhsanDebugShippingGates"
         ] + arguments
         app.launch()
 
@@ -111,11 +131,12 @@ final class AppStoreShotsUITests: XCTestCase {
         }
         Thread.sleep(forTimeInterval: settle)
 
-        if scrollsToBottom {
-            for _ in 0..<4 {
-                app.swipeUp(velocity: .fast)
-                Thread.sleep(forTimeInterval: 0.4)
-            }
+        if let tapLabelPrefix {
+            let control = app.buttons
+                .matching(NSPredicate(format: "label BEGINSWITH %@", tapLabelPrefix))
+                .firstMatch
+            XCTAssertTrue(control.waitForExistence(timeout: 10), "Missing \(tapLabelPrefix)")
+            control.tap()
             Thread.sleep(forTimeInterval: 1.0)
         }
 

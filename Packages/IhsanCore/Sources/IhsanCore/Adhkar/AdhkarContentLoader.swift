@@ -157,7 +157,10 @@ public enum AdhkarAvailability {
             return true
         case .draft:
             #if DEBUG
-            return true
+            // `-IhsanDebugShippingGates` shows a debug build exactly
+            // what a release build shows. The App Store screenshots are
+            // captured under it, so they never picture a gated layer.
+            return !ProcessInfo.processInfo.arguments.contains("-IhsanDebugShippingGates")
             #else
             return false
             #endif

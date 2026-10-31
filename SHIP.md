@@ -45,6 +45,15 @@ an app, not just personal use. App Review spot-checks audio provenance.
 
 ### 2. The scholar's eyes
 
+**The adhkār gate is already open.** On 28 Oct 2026 the maintainer set
+`"reviewStatus": "reviewed"` on the reviewer's commitment to sign, so a
+release build now ships the remembrance layer and the weather duas.
+Do not upload until the sign-off block at the end of `ADHKAR_REVIEW.md`
+is filled in and the 25 references marked `needsVerification` have been
+checked against a printed copy. If the signature does not come, set the
+field back to `"draft"`: one line, and the layer disappears from
+release again.
+
 The app never rules, and the places it comes closest to a ruling want a
 second reading:
 
@@ -107,7 +116,9 @@ names.
    field. The same text is inside the app at Set → About → Privacy
    policy, so the in-app requirement is already met; only the metadata
    field needs the link. The old `sameerstudios.github.io/ihsan/privacy`
-   address does not resolve — do not reuse it.
+   address does not resolve — do not reuse it. The repository is
+   public, so `https://github.com/Smear6uard/ihsan/blob/main/docs/privacy-policy.md`
+   works today; GitHub Pages on the same repository gives a cleaner one.
 1. **Version.** `MARKETING_VERSION = 1.0.0`, `CURRENT_PROJECT_VERSION = 1`.
 2. **Archive.** `xcodebuild archive -scheme ihsan -destination
    'generic/platform=iOS'` succeeds. Re-run with real signing, and
@@ -120,9 +131,12 @@ names.
 3. **App Privacy.** Answer from `docs/app-privacy.md`. The short
    version: **no data collected**, no tracking, no third-party SDKs.
    That answer is true, and the manifest says the same.
-4. **Screenshots.** Six frames in `docs/app-store/`, captions in
-   `docs/app-store-captions.md`. Regenerate at 6.9" against an
-   iPhone 17 Pro Max destination before uploading.
+4. **Screenshots.** Six frames in `docs/app-store/`, regenerated at
+   6.9" (1320 × 2868) on iPhone 17 Pro Max with a pinned 9:41 status
+   bar, 28 Oct 2026. Frame 6 is now Path; it used to be the debug
+   widget gallery with a section label under the status bar clock.
+   App Store Connect has no caption field — `docs/app-store-captions.md`
+   says what to do with the lines written there.
 5. **Review notes.** The "Notes for App Review" section of
    `docs/app-privacy.md` covers religious-content provenance, the
    on-device model's scope, AlarmKit, and why there is no background
@@ -133,6 +147,17 @@ names.
    background `fetch` + `remote-notification`, and the BGTaskScheduler
    identifier `com.sameerstudios.ihsan.refresh-notifications`. Sign in
    with Apple is intentionally not used.
+
+   **WeatherKit has two checkboxes, and both are required.** In
+   Certificates, Identifiers & Profiles → Identifiers →
+   `com.sameerstudios.ihsan`, tick WeatherKit under **Capabilities**
+   and again under **App Services**, then save. App Store Connect has
+   no WeatherKit switch. Allow up to about half an hour before the
+   first request authenticates; until then every fetch fails, and the
+   plate silently paints its idealized sky. 500,000 calls a month are
+   included in the membership. The required attribution (the
+   Weather mark and the legal link) is in Set → Display beside the
+   Living sky switch, and again in Set → About.
 7. **Platforms.** The app targets iPhone only
    (`TARGETED_DEVICE_FAMILY = 1`, portrait). On iPad, Mac, and Vision
    Pro it runs in iPhone-compatibility mode; if any of those should not
