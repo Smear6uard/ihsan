@@ -133,7 +133,8 @@ names.
    That answer is true, and the manifest says the same.
 4. **Screenshots.** Six frames in `docs/app-store/`, regenerated at
    6.9" (1320 × 2868) on iPhone 17 Pro Max with a pinned 9:41 status
-   bar, 28 Oct 2026. Frame 6 is now Path; it used to be the debug
+   bar, 30 Oct 2026, after the status bar fix merged (the daytime
+   logging frame shows the dark clock and the lighter sheet dim). Frame 6 is now Path; it used to be the debug
    widget gallery with a section label under the status bar clock.
    App Store Connect has no caption field — `docs/app-store-captions.md`
    says what to do with the lines written there.
