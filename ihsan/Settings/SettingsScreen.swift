@@ -166,6 +166,10 @@ struct SettingsScreen: View {
             }
             .toolbar(.hidden, for: .navigationBar)
         }
+        // Set lives in the window, whose scheme follows the sky; the
+        // system switch would draw its off track from that light scheme
+        // by day, white on these cards. Pushed pickers inherit it.
+        .toggleStyle(IhsanSwitchToggleStyle())
         .task {
             bootstrapSettings()
             latestPlace = locationCoordinator.mostRecentResolvedPlace()

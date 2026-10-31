@@ -1458,16 +1458,19 @@ logs are retained in build/launch-verification/ (ignored by git).
   a glance day and night and no fleck lands in a label. Still owed:
   the arm's-length photo of each, and whether the day keyline reads as
   snow or as bubbles on a real panel.
-- **The status bar is white on the day pages.** The app pins
-  `.preferredColorScheme(.dark)` at the root, so on Path, Reflect, and
-  Set by day the clock and battery are white on near-white (about
-  1.3:1), and on the Today sky about 1.9:1. Flipping the window's
-  scheme with the sky fixes the bar but is not enough on its own: every
-  sheet and full-screen cover inherits the window's scheme, and by day
-  the log sheet's "In Jamāʿah" switch went white-on-white. The fix that
-  holds is the flip plus `.preferredColorScheme(.dark)` on the content
-  of each of the 32 presentations, with a source sweep to keep new
-  ones honest. Tried and backed out of this pass for its reach.
+- **The status bar now follows the sky — check it on a real panel.**
+  The window's scheme goes light while the zenith's luminance is above
+  0.179 (`StatusBarInk`), so the clock and battery are dark by day on
+  Today, Path, Reflect and Set and white at night. Every sheet and cover
+  pins `.dark` (`PresentationColorSchemeTests` sweeps for it), so sheet
+  content is unchanged. Three things follow the window by day and want
+  a look on device: the system dim behind a page sheet is lighter (the
+  sky still reads as day under it); confirmation dialogs and alerts are
+  light glass; and Set's switches are drawn by the app
+  (`IhsanSwitchToggleStyle`), because the system switch read its off
+  track from the light window and went white on Set's cards. Check the
+  drawn switch's tap feel against the system one, and the flip at
+  sunrise and maghrib, when the bar changes ink within a minute.
 - **The header no longer runs into the Dhuhr ornament.** The plate
   now yields to the header's measured height
   (`TodayCompositionMetrics.measuredHeaderHeight`); a long Hijri month
