@@ -58,16 +58,21 @@ struct KhatamDetailScreen: View {
             }
             .presentationDetents([.large])
             .presentationDragIndicator(.visible)
+            .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingSettings) {
-            if let plan = activePlan {
-                KhatamPlanSettingsSheet(plan: plan)
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
+            Group {
+                if let plan = activePlan {
+                    KhatamPlanSettingsSheet(plan: plan)
+                        .presentationDetents([.medium, .large])
+                        .presentationDragIndicator(.visible)
+                }
             }
+            .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $showingSetup) {
             KhatamSetupFlow()
+                .preferredColorScheme(.dark)
         }
         .overlay {
             if let completed = plans.first(where: {

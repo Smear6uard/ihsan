@@ -94,16 +94,19 @@ struct ReflectionScreen: View {
             }
         }
         .sheet(item: $presentedReflection) { reflection in
-            if let viewModel {
-                ReflectionDetailSheet(
-                    tokens: IhsanPageChrome.tokens(at: nowProvider.now()),
-                    reflection: reflection,
-                    isPlaybackActive: viewModel.playback.activeMemoID == reflection.voiceMemoID,
-                    isPlaybackPlaying: isPlaybackPlayingForCurrentSheet(viewModel: viewModel, reflection: reflection),
-                    playbackCurrentTime: viewModel.playback.currentTime,
-                    onTogglePlayback: { viewModel.togglePlayback(for: reflection) }
-                )
+            Group {
+                if let viewModel {
+                    ReflectionDetailSheet(
+                        tokens: IhsanPageChrome.tokens(at: nowProvider.now()),
+                        reflection: reflection,
+                        isPlaybackActive: viewModel.playback.activeMemoID == reflection.voiceMemoID,
+                        isPlaybackPlaying: isPlaybackPlayingForCurrentSheet(viewModel: viewModel, reflection: reflection),
+                        playbackCurrentTime: viewModel.playback.currentTime,
+                        onTogglePlayback: { viewModel.togglePlayback(for: reflection) }
+                    )
+                }
             }
+            .preferredColorScheme(.dark)
         }
     }
 

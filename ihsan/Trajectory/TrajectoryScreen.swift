@@ -268,6 +268,7 @@ struct TrajectoryScreen: View {
         }
         .sheet(item: $retroSelection) { selection in
             retroLogSheet(for: selection)
+                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingMasjidFinder) {
             // Only the resolved city name travels here, never a
@@ -279,28 +280,34 @@ struct TrajectoryScreen: View {
             .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
             .presentationBackground(.thinMaterial)
+            .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
+                .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $showingKhatamSetup) {
             KhatamSetupFlow(prefersRamadan: true)
+                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingRepairDetail) {
             RepairDetailScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingKhatamDetail) {
             KhatamDetailScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .preferredColorScheme(.dark)
         }
         .sheet(item: $sharePreview) { payload in
             PatternSharePreviewSheet(payload: payload)
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+                .preferredColorScheme(.dark)
         }
         .alert("The image could not be prepared", isPresented: $shareRenderError) {
             Button("OK", role: .cancel) {}

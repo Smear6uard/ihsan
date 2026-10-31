@@ -77,7 +77,11 @@ struct IhsanApp: App {
         WindowGroup {
             RootGate()
                 .environment(\.nowProvider, nowProvider)
-                .preferredColorScheme(.dark)
+                // Every surface is drawn for a dark window, whatever
+                // the window itself says; only the status bar follows
+                // the sky (`StatusBarInk`).
+                .environment(\.colorScheme, .dark)
+                .background { StatusBarInk(nowProvider: nowProvider) }
                 .task {
                     // Pre-warm the location coordinator so authorization and
                     // significant-change monitoring are ready by the time Today appears.
@@ -89,6 +93,43 @@ struct IhsanApp: App {
                 }
         }
         .modelContainer(modelContainer)
+    }
+}
+
+/// The window's color scheme, which decides one thing the app does not
+/// draw itself: the ink of the status bar.
+///
+/// The app paints its own palettes from `IhsanPageChrome` and reads
+/// `.dark` from the environment everywhere, so the window is free to
+/// follow the sky. It goes light while the zenith is bright enough
+/// that black ink out-contrasts white — relative luminance 0.179 is
+/// the crossover — so the clock and battery read dark on the day
+/// grounds of Path, Reflect and Settings and on Today's sky, instead
+/// of white at about 1.3:1.
+///
+/// The price: UIKit presentations take the WINDOW's traits, not the
+/// environment. Unpinned, a sheet by day goes light-glass and the log
+/// sheet's off "In Jamāʿah" switch goes white-on-white. So every
+/// `.sheet`, `.fullScreenCover` and `.popover` pins
+/// `.preferredColorScheme(.dark)` on its content, and
+/// `PresentationColorSchemeTests` holds that line. Two things cannot
+/// take a pin and do follow the window by day, by design: the system
+/// dim behind a page sheet (lighter, so the sky still reads as day)
+/// and confirmation dialogs and alerts (light glass).
+private struct StatusBarInk: View {
+    let nowProvider: NowProvider
+
+    var body: some View {
+        TimelineView(.everyMinute) { context in
+            Color.clear
+                .preferredColorScheme(Self.scheme(at: nowProvider.resolve(context.date)))
+        }
+    }
+
+    static func scheme(at date: Date) -> ColorScheme {
+        IhsanPageChrome.tokens(at: date).skyZenithValue.relativeLuminance > 0.179
+            ? .light
+            : .dark
     }
 }
 

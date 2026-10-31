@@ -563,6 +563,7 @@ private struct TodayReadyView: View {
                     now: now,
                     resolution: resolution
                 )
+                .preferredColorScheme(.dark)
             }
             .sheet(item: $khatamLogRequest) { request in
                 KhatamLogSheet(
@@ -575,6 +576,7 @@ private struct TodayReadyView: View {
                 ) { _ in }
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $isCelestialReferencePresented) {
                 QiblaScreen(
@@ -584,9 +586,11 @@ private struct TodayReadyView: View {
                 )
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+                .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $isHijriSheetPresented) {
                 hijriMonthSheet
+                    .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $isMasjidFinderPresented) {
                 MasjidFinderScreen(
@@ -595,9 +599,11 @@ private struct TodayReadyView: View {
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+                .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $isYesterdaySheetPresented) {
                 yesterdaySheet(at: now)
+                    .preferredColorScheme(.dark)
             }
             .sheet(isPresented: $isRemembrancePresented, onDismiss: applyPendingRemembrance) {
                 RemembranceSheet(
@@ -610,6 +616,7 @@ private struct TodayReadyView: View {
                     tokens: tokens,
                     onSelect: { pendingRemembrance = $0 }
                 )
+                .preferredColorScheme(.dark)
             }
             // Widget taps: the router already switched to this tab;
             // the destination sheet is presented here, through the
@@ -642,6 +649,7 @@ private struct TodayReadyView: View {
                     showsTransliteration: sunnahSettings?.adhkarShowsTransliteration ?? true,
                     onDismiss: { adhkarSelection = nil }
                 )
+                .preferredColorScheme(.dark)
             }
             .confirmationDialog(
                 "After the prayer",

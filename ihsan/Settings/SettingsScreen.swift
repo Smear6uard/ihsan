@@ -206,14 +206,17 @@ struct SettingsScreen: View {
         }
         .fullScreenCover(isPresented: $showingRepairSetup) {
             RepairSetupFlow()
+                .preferredColorScheme(.dark)
         }
         .fullScreenCover(isPresented: $showingKhatamSetup) {
             KhatamSetupFlow()
+                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingKhatamDetail) {
             KhatamDetailScreen()
                 .presentationDetents([.large])
                 .presentationDragIndicator(.visible)
+                .preferredColorScheme(.dark)
         }
         .confirmationDialog(
             "Enable Pause Mode?",
@@ -248,6 +251,7 @@ struct SettingsScreen: View {
         .sheet(item: $exportItem) { item in
             ActivityView(activityItems: [item.url])
                 .presentationDetents([.medium, .large])
+                .preferredColorScheme(.dark)
         }
         .alert("Export failed", isPresented: Binding(
             get: { exportError != nil },
@@ -263,6 +267,7 @@ struct SettingsScreen: View {
                 .presentationDetents([.medium])
                 .presentationDragIndicator(.visible)
                 .presentationBackground(.thinMaterial)
+                .preferredColorScheme(.dark)
         }
         #endif
     }
