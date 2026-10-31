@@ -198,7 +198,9 @@ struct CelestialPlateScene: View {
                     horizonY: plate.horizonY,
                     plateHeight: plate.rect.height,
                     probe: probe,
-                    weather: weather
+                    weather: weather,
+                    weatherClearings: weather == .clear ? [] : knockoutRects(plate: plate),
+                    weatherTopY: plate.rect.minY
                 )
 
                 atmosphere(
@@ -373,7 +375,7 @@ struct CelestialPlateScene: View {
         sun: SolarPosition,
         apexAltitude: Double
     ) {
-        let strength = solarBloomStrength(altitudeDegrees: sun.altitude)
+        let strength = solarBloomStrength(altitudeDegrees: sun.altitude) * weather.bloomDamping
         guard strength > 0.005 else { return }
 
         let center = plate.bodyPosition(
@@ -436,6 +438,7 @@ struct CelestialPlateScene: View {
             * submergedPresence(altitudeDegrees: moon.altitude)
             * lunarDaylightPresence(sunAltitudeDegrees: sun.altitude)
             * lunarDeference(plate: plate, sun: sun, moon: moon, apexAltitude: apexAltitude)
+            * weather.bodyVeil
         guard strength > 0.005 else { return }
 
         let center = plate.bodyPosition(
@@ -931,6 +934,11 @@ struct CelestialPlateScene: View {
             submergedPresence(altitudeDegrees: moon.altitude)
                 * lunarDaylightPresence(sunAltitudeDegrees: sun.altitude)
                 * lunarDeference(plate: plate, sun: sun, moon: moon, apexAltitude: apexAltitude)
+                // Half the veil on the disc: a cream disc taken to 0.55
+                // over the night ground went flat gray, a dead moon
+                // rather than one behind cloud. Its bloom takes the
+                // full veil, so the glow is what the cloud takes away.
+                * (0.5 + 0.5 * weather.bodyVeil)
         )
         .position(
             plate.bodyPosition(
@@ -941,7 +949,10 @@ struct CelestialPlateScene: View {
         )
 
         LuminousBody(kind: .sun, diameter: Self.sunDiameter, tokens: tokens)
-            .opacity(sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise))
+            .opacity(
+                sunPresence(altitudeDegrees: sun.altitude, beforeSunrise: beforeSunrise)
+                    * weather.bodyVeil
+            )
             .position(
                 plate.bodyPosition(
                     altitudeDegrees: sun.altitude,

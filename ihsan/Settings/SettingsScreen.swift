@@ -157,6 +157,7 @@ struct SettingsScreen: View {
                 .padding(.horizontal, IhsanSpacing.md)
                 .padding(.top, IhsanSpacing.md)
             }
+            .ihsanStatusBarEdge()
             .ihsanManuscriptPage()
             .navigationDestination(for: SettingsRoute.self) { route in
                 if let settings {
@@ -2001,7 +2002,28 @@ private struct DisplaySection: View {
                     .accessibilityLabel("Living sky")
             }
             SettingsDescriptionText("Paints the current weather onto the Today plate in the manuscript's own language — washes, engraved hatching, a grayer page — always behind the instrument. When the sky is unknown, the plate keeps its idealized day.")
+            WeatherAttributionRow()
         }
+    }
+}
+
+/// The WeatherKit attribution: the Apple Weather mark, set as the
+/// trademark is written (the row's subtitle register uppercases, so
+/// the mark is the title), and the legal page listing the other data
+/// sources. Shown beside the Living sky switch, where weather is
+/// turned on, and again in About.
+private struct WeatherAttributionRow: View {
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        SettingsRow(
+            title: "\u{F8FF} Weather",
+            subtitle: "Data sources",
+            glyph: .sun,
+            action: { openURL(URL(string: "https://weatherkit.apple.com/legal-attribution.html")!) }
+        )
+        .accessibilityLabel("Apple Weather, data sources")
+        .accessibilityHint("Opens the Apple Weather legal attribution page.")
     }
 }
 
@@ -2165,14 +2187,7 @@ private struct AboutSection: View {
                 glyph: .book,
                 action: { openURL(URL(string: "https://github.com/Smear6uard/ihsan-fiqh-config")!) }
             )
-            // Required Apple Weather attribution: the trademark line
-            // and the legal link, quiet in the inscription register.
-            SettingsRow(
-                title: "Weather data",
-                subtitle: "Apple Weather",
-                glyph: .sun,
-                action: { openURL(URL(string: "https://weatherkit.apple.com/legal-attribution.html")!) }
-            )
+            WeatherAttributionRow()
             SettingsRow(title: "Made as sadaqah jariyah by Sameer Studios LLC", glyph: .heart) { EmptyView() }
             SettingsRow(
                 title: "Privacy policy",

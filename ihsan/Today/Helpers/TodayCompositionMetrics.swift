@@ -20,11 +20,29 @@ struct TodayCompositionMetrics: Equatable {
     let safeAreaBottom: CGFloat
     let cardHeight: CGFloat
     let hasDuhaCard: Bool
+    /// The header's laid-out height below the safe area, top padding
+    /// included — measured, because the header grows: a long Hijri
+    /// month wraps the date line, and the weather, yesterday, and
+    /// significant-day notes each add a line. Zero until measured.
+    var measuredHeaderHeight: CGFloat = 0
 
     /// Vertical room the header occupies below the safe area. The plate
     /// keeps its arc, markers, and labels clear of this band; the
-    /// atmosphere still fills the frame behind it.
+    /// atmosphere still fills the frame behind it. This is the floor;
+    /// a taller header pushes the plate down (see `headerZone`).
     static let headerZoneHeight: CGFloat = 92
+    /// How far the header may reach past the plate's top edge. The
+    /// apex marker sits a little below that edge — closest at
+    /// midsummer, when Dhuhr's sun is highest — so the header gets
+    /// only a hairline of it. Two notes stacked under a wrapped date
+    /// used to run straight into the Dhuhr ornament.
+    static let headerOverreach: CGFloat = 8
+
+    /// The band the plate leaves to the header: the designed zone, or
+    /// the header's real height when it has grown past it.
+    var headerZone: CGFloat {
+        max(Self.headerZoneHeight, measuredHeaderHeight - Self.headerOverreach)
+    }
     /// Bottom padding under the focused card (IhsanSpacing.md).
     static let cardBottomPadding: CGFloat = IhsanSpacing.md
     /// Optical gap between the plate's marker zone and the card.
@@ -54,7 +72,7 @@ struct TodayCompositionMetrics: Equatable {
     static let horizonScreenFraction: CGFloat = 0.65
 
     var plateTopInset: CGFloat {
-        safeAreaTop + Self.headerZoneHeight
+        safeAreaTop + headerZone
     }
 
     var plateBottomInset: CGFloat {

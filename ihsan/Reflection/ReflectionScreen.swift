@@ -203,6 +203,7 @@ struct ReflectionScreen: View {
             }
             .padding(.top, IhsanSpacing.md)
         }
+        .ihsanStatusBarEdge()
     }
 
     // MARK: - Header

@@ -249,18 +249,31 @@ struct TodayHeader: View {
         foreground: Color
     ) -> some View {
         let hijri = HijriDateFormatter.string(from: now)
-        let combined: String = {
-            if let nextInscription {
-                return "\(hijri) · \(nextInscription)"
-            }
-            return hijri
-        }()
 
-        Text(combined)
+        // One line when it fits. When it does not — a long month like
+        // Jumada al-Ula does not — break at the separator, so the date
+        // and the next prayer each stay whole instead of the time
+        // wrapping alone onto a second line.
+        if let nextInscription {
+            ViewThatFits(in: .horizontal) {
+                inscriptionText("\(hijri) · \(nextInscription)", foreground: foreground)
+                    .fixedSize(horizontal: true, vertical: false)
+                VStack(alignment: .leading, spacing: 3) {
+                    inscriptionText(hijri, foreground: foreground)
+                    inscriptionText(nextInscription, foreground: foreground)
+                }
+            }
+        } else {
+            inscriptionText(hijri, foreground: foreground)
+        }
+    }
+
+    private func inscriptionText(_ text: String, foreground: Color) -> some View {
+        Text(text)
             .font(.system(size: 10, weight: .semibold).smallCaps())
             .tracking(1.4)
             .foregroundStyle(foreground)
-            .lineLimit(2)
+            .lineLimit(1)
             .minimumScaleFactor(0.7)
             .inkKeyline(tokens)
     }

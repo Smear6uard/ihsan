@@ -70,6 +70,15 @@ public struct CelestialSkyView: View {
     /// story whenever weather is off, unknown, stale, or unapproved —
     /// renders the idealized page byte for byte.
     public let weather: SkyWeatherTreatment
+    /// Where falling weather — rain hatching, snow — is never drawn:
+    /// the plate's ornaments and their labels, in this view's
+    /// coordinates. A white fleck inside "MAGHRIB" reads as a broken
+    /// letter, not as snow.
+    public let weatherClearings: [CGRect]
+    /// Falling weather fades in across this line rather than running
+    /// up through the header's inscriptions, where a stray fleck reads
+    /// as punctuation. `nil` lets it fill the whole sky.
+    public let weatherTopY: CGFloat?
 
     @Environment(\.accessibilityReduceMotion) private var systemReduceMotion
     @Environment(\.accessibilityReduceTransparency) private var systemReduceTransparency
@@ -88,7 +97,9 @@ public struct CelestialSkyView: View {
         plateHeight: CGFloat? = nil,
         starSeed: UInt64 = 0x1A5F_0426,
         probe: FrameTimeProbe? = nil,
-        weather: SkyWeatherTreatment = .clear
+        weather: SkyWeatherTreatment = .clear,
+        weatherClearings: [CGRect] = [],
+        weatherTopY: CGFloat? = nil
     ) {
         self.phase = phase
         self.sunAltitudeDegrees = sunAltitudeDegrees
@@ -99,6 +110,8 @@ public struct CelestialSkyView: View {
         self.starSeed = starSeed
         self.probe = probe
         self.weather = weather
+        self.weatherClearings = weatherClearings
+        self.weatherTopY = weatherTopY
     }
 
     /// The only time-dependent term is the horizon glow's breathing;
@@ -128,7 +141,9 @@ public struct CelestialSkyView: View {
                     flat: reduceTransparency,
                     seed: starSeed,
                     dawnProgress: phase.dawnProgress,
-                    weather: weather
+                    weather: weather,
+                    weatherClearings: weatherClearings,
+                    weatherTopY: weatherTopY
                 )
                 probe?.record(CFAbsoluteTimeGetCurrent() - start)
             }
@@ -321,7 +336,9 @@ public struct CelestialSkyView: View {
         flat: Bool,
         seed: UInt64,
         dawnProgress: Double = 0,
-        weather: SkyWeatherTreatment = .clear
+        weather: SkyWeatherTreatment = .clear,
+        weatherClearings: [CGRect] = [],
+        weatherTopY: CGFloat? = nil
     ) {
         // The horizon band: ~8% of the *plate* height, inside the
         // spec's 6–10% window.
@@ -390,14 +407,16 @@ public struct CelestialSkyView: View {
             )
         }
 
-        // Star field — night only, two depth layers, fixed seed.
-        if nightness > 0.02 {
+        // Star field — night only, two depth layers, fixed seed. Cloud
+        // hides it in proportion to how much the weather veils the sky.
+        let starPresence = nightness * weather.starVisibility
+        if starPresence > 0.02 {
             drawStars(
                 into: &context,
                 size: size,
                 belowLimit: horizonY - bandHeight * 0.6,
                 color: tokens.inkValue.color,
-                nightness: nightness,
+                nightness: starPresence,
                 seed: seed
             )
         }
@@ -424,18 +443,22 @@ public struct CelestialSkyView: View {
                 size: size,
                 horizonY: horizonY,
                 tokens: tokens,
-                seed: seed
+                seed: seed,
+                clearings: weatherClearings,
+                topY: weatherTopY
             )
         }
 
-        // Snow: the gold-dust field's discipline in cool white.
-        if !flat, weather.showsSnowDust {
-            drawSnowDust(
+        // Snow: white-lead flecks on the grayed page, keylined by day.
+        if !flat, weather.showsSnowFlecks {
+            drawSnowFlecks(
                 into: &context,
                 size: size,
-                belowLimit: horizonY - bandHeight * 0.6,
+                horizonY: horizonY,
                 tokens: tokens,
-                seed: seed
+                seed: seed,
+                clearings: weatherClearings,
+                topY: weatherTopY
             )
         }
 
@@ -719,7 +742,9 @@ public struct CelestialSkyView: View {
         size: CGSize,
         horizonY: CGFloat,
         tokens: SkyPaletteTokens,
-        seed: UInt64
+        seed: UInt64,
+        clearings: [CGRect] = [],
+        topY: CGFloat? = nil
     ) {
         guard horizonY > 8 else { return }
         let count = Int((size.width * horizonY / rainHatchMarkArea).rounded())
@@ -736,6 +761,11 @@ public struct CelestialSkyView: View {
             let y = horizonY * pow(rng.unit(), 0.55)
             let length = 9.0 + rng.unit() * 5.0
             let presence = (0.35 + 0.65 * (y / horizonY)) * (0.7 + 0.3 * rng.unit())
+                * fallingMarkFade(y: y, topY: topY)
+            let bounds = CGRect(x: x - length * 0.28, y: y, width: length * 0.28, height: length)
+            guard presence > 0.01,
+                  !fallingMarkIsCleared(bounds, clearings: clearings)
+            else { continue }
             var stroke = Path()
             stroke.move(to: CGPoint(x: x, y: y))
             // One consistent slant, steeper than diagonal: drawn rain,
@@ -749,37 +779,84 @@ public struct CelestialSkyView: View {
         }
     }
 
-    /// Snow flecks: no brighter and no denser than the gold dust whose
-    /// discipline they borrow — pinned by `LivingSkyTreatmentTests`.
-    nonisolated static let snowDustPeakOpacity: Double = 0.15
-    nonisolated static let snowDustMarkArea: Double = 2_300
+    /// Snow flecks. The first calibration borrowed the gold dust's
+    /// discipline (0.15 peak, one fleck per 2,300 pt²) and on device it
+    /// was simply not there: invisible on the day field and
+    /// indistinguishable from the star field at night. Snow is the one
+    /// mark on the plate meant to be read as matter, so it is denser
+    /// than the dust, larger than the stars, and opaque enough to
+    /// register at arm's length — still static, still seeded, and still
+    /// clipped to the sky. Pinned by `LivingSkyTreatmentTests`.
+    nonisolated static let snowFleckPeakOpacity: Double = 0.82
+    nonisolated static let snowFleckMarkArea: Double = 620
+    nonisolated static let snowFleckRadius: ClosedRange<Double> = 0.9...2.4
+    /// White on a near-white field needs an edge. By day each fleck
+    /// carries a hairline in the engraving metal — the illuminator's
+    /// outline around white lead — fading out as the page darkens.
+    nonisolated static let snowFleckDayKeyline: Double = 0.30
 
-    /// The gold-dust field's discipline in cool white: sparse static
-    /// flecks, fixed seed, no fall, no twinkle.
-    private static func drawSnowDust(
+    /// White-lead snow: round flecks, a few large among many small,
+    /// thickening toward the horizon the way the rain hatching does.
+    /// Nothing falls, nothing twinkles.
+    private static func drawSnowFlecks(
         into context: inout GraphicsContext,
         size: CGSize,
-        belowLimit: CGFloat,
+        horizonY: CGFloat,
         tokens: SkyPaletteTokens,
-        seed: UInt64
+        seed: UInt64,
+        clearings: [CGRect] = [],
+        topY: CGFloat? = nil
     ) {
-        guard belowLimit > 4 else { return }
-        let count = max(6, Int((size.width * belowLimit / snowDustMarkArea).rounded()))
-        let tint = SRGBValue(red: 0.93, green: 0.96, blue: 1.0).color
+        guard horizonY > 8 else { return }
+        let count = Int((size.width * horizonY / snowFleckMarkArea).rounded())
+        let fill = SRGBValue(red: 0.97, green: 0.98, blue: 1.0).color
+        let keyline = tokens.metalValue.color
+        let keylineAlpha = snowFleckDayKeyline * tokens.daylightPresence
         var rng = SeededGenerator(state: seed ^ 0x2E9B_63C1_0D84_FA77)
+        var sky = context
+        sky.clip(to: Path(CGRect(x: 0, y: 0, width: size.width, height: horizonY)))
         for _ in 0..<count {
             let x = rng.unit() * size.width
-            let y = rng.unit() * belowLimit
-            let radius = 0.4 + rng.unit() * 0.6
-            let weight = 0.34 + 0.66 * pow(rng.unit(), 2.2)
-            context.fill(
-                Path(ellipseIn: CGRect(
-                    x: x - radius, y: y - radius,
-                    width: radius * 2, height: radius * 2
-                )),
-                with: .color(tint.opacity(snowDustPeakOpacity * weight))
+            let y = horizonY * pow(rng.unit(), 0.7)
+            let radius = snowFleckRadius.lowerBound
+                + pow(rng.unit(), 2.0) * (snowFleckRadius.upperBound - snowFleckRadius.lowerBound)
+            let presence = (0.55 + 0.45 * (y / horizonY)) * (0.6 + 0.4 * rng.unit())
+                * fallingMarkFade(y: y, topY: topY)
+            let bounds = CGRect(
+                x: x - radius, y: y - radius,
+                width: radius * 2, height: radius * 2
             )
+            guard presence > 0.01,
+                  !fallingMarkIsCleared(bounds, clearings: clearings)
+            else { continue }
+            let fleck = Path(ellipseIn: bounds)
+            sky.fill(fleck, with: .color(fill.opacity(snowFleckPeakOpacity * presence)))
+            if keylineAlpha > 0.01 {
+                sky.stroke(
+                    fleck,
+                    with: .color(keyline.opacity(keylineAlpha * presence)),
+                    lineWidth: 0.5
+                )
+            }
         }
+    }
+
+    /// Falling marks keep this far from every cleared form — the same
+    /// spacing the engraved filaments keep from the ornaments.
+    nonisolated static let fallingMarkClearance: CGFloat = 4
+    /// The fade band either side of `weatherTopY`.
+    nonisolated static let fallingMarkFadeBand: CGFloat = 28
+
+    private static func fallingMarkIsCleared(_ bounds: CGRect, clearings: [CGRect]) -> Bool {
+        let padded = bounds.insetBy(dx: -fallingMarkClearance, dy: -fallingMarkClearance)
+        return clearings.contains { $0.intersects(padded) }
+    }
+
+    /// 0 above the fade band, 1 below it, smoothstepped between.
+    private static func fallingMarkFade(y: CGFloat, topY: CGFloat?) -> Double {
+        guard let topY else { return 1 }
+        let t = min(max((y - (topY - fallingMarkFadeBand)) / (fallingMarkFadeBand * 2), 0), 1)
+        return Double(t * t * (3 - 2 * t))
     }
 
     private static func drawStars(

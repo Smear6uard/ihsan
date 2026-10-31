@@ -216,6 +216,7 @@ struct TrajectoryScreen: View {
             }
             .padding(.top, IhsanSpacing.md)
         }
+        .ihsanStatusBarEdge()
         .ihsanManuscriptPage()
         .onAppear {
             // The screen's clock is the injected provider — never the

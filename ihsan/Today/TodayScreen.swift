@@ -267,6 +267,9 @@ private struct TodayReadyView: View {
     /// long absence from the foreground.
     @State private var entranceProgress: Double = 0
     @State private var lastActiveAt: Date?
+    /// The header's laid-out height, handed to the composition metrics
+    /// so the plate yields when the header grows past its zone.
+    @State private var headerHeight: CGFloat = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var prayerNotificationRoute = PrayerNotificationRoute.shared
@@ -426,7 +429,8 @@ private struct TodayReadyView: View {
                     ) != nil,
                     accessibilityLayout: dynamicTypeSize.isAccessibilitySize
                 ),
-                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil
+                hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil,
+                measuredHeaderHeight: headerHeight
             )
 
             ZStack(alignment: .bottom) {
@@ -495,6 +499,9 @@ private struct TodayReadyView: View {
                     )
                     .padding(.horizontal, IhsanSpacing.md)
                     .padding(.top, IhsanSpacing.md)
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                        headerHeight = $0
+                    }
 
                     Spacer(minLength: 0)
                 }

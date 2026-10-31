@@ -84,9 +84,17 @@ public extension SkyWeatherTreatment {
     /// two gray pages. First calibration (0.80/0.70) measured ±2
     /// points of channel change on device frames — applied but
     /// unreadable; a gray day must be seen at a glance.
+    ///
+    /// Rain and snow gray the page too. Hatching drawn over a clear,
+    /// sunlit blue read as a sun shower, and white flecks drawn over
+    /// an ungrayed day field vanished into it: falling weather needs
+    /// the veiled sky it falls from. Both stay lighter than overcast —
+    /// rain is a softer gray, snow the bright white-gray of a snow sky.
     var valueCompression: Double {
         switch self {
-        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .clear, .partlyVeiled: 1.0
+        case .rain: 0.76
+        case .snow: 0.66
         case .overcast: 0.62
         case .storm: 0.52
         }
@@ -96,7 +104,8 @@ public extension SkyWeatherTreatment {
     /// overcast day is not only flatter, it is a shade darker.
     var grayPivotShift: Double {
         switch self {
-        case .clear, .partlyVeiled, .rain, .snow: 0
+        case .clear, .partlyVeiled: 0
+        case .rain, .snow: -0.01
         case .overcast: -0.015
         case .storm: -0.03
         }
@@ -106,7 +115,9 @@ public extension SkyWeatherTreatment {
     /// it is the same page with the color sky drawn through a veil.
     var chromaCalm: Double {
         switch self {
-        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .clear, .partlyVeiled: 1.0
+        case .rain: 0.68
+        case .snow: 0.45
         case .overcast: 0.55
         case .storm: 0.45
         }
@@ -117,7 +128,8 @@ public extension SkyWeatherTreatment {
     /// the horizon and the day's record stay at full presence.
     var metalQuiet: Double {
         switch self {
-        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .clear, .partlyVeiled: 1.0
+        case .rain, .snow: 0.92
         case .overcast: 0.85
         case .storm: 0.78
         }
@@ -137,13 +149,44 @@ public extension SkyWeatherTreatment {
     /// it warms the wash it sits behind.
     var bloomDamping: Double {
         switch self {
-        case .clear, .partlyVeiled, .rain, .snow: 1.0
+        case .clear, .partlyVeiled: 1.0
+        case .rain: 0.55
+        case .snow: 0.45
         case .overcast: 0.45
         case .storm: 0.30
         }
     }
 
+    /// How present the sun's and moon's discs are through the weather.
+    /// A veiled body is a pale disc, not a missing one: the sun is the
+    /// plate's hand on the day's clock, so it dims and never leaves.
+    /// The first gray pages left it blazing, which read as a sunny day
+    /// with a gray filter on it.
+    var bodyVeil: Double {
+        switch self {
+        case .clear, .partlyVeiled: 1.0
+        case .rain: 0.5
+        case .snow: 0.55
+        case .overcast: 0.55
+        case .storm: 0.35
+        }
+    }
+
+    /// How much of the star field shows through the weather. Cloud
+    /// that grays the day page hides the night's stars; under snow the
+    /// flecks take the stars' place entirely, so the two never read as
+    /// one field.
+    var starVisibility: Double {
+        switch self {
+        case .clear: 1.0
+        case .partlyVeiled: 0.75
+        case .overcast: 0.2
+        case .rain: 0.15
+        case .snow, .storm: 0
+        }
+    }
+
     var showsRainHatching: Bool { self == .rain || self == .storm }
-    var showsSnowDust: Bool { self == .snow }
+    var showsSnowFlecks: Bool { self == .snow }
     var showsCloudWashes: Bool { self == .partlyVeiled }
 }

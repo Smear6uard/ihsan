@@ -1446,3 +1446,33 @@ IhsanLocation 18/18 and IhsanNotifications 45/45 passed; ihsanWatch simulator
 build succeeded. Both icons are 1024 × 1024 with no alpha, and all four privacy
 manifests plus the app/watch plists pass syntax validation. Local verification
 logs are retained in build/launch-verification/ (ignored by git).
+
+## The launch design pass (28 Oct 2026)
+
+- **Rain and snow, recalibrated — re-judge the gates on device.** Rain
+  now grays the page (compression 0.76, chroma 0.68) and veils the sun
+  and moon to 0.5; snow grays it further toward white (0.66, chroma
+  0.45), veils the bodies to 0.55, hides the stars, and draws
+  white-lead flecks (peak 0.82, radius 0.9–2.4 pt, one per 620 pt²)
+  with a 0.30 metal keyline by day. On the simulator, snow now reads at
+  a glance day and night and no fleck lands in a label. Still owed:
+  the arm's-length photo of each, and whether the day keyline reads as
+  snow or as bubbles on a real panel.
+- **The status bar is white on the day pages.** The app pins
+  `.preferredColorScheme(.dark)` at the root, so on Path, Reflect, and
+  Set by day the clock and battery are white on near-white (about
+  1.3:1), and on the Today sky about 1.9:1. Flipping the window's
+  scheme with the sky fixes the bar but is not enough on its own: every
+  sheet and full-screen cover inherits the window's scheme, and by day
+  the log sheet's "In Jamāʿah" switch went white-on-white. The fix that
+  holds is the flip plus `.preferredColorScheme(.dark)` on the content
+  of each of the 32 presentations, with a source sweep to keep new
+  ones honest. Tried and backed out of this pass for its reach.
+- **The header no longer runs into the Dhuhr ornament.** The plate
+  now yields to the header's measured height
+  (`TodayCompositionMetrics.measuredHeaderHeight`); a long Hijri month
+  breaks the date line at its separator. Check on the smallest
+  supported phone with the weather line, yesterday's line, and a
+  significant-day line all showing at once — the plate gives up the
+  most height there.
+

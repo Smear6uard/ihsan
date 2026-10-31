@@ -63,7 +63,7 @@ extension SkyConditions.Kind {
     /// The provider's vocabulary, case for case. A condition this build
     /// has never heard of becomes `unknown`, which renders as the
     /// idealized sky.
-    init(_ condition: WeatherCondition) {
+    nonisolated init(_ condition: WeatherCondition) {
         switch condition {
         case .clear: self = .clear
         case .mostlyClear: self = .mostlyClear

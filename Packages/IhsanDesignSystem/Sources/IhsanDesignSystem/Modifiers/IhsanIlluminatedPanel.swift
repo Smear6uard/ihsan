@@ -112,7 +112,56 @@ public struct IhsanManuscriptPageModifier: ViewModifier {
     }
 }
 
+public struct IhsanStatusBarEdgeModifier: ViewModifier {
+    @Environment(\.timeOfDayOverride) private var override
+    /// The page's top edge in screen space — the height of the band
+    /// above it. Measured, because a scroll view hands its overlays no
+    /// top safe-area inset to grow into.
+    @State private var band: CGFloat = 0
+
+    /// How far below the status bar the ground fades to nothing.
+    static let fade: CGFloat = 18
+
+    public func body(content: Content) -> some View {
+        content
+            .onGeometryChange(for: CGFloat.self) { $0.frame(in: .global).minY } action: {
+                band = max(0, $0)
+            }
+            .overlay(alignment: .top) {
+                TimelineView(.periodic(from: .distantPast, by: 60)) { context in
+                    let ground = IhsanPageChrome
+                        .tokens(at: override ?? NowProvider.active.resolve(context.date))
+                        .pageGroundTopValue.color
+                    LinearGradient(
+                        stops: [
+                            .init(color: ground, location: 0),
+                            .init(color: ground, location: band / (band + Self.fade)),
+                            .init(color: ground.opacity(0), location: 1)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: band + Self.fade)
+                    .offset(y: -band)
+                }
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+    }
+}
+
 public extension View {
+    /// Keep what scrolls clear of the status bar. A top-level page has
+    /// no navigation bar, so the system draws no scroll edge effect
+    /// there and rows slid straight under the clock — "Current method"
+    /// printed through "9:41". (An empty `safeAreaBar` does not earn
+    /// one.) The page's own ground covers the status bar band and
+    /// fades out just below it. Apply to the page's root `ScrollView`,
+    /// on a page that starts at the top safe-area edge.
+    func ihsanStatusBarEdge() -> some View {
+        modifier(IhsanStatusBarEdgeModifier())
+    }
+
     /// Apply the quiet page ground. Use once per screen at the root.
     func ihsanManuscriptPage() -> some View {
         modifier(IhsanManuscriptPageModifier())
