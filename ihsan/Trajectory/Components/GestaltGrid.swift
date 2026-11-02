@@ -2,12 +2,12 @@ import SwiftUI
 import IhsanCore
 import IhsanDesignSystem
 
-/// The visual heart of the Path screen — a 5×N matrix of small marks
-/// that lets the user read their pattern of prayer at a glance,
-/// before any number is shown. The gestalt IS the headline: from
-/// arm's length a month of mixed states reads as a texture; on
-/// inspection each mark is one prayer on one day, speaking the
-/// plate's ornament-state language at dot scale:
+/// The Path's one picture of the period: a row per prayer, a column per
+/// day, and the same grid is the way into any single day.
+///
+/// From arm's length a month of mixed states reads as a texture; each
+/// mark is one prayer on one day, speaking the plate's ornament-state
+/// language at dot scale:
 ///
 /// - **On time** — the filled gilded form: leaf gold bounded by the
 ///   keyline.
@@ -19,49 +19,59 @@ import IhsanDesignSystem
 ///   scold.
 /// - **Qadā** — the lapis pigment bounded by metal, the sheet's own
 ///   made-up-later voice.
-/// - **Unlogged / future** — the faintest metal ring.
+/// - **No record** — the faintest metal ring.
+/// - **Not counted** — a small pip: today's prayers still to come, and
+///   the days before the record began. `PathTally.isCounted` decides,
+///   so the marks and the key's numbers cannot disagree.
 /// - **Excused pause** — a calm neutral dash across the whole
 ///   column: excluded, never negative.
-/// - **Travel** — the day's marks render normally and the column is
-///   footnoted with the engraved plane mark.
+/// - **Travel** — the day's marks render normally and a Travel row
+///   footnotes the column with the engraved plane mark.
 ///
-/// Five rows, Fajr at top through Isha at bottom. 7D/30D/90D give a
-/// column per day; YEAR gives a column per week (modal status).
+/// Every row is named at the left margin. A pattern nobody can read
+/// without being told which row is which was the first thing wrong with
+/// the card this replaces, along with having no way in: the same data
+/// was drawn a second time, flipped, thirty rows further down the page,
+/// because this one could not be touched.
 ///
-/// Beneath the fardh rows, and only when there is something in them,
-/// sit the two presence rows — NAFL and DHIKR — each named at the left
-/// margin where a row label belongs. Nothing switches them on: they
-/// follow the data, because the switches that used to govern them could
-/// be flipped without changing a single pixel.
+/// Tap a column, or drag across the grid, and the day card beneath
+/// follows. 7 / 30 / 90 days give a column per day; a year gives a
+/// column per week (modal status), and touching a week lands on its
+/// latest day. Beneath the fardh rows, and only when there is something
+/// in them, sit the Nafl and Dhikr presence rows.
 ///
-/// The rows share the fardh columns exactly: one `GestaltLayout`
-/// positions all seven, so a mark cannot land off-grid. They earn a
-/// label rather than a key underneath — a key names a mark, a label
-/// names a ROW, and what these needed was to be read as rows.
+/// All rows share one `GestaltLayout`, so a mark cannot land off-grid.
 struct GestaltGrid: View {
     let days: [DayCompletion]
     let period: TrajectoryPeriod
     /// Resolved page tokens — the grid never picks its own colors.
     let tokens: SkyPaletteTokens
     /// Days carrying any voluntary record. Non-nil when the sunnah
-    /// layer is on; it adds a sixth, quieter row beneath the five fardh
-    /// rows — presence only, no denominator, no figure.
-    ///
-    /// The row appears only if at least one day in the window actually
-    /// carries a record. There is no switch for it and there should not
-    /// be: the control this replaced could be toggled all day without
-    /// changing a pixel, because an overlay of nothing looks exactly
-    /// like no overlay.
+    /// layer is on; a row beneath the five fardh rows — presence only,
+    /// no denominator, no figure — appears only if at least one day in
+    /// the window actually carries a record.
     var naflDays: Set<Date>? = nil
     /// Days carrying a recorded tasbīḥ sitting — same quiet
     /// presence-only register, same appears-only-with-data rule.
     var dhikrDays: Set<Date>? = nil
+    /// The day of the earliest record anywhere. See `PathTally`.
+    var recordBegan: Date? = nil
+    /// The column the day card is showing. `nil` on the share image,
+    /// which has no day card and takes no touches.
+    var selectedColumn: Int? = nil
+    /// Spoken as the grid's value: what the selected day holds.
+    var selectionSummary: String? = nil
+    /// A touch resolved to a column.
+    var onSelectColumn: ((Int) -> Void)? = nil
+    /// VoiceOver's up and down swipes: +1 is a day later, -1 a day
+    /// earlier. Days rather than columns, so a year can still be walked.
+    var onStepDay: ((Int) -> Void)? = nil
 
     /// The label gutter and row height grow with the reader's type
-    /// size: a row label that clips is a row nobody can name, which is
-    /// the defect this card is being corrected for.
-    @ScaledMetric(relativeTo: .caption2) private var labelGutter: CGFloat = 46
-    @ScaledMetric(relativeTo: .caption2) private var labelHeight: CGFloat = 13
+    /// size: a row label that clips is a row nobody can name.
+    @ScaledMetric(relativeTo: .caption) private var labelGutter: CGFloat = 54
+    @ScaledMetric(relativeTo: .caption) private var labelHeight: CGFloat = 16
+    @ScaledMetric(relativeTo: .caption) private var axisHeight: CGFloat = 18
 
     /// One rendered column: the five-prayer slate plus the day-level
     /// state that colors it.
@@ -69,6 +79,8 @@ struct GestaltGrid: View {
         let slate: [PrayerCompletion]
         let isPaused: Bool
         let isTraveling: Bool
+        /// Whether a blank in this column counts as a gap.
+        let countsBlanks: Bool
     }
 
     var body: some View {
@@ -76,10 +88,12 @@ struct GestaltGrid: View {
             let layout = self.layout(availableWidth: proxy.size.width)
             let columns = self.columns
 
-            VStack(spacing: IhsanSpacing.sm) {
-                grid(columns: columns, layout: layout)
-                if columns.contains(where: \.isTraveling) {
-                    travelRow(columns: columns, layout: layout)
+            VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
+                touchable(layout: layout) {
+                    ZStack(alignment: .topLeading) {
+                        selectionBand(layout: layout)
+                        grid(columns: columns, layout: layout)
+                    }
                 }
                 timeAxis(layout: layout)
             }
@@ -88,47 +102,76 @@ struct GestaltGrid: View {
         .frame(height: patternHeight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityLabel)
+        .modifier(AdjustableSelection(
+            value: selectionSummary,
+            onStepDay: onStepDay
+        ))
     }
 
     /// The one layout every row on this card is positioned from.
-    ///
-    /// The gutter exists only when there is a row to name. A card with
-    /// no voluntary record in the window keeps its full width for the
-    /// pattern and shows no labels at all — pristine, which is the
-    /// state most cards are in.
     private func layout(availableWidth: CGFloat) -> GestaltLayout {
         GestaltLayout(
             period: period,
             availableWidth: availableWidth,
-            labelGutter: showsAnyPresenceRow ? labelGutter : 0,
-            labelHeight: showsAnyPresenceRow ? labelHeight : 0
+            labelGutter: labelGutter,
+            labelHeight: labelHeight
         )
     }
 
-    private var showsAnyPresenceRow: Bool { showsNaflRow || showsDhikrRow }
+    // MARK: - Touch
+
+    /// A tap picks a column; a horizontal drag scrubs across them. The
+    /// drag has to leave a vertical swipe to the page's scroll view, or
+    /// the card would be a dead patch in the middle of the screen — so
+    /// it is a pan that declines to begin unless it starts sideways.
+    @ViewBuilder
+    private func touchable<Content: View>(
+        layout: GestaltLayout,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        if let onSelectColumn {
+            content()
+                .contentShape(Rectangle())
+                .onTapGesture { location in
+                    onSelectColumn(layout.column(atX: location.x))
+                }
+                .gesture(HorizontalScrubGesture { x in
+                    onSelectColumn(layout.column(atX: x))
+                })
+        } else {
+            content()
+        }
+    }
+
+    /// The selected day, as a lit band through its column. Wider than
+    /// the column at the dense periods, where a column is three points
+    /// across and a band that size would not be seen.
+    @ViewBuilder
+    private func selectionBand(layout: GestaltLayout) -> some View {
+        if let selectedColumn {
+            let width = max(layout.pitch, 7)
+            RoundedRectangle(cornerRadius: min(width / 2, 7), style: .continuous)
+                .fill(tokens.metal.opacity(0.20))
+                .overlay {
+                    RoundedRectangle(cornerRadius: min(width / 2, 7), style: .continuous)
+                        .strokeBorder(Self.overlayMarkValue(for: tokens).color, lineWidth: 1)
+                }
+                .frame(width: width, height: gridHeight(layout: layout))
+                .offset(x: layout.prayerDotCenter(column: selectedColumn) - width / 2)
+                .accessibilityHidden(true)
+        }
+    }
 
     // MARK: - Row labels
 
-    /// Small caps at the left margin, where the fardh rows' own labels
-    /// would sit if the pattern named them. `inkSecondary`: present to
-    /// anyone who looks for it, quiet to anyone reading the texture.
     private func rowLabel(_ name: String, layout: GestaltLayout) -> some View {
         Text(name)
-            .font(IhsanFont.inscription)
-            .tracking(1.3)
+            .font(.system(.caption, weight: .medium))
             .foregroundStyle(tokens.inkSecondary)
             .lineLimit(1)
             .minimumScaleFactor(0.7)
-            .frame(
-                width: max(0, layout.labelGutter - Self.labelInset),
-                alignment: .trailing
-            )
-            .padding(.trailing, Self.labelInset)
+            .frame(width: layout.labelGutter, alignment: .leading)
     }
-
-    /// Breathing room between a label and the first column.
-    private static let labelInset: CGFloat = 6
-
 
     // MARK: - Grid
 
@@ -150,35 +193,32 @@ struct GestaltGrid: View {
             : SRGBValue.mix(tokens.metalValue, tokens.keylineValue, amount: 0.45)
     }
 
-    /// Gap between the five fardh rows and the presence overlays.
+    /// Gap between the five fardh rows and the rows beneath them.
     private static let overlayGap: CGFloat = IhsanSpacing.xs
-    private static let voluntaryHeaderHeight: CGFloat = 15
 
     @ViewBuilder
     private func grid(
         columns: [Column],
         layout: GestaltLayout
     ) -> some View {
-        VStack(spacing: GestaltLayout.rowSpacing(for: period)) {
-            ForEach(0..<5, id: \.self) { row in
-                columnRow(layout: layout, count: columns.count) { col in
-                    GestaltDot(
-                        completion: columns[col].slate[row],
-                        isPausedDay: columns[col].isPaused,
-                        size: layout.dotSize,
-                        tokens: tokens
-                    )
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(Prayer.allCases.enumerated()), id: \.element) { row, prayer in
+                columnRow(
+                    layout: layout,
+                    count: columns.count,
+                    label: prayer.displayNameEnglish
+                ) { col in
+                    prayerMark(column: columns[col], row: row, layout: layout)
                 }
             }
 
-            if showsAnyPresenceRow {
-                voluntaryHeader(layout: layout)
-                    .padding(.top, Self.overlayGap)
+            if showsAnyPresenceRow || columns.contains(where: \.isTraveling) {
+                Color.clear.frame(height: Self.overlayGap)
             }
 
             if showsNaflRow, let naflColumns, naflColumns.count == columns.count {
                 presenceRow(
-                    label: "NAFL", present: naflColumns, layout: layout
+                    label: "Nafl", present: naflColumns, layout: layout
                 ) { present in
                     NaflPresenceMark(
                         present: present, size: layout.presenceMarkSize, tokens: tokens
@@ -188,13 +228,41 @@ struct GestaltGrid: View {
 
             if showsDhikrRow, let dhikrColumns, dhikrColumns.count == columns.count {
                 presenceRow(
-                    label: "DHIKR", present: dhikrColumns, layout: layout
+                    label: "Dhikr", present: dhikrColumns, layout: layout
                 ) { present in
                     DhikrPresenceMark(
                         present: present, size: layout.presenceMarkSize, tokens: tokens
                     )
                 }
             }
+
+            if columns.contains(where: \.isTraveling) {
+                travelRow(columns: columns, layout: layout)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func prayerMark(column: Column, row: Int, layout: GestaltLayout) -> some View {
+        let completion = column.slate[row]
+        let uncounted = completion.status == nil && !column.countsBlanks
+        if layout.drawsTicks {
+            GestaltTick(
+                completion: completion,
+                isPausedDay: column.isPaused,
+                isUncounted: uncounted,
+                width: layout.dotSize,
+                height: layout.rowHeight - 3,
+                tokens: tokens
+            )
+        } else {
+            GestaltDot(
+                completion: completion,
+                isPausedDay: column.isPaused,
+                isUncounted: uncounted,
+                size: layout.dotSize,
+                tokens: tokens
+            )
         }
     }
 
@@ -204,39 +272,23 @@ struct GestaltGrid: View {
     private func columnRow<Cell: View>(
         layout: GestaltLayout,
         count: Int,
-        label: String? = nil,
-        rowHeight: CGFloat? = nil,
+        label: String,
         @ViewBuilder cell: @escaping (Int) -> Cell
     ) -> some View {
-        // The gutter sits OUTSIDE the spaced stack. Inside it, the
-        // stack's own spacing would be added after the label and every
-        // column would start one gap further right than
-        // `GestaltLayout` says it does — the layout value has to
-        // describe the view exactly, or the test that holds the rows
-        // together is testing arithmetic nobody renders.
         HStack(spacing: 0) {
-            if layout.labelGutter > 0 {
-                if let label {
-                    rowLabel(label, layout: layout)
-                } else {
-                    Color.clear.frame(width: layout.labelGutter, height: 1)
-                }
-            }
-            HStack(spacing: layout.spacing) {
+            rowLabel(label, layout: layout)
+            HStack(spacing: 0) {
                 ForEach(0..<count, id: \.self) { column in
                     cell(column)
-                        .frame(width: layout.dotSize)
+                        .frame(width: layout.pitch)
                 }
             }
             Spacer(minLength: 0)
         }
-        .frame(height: rowHeight)
+        .frame(height: layout.rowHeight)
     }
 
-    /// A named presence row. Its marks are dot-sized and dot-centred;
-    /// only the row's HEIGHT differs, so an eleven-point label has
-    /// somewhere to sit at the periods where the dots are three points
-    /// apart.
+    /// A named presence row. Its marks are dot-sized and dot-centred.
     private func presenceRow<Mark: View>(
         label: String,
         present: [Bool],
@@ -246,37 +298,10 @@ struct GestaltGrid: View {
         columnRow(
             layout: layout,
             count: present.count,
-            label: label,
-            rowHeight: layout.presenceRowHeight
+            label: label
         ) { column in
-            ZStack {
-                Capsule()
-                    .fill(tokens.inkSecondary.opacity(0.12))
-                    .frame(
-                        width: layout.dotSize,
-                        height: max(1, layout.presenceMarkSize * 0.16)
-                    )
-                mark(present[column])
-            }
+            mark(present[column])
         }
-    }
-
-    /// Separates factual voluntary presence from the five obligatory
-    /// prayer rows. The old gap left isolated stars floating beneath
-    /// the matrix; this names the register before the first mark.
-    private func voluntaryHeader(layout: GestaltLayout) -> some View {
-        HStack(spacing: IhsanSpacing.sm) {
-            FourPointedStar()
-                .fill(tokens.metal.opacity(0.72))
-                .frame(width: 7, height: 7)
-            Text("VOLUNTARY PRACTICE")
-                .font(IhsanFont.inscription)
-                .tracking(1.35)
-                .foregroundStyle(tokens.inkSecondary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .frame(height: Self.voluntaryHeaderHeight)
     }
 
     // MARK: - Which overlay rows are drawn
@@ -286,6 +311,8 @@ struct GestaltGrid: View {
     // be toggled all day without changing a pixel, because a presence
     // overlay with no presences is indistinguishable from no overlay.
     // The data decides now, so the answer is always visible.
+
+    private var showsAnyPresenceRow: Bool { showsNaflRow || showsDhikrRow }
 
     private var showsNaflRow: Bool {
         GestaltAggregation.hasAnyPresence(
@@ -324,68 +351,98 @@ struct GestaltGrid: View {
     }
 
     /// Travel is a named row rather than an unexplained symbol beneath
-    /// the pattern. Today is identified by the time axis below.
+    /// the pattern.
     private func travelRow(
         columns: [Column],
         layout: GestaltLayout
     ) -> some View {
         let markSize: CGFloat = max(6, min(10, layout.dotSize + 4))
-        let planeVisible = layout.dotSize >= 5
         return columnRow(
             layout: layout,
             count: columns.count,
-            label: layout.labelGutter > 0 ? "TRAVEL" : nil,
-            rowHeight: markSize
+            label: "Travel"
         ) { col in
-            Group {
-                if columns[col].isTraveling, planeVisible {
+            if columns[col].isTraveling {
+                if layout.pitch >= markSize {
                     TravelPlaneMark()
                         .fill(tokens.metal.opacity(0.60))
                         .frame(width: markSize, height: markSize)
                 } else {
-                    Color.clear
-                        .frame(width: 1, height: 1)
+                    // A plane does not fit a three-point column.
+                    Capsule()
+                        .fill(Self.overlayMarkValue(for: tokens).color.opacity(Self.overlayMarkOpacity))
+                        .frame(width: max(1.5, layout.dotSize), height: markSize)
                 }
+            } else {
+                Color.clear.frame(width: 1, height: 1)
             }
-            .frame(width: layout.dotSize, alignment: .center)
         }
     }
 
+    /// The window's two ends, in dates rather than "earlier", and the
+    /// one thing this card can do that nothing about it shows.
     private func timeAxis(layout: GestaltLayout) -> some View {
         HStack(spacing: 0) {
-            if layout.labelGutter > 0 {
-                Color.clear.frame(width: layout.labelGutter, height: 1)
+            Color.clear.frame(width: layout.labelGutter, height: 1)
+            if let first = axisStart {
+                Text(first, format: .dateTime.month(.abbreviated).day())
             }
-            Text(period == .year ? "EARLIER WEEKS" : "EARLIER")
             Spacer(minLength: IhsanSpacing.sm)
-            Text(period == .year ? "THIS WEEK" : "TODAY")
+            if onSelectColumn != nil {
+                Text(period == .year ? "Tap a week" : "Tap a day")
+                Spacer(minLength: IhsanSpacing.sm)
+            }
+            Text(period == .year ? "This week" : "Today")
         }
-        .font(IhsanFont.inscription)
-        .tracking(1.25)
+        .font(.caption2)
         .foregroundStyle(tokens.inkSecondary)
         .lineLimit(1)
         .minimumScaleFactor(0.75)
-        .frame(height: 12)
+        .frame(height: axisHeight)
+    }
+
+    private var axisStart: Date? {
+        switch period {
+        case .year: GestaltAggregation.yearWeekDayGroups(days: days).first?.first?.date
+        default: days.first?.date
+        }
     }
 
     // MARK: - Columns source
 
-    /// For 7D / 30D / 90D returns the `days`' five-prayer slates with
-    /// their day states. For YEAR returns 52 week-aggregated columns —
+    /// For 7 / 30 / 90 days returns the `days`' five-prayer slates with
+    /// their day states. For a year returns 52 week-aggregated columns —
     /// week columns carry no pause/travel footnote (the aggregation
     /// already abstracts the day).
     private var columns: [Column] {
         switch period {
         case .year:
-            return GestaltAggregation.yearWeekColumns(days: days).map {
-                Column(slate: $0, isPaused: false, isTraveling: false)
+            let newest = days.last?.date
+            let weeks = GestaltAggregation.yearWeekDayGroups(days: days)
+            return GestaltAggregation.yearWeekColumns(days: days).enumerated().map { index, slate in
+                // A week counts its blanks unless it holds the current
+                // day or wholly predates the record.
+                let latest = weeks[index].last?.date
+                let countsBlanks = latest.map {
+                    PathTally.isCounted(dayDate: $0, newestDay: newest, recordBegan: recordBegan)
+                } ?? true
+                return Column(
+                    slate: slate,
+                    isPaused: false,
+                    isTraveling: false,
+                    countsBlanks: countsBlanks
+                )
             }
         default:
+            let newest = days.last?.date
             return days.map {
                 Column(
                     slate: $0.prayerCompletions,
                     isPaused: $0.isPaused,
-                    isTraveling: $0.isTraveling
+                    isTraveling: $0.isTraveling,
+                    countsBlanks: PathTally.isCounted(
+                        dayDate: $0.date, newestDay: newest, recordBegan: recordBegan
+                    )
                 )
             }
         }
@@ -393,36 +450,27 @@ struct GestaltGrid: View {
 
     // MARK: - Height
 
-    /// The pattern block needs a stable height for the parent's VStack
-    /// before layout runs; `GestaltLayout` recomputes spacing per
-    /// device inside, but height barely varies across the supported
-    /// widths, so it is derived from the spec sizes here.
-    ///
-    /// Counts only the rows that will actually be drawn — a panel that
-    /// reserves space for an empty presence row is a panel with a hole
-    /// in it.
+    /// The rows' height is independent of width, so the parent's VStack
+    /// has a stable height before layout runs. Counts only the rows that
+    /// will actually be drawn — a panel that reserves space for an
+    /// empty presence row is a panel with a hole in it.
+    private func gridHeight(layout: GestaltLayout) -> CGFloat {
+        let extraRows = (showsNaflRow ? 1 : 0)
+            + (showsDhikrRow ? 1 : 0)
+            + (days.contains(where: \.isTraveling) && period != .year ? 1 : 0)
+        return CGFloat(5 + extraRows) * layout.rowHeight
+            + (extraRows > 0 ? Self.overlayGap : 0)
+    }
+
     private var patternHeight: CGFloat {
+        // Width plays no part in the height; any width will do.
         let layout = GestaltLayout(
             period: period,
-            availableWidth: .greatestFiniteMagnitude,
-            labelGutter: showsAnyPresenceRow ? labelGutter : 0,
-            labelHeight: showsAnyPresenceRow ? labelHeight : 0
+            availableWidth: 400,
+            labelGutter: labelGutter,
+            labelHeight: labelHeight
         )
-        let spacing = GestaltLayout.rowSpacing(for: period)
-        let presenceRows = (showsNaflRow ? 1 : 0) + (showsDhikrRow ? 1 : 0)
-        let rowCount = CGFloat(5 + presenceRows)
-
-        var height = 5 * layout.dotSize
-            + CGFloat(presenceRows) * layout.presenceRowHeight
-            + (rowCount - 1) * spacing
-        if presenceRows > 0 {
-            height += Self.overlayGap + Self.voluntaryHeaderHeight + spacing
-        }
-
-        let travelHeight = columns.contains(where: \.isTraveling)
-            ? IhsanSpacing.sm + max(6, min(10, layout.dotSize + 4))
-            : 0
-        return height + travelHeight + IhsanSpacing.sm + 12
+        return gridHeight(layout: layout) + IhsanSpacing.xs + axisHeight
     }
 
     // MARK: - Accessibility
@@ -438,27 +486,92 @@ struct GestaltGrid: View {
     private var accessibilityLabel: String {
         let span: String
         switch period {
-        case .sevenDays: span = "the last seven days"
-        case .thirtyDays: span = "the last thirty days"
-        case .ninetyDays: span = "the last ninety days"
-        case .year: span = "the last year, aggregated by week"
+        case .sevenDays: span = "the last 7 days"
+        case .thirtyDays: span = "the last 30 days"
+        case .ninetyDays: span = "the last 90 days"
+        case .year: span = "the last year, by week"
         }
-        var label = "Pattern of prayer across \(span). Five rows, Fajr at top through Isha at bottom. Today is the rightmost column."
+        var label = "Your prayers across \(span). Five rows, Fajr at top through Isha at bottom. Today is the rightmost column."
         if days.contains(where: \.isPaused) {
-            label += " Paused days show as neutral dashes and are excluded from totals."
+            label += " Paused days show as neutral dashes and are not counted."
         }
         if days.contains(where: \.isTraveling) {
             label += " Traveling days carry a small plane mark."
         }
         if showsNaflRow {
-            label += " A quieter row beneath, labelled NAFL, marks the days"
+            label += " A row labelled Nafl marks the days"
                 + " carrying voluntary prayer: \(presenceSummary(naflColumns))."
         }
         if showsDhikrRow {
-            label += " A row labelled DHIKR marks the days carrying a recorded"
+            label += " A row labelled Dhikr marks the days carrying a recorded"
                 + " sitting: \(presenceSummary(dhikrColumns))."
         }
         return label
+    }
+}
+
+// MARK: - The selection, for VoiceOver
+
+/// The grid is one element under VoiceOver. A hundred and fifty buttons,
+/// one per mark, is a wall to walk; an adjustable element that says what
+/// the day holds, and moves a day at a time, is a conversation.
+private struct AdjustableSelection: ViewModifier {
+    let value: String?
+    let onStepDay: ((Int) -> Void)?
+
+    func body(content: Content) -> some View {
+        if let value, let onStepDay {
+            content
+                .accessibilityValue(value)
+                .accessibilityHint("Swipe up for a later day, down for an earlier one.")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: onStepDay(1)
+                    case .decrement: onStepDay(-1)
+                    @unknown default: break
+                    }
+                }
+        } else {
+            content
+        }
+    }
+}
+
+// MARK: - Scrubbing
+
+/// A pan that begins only when the finger starts sideways, reporting the
+/// touch's x. SwiftUI's `DragGesture` cannot make that choice before it
+/// has already taken the touch from the scroll view around it.
+private struct HorizontalScrubGesture: UIGestureRecognizerRepresentable {
+    let onChange: (CGFloat) -> Void
+
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.delegate = context.coordinator
+        return pan
+    }
+
+    func handleUIGestureRecognizerAction(
+        _ recognizer: UIPanGestureRecognizer, context: Context
+    ) {
+        switch recognizer.state {
+        case .began, .changed:
+            onChange(context.converter.localLocation.x)
+        default:
+            break
+        }
+    }
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator()
+    }
+
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return true }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
     }
 }
 
@@ -536,6 +649,8 @@ struct GestaltDot: View {
     /// The whole day is excused: every mark in the column renders the
     /// calm neutral dash.
     var isPausedDay: Bool = false
+    /// A blank that is not a gap: drawn as a small pip. See `PathTally`.
+    var isUncounted: Bool = false
     let size: CGFloat
     let tokens: SkyPaletteTokens
 
@@ -599,6 +714,10 @@ struct GestaltDot: View {
                     .fill(tokens.inkSecondary.opacity(0.35))
                     .frame(width: size, height: max(1, size * 0.22))
                     .frame(width: size, height: size)
+            } else if isUncounted {
+                Circle()
+                    .fill(tokens.metal.opacity(0.45))
+                    .frame(width: max(2, size * 0.26), height: max(2, size * 0.26))
             } else {
                 mark
             }
@@ -674,6 +793,61 @@ struct GestaltDot: View {
                     tokens.metal.opacity(0.28),
                     lineWidth: max(0.5, size * 0.16)
                 )
+        }
+    }
+}
+
+// MARK: - GestaltTick
+
+/// The mark at the long periods, where a column is a few points wide
+/// and a hollow ring has no room to be hollow. Colour still says which
+/// state, from `GestaltDot`'s audited values, and height says how much
+/// happened: a stroke the full height of its row for a prayer offered
+/// on time or made up, a shorter one for delayed, and a low stub where
+/// nothing was prayed. Read along a row, a steady prayer is an unbroken
+/// band, and a gap is a visible dip.
+struct GestaltTick: View {
+    let completion: PrayerCompletion
+    var isPausedDay: Bool = false
+    var isUncounted: Bool = false
+    let width: CGFloat
+    let height: CGFloat
+    let tokens: SkyPaletteTokens
+
+    var body: some View {
+        Capsule(style: .continuous)
+            .fill(color)
+            .frame(width: max(1, width), height: height * heightShare)
+            .frame(width: max(1, width), height: height, alignment: .bottom)
+    }
+
+    private var heightShare: CGFloat {
+        if isPausedDay || isUncounted { return 0.14 }
+        switch completion.status {
+        case .onTime, .qada: return 1
+        case .late: return 0.6
+        case .missed, nil: return 0.26
+        }
+    }
+
+    private var color: Color {
+        if isPausedDay { return tokens.inkSecondary.opacity(0.35) }
+        if isUncounted { return tokens.metal.opacity(0.45) }
+        // At a tick's width there is no keyline, so the bodies use the
+        // same keyline-less values the small dots do.
+        switch (completion.status, completion.withJamaah) {
+        case (.onTime, true):
+            return tokens.metalHighlight
+        case (.onTime, _):
+            return GestaltDot.onTimeBodyValue(for: tokens, size: width).color
+        case (.qada, _):
+            return GestaltDot.qadaBodyValue(for: tokens, size: width).color
+        case (.late, _):
+            return GestaltDot.lateOutlineValue(for: tokens).color.opacity(0.95)
+        case (.missed, _):
+            return GestaltDot.missedOutlineValue(for: tokens).color.opacity(0.60)
+        case (.none, _):
+            return tokens.metal.opacity(0.28)
         }
     }
 }

@@ -43,6 +43,11 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
     /// independent of notifications, so someone can keep the banner
     /// and adhan while declining the standing lock-screen countdown.
     public let prayerLiveActivitiesEnabled: Bool
+    /// The prayers this device has declined a Live Activity for, each
+    /// on its own. A separate choice from that prayer's notification:
+    /// someone can keep Fajr's adhan and lose its countdown, or the
+    /// other way around.
+    public let prayersWithoutLiveActivity: Set<Prayer>
     public let morningAdhkarReminderEnabled: Bool
     public let eveningAdhkarReminderEnabled: Bool
     public let calculationMethod: CalculationMethodChoice
@@ -65,6 +70,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         notificationsEnabled: Bool = true,
         prayerNotificationsSuppressed: Bool = false,
         prayerLiveActivitiesEnabled: Bool = true,
+        prayersWithoutLiveActivity: Set<Prayer> = [],
         morningAdhkarReminderEnabled: Bool = false,
         eveningAdhkarReminderEnabled: Bool = false,
         calculationMethod: CalculationMethodChoice = .isna,
@@ -80,6 +86,7 @@ public struct NotificationScheduleSettings: Equatable, Sendable {
         self.notificationsEnabled = notificationsEnabled
         self.prayerNotificationsSuppressed = prayerNotificationsSuppressed
         self.prayerLiveActivitiesEnabled = prayerLiveActivitiesEnabled
+        self.prayersWithoutLiveActivity = prayersWithoutLiveActivity
         self.morningAdhkarReminderEnabled = morningAdhkarReminderEnabled
         self.eveningAdhkarReminderEnabled = eveningAdhkarReminderEnabled
         self.calculationMethod = calculationMethod
@@ -102,6 +109,7 @@ extension NotificationScheduleSettings {
         userSettings: UserSettings,
         isPaused: Bool = false,
         liveActivitiesEnabled: Bool = true,
+        prayersWithoutLiveActivity: Set<Prayer> = [],
         adhkarRemindersEnabled: Bool = false,
         myMasjid: MyMasjidSnapshot? = nil,
         loggedPrayerKeys: Set<String> = []
@@ -115,6 +123,7 @@ extension NotificationScheduleSettings {
             notificationsEnabled: userSettings.notificationsEnabled,
             prayerNotificationsSuppressed: isPaused,
             prayerLiveActivitiesEnabled: liveActivitiesEnabled,
+            prayersWithoutLiveActivity: prayersWithoutLiveActivity,
             morningAdhkarReminderEnabled: adhkarRemindersEnabled
                 && AdhkarAvailability.isAvailable
                 && userSettings.adhkarLayerEnabled
@@ -215,6 +224,7 @@ public actor UserSettingsNotificationSettingsProvider: NotificationSettingsProvi
             userSettings: settings,
             isPaused: !activePauses.isEmpty,
             liveActivitiesEnabled: PrayerLiveActivityPreferenceStore.isEnabled,
+            prayersWithoutLiveActivity: PrayerLiveActivityPreferenceStore.disabledPrayers,
             adhkarRemindersEnabled: AdhkarReminderPreferenceStore.isEnabled,
             myMasjid: MyMasjid.fetchExisting(in: context)?.snapshot,
             loggedPrayerKeys: loggedKeys
@@ -254,6 +264,34 @@ public enum PrayerLiveActivityPreferenceStore {
     public static var isEnabled: Bool {
         get { (defaults.object(forKey: key) as? Bool) ?? true }
         set { defaults.set(newValue, forKey: key) }
+    }
+
+    public static let disabledPrayersKey = "IhsanPrayerLiveActivitiesDisabledPrayers"
+
+    /// The prayers declined one by one. Stored as the exceptions, so an
+    /// absent key means every prayer, which is the shipped behavior.
+    public static var disabledPrayers: Set<Prayer> {
+        get {
+            let names = defaults.stringArray(forKey: disabledPrayersKey) ?? []
+            return Set(names.compactMap(Prayer.init(rawValue:)))
+        }
+        set {
+            defaults.set(newValue.map(\.rawValue).sorted(), forKey: disabledPrayersKey)
+        }
+    }
+
+    public static func isEnabled(for prayer: Prayer) -> Bool {
+        !disabledPrayers.contains(prayer)
+    }
+
+    public static func setEnabled(_ enabled: Bool, for prayer: Prayer) {
+        var disabled = disabledPrayers
+        if enabled {
+            disabled.remove(prayer)
+        } else {
+            disabled.insert(prayer)
+        }
+        disabledPrayers = disabled
     }
 }
 
@@ -327,6 +365,15 @@ public actor NotificationScheduler {
         try await notificationCenter.requestAuthorization(options: [.alert, .sound, .badge])
     }
 
+    /// Applies a change to the Live Activity switches. Withdraws what is
+    /// standing and parked first, because a rebuild only stages: a start
+    /// already parked for a prayer just switched off would otherwise
+    /// still fire. The rebuild then stages what remains.
+    public func applyLiveActivityPreferences() async throws {
+        await prayerActivityScheduler.cancelAllPrayerActivities()
+        try await rebuildSchedule()
+    }
+
     public func rebuildSchedule() async throws {
         let settings = try await settingsProvider.currentNotificationSettings()
         let authorizationStatus = await notificationCenter.authorizationStatus()
@@ -382,10 +429,6 @@ public actor NotificationScheduler {
             if settings.notificationsEnabled && !settings.prayerNotificationsSuppressed {
                 for prayerTime in day.allFardh {
                     let preference = settings.preference(for: prayerTime.prayer)
-                    guard preference.isEnabled else {
-                        continue
-                    }
-
                     let notificationDate = prayerTime.scheduledTime.addingTimeInterval(TimeInterval(-preference.leadTimeSeconds))
                     let activityStartDate = prayerTime.scheduledTime.addingTimeInterval(
                         -LiveActivityWindow.preAdhanLead
@@ -401,7 +444,11 @@ public actor NotificationScheduler {
                         for: prayerTime.prayer,
                         nextFajr: days[dayIndex + 1].fajr.scheduledTime
                     )
+                    // Each prayer's countdown is its own choice, read
+                    // before its notification's: turning off Asr's
+                    // notification no longer takes Asr's countdown too.
                     if settings.prayerLiveActivitiesEnabled,
+                       !settings.prayersWithoutLiveActivity.contains(prayerTime.prayer),
                        activityStartDate > referenceDate || windowEnd > referenceDate {
                         // A refused activity — Live Activities switched
                         // off in iOS Settings, or ActivityKit's own
@@ -419,7 +466,7 @@ public actor NotificationScheduler {
                         }
                     }
 
-                    guard notificationDate > referenceDate else {
+                    guard preference.isEnabled, notificationDate > referenceDate else {
                         continue
                     }
 

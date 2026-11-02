@@ -20,11 +20,9 @@ struct PatternExportPrivacyTests {
         }
         let pausedDay = try #require(pausedCandidate)
         let absentDay = try #require(absentCandidate)
-        let aggregate = TrajectoryAggregator.aggregate(days: seededMonth, qadaLogs: [])
 
         let prepared = PatternExportPrivacy.prepare(
             days: seededMonth,
-            aggregate: aggregate,
             naflDays: [pausedDay.date],
             dhikrDays: [pausedDay.date],
             calendar: calendar
@@ -68,10 +66,8 @@ struct PatternExportPrivacyTests {
     func rendererProducesThreeTimesPortraitImage() throws {
         let calendar = utcCalendar
         let days = makeSeededMonth(calendar: calendar)
-        let aggregate = TrajectoryAggregator.aggregate(days: days, qadaLogs: [])
         let content = PatternExportPrivacy.prepare(
             days: days,
-            aggregate: aggregate,
             naflDays: nil,
             dhikrDays: nil,
             calendar: calendar

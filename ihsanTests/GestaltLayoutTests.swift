@@ -1,4 +1,5 @@
 import Foundation
+import IhsanCore
 import Testing
 @testable import ihsan
 
@@ -115,35 +116,88 @@ struct GestaltLayoutTests {
         }
     }
 
-    /// The label needs vertical room the dots do not have at 90D. It
-    /// may take it from the row's HEIGHT and from nowhere else.
-    @Test("A presence row is at least as tall as its label")
-    func presenceRowsMakeRoomForTheirLabel() {
+    /// A row label needs vertical room the dots do not have at 90 days.
+    /// It may take it from the row's HEIGHT and from nowhere else.
+    @Test("Every row is at least as tall as its label")
+    func rowsMakeRoomForTheirLabel() {
         for period in TrajectoryPeriod.allCases {
-            let layout = GestaltLayout(
-                period: period, availableWidth: 343, labelGutter: 46, labelHeight: 13
-            )
-            #expect(layout.presenceRowHeight >= 13)
-            #expect(layout.presenceRowHeight >= layout.dotSize)
+            for labelHeight: CGFloat in [13, 16, 40] {
+                let layout = GestaltLayout(
+                    period: period, availableWidth: 343, labelGutter: 46, labelHeight: labelHeight
+                )
+                #expect(layout.rowHeight >= labelHeight)
+                #expect(layout.rowHeight >= layout.dotSize)
+            }
         }
     }
 
-    // MARK: - The pristine card
+    // MARK: - Touch
 
-    /// With no voluntary record in the window there is no gutter, and
-    /// the pattern keeps the full width — the card a new account sees
-    /// is the card that existed before any of this.
-    @Test("No gutter means the pattern starts at the leading edge")
-    func aPristineCardKeepsItsFullWidth() {
+    /// The touch and the mark have to agree on what a column is: a tap
+    /// on a dot that resolves to its neighbour edits the wrong day.
+    @Test("A touch on a mark lands on that mark's column")
+    func touchesResolveToTheColumnUnderThem() {
         for period in TrajectoryPeriod.allCases {
-            let bare = GestaltLayout(period: period, availableWidth: 343)
-            #expect(bare.labelGutter == 0)
-            #expect(bare.prayerDotCenter(column: 0) == bare.dotSize / 2)
+            for width in Self.widths where width >= 260 {
+                let layout = GestaltLayout(
+                    period: period, availableWidth: width, labelGutter: 54, labelHeight: 16
+                )
+                for column in 0..<layout.columnCount {
+                    #expect(
+                        layout.column(atX: layout.prayerDotCenter(column: column)) == column,
+                        "\(period) at \(width): the mark in column \(column) answers for another"
+                    )
+                }
+            }
+        }
+    }
 
-            let labelled = GestaltLayout(
-                period: period, availableWidth: 343, labelGutter: 46, labelHeight: 13
+    @Test("A touch outside the columns goes to the nearest one")
+    func strayTouchesStillLandSomewhere() {
+        let layout = GestaltLayout(
+            period: .thirtyDays, availableWidth: 343, labelGutter: 54, labelHeight: 16
+        )
+        #expect(layout.column(atX: -10) == 0)
+        #expect(layout.column(atX: 20) == 0)
+        #expect(layout.column(atX: 10_000) == layout.columnCount - 1)
+    }
+
+    @Test("Columns fill the width the labels leave")
+    func columnsFillTheCard() {
+        for period in TrajectoryPeriod.allCases {
+            let layout = GestaltLayout(
+                period: period, availableWidth: 343, labelGutter: 54, labelHeight: 16
             )
-            #expect(labelled.dotSize <= bare.dotSize)
+            #expect(abs(layout.totalWidth - 343) < 0.0001)
+        }
+    }
+
+    @Test("A column and the day it means agree, at every period")
+    func columnsRoundTripThroughTheirDays() throws {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: .now)
+        let all: [DayCompletion] = (0..<365).reversed().map { offset in
+            let date = calendar.date(byAdding: .day, value: -offset, to: today) ?? today
+            return DayCompletion(
+                id: date, date: date, prayerCompletions: [], isPaused: false, isTraveling: false
+            )
+        }
+        for period in TrajectoryPeriod.allCases {
+            let window = Array(all.suffix(period.dayCount))
+            for column in 0..<GestaltLayout.columnCount(for: period) {
+                let day = try #require(
+                    GestaltAggregation.day(forColumn: column, days: window, period: period)
+                )
+                #expect(GestaltAggregation.column(for: day, days: window, period: period) == column)
+            }
+            #expect(
+                GestaltAggregation.day(
+                    forColumn: GestaltLayout.columnCount(for: period) - 1,
+                    days: window,
+                    period: period
+                ) == today,
+                "the last column of \(period) must mean today"
+            )
         }
     }
 

@@ -88,7 +88,8 @@ struct BannedLanguageSweepTests {
         "ihsanWidgets/Provider/PrayerTimelineEntry.swift",
         // The two clocks and the voluntary rows.
         "ihsan/Trajectory/Components/GestaltGrid.swift",
-        "ihsan/Trajectory/Components/DailyPracticeGrid.swift",
+        "ihsan/Trajectory/Components/PathDayCard.swift",
+        "ihsan/Trajectory/Components/PathKey.swift",
         "ihsan/Trajectory/Models/DayVoluntaryDetail.swift",
         "ihsan/Trajectory/TrajectoryScreen.swift",
         "ihsan/Trajectory/Share/PatternShareCard.swift",

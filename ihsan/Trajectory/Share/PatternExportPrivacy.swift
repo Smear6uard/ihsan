@@ -11,15 +11,16 @@ struct PatternExportContent: Sendable {
     let days: [DayCompletion]
     let naflDays: Set<Date>?
     let dhikrDays: Set<Date>?
-    let summary: QuietSummary
+    let recordBegan: Date?
+    let tally: PathTally
 }
 
 enum PatternExportPrivacy {
     static func prepare(
         days: [DayCompletion],
-        aggregate: TrajectoryAggregate,
         naflDays: Set<Date>?,
         dhikrDays: Set<Date>?,
+        recordBegan: Date? = nil,
         calendar: Calendar = .current
     ) -> PatternExportContent {
         let pausedDates = Set(
@@ -44,7 +45,11 @@ enum PatternExportPrivacy {
             days: flattenedDays,
             naflDays: removing(pausedDates, from: naflDays, calendar: calendar),
             dhikrDays: removing(pausedDates, from: dhikrDays, calendar: calendar),
-            summary: QuietSummary(aggregate: aggregate)
+            recordBegan: recordBegan,
+            // Counted from the flattened days, not the aggregate: a
+            // paused day is a blank here, in the count as in the marks,
+            // and nothing in the image can tell the two apart.
+            tally: PathTally(days: flattenedDays, recordBegan: recordBegan)
         )
     }
 

@@ -1,9 +1,9 @@
 import XCTest
 
 /// Pins the two retroactive entry points end to end: a passed prayer
-/// logged from the plate's marker → card → sheet path, and prior
-/// days logged or edited from Path's day×prayer grid — the canonical
-/// way to log yesterday and earlier.
+/// logged from the plate's marker → the card's seals, and prior days
+/// logged or edited from Path's day card — the canonical way to log
+/// yesterday and earlier.
 final class RetroactiveLogUITests: XCTestCase {
 
     @MainActor
@@ -71,8 +71,7 @@ final class RetroactiveLogUITests: XCTestCase {
         return formatter.string(from: date)
     }
 
-    /// Scrolls until the element is hittable (the practice grid sits
-    /// below the fold on Path).
+    /// Scrolls until the element is hittable.
     private func scrollTo(_ element: XCUIElement, in app: XCUIApplication) {
         var attempts = 0
         while !element.isHittable && attempts < 5 {
@@ -94,30 +93,23 @@ final class RetroactiveLogUITests: XCTestCase {
         XCTAssertTrue(dhuhrMarker.waitForExistence(timeout: 15))
         dhuhrMarker.tap()
 
-        // The focused card swaps to Dhuhr's window-closed state and
-        // carries the log affordance; tapping it opens the sheet.
+        // The focused card swaps to Dhuhr's window-closed state.
         let passedCard = element(in: app, labelBeginning: "Dhuhr prayer, window closed")
         XCTAssertTrue(passedCard.waitForExistence(timeout: 3))
-        passedCard.tap()
 
         // The corrected truth rule: the timing axis describes when
         // the prayer was PERFORMED, not when the entry is created —
-        // a closed window offers all four states, On Time included
+        // a closed window offers all four seals, On Time included
         // (praying in the window and logging after it is the most
         // common pattern).
-        let onTimeTile = app.buttons["On Time, prayed in its window"]
-        XCTAssertTrue(onTimeTile.waitForExistence(timeout: 5))
-        XCTAssertTrue(onTimeTile.isEnabled, "A closed window must keep On Time available.")
+        for timing in ["On Time", "Delayed", "Qadā", "Missed"] {
+            XCTAssertTrue(
+                app.buttons["Log as \(timing)"].waitForExistence(timeout: 5),
+                "A closed window must offer \(timing)."
+            )
+        }
+        app.buttons["Log as Delayed"].tap()
 
-        let lateTile = app.buttons["Delayed, prayed late in its window"]
-        XCTAssertTrue(lateTile.isEnabled)
-        lateTile.tap()
-
-        let commit = app.buttons["Log Dhuhr"]
-        XCTAssertTrue(commit.waitForExistence(timeout: 3))
-        commit.tap()
-
-        XCTAssertTrue(commit.waitForNonExistence(timeout: 5))
         XCTAssertTrue(
             element(in: app, labelBeginning: "Dhuhr prayer, logged, delayed")
                 .waitForExistence(timeout: 5),
@@ -125,39 +117,47 @@ final class RetroactiveLogUITests: XCTestCase {
         )
     }
 
+    /// Opens Path and moves the day card back one day, to yesterday.
+    private func openYesterdayOnPath(in app: XCUIApplication) {
+        app.tabBars.buttons["Path"].tap()
+        let earlier = app.buttons["Earlier day"]
+        XCTAssertTrue(earlier.waitForExistence(timeout: 10))
+        scrollTo(earlier, in: app)
+        earlier.tap()
+    }
+
     // MARK: - 2. A prior day, from Path
 
     @MainActor
     func testLoggingAPriorDayFromPath() throws {
         // Seed one log so Path renders its grid; yesterday's Dhuhr
-        // cell stays empty.
+        // stays empty.
         let app = launch(
             nowOverride: Self.middayOverride,
             extraArguments: ["-IhsanDebugLogPrayer", "fajr:onTime"]
         )
+        openYesterdayOnPath(in: app)
 
-        app.tabBars.buttons["Path"].tap()
+        let row = app.buttons["Dhuhr, \(yesterdayLabelFragment), no record"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        scrollTo(row, in: app)
+        row.tap()
 
-        let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), not logged"]
-        XCTAssertTrue(cell.waitForExistence(timeout: 10))
-        scrollTo(cell, in: app)
-        cell.tap()
+        // A past day offers all four timings, and one tap records.
+        for timing in ["On Time", "Delayed", "Missed"] {
+            XCTAssertTrue(app.buttons["Log as \(timing)"].waitForExistence(timeout: 5))
+        }
+        let qada = app.buttons["Log as Qadā"]
+        XCTAssertTrue(qada.waitForExistence(timeout: 5))
+        qada.tap()
 
-        // Fresh entry on a past day: the commit names the act and
-        // all four tiles are live.
-        let commit = app.buttons["Log Dhuhr"]
-        XCTAssertTrue(commit.waitForExistence(timeout: 5))
-        let qadaTile = app.buttons["Qadā, prayed after its window"]
-        XCTAssertTrue(qadaTile.isEnabled, "A past day offers all four states.")
-        XCTAssertTrue(app.buttons["On Time, prayed in its window"].isEnabled)
-
-        qadaTile.tap()
-        commit.tap()
-
-        XCTAssertTrue(commit.waitForNonExistence(timeout: 5))
         XCTAssertTrue(
             app.buttons["Dhuhr, \(yesterdayLabelFragment), qadā"].waitForExistence(timeout: 5),
-            "The cell must reflect the retro entry."
+            "The day card must reflect the entry."
+        )
+        XCTAssertTrue(
+            app.staticTexts["Qadā, 1"].exists || app.otherElements["Qadā, 1"].exists,
+            "The key's count must follow the entry."
         )
     }
 
@@ -169,28 +169,78 @@ final class RetroactiveLogUITests: XCTestCase {
             nowOverride: Self.middayOverride,
             extraArguments: ["-IhsanDebugLogPrayer", "dhuhr:late:-1"]
         )
+        openYesterdayOnPath(in: app)
 
-        app.tabBars.buttons["Path"].tap()
+        let row = app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        scrollTo(row, in: app)
+        row.tap()
 
-        let cell = app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"]
-        XCTAssertTrue(cell.waitForExistence(timeout: 10))
-        scrollTo(cell, in: app)
-        cell.tap()
+        let onTime = app.buttons["Change to On Time"]
+        XCTAssertTrue(onTime.waitForExistence(timeout: 5))
+        onTime.tap()
 
-        // Editing: the commit says Save Changes, and the past-day
-        // rule keeps every tile live.
-        let save = app.buttons["Save Changes"]
-        XCTAssertTrue(save.waitForExistence(timeout: 5))
-        let onTimeTile = app.buttons["On Time, prayed in its window"]
-        XCTAssertTrue(onTimeTile.isEnabled)
-
-        onTimeTile.tap()
-        save.tap()
-
-        XCTAssertTrue(save.waitForNonExistence(timeout: 5))
         XCTAssertTrue(
             app.buttons["Dhuhr, \(yesterdayLabelFragment), on time"].waitForExistence(timeout: 5),
-            "The cell must reflect the edit."
+            "The day card must reflect the edit."
+        )
+    }
+
+    // MARK: - 4. Taking it back
+
+    @MainActor
+    func testUndoRestoresThePriorDayEntry() throws {
+        let app = launch(
+            nowOverride: Self.middayOverride,
+            extraArguments: ["-IhsanDebugLogPrayer", "dhuhr:late:-1"]
+        )
+        openYesterdayOnPath(in: app)
+
+        let delayed = app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"]
+        XCTAssertTrue(delayed.waitForExistence(timeout: 10))
+        scrollTo(delayed, in: app)
+        delayed.tap()
+
+        let missed = app.buttons["Change to Missed"]
+        XCTAssertTrue(missed.waitForExistence(timeout: 5))
+        missed.tap()
+        XCTAssertTrue(
+            app.buttons["Dhuhr, \(yesterdayLabelFragment), missed"].waitForExistence(timeout: 5)
+        )
+
+        let undo = app.buttons["Undo"]
+        XCTAssertTrue(undo.waitForExistence(timeout: 3))
+        undo.tap()
+
+        XCTAssertTrue(
+            app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"].waitForExistence(timeout: 5),
+            "Undo must put the record back."
+        )
+    }
+
+    @MainActor
+    func testRemovingAPriorDayEntryIsUndoable() throws {
+        let app = launch(
+            nowOverride: Self.middayOverride,
+            extraArguments: ["-IhsanDebugLogPrayer", "fajr:onTime;dhuhr:late:-1"]
+        )
+        openYesterdayOnPath(in: app)
+
+        let delayed = app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"]
+        XCTAssertTrue(delayed.waitForExistence(timeout: 10))
+        scrollTo(delayed, in: app)
+        delayed.tap()
+
+        let remove = app.buttons["Remove record"]
+        XCTAssertTrue(remove.waitForExistence(timeout: 5))
+        remove.tap()
+        XCTAssertTrue(
+            app.buttons["Dhuhr, \(yesterdayLabelFragment), no record"].waitForExistence(timeout: 5)
+        )
+
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(
+            app.buttons["Dhuhr, \(yesterdayLabelFragment), delayed"].waitForExistence(timeout: 5)
         )
     }
 }

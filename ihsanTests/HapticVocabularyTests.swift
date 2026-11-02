@@ -37,7 +37,7 @@ struct HapticVocabularyTests {
 
     /// Every surface that records an act of worship.
     private static let worshipCommitSites: [String] = [
-        "ihsan/Today/Components/PrayerLogSheet.swift",
+        "ihsan/Trajectory/Components/PathDayCard.swift",
         "ihsan/Today/Components/FocusedPrayerCard.swift",
         "ihsan/Today/Components/YesterdaySheet.swift",
         "ihsan/Reflection/Helpers/ReflectionHaptics.swift",

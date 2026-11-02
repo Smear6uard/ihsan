@@ -37,6 +37,42 @@ enum GestaltAggregation {
         }
     }
 
+    /// The column a day is drawn in, for the band that marks the day the
+    /// card is showing. `nil` only for the one day a year's 52 full weeks
+    /// leave out.
+    static func column(
+        for date: Date,
+        days: [DayCompletion],
+        period: TrajectoryPeriod
+    ) -> Int? {
+        switch period {
+        case .year:
+            return yearWeekDayGroups(days: days).firstIndex { week in
+                week.contains { $0.date == date }
+            }
+        default:
+            return days.firstIndex { $0.date == date }
+        }
+    }
+
+    /// The day a touch on a column means. A week has no one day, so it
+    /// lands on the latest; the card's arrows walk the rest of it.
+    static func day(
+        forColumn column: Int,
+        days: [DayCompletion],
+        period: TrajectoryPeriod
+    ) -> Date? {
+        switch period {
+        case .year:
+            let weeks = yearWeekDayGroups(days: days)
+            guard weeks.indices.contains(column) else { return nil }
+            return weeks[column].last?.date
+        default:
+            guard days.indices.contains(column) else { return nil }
+            return days[column].date
+        }
+    }
+
     /// Per-column presence of some record, aligned 1:1 with the fardh
     /// columns the same period produces.
     ///

@@ -166,8 +166,7 @@ struct PathFindingTests {
         let finding = Self.make(days: days)
 
         #expect(finding.kind == .unrecordedSlots)
-        #expect(finding.headline.contains("28 of the last 35 slots"))
-        #expect(finding.headline.contains("7 that do"))
+        #expect(finding.headline.contains("28 prayers in this period have no record"))
     }
 
     @Test("The offered slot is the most recent gap, at its first prayer")
@@ -211,7 +210,7 @@ struct PathFindingTests {
 
         let finding = Self.make(days: days)
         #expect(finding.kind != .unrecordedSlots)
-        #expect(finding.headline.contains("of 3 days"), "today leaked into the denominator")
+        #expect(finding.headline.contains("of the past 3"), "today leaked into the denominator")
     }
 
     @Test("Paused days contribute neither slots nor gaps")
@@ -234,8 +233,7 @@ struct PathFindingTests {
 
         let finding = Self.make(days: days, logs: [missed])
         #expect(finding.kind == .outstandingMakeups)
-        #expect(finding.headline.contains("1 prayer is recorded missed"))
-        #expect(finding.headline.contains("logged against it yet"))
+        #expect(finding.headline.contains("1 missed prayer in this period has no qadā"))
         #expect(finding.action == .openMakeupLedger)
     }
 
@@ -251,8 +249,7 @@ struct PathFindingTests {
         ]
 
         let finding = Self.make(days: days, logs: logs)
-        #expect(finding.headline.contains("2 prayers are recorded missed"))
-        #expect(finding.headline.contains("logged against them yet"))
+        #expect(finding.headline.contains("2 missed prayers in this period have no qadā"))
     }
 
     /// The one that would have shipped wrong. `markAsQada` writes a
@@ -295,8 +292,8 @@ struct PathFindingTests {
 
         let finding = Self.make(days: days, reminders: Self.allRemindersOn)
         #expect(finding.kind == .weakAsr)
-        #expect(finding.headline.contains("Asr is the weak point"))
-        #expect(finding.headline.contains("prayed on 2 of 7 days"))
+        #expect(finding.headline.contains("Asr has the most gaps"))
+        #expect(finding.headline.contains("prayed on 2 of the past 7 days"))
     }
 
     /// The reading that would have been actively insulting: somebody
@@ -315,7 +312,7 @@ struct PathFindingTests {
 
         let finding = Self.make(days: days)
         #expect(finding.kind == .delayedAsr)
-        #expect(!finding.headline.contains("weak point"))
+        #expect(!finding.headline.contains("most gaps"))
     }
 
     @Test("Fajr and Isha share one reading")
@@ -361,7 +358,7 @@ struct PathFindingTests {
 
         let finding = Self.make(days: days)
         #expect(finding.kind == .delayedAsr)
-        #expect(finding.headline.contains("delayed on 5 of 7 days"))
+        #expect(finding.headline.contains("delayed on 5 of the past 7 days"))
     }
 
     // MARK: - Congregation
@@ -371,7 +368,7 @@ struct PathFindingTests {
         let finding = Self.make(days: Self.steadyWeek())
         #expect(finding.kind == .noJamaah)
         #expect(finding.action == .findCongregation)
-        #expect(finding.headline.contains("35 prayers recorded"))
+        #expect(finding.headline.contains("None of the prayers recorded"))
     }
 
     @Test("A record already half in congregation gets no button")
@@ -382,7 +379,7 @@ struct PathFindingTests {
         #expect(finding.kind == .steady)
         #expect(finding.action == nil)
         #expect(finding.actionTitle == nil)
-        #expect(finding.headline.contains("Nothing in this period is slipping"))
+        #expect(finding.headline.contains("Nothing stands out as slipping"))
     }
 
     // MARK: - The remedy ladder
@@ -434,7 +431,7 @@ struct PathFindingTests {
         let first = Self.make(days: days)
         let second = Self.make(days: days)
         #expect(first == second)
-        #expect(first.headline.hasPrefix("Fajr is the weak point"))
+        #expect(first.headline.hasPrefix("Fajr has the most gaps"))
     }
 
     @Test("Every reading the engine can return has grounding behind it")

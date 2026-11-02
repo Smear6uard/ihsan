@@ -192,7 +192,7 @@ struct MyMasjidEditorScreen: View {
                 accessory: { EmptyView() }
             )
 
-            SettingsDescriptionText("Removing it takes the iqamah times off the card and the log sheet, and cancels any reminders.")
+            SettingsDescriptionText("Removing it takes the iqamah times off the card, and cancels any reminders.")
         }
     }
 

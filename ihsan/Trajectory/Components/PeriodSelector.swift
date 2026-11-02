@@ -1,10 +1,8 @@
 import SwiftUI
 import IhsanDesignSystem
 
-/// 7D / 30D / 90D / Year segmented control. Restyled as a small caps
-/// inscription strip with a brass underline marking the selected
-/// option — sits above the grid like a marginal note in a manuscript
-/// rather than as a standalone control element.
+/// The period strip: a brass underline marks the selected option, and
+/// the options say what they are.
 struct PeriodSelector: View {
     @Binding var period: TrajectoryPeriod
     let tokens: SkyPaletteTokens
@@ -23,9 +21,10 @@ struct PeriodSelector: View {
                     }
                 } label: {
                     VStack(spacing: 6) {
-                        Text(option.label.uppercased())
-                            .font(IhsanFont.inscription)
-                            .tracking(1.6)
+                        Text(option.title)
+                            .font(.system(.subheadline, weight: period == option ? .semibold : .regular))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .foregroundStyle(
                                 period == option
                                     ? tokens.ink
@@ -46,7 +45,7 @@ struct PeriodSelector: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(option.label) period")
+                .accessibilityLabel(option.title)
                 .accessibilityAddTraits(period == option ? [.isSelected] : [])
             }
         }

@@ -69,11 +69,11 @@ struct TrajectoryInsightNarrativeTests {
         )
     }
 
-    /// Six elapsed days plus an untouched today. The finding above this
-    /// line says "of 6 days"; this one must not say seven, and must not
-    /// count today's five not-yet-due slots as unrecorded.
-    @Test("Coverage counts elapsed days only, exactly as the finding does")
-    func coverageAgreesWithTheFinding() {
+    /// "132 recorded" one line above "129 of 145" is the failure this
+    /// line was rewritten to end. The key states the count; a second
+    /// count here, on any basis, would be that failure again.
+    @Test("It states no coverage figure")
+    func statesNoSecondCount() {
         var days = (1...6).map { offset in
             Self.day(offset, statuses: Dictionary(
                 uniqueKeysWithValues: Prayer.allCases.map { ($0, PrayerStatus.onTime) }
@@ -82,20 +82,24 @@ struct TrajectoryInsightNarrativeTests {
         days.append(Self.day(0, statuses: [:]))
 
         let text = make(days: days)
-        #expect(text.contains("30 of 30 slots across 6 elapsed days carry a record."))
+        #expect(!text.contains("30"))
         #expect(!text.contains("35"))
-        #expect(!text.contains("7 elapsed"))
+        #expect(!text.contains(" of "))
     }
 
-    @Test("A qadā slot still counts as a slot that carries a record")
-    func qadaSlotsCountAsRecorded() {
-        let days = (1...4).map { offset in
+    /// The internal words a reader had no way to know.
+    @Test("It speaks plainly")
+    func usesNoInternalVocabulary() {
+        let days = (1...7).map { offset in
             Self.day(offset, statuses: [
-                .fajr: .qada, .dhuhr: .onTime, .asr: .onTime, .maghrib: .onTime, .isha: .onTime
+                .fajr: .onTime,
+                .asr: offset <= 2 ? .onTime : .late
             ])
         }
-
-        #expect(make(days: days).contains("20 of 20 slots"))
+        let text = make(days: days, qadaCount: 2, pausedDays: 1)
+        for word in ["slot", "carry a record", "hold their time", "holds its", "move around", "elapsed"] {
+            #expect(!text.contains(word), "\(word) is back in \(text)")
+        }
     }
 
     @Test("The shape names what holds and what moves")
@@ -111,12 +115,11 @@ struct TrajectoryInsightNarrativeTests {
         }
 
         let text = make(days: days)
-        #expect(text.contains("Fajr, Dhuhr, and Maghrib hold their time"))
-        #expect(text.contains("Asr and Isha move around"))
+        #expect(text.contains("Fajr, Dhuhr, and Maghrib were usually on time"))
+        #expect(text.contains("Asr and Isha varied"))
     }
 
-    /// The bug that reached a screenshot: "Asr move around."
-    @Test("A single prayer takes a singular verb")
+    @Test("A single prayer is named on its own")
     func singleSubjectAgreesInNumber() {
         let days = (1...7).map { offset in
             Self.day(offset, statuses: [
@@ -129,37 +132,29 @@ struct TrajectoryInsightNarrativeTests {
         }
 
         let text = make(days: days)
-        #expect(text.contains("Asr moves around"))
-        #expect(!text.contains("Asr move around"))
+        #expect(text.contains("Asr varied"))
     }
 
-    @Test("A single settled prayer keeps its own time")
+    @Test("A single steady prayer takes a singular verb")
     func singleHoldingSubjectAgreesInNumber() {
         let days = (1...7).map { offset in
             Self.day(offset, statuses: [.fajr: .onTime])
         }
 
         let text = make(days: days)
-        #expect(text.contains("Fajr holds its time"))
-        #expect(text.contains("Dhuhr, Asr, Maghrib, and Isha move around"))
+        #expect(text.contains("Fajr was usually on time"))
+        #expect(text.contains("Dhuhr, Asr, Maghrib, and Isha varied"))
     }
 
-    /// The failure this line was rewritten to avoid: restating totals
-    /// the quiet summary row already prints two inches above it.
-    @Test("It never re-reads the counts row back to the user")
-    func doesNotRestateTheCountsRow() {
+    @Test("All five are called all five")
+    func allFiveAreNotListedOut() {
         let days = (1...7).map { offset in
-            Self.day(offset, statuses: [
-                .fajr: .onTime, .dhuhr: .onTime, .maghrib: .onTime,
-                .asr: .late, .isha: .missed
-            ])
+            Self.day(offset, statuses: Dictionary(
+                uniqueKeysWithValues: Prayer.allCases.map { ($0, PrayerStatus.onTime) }
+            ))
         }
 
-        let text = make(days: days)
-        #expect(!text.contains("on time"))
-        #expect(!text.contains("delayed within the window"))
-        #expect(!text.contains("has the most on-time records"))
-        #expect(!text.localizedCaseInsensitiveContains("score"))
+        #expect(make(days: days) == "All five prayers were usually on time.")
     }
 
     @Test("A uniform period reports no shape rather than inventing one")
@@ -175,10 +170,10 @@ struct TrajectoryInsightNarrativeTests {
             )
         }
 
-        #expect(make(days: days) == "15 of 30 slots across 6 elapsed days carry a record.")
+        #expect(make(days: days).isEmpty)
     }
 
-    @Test("Pauses and make-ups are reported without entering the coverage count")
+    @Test("Pauses and separate make-ups are said in words")
     func pausesAndMakeupsAreReportedSeparately() {
         var days = (1...6).map { offset in
             Self.day(offset, statuses: Dictionary(
@@ -188,9 +183,40 @@ struct TrajectoryInsightNarrativeTests {
         days.append(Self.day(7, statuses: [:], isPaused: true))
 
         let text = make(days: days, qadaCount: 1, pausedDays: 1)
-        #expect(text.contains("30 of 30 slots across 6 elapsed days"))
-        #expect(text.contains("1 later makeup is tracked separately."))
-        #expect(text.contains("1 paused day was excluded from these counts."))
+        #expect(text.contains("1 earlier prayer was made up in this period."))
+        #expect(text.contains("1 paused day isn’t counted."))
+    }
+
+    /// A qadā recorded on its own day has a mark, and the key counts it.
+    /// Only the make-ups that left their own day's slate alone need
+    /// saying, or the same act gets counted out loud twice.
+    @Test("A qadā with a mark of its own is not mentioned again")
+    func markedQadaIsNotRepeated() {
+        let days = (1...6).map { offset in
+            Self.day(offset, statuses: [.fajr: offset == 1 ? .qada : .onTime])
+        }
+
+        #expect(!make(days: days, qadaCount: 1).contains("made up"))
+        #expect(make(days: days, qadaCount: 3).contains("2 earlier prayers were made up"))
+    }
+
+    @Test("The days before the record began don't shape the reading")
+    func daysBeforeTheRecordAreLeftOut() {
+        let days = (1...7).map { offset in
+            Self.day(offset, statuses: offset <= 3 ? [.fajr: .onTime] : [:])
+        }
+        let began = Self.calendar.date(
+            byAdding: .day, value: -3, to: Self.calendar.startOfDay(for: Self.now)
+        )
+
+        let text = TrajectoryInsightNarrative.make(
+            days: days,
+            aggregate: aggregate(),
+            now: Self.now,
+            recordBegan: began,
+            calendar: Self.calendar
+        )
+        #expect(text.contains("Fajr was usually on time"))
     }
 
     @Test("Model prose that names nothing concrete is refused")

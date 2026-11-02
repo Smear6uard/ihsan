@@ -9,7 +9,7 @@ import UIKit
 #endif
 
 /// The portrait composition rendered offscreen. This is purpose-built
-/// from the same pattern and summary components as Path; it is never a
+/// from the same pattern and key as Path; it is never a
 /// screenshot of the live interface.
 struct PatternShareCard: View {
     static let pointSize = CGSize(width: 390, height: 650)
@@ -27,18 +27,20 @@ struct PatternShareCard: View {
             VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
                 heading
 
-                GestaltGrid(
-                    days: content.days,
-                    period: period,
-                    tokens: tokens,
-                    naflDays: content.naflDays,
-                    dhikrDays: content.dhikrDays
-                )
-                .padding(IhsanSpacing.lg)
+                VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+                    GestaltGrid(
+                        days: content.days,
+                        period: period,
+                        tokens: tokens,
+                        naflDays: content.naflDays,
+                        dhikrDays: content.dhikrDays,
+                        recordBegan: content.recordBegan
+                    )
+                    PathKey(tally: content.tally, period: period, tokens: tokens)
+                }
+                .padding(IhsanSpacing.md)
                 .frame(maxWidth: .infinity)
                 .celestialPanel(tokens: tokens, cornerRadius: 18)
-
-                QuietSummaryRow(summary: content.summary, tokens: tokens)
 
                 Spacer(minLength: 0)
 
@@ -76,26 +78,23 @@ struct PatternShareCard: View {
 
     private var heading: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.xs) {
-            Text("A pattern of days")
+            Text("Path")
                 .font(.system(size: 28, weight: .medium, design: .serif))
                 .foregroundStyle(tokens.ink)
                 .inkKeyline(tokens)
 
-            Text(periodInscription)
-                .font(IhsanFont.inscription)
-                .tracking(1.7)
-                .foregroundStyle(tokens.inkSecondary)
+            Text(period.phrase)
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(tokens.ink)
                 .inkKeyline(tokens)
 
             Text(gregorianRange)
-                .font(IhsanFont.inscription)
-                .tracking(1.25)
+                .font(.footnote)
                 .foregroundStyle(tokens.inkSecondary)
                 .inkKeyline(tokens)
 
             Text(hijriRange)
-                .font(IhsanFont.inscription)
-                .tracking(1.25)
+                .font(.footnote)
                 .foregroundStyle(tokens.inkSecondary)
                 .inkKeyline(tokens)
         }
@@ -115,30 +114,20 @@ struct PatternShareCard: View {
         .accessibilityHidden(true)
     }
 
-    private var periodInscription: String {
-        switch period {
-        case .sevenDays: "SEVEN DAYS"
-        case .thirtyDays: "THIRTY DAYS"
-        case .ninetyDays: "NINETY DAYS"
-        case .year: "ONE YEAR"
-        }
-    }
-
     private var gregorianRange: String {
-        guard let end = content.days.last?.date else { return periodInscription }
-        return "GREGORIAN · " + period.formattedRange(cycleDate: end).uppercased()
+        guard let end = content.days.last?.date else { return period.phrase }
+        return period.formattedRange(cycleDate: end)
     }
 
     private var hijriRange: String {
         guard let start = content.days.first?.date,
-              let end = content.days.last?.date else { return "HIJRI" }
-        return "HIJRI · \(HijriDateFormatter.string(from: start).uppercased())"
-            + " – \(HijriDateFormatter.string(from: end).uppercased())"
+              let end = content.days.last?.date else { return "" }
+        return "\(HijriDateFormatter.string(from: start)) – \(HijriDateFormatter.string(from: end))"
     }
 
     var accessibilityDescription: String {
-        "Ihsan prayer pattern for \(periodInscription.lowercased()), "
-            + "with five prayer rows and a quiet summary."
+        "Ihsan prayer pattern for the \(period.phrase.lowercased()), "
+            + "with five prayer rows and a key with counts."
     }
 }
 

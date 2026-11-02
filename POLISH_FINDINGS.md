@@ -1529,3 +1529,29 @@ Spec: `docs/superpowers/specs/2026-10-31-dawn-ahead-and-the-one-tap-card-design.
   the day's prayers showed the previous night's records until the next
   Fajr. Worth one real check: open the app around 4 AM, lock the phone,
   open it after Fajr.
+
+## Path, made legible (2026-11-01)
+
+Source and simulator only. Not checked on a device:
+
+- **Scrubbing in the hand.** Dragging across the grid fires a light tap
+  per column. At 30 days that should feel like detents; at 90 days a
+  column is three points wide, so confirm it isn't a buzz. Also confirm
+  a drag that starts slightly diagonal still scrolls or scrubs the way
+  the thumb meant, and that scrubbing a full year of data stays smooth.
+- **Landing on a column at 90 days and a year.** A column is 3–5 points
+  wide there. The band and the card's arrows are the answer; check it's
+  enough on the smallest phone.
+- **Ticks on OLED.** On-time ticks use the keyline-less body the small
+  dots use, so by day they read bronze rather than gold. Delayed is told
+  apart by height and tone; confirm that holds at ~50% brightness.
+- **Dynamic Type.** Row labels and the key scale without a cap now, and
+  the key drops to one column at accessibility sizes. Check accessibility5:
+  the gutter caps at a quarter of the card, and "Maghrib" may scale down.
+- **VoiceOver.** The grid is one adjustable element; swiping up and down
+  moves a day and reads what it holds. Confirm the wording, and the 20-
+  second Undo on the day card, by ear.
+- **Live Activity switches on a real Lock Screen.** Turn off one prayer
+  with its countdown standing: it should withdraw, and the others should
+  still appear. Also confirm the "Off in iOS Settings" subtitle after
+  turning Live Activities off for Ihsan in iOS Settings.

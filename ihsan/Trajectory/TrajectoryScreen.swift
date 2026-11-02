@@ -7,25 +7,19 @@ import IhsanInsights
 import IhsanIntents
 import IhsanNotifications
 
-/// The Trajectory tab.
+/// The Path tab.
 ///
 /// Reads `PrayerLog`, `PauseInterval`, and `TravelInterval` directly
 /// from SwiftData via `@Query`, hands them to a `TrajectoryViewModel`
-/// for aggregation, and presents — top to bottom:
+/// for aggregation, and presents — top to bottom, data first:
 ///
-/// 1. A manuscript-style page header ("A pattern of days") with the
-///    period inscription as subtitle.
-/// 2. The 7D / 30D / 90D / YEAR range selector pill.
-/// 3. The gestalt dot pattern — a single illuminated panel containing a
-///    5×N matrix of small dots, one row per prayer, one column per day
-///    (or per week in YEAR mode). The visual heart of the screen — the
-///    user reads their pattern at a glance before any number is shown.
-/// 4. A quiet inscriptional row of counts (ON TIME · N, JAMAʿAH · N,
-///    DELAYED · N, MISSED · N, QADĀ · N). Replaces the previous giant
-///    "% on-time" panel.
-/// 5. The day-by-day detail grid — same five-prayer × N-day matrix as
-///    before, scaled down so the gestalt above is the headline and this
-///    is the drill-down.
+/// 1. The title, the dates, and the period.
+/// 2. The pattern: one row per prayer, one column per day, with its key
+///    and its counts in the same panel. Tap or drag across it to choose
+///    a day.
+/// 3. That day, in words, with the one-tap way to change it.
+/// 4. What stands out in the period, and one thing to do about it.
+/// 5. At most one offer, and the panels for anything already underway.
 struct TrajectoryScreen: View {
     @Query(sort: \PrayerLog.prayerDate, order: .reverse)
     private var logs: [PrayerLog]
@@ -70,8 +64,15 @@ struct TrajectoryScreen: View {
     @State private var showingKhatamDetail = false
     @AppStorage("IhsanKhatamOfferRamadanYear")
     private var khatamOfferRamadanYear: Int = 0
-    /// A grid cell awaiting the retroactive log sheet.
-    @State private var retroSelection: RetroLogSelection?
+    /// The day the card shows. Nil follows the newest day, so the card
+    /// is on today whenever a person hasn't asked for anything else, and
+    /// stays on today when a new day begins.
+    @State private var selectedDay: Date?
+    /// The prayer whose seals are showing on the day card.
+    @State private var openPrayer: Prayer?
+    @State private var recordEditor = PathRecordEditor()
+    /// Bumped to bring the day card into view.
+    @State private var dayCardScrollRequest = 0
     @State private var insightText: String?
     @State private var isInsightLoading = false
     @State private var finding: PathFinding?
@@ -83,7 +84,7 @@ struct TrajectoryScreen: View {
     @State private var sharePreview: PatternSharePayload?
     @State private var shareRenderError = false
     @State private var fiqhInsight = TrajectoryInsightFraming(
-        title: "How this ledger uses timing",
+        title: "How Ihsan records timing",
         body: "The five prayers have appointed times. In Ihsan, ‘On Time’ and ‘Delayed’ both describe a prayer performed within its valid window; ‘Delayed’ is a personal tracking distinction, not a separate legal ruling. A prayer performed after its window is recorded separately as qadāʾ.",
         citation: "Qur’an 4:103 · Ṣaḥīḥ al-Bukhārī 597 · Ṣaḥīḥ Muslim 684d"
     )
@@ -91,6 +92,8 @@ struct TrajectoryScreen: View {
     @Environment(\.nowProvider) private var nowProvider
     @Environment(\.modelContext) private var modelContext
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
 
     private var settings: UserSettings? {
         settingsRows.first
@@ -147,74 +150,39 @@ struct TrajectoryScreen: View {
 
     @ViewBuilder
     private func page(tokens: SkyPaletteTokens) -> some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: IhsanSpacing.lg) {
-                header(tokens: tokens)
-                    .padding(.horizontal, IhsanSpacing.md)
-
-                PeriodSelector(period: $viewModel.period, tokens: tokens)
-                    .padding(.horizontal, IhsanSpacing.md)
-
-                if let settings, !settings.qadaTrackingEnabled, !settings.qadaPathCardDismissed {
-                    RepairInviteCard(
-                        onBegin: { showingRepairSetup = true },
-                        onDismiss: {
-                            settings.qadaPathCardDismissed = true
-                            settings.modifiedAt = .now
-                        }
-                    )
-                    .padding(.horizontal, IhsanSpacing.md)
-                }
-
-                if shouldOfferRamadanKhatam {
-                    KhatamRamadanOfferCard(
-                        onBegin: {
-                            khatamOfferRamadanYear = currentHijriYear
-                            showingKhatamSetup = true
-                        },
-                        onDismiss: {
-                            khatamOfferRamadanYear = currentHijriYear
-                        }
-                    )
-                    .padding(.horizontal, IhsanSpacing.md)
-                }
-
-                // The sunnah layer is invisible until turned on, which
-                // is right and also means nobody finds it. This is the
-                // one time the app mentions it — after a fortnight, and
-                // never again after either answer.
-                if let settings, SunnahInvite.shouldOffer(
-                    distinctLoggedDays: DebugLaunch.flag("-IhsanDebugSunnahInvite")
-                        ? SunnahInvite.requiredDays
-                        : distinctLoggedDayCount,
-                    sunnahLayerEnabled: settings.sunnahLayerEnabled,
-                    hasBeenDismissed: sunnahInviteDismissed
-                ) {
-                    SunnahInviteCard(
-                        onShow: {
-                            sunnahInviteDismissed = true
-                            onOpenSunnahSettings?()
-                        },
-                        onDismiss: { sunnahInviteDismissed = true }
-                    )
-                    .padding(.horizontal, IhsanSpacing.md)
-                }
-
-                content(tokens: tokens)
-
-                if KhatamSurfaceModel.activePlan(in: khatamPlans) != nil {
-                    KhatamSection(onOpen: { showingKhatamDetail = true })
+        ScrollViewReader { reader in
+            ScrollView {
+                VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+                    header(tokens: tokens)
                         .padding(.horizontal, IhsanSpacing.md)
-                }
 
-                if settings?.qadaTrackingEnabled == true {
-                    RepairSection(onOpen: { showingRepairDetail = true })
+                    PeriodSelector(period: $viewModel.period, tokens: tokens)
                         .padding(.horizontal, IhsanSpacing.md)
-                }
 
-                Color.clear.frame(height: IhsanSpacing.xl)
+                    content(tokens: tokens)
+
+                    offer
+                        .padding(.horizontal, IhsanSpacing.md)
+
+                    if KhatamSurfaceModel.activePlan(in: khatamPlans) != nil {
+                        KhatamSection(onOpen: { showingKhatamDetail = true })
+                            .padding(.horizontal, IhsanSpacing.md)
+                    }
+
+                    if settings?.qadaTrackingEnabled == true {
+                        RepairSection(onOpen: { showingRepairDetail = true })
+                            .padding(.horizontal, IhsanSpacing.md)
+                    }
+
+                    Color.clear.frame(height: IhsanSpacing.xl)
+                }
+                .padding(.top, IhsanSpacing.md)
             }
-            .padding(.top, IhsanSpacing.md)
+            .onChange(of: dayCardScrollRequest) {
+                withAnimation(reduceMotion ? nil : .easeOut(duration: 0.3)) {
+                    reader.scrollTo(Self.dayCardID, anchor: .top)
+                }
+            }
         }
         .ihsanStatusBarEdge()
         .ihsanManuscriptPage()
@@ -250,6 +218,15 @@ struct TrajectoryScreen: View {
                 travelIntervals: travels
             )
         }
+        .onChange(of: viewModel.period) {
+            openPrayer = nil
+        }
+        .onChange(of: scenePhase) {
+            if scenePhase != .active { recordEditor.settle() }
+        }
+        .onDisappear {
+            recordEditor.settle()
+        }
         .task(id: insightRequestID) {
             await refreshInsight()
         }
@@ -265,10 +242,6 @@ struct TrajectoryScreen: View {
             // launches exercise the same sheet path as a real card tap.
             await Task.yield()
             showingKhatamDetail = true
-        }
-        .sheet(item: $retroSelection) { selection in
-            retroLogSheet(for: selection)
-                .preferredColorScheme(.dark)
         }
         .sheet(isPresented: $showingMasjidFinder) {
             // Only the resolved city name travels here, never a
@@ -316,6 +289,53 @@ struct TrajectoryScreen: View {
         }
     }
 
+    // MARK: - The one offer
+
+    /// Invitations wait until the person has seen their days, and speak
+    /// one at a time. Two of them stacked at the top of the screen once
+    /// pushed the pattern below the fold. Whichever is answered makes
+    /// way for the next; Ramadan goes first because it will not wait.
+    @ViewBuilder
+    private var offer: some View {
+        if shouldOfferRamadanKhatam {
+            KhatamRamadanOfferCard(
+                onBegin: {
+                    khatamOfferRamadanYear = currentHijriYear
+                    showingKhatamSetup = true
+                },
+                onDismiss: {
+                    khatamOfferRamadanYear = currentHijriYear
+                }
+            )
+        } else if let settings, !settings.qadaTrackingEnabled, !settings.qadaPathCardDismissed {
+            RepairInviteCard(
+                onBegin: { showingRepairSetup = true },
+                onDismiss: {
+                    settings.qadaPathCardDismissed = true
+                    settings.modifiedAt = .now
+                }
+            )
+        } else if let settings, SunnahInvite.shouldOffer(
+            // The sunnah layer is invisible until turned on, which is
+            // right and also means nobody finds it. This is the one time
+            // the app mentions it — after a fortnight, and never again
+            // after either answer.
+            distinctLoggedDays: DebugLaunch.flag("-IhsanDebugSunnahInvite")
+                ? SunnahInvite.requiredDays
+                : distinctLoggedDayCount,
+            sunnahLayerEnabled: settings.sunnahLayerEnabled,
+            hasBeenDismissed: sunnahInviteDismissed
+        ) {
+            SunnahInviteCard(
+                onShow: {
+                    sunnahInviteDismissed = true
+                    onOpenSunnahSettings?()
+                },
+                onDismiss: { sunnahInviteDismissed = true }
+            )
+        }
+    }
+
     private var currentHijriYear: Int {
         HijriConverter.components(
             for: nowProvider.now(),
@@ -339,14 +359,13 @@ struct TrajectoryScreen: View {
     private func header(tokens: SkyPaletteTokens) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .top, spacing: IhsanSpacing.md) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("A pattern of days")
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Path")
                         .font(.system(size: 32, weight: .medium, design: .serif))
                         .foregroundStyle(tokens.ink)
 
                     Text(subtitleText)
-                        .font(IhsanFont.inscription)
-                        .tracking(1.8)
+                        .font(.footnote)
                         .foregroundStyle(tokens.inkSecondary)
                 }
 
@@ -379,8 +398,6 @@ struct TrajectoryScreen: View {
                 }
             }
 
-            OrnamentalDivider(tint: tokens.metal, opacity: 0.5)
-                .padding(.top, IhsanSpacing.xs)
         }
     }
 
@@ -392,9 +409,9 @@ struct TrajectoryScreen: View {
         isRenderingPatternShare = true
         let exportContent = PatternExportPrivacy.prepare(
             days: snapshot.days,
-            aggregate: snapshot.aggregate,
             naflDays: overlayNaflDays,
-            dhikrDays: overlayDhikrDays
+            dhikrDays: overlayDhikrDays,
+            recordBegan: recordBegan
         )
 
         Task { @MainActor in
@@ -414,15 +431,18 @@ struct TrajectoryScreen: View {
         }
     }
 
+    /// The dates the period covers, which the selector's "30 days"
+    /// doesn't say.
     private var subtitleText: String {
-        let periodCaption: String
-        switch viewModel.period {
-        case .sevenDays: periodCaption = "SEVEN DAYS"
-        case .thirtyDays: periodCaption = "THIRTY DAYS"
-        case .ninetyDays: periodCaption = "NINETY DAYS"
-        case .year: periodCaption = "ONE YEAR"
-        }
-        return "TRAJECTORY · \(periodCaption)"
+        viewModel.period.formattedRange(
+            cycleDate: PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
+        )
+    }
+
+    /// The day of the earliest record. Days before it aren't gaps; they
+    /// are days before this person began. `logs` is newest-first.
+    private var recordBegan: Date? {
+        logs.last.map { Calendar.current.startOfDay(for: $0.prayerDate) }
     }
 
     // MARK: - Content
@@ -441,12 +461,23 @@ struct TrajectoryScreen: View {
                 .padding(.top, IhsanSpacing.xxl)
 
         case .ready(let snapshot):
-            VStack(spacing: IhsanSpacing.lg) {
-                gestaltPanel(snapshot: snapshot, tokens: tokens)
-                    .padding(.horizontal, IhsanSpacing.md)
+            let days = recordEditor.applying(to: snapshot.days)
+            let selected = selectedDayCompletion(in: days)
 
-                QuietSummaryRow(aggregate: snapshot.aggregate, tokens: tokens)
-                    .padding(.horizontal, IhsanSpacing.md)
+            VStack(spacing: IhsanSpacing.md) {
+                patternPanel(
+                    days: days,
+                    selected: selected,
+                    period: snapshot.period,
+                    tokens: tokens
+                )
+                .padding(.horizontal, IhsanSpacing.md)
+
+                if let selected {
+                    dayCard(for: selected, in: days, tokens: tokens)
+                        .id(Self.dayCardID)
+                        .padding(.horizontal, IhsanSpacing.md)
+                }
 
                 if isInsightLoading || insightText != nil || finding != nil {
                     TrajectoryInsightCard(
@@ -462,43 +493,128 @@ struct TrajectoryScreen: View {
                     .padding(.horizontal, IhsanSpacing.md)
                     .transition(.opacity)
                 }
-
-                DailyPracticeGrid(
-                    days: snapshot.days,
-                    tokens: tokens,
-                    voluntary: voluntaryDetail,
-                    onCellTap: { day, completion in
-                        retroSelection = RetroLogSelection(
-                            day: day.date,
-                            prayer: completion.prayer,
-                            currentStatus: completion.status,
-                            isJamaah: completion.withJamaah
-                        )
-                    }
-                )
-                .padding(.horizontal, IhsanSpacing.md)
             }
         }
     }
 
-    /// The gestalt-pattern panel — the visual headline of the screen.
-    /// Wrapped here (rather than inside `GestaltGrid`) so the panel
-    /// padding stays in lockstep with the other illuminated panels on
-    /// the page.
-    @ViewBuilder
-    private func gestaltPanel(
-        snapshot: TrajectoryState.Snapshot, tokens: SkyPaletteTokens
+    private static let dayCardID = "path-day-card"
+
+    /// The pattern and its key, in one panel: a mark and the word for it
+    /// should never be a scroll apart.
+    private func patternPanel(
+        days: [DayCompletion],
+        selected: DayCompletion?,
+        period: TrajectoryPeriod,
+        tokens: SkyPaletteTokens
     ) -> some View {
-        GestaltGrid(
-            days: snapshot.days,
-            period: snapshot.period,
-            tokens: tokens,
-            naflDays: overlayNaflDays,
-            dhikrDays: overlayDhikrDays
-        )
-        .padding(IhsanSpacing.lg)
+        VStack(alignment: .leading, spacing: IhsanSpacing.md) {
+            GestaltGrid(
+                days: days,
+                period: period,
+                tokens: tokens,
+                naflDays: overlayNaflDays,
+                dhikrDays: overlayDhikrDays,
+                recordBegan: recordBegan,
+                selectedColumn: selected.flatMap {
+                    GestaltAggregation.column(for: $0.date, days: days, period: period)
+                },
+                selectionSummary: selected.map(spokenSummary(of:)),
+                onSelectColumn: { column in
+                    selectColumn(column, days: days, period: period)
+                },
+                onStepDay: { step in
+                    stepDay(by: step, days: days)
+                }
+            )
+
+            PathKey(
+                tally: PathTally(days: days, recordBegan: recordBegan),
+                period: period,
+                tokens: tokens
+            )
+        }
+        .padding(IhsanSpacing.md)
         .frame(maxWidth: .infinity)
         .celestialPanel(tokens: tokens, cornerRadius: 18)
+    }
+
+    private func dayCard(
+        for day: DayCompletion,
+        in days: [DayCompletion],
+        tokens: SkyPaletteTokens
+    ) -> some View {
+        PathDayCard(
+            day: day,
+            isToday: day.date == days.last?.date,
+            countsBlanks: PathTally.isCounted(
+                dayDate: day.date,
+                newestDay: days.last?.date,
+                recordBegan: recordBegan
+            ),
+            canStepBack: day.date != days.first?.date,
+            canStepForward: day.date != days.last?.date,
+            voluntary: voluntaryDetail[day.date],
+            tokens: tokens,
+            editor: recordEditor,
+            openPrayer: $openPrayer,
+            isRemovalRefused: { isRepaired($0, on: day.date) },
+            onStep: { stepDay(by: $0, days: days) }
+        )
+    }
+
+    // MARK: - Choosing a day
+
+    private func selectedDayCompletion(in days: [DayCompletion]) -> DayCompletion? {
+        guard let selectedDay else { return days.last }
+        return days.first { $0.date == selectedDay } ?? days.last
+    }
+
+    private func selectColumn(_ column: Int, days: [DayCompletion], period: TrajectoryPeriod) {
+        guard let date = GestaltAggregation.day(forColumn: column, days: days, period: period),
+              date != selectedDayCompletion(in: days)?.date
+        else { return }
+        Haptics.tap()
+        select(date, days: days)
+    }
+
+    private func stepDay(by step: Int, days: [DayCompletion]) {
+        guard let current = selectedDayCompletion(in: days),
+              let index = days.firstIndex(where: { $0.date == current.date }),
+              days.indices.contains(index + step)
+        else { return }
+        select(days[index + step].date, days: days)
+    }
+
+    private func select(_ date: Date, days: [DayCompletion]) {
+        recordEditor.settle()
+        openPrayer = nil
+        selectedDay = date == days.last?.date ? nil : date
+    }
+
+    /// The selected day read aloud, for the grid's value.
+    private func spokenSummary(of day: DayCompletion) -> String {
+        let date = day.date.formatted(.dateTime.weekday(.wide).month(.wide).day())
+        if day.isPaused { return "\(date), paused, not counted" }
+        let prayers = day.prayerCompletions.map { completion in
+            let state = completion.status?.spokenLabel ?? "no record"
+            return "\(completion.prayer.displayNameEnglish) \(state)"
+        }
+        return ([date] + prayers).joined(separator: ", ")
+    }
+
+    /// Whether a make-up points at this prayer's record for this day.
+    /// `RemovePrayerLogIntent` refuses such a removal, so the card
+    /// doesn't offer one it would only have to take back.
+    private func isRepaired(_ prayer: Prayer, on day: Date) -> Bool {
+        let repaired = Set(logs.compactMap(\.qadaForPrayerLogID))
+        guard !repaired.isEmpty else { return false }
+        let calendar = Calendar.current
+        return logs.contains { log in
+            log.prayer == prayer
+                && log.qadaForPrayerLogID == nil
+                && calendar.isDate(log.prayerDate, inSameDayAs: day)
+                && repaired.contains(log.id)
+        }
     }
 
     // MARK: - Presence overlays
@@ -512,12 +628,11 @@ struct TrajectoryScreen: View {
     // trust that something happened.
     //
     // The rows now follow the data: the screen hands over what it has,
-    // `GestaltGrid` draws a row only when that row has marks in it, and
-    // a key underneath names each one.
+    // and `GestaltGrid` draws and names a row only when it has marks.
 
-    /// What each cycle holds beyond its five fardh, for the table's
-    /// day detail. The pattern card says a day carried voluntary
-    /// worship; this says what, for the one day a person taps.
+    /// What each cycle holds beyond its five fardh, for the day card.
+    /// The pattern says a day carried voluntary worship; this says what,
+    /// for the one day a person chooses.
     private var voluntaryDetail: [Date: DayVoluntaryDetail] {
         DayVoluntaryDetail.index(
             naflLogs: settings?.sunnahLayerEnabled == true ? naflLogs : [],
@@ -567,15 +682,14 @@ struct TrajectoryScreen: View {
     private func act(on action: PathFindingAction) {
         switch action {
         case .logSlot(let day, let prayer):
-            retroSelection = RetroLogSelection(
-                day: day,
-                prayer: prayer,
-                currentStatus: nil,
-                isJamaah: false
-            )
+            // Straight to the empty prayer, with its seals already open.
+            recordEditor.settle()
+            selectedDay = day
+            openPrayer = prayer
+            dayCardScrollRequest += 1
 
         case .openMakeupLedger:
-            // The ledger has to exist before it can be opened. Somebody
+            // Repair has to exist before it can be opened. Somebody
             // who never set qadāʾ tracking up gets the setup flow, which
             // is the same door from the invite card above.
             if settings?.qadaTrackingEnabled == true {
@@ -640,12 +754,17 @@ struct TrajectoryScreen: View {
         // from the ledger alone. It does not wait on Foundation Models,
         // does not depend on the insights toggle, and is identical on a
         // device where Apple Intelligence never becomes available.
+        //
+        // "Now" here is the cycle in progress, like the grid's newest
+        // column: at 2 AM the evening's blanks are not yet gaps.
+        let cycleNow = PrayerCycleClock.sharedCycleDate(at: nowProvider.now())
         let resolved = PathFinding.make(
             days: snapshot.days,
             aggregate: snapshot.aggregate,
             logs: logs,
             reminders: reminderSettings,
-            now: nowProvider.now(),
+            now: cycleNow,
+            recordBegan: recordBegan,
             calendar: .current
         )
         // Both halves of the card land in the same frame, with the
@@ -654,12 +773,14 @@ struct TrajectoryScreen: View {
         // citation on screen together for as long as the load takes.
         finding = resolved
         findingGrounding = .standard(for: resolved.kind)
-        insightText = TrajectoryInsightNarrative.make(
+        let narrative = TrajectoryInsightNarrative.make(
             days: snapshot.days,
             aggregate: snapshot.aggregate,
-            now: nowProvider.now(),
+            now: cycleNow,
+            recordBegan: recordBegan,
             calendar: .current
         )
+        insightText = narrative.isEmpty ? nil : narrative
 
         if let configured = await currentFraming()?.findingFraming(for: resolved.kind) {
             findingGrounding = configured
@@ -716,9 +837,8 @@ struct TrajectoryScreen: View {
                     .generateMonthlyInsight(from: summary)
                     .summarySentence
             }
-            if TrajectoryInsightNarrative.isUsefulGeneratedObservation(generated),
-               let exactReadout = insightText {
-                insightText = exactReadout + " " + generated
+            if TrajectoryInsightNarrative.isUsefulGeneratedObservation(generated) {
+                insightText = [insightText, generated].compactMap(\.self).joined(separator: " ")
             }
             try modelContext.save()
         } catch {
@@ -728,68 +848,6 @@ struct TrajectoryScreen: View {
             // Keep the deterministic readout already on screen.
         }
     }
-
-    // MARK: - Retroactive logging (the ledger's way in)
-
-    /// The log sheet for a tapped grid cell. Prior days open with all
-    /// four tiles active (the past-day rule); today's cells defer to
-    /// the availability rule. The sheet inscribes the day instead of
-    /// clock times — a past day has no window to describe.
-    @ViewBuilder
-    private func retroLogSheet(for selection: RetroLogSelection) -> some View {
-        let now = nowProvider.now()
-        let tokens = PaletteState.resolved(
-            for: SkyPhase.approximate(at: now, timeZone: .current)
-        )
-        PrayerLogSheet(
-            prayer: selection.prayer,
-            scheduledTime: selection.day,
-            windowEndTime: nil,
-            timeZone: .current,
-            tokens: tokens,
-            currentStatus: selection.currentStatus,
-            isJamaah: selection.isJamaah,
-            availableStatuses: TimingAvailability.allowedStatuses(
-                cycleDate: PrayerCycleClock.sharedCycleDate(at: now),
-                dayBeingLogged: selection.day,
-                windowState: nil,
-                currentStatus: selection.currentStatus
-            ),
-            displayDate: selection.day,
-            onCommit: { status, jamaah in
-                commitRetro(selection: selection, status: status, jamaah: jamaah)
-            },
-            onCancel: {}
-        )
-    }
-
-    /// The same single funnel every surface uses — the intents —
-    /// with the cell's civil day attached. Dedup holds per
-    /// (prayer, day); an edit rewrites in place.
-    private func commitRetro(
-        selection: RetroLogSelection, status: PrayerStatus, jamaah: Bool
-    ) {
-        Task {
-            _ = try? await LogPrayerWithStatusIntent(
-                prayer: selection.prayer, status: status, date: selection.day
-            ).perform()
-            if jamaah != selection.isJamaah {
-                _ = try? await ToggleJamaahIntent(
-                    prayer: selection.prayer, date: selection.day
-                ).perform()
-            }
-        }
-    }
-
-}
-
-/// Identifies the grid cell whose log sheet is presented.
-private struct RetroLogSelection: Identifiable, Hashable {
-    let day: Date
-    let prayer: Prayer
-    let currentStatus: PrayerStatus?
-    let isJamaah: Bool
-    var id: String { "\(prayer.rawValue)-\(day.timeIntervalSinceReferenceDate)" }
 }
 
 #Preview {

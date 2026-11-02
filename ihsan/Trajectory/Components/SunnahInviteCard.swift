@@ -5,7 +5,7 @@ import SwiftUI
 ///
 /// The layer is invisible until turned on, which is the right default
 /// and also means nobody finds it. So it says so — once, after a
-/// fortnight of logging, in the Returning card's pattern and register.
+/// fortnight of logging, in the Repair invitation's pattern and register.
 /// Either answer retires it forever: "Show me" opens Set, "Not now"
 /// puts it away, and the app never raises it again either way.
 ///
@@ -16,7 +16,7 @@ struct SunnahInviteCard: View {
     let onShow: () -> Void
     let onDismiss: () -> Void
 
-    /// A fixed identity, like the Returning card: the same deep plum
+    /// A fixed identity, like the Repair invitation: the same deep plum
     /// whatever hour the page is at.
     private var tokens: SkyPaletteTokens {
         PaletteState.sunset.tokens
@@ -24,9 +24,8 @@ struct SunnahInviteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            Text("IF YOU WANT IT")
-                .font(IhsanFont.inscription)
-                .tracking(1.6)
+            Text("Voluntary prayers")
+                .font(IhsanFont.bodyEnglishBold)
                 .foregroundStyle(tokens.metal)
 
             Text("There is more to the day than the five — the rawatib, duha, the night. It waits in Set, and stays off until you turn it on.")

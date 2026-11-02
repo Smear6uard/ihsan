@@ -4,7 +4,7 @@ import Testing
 @testable import ihsan
 
 /// Corrective G, phase 3 — the sheet's contrast audit, computed from
-/// the exact recipes the tiles render (`PrayerLogSheet`'s static
+/// the exact recipes the tiles render (`TimingSealGlyph`'s static
 /// treatment functions), across all six canonical SkyPhases.
 ///
 /// The standard: every timing tile's PRIMARY boundary — the strongest
@@ -12,8 +12,8 @@ import Testing
 /// against the tile it sits on, in every palette. Quiet must never
 /// mean invisible: the qadā roundel was a dark shape on a dark tile;
 /// its lifted-lapis body plus metal edge now reads in every phase.
-@Suite("PrayerLogSheet contrast")
-struct PrayerLogSheetContrastTests {
+@Suite("Timing seal contrast")
+struct TimingSealContrastTests {
 
     private let states = PaletteState.allCases
 
@@ -37,22 +37,22 @@ struct PrayerLogSheetContrastTests {
             #expect(onTime >= 3.0, "\(state) onTime silhouette \(onTime)")
 
             // Late — the warm outline, deepened on light grounds.
-            let late = PrayerLogSheet.lateOutlineValue(for: tokens)
+            let late = TimingSealGlyph.lateOutlineValue(for: tokens)
                 .contrastRatio(against: panel)
             #expect(late >= 3.0, "\(state) late outline \(late)")
 
             // Qadā — lifted lapis body + metal edge.
             let qada = silhouette(
                 [
-                    PrayerLogSheet.qadaBodyValue(for: tokens),
-                    PrayerLogSheet.qadaEdgeValue(for: tokens)
+                    TimingSealGlyph.qadaBodyValue(for: tokens),
+                    TimingSealGlyph.qadaEdgeValue(for: tokens)
                 ],
                 against: panel
             )
             #expect(qada >= 3.0, "\(state) qadā silhouette \(qada)")
 
             // Missed — quiet secondary ink.
-            let missed = PrayerLogSheet.missedOutlineValue(for: tokens)
+            let missed = TimingSealGlyph.missedOutlineValue(for: tokens)
                 .contrastRatio(against: panel)
             #expect(missed >= 3.0, "\(state) missed outline \(missed)")
         }
@@ -65,41 +65,9 @@ struct PrayerLogSheetContrastTests {
     func qadaBodyIsNeverInvisibleOnItsTile() {
         for state in states {
             let tokens = state.tokens
-            let body = PrayerLogSheet.qadaBodyValue(for: tokens)
+            let body = TimingSealGlyph.qadaBodyValue(for: tokens)
                 .contrastRatio(against: tokens.panelFillValue)
             #expect(body >= 1.9, "\(state) qadā body \(body)")
-        }
-    }
-
-    /// The truth pass quiets unavailable tiles to
-    /// `unavailableTileOpacity` — quiet must still never mean
-    /// invisible. Compositing each ornament's strongest boundary at
-    /// that opacity over its tile must keep a ≥1.9:1 presence in
-    /// every phase, and the qadā roundel specifically must survive
-    /// the dimming on day and night grounds.
-    @Test
-    func unavailableTilesStayPerceptibleInEveryPhase() {
-        let alpha = PrayerLogSheet.unavailableTileOpacity
-        for state in states {
-            let tokens = state.tokens
-            let panel = tokens.panelFillValue
-
-            let boundaries: [(String, [SRGBValue])] = [
-                ("onTime", [tokens.leafGoldValue, tokens.keylineValue]),
-                ("late", [PrayerLogSheet.lateOutlineValue(for: tokens)]),
-                ("qada", [
-                    PrayerLogSheet.qadaBodyValue(for: tokens),
-                    PrayerLogSheet.qadaEdgeValue(for: tokens)
-                ]),
-                ("missed", [PrayerLogSheet.missedOutlineValue(for: tokens)]),
-            ]
-
-            for (name, candidates) in boundaries {
-                let dimmed = candidates
-                    .map { SRGBValue.mix(panel, $0, amount: alpha) }
-                let strongest = silhouette(dimmed, against: panel)
-                #expect(strongest >= 1.9, "\(state) dimmed \(name) \(strongest)")
-            }
         }
     }
 

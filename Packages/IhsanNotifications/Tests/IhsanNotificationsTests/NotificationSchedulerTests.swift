@@ -296,8 +296,9 @@ func rebuildScheduleSkipsPrayersDisabledInSettings() async throws {
     let scheduled = await scheduler.scheduledNotifications()
     #expect(scheduled.count == 56)
     #expect(!scheduled.contains { $0.prayer == .asr })
-    #expect(activityScheduler.requests.count == 56)
-    #expect(!activityScheduler.requests.contains { $0.prayer == .asr })
+    // A prayer's countdown is its own switch: declining the notification
+    // does not decline the countdown.
+    #expect(activityScheduler.requests.contains { $0.prayer == .asr })
 }
 
 /// The device-local Live Activity switch: off must withdraw every
@@ -321,6 +322,45 @@ func liveActivitySwitchOffKeepsNotificationsAndWithdrawsActivities() async throw
     #expect(!scheduled.isEmpty)
     #expect(activityScheduler.requests.isEmpty)
     #expect(activityScheduler.cancelCount == 1)
+}
+
+/// One prayer's countdown switched off leaves the others standing, and
+/// leaves that prayer's own notification alone.
+@Test
+func onePrayersLiveActivityOffLeavesTheOthersAndItsNotification() async throws {
+    let center = MockNotificationCenter()
+    let activityScheduler = MockPrayerActivityScheduler()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: center,
+        settings: NotificationScheduleSettings(prayersWithoutLiveActivity: [.asr]),
+        activityScheduler: activityScheduler
+    )
+
+    try await scheduler.rebuildSchedule()
+
+    #expect(!activityScheduler.requests.contains { $0.prayer == .asr })
+    #expect(activityScheduler.requests.contains { $0.prayer == .dhuhr })
+    let scheduled = await scheduler.scheduledNotifications()
+    #expect(scheduled.contains { $0.prayer == .asr })
+}
+
+/// A start already parked for a prayer just switched off would still
+/// fire: a rebuild only stages. The switch withdraws first.
+@Test
+func applyingLiveActivityPreferencesWithdrawsBeforeStaging() async throws {
+    let activityScheduler = MockPrayerActivityScheduler()
+    let scheduler = makeScheduler(
+        now: fixedDate(),
+        center: MockNotificationCenter(),
+        settings: NotificationScheduleSettings(prayersWithoutLiveActivity: [.fajr]),
+        activityScheduler: activityScheduler
+    )
+
+    try await scheduler.applyLiveActivityPreferences()
+
+    #expect(activityScheduler.cancelCount == 1)
+    #expect(!activityScheduler.requests.contains { $0.prayer == .fajr })
 }
 
 @Test

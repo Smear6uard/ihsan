@@ -4,8 +4,8 @@ import IhsanFiqhConfig
 
 /// The one thing in this period worth doing something about.
 ///
-/// The Path already *shows* the pattern (the gestalt grid) and *counts*
-/// it (the quiet summary row). Restating either in a sentence adds
+/// The Path already *shows* the pattern (the grid) and *counts* it (the
+/// key beneath it). Restating either in a sentence adds
 /// nothing, which is what the readout used to do. This picks the single
 /// sharpest reading the ledger supports, says it plainly with the
 /// numbers that make it true, and offers one action that changes
@@ -36,7 +36,7 @@ struct PathFinding: Equatable, Sendable {
 /// neither see nor undo. The app has exactly one visible lever on a
 /// prayer's reminder, and this uses that one.
 enum PathFindingAction: Equatable, Sendable {
-    /// Open the retroactive log sheet on this exact empty slot.
+    /// Open this exact empty prayer in the day card.
     case logSlot(day: Date, prayer: Prayer)
     /// Open the qadāʾ ledger.
     case openMakeupLedger
@@ -65,19 +65,25 @@ extension PathFinding {
     /// empty slots, the empty slots *are* the finding.
     static let coverageFloor = 0.5
 
+    /// - Parameter recordBegan: The day of the earliest record. The days
+    ///   before it are days before the person began, not gaps — without
+    ///   this every new account is told most of its month is blank.
     static func make(
         days: [DayCompletion],
         aggregate: TrajectoryAggregate,
         logs: [PrayerLog],
         reminders: [PathReminderSetting],
         now: Date,
+        recordBegan: Date? = nil,
         calendar: Calendar = .current
     ) -> PathFinding {
         // Today is excluded outright. Its later prayers are not due
         // yet, and counting a not-yet-due slot as a gap would make the
         // card wrong every morning. Paused days never enter any count.
         let today = calendar.startOfDay(for: now)
-        let elapsed = days.filter { !$0.isPaused && $0.date < today }
+        let elapsed = days.filter {
+            !$0.isPaused && $0.date < today && $0.date >= (recordBegan ?? .distantPast)
+        }
         let elapsedSlots = elapsed.count * 5
         let stats = PrayerStats.build(from: elapsed)
 
@@ -115,9 +121,10 @@ extension PathFinding {
         }
         guard Double(unrecorded) > Double(elapsedSlots) * coverageFloor else { return nil }
 
-        let recorded = elapsedSlots - unrecorded
-        let headline = "\(unrecorded) of the last \(elapsedSlots) slots hold no record at all. "
-            + "The pattern above is drawn from the \(recorded) that do."
+        // No denominator: the key above already states how many were
+        // counted, and this figure is its "No record".
+        let headline = "\(unrecorded) prayers in this period have no record, "
+            + "so the pattern above shows only part of the picture."
 
         // The most recent gap, not the oldest: a person can still
         // remember yesterday afternoon.
@@ -134,7 +141,7 @@ extension PathFinding {
             kind: .unrecordedSlots,
             headline: headline,
             action: .logSlot(day: gap.day, prayer: gap.prayer),
-            actionTitle: "Record \(gap.prayer.displayNameEnglish) · \(weekday(gap.day, calendar: calendar))"
+            actionTitle: "Record \(weekday(gap.day, calendar: calendar))’s \(gap.prayer.displayNameEnglish)"
         )
     }
 
@@ -178,15 +185,14 @@ extension PathFinding {
         guard !outstanding.isEmpty else { return nil }
 
         let isOne = outstanding.count == 1
-        let headline = "\(outstanding.count) \(isOne ? "prayer is" : "prayers are") "
-            + "recorded missed in this period with no makeup logged against "
-            + "\(isOne ? "it" : "them") yet."
+        let headline = "\(outstanding.count) missed \(isOne ? "prayer" : "prayers") "
+            + "in this period \(isOne ? "has" : "have") no qadā recorded yet."
 
         return PathFinding(
             kind: .outstandingMakeups,
             headline: headline,
             action: .openMakeupLedger,
-            actionTitle: "Open the makeup ledger"
+            actionTitle: "Open Repair"
         )
     }
 
@@ -217,8 +223,8 @@ extension PathFinding {
         case .dhuhr, .maghrib: .weakOtherPrayer
         }
 
-        let headline = "\(worst.prayer.displayNameEnglish) is the weak point: "
-            + "prayed on \(worst.present) of \(dayCount) days, "
+        let headline = "\(worst.prayer.displayNameEnglish) has the most gaps: "
+            + "prayed on \(worst.present) of the past \(dayCount) days, "
             + "against \(best.present) for \(best.prayer.displayNameEnglish)."
         let remedy = remedy(for: worst.prayer, reminders: reminders)
 
@@ -244,8 +250,9 @@ extension PathFinding {
         else { return nil }
 
         let kind: PathFindingKind = worst.prayer == .asr ? .delayedAsr : .delayedOtherPrayer
-        let headline = "\(worst.prayer.displayNameEnglish) is recorded delayed on "
-            + "\(worst.late) of \(dayCount) days — inside its window, at the end of it."
+        let headline = "\(worst.prayer.displayNameEnglish) was delayed on "
+            + "\(worst.late) of the past \(dayCount) days: prayed in its time, "
+            + "but toward the end of it."
         let remedy = remedy(for: worst.prayer, reminders: reminders)
 
         return PathFinding(
@@ -262,8 +269,8 @@ extension PathFinding {
 
         return PathFinding(
             kind: .noJamaah,
-            headline: "\(aggregate.totalLogged) prayers recorded in this period, "
-                + "none of them with a congregation.",
+            headline: "None of the prayers recorded in this period were in "
+                + "\(IhsanVocabulary.jamaah).",
             action: .findCongregation,
             actionTitle: "Find a masjid"
         )
@@ -278,10 +285,10 @@ extension PathFinding {
     ) -> PathFinding {
         let headline: String
         if dayCount > 0, let worst = stats.min(by: PrayerStats.byOnTimeRate) {
-            headline = "Nothing in this period is slipping. The thinnest point is "
-                + "\(worst.prayer.displayNameEnglish), on time on \(worst.onTime) of \(dayCount) days."
+            headline = "Nothing stands out as slipping. \(worst.prayer.displayNameEnglish) "
+                + "has the fewest on-time days: \(worst.onTime) of the past \(dayCount)."
         } else {
-            headline = "Not enough elapsed days in this period to read a pattern yet."
+            headline = "It’s too early in this period to see a pattern."
         }
 
         // Offering a masjid search to somebody already praying half
@@ -345,7 +352,7 @@ extension PathFinding {
         formatter.calendar = calendar
         formatter.locale = .current
         formatter.timeZone = calendar.timeZone
-        formatter.setLocalizedDateFormatFromTemplate("EEE")
+        formatter.setLocalizedDateFormatFromTemplate("EEEE")
         return formatter.string(from: date)
     }
 }
@@ -358,8 +365,9 @@ struct PrayerStats: Equatable, Sendable {
     let late: Int
     let missed: Int
 
-    /// Prayed at all, punctual or not.
-    var present: Int { onTime + late }
+    /// Prayed at all, punctual or not. Nonisolated, like the
+    /// comparators that read it: arithmetic on two stored counts.
+    nonisolated var present: Int { onTime + late }
 
     func onTimeRate(over dayCount: Int) -> Double {
         guard dayCount > 0 else { return 0 }
@@ -398,7 +406,7 @@ struct PrayerStats: Equatable, Sendable {
     /// chosen per call site instead. This one is read by `min` to find
     /// the weakest prayer, so an ascending tie hands back the earlier
     /// of two equally weak ones.
-    static func byOnTimeRate(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
+    nonisolated static func byOnTimeRate(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
         if lhs.onTime != rhs.onTime { return lhs.onTime < rhs.onTime }
         return order(lhs.prayer) < order(rhs.prayer)
     }
@@ -409,19 +417,19 @@ struct PrayerStats: Equatable, Sendable {
     /// `max` only ever supplies a comparison figure, so which of two
     /// equally strong prayers it picks does not matter beyond being
     /// stable.
-    static func byPresence(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
+    nonisolated static func byPresence(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
         if lhs.present != rhs.present { return lhs.present < rhs.present }
         return order(lhs.prayer) < order(rhs.prayer)
     }
 
     /// Read by `max` to find the most-delayed prayer, so this tie runs
     /// the other way: the earlier prayer sorts highest and wins.
-    static func byLateCount(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
+    nonisolated static func byLateCount(_ lhs: PrayerStats, _ rhs: PrayerStats) -> Bool {
         if lhs.late != rhs.late { return lhs.late < rhs.late }
         return order(lhs.prayer) > order(rhs.prayer)
     }
 
-    private static func order(_ prayer: Prayer) -> Int {
+    nonisolated private static func order(_ prayer: Prayer) -> Int {
         Prayer.allCases.firstIndex(of: prayer) ?? 0
     }
 }

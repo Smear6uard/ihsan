@@ -68,8 +68,8 @@ public extension TrajectoryFindingFraming {
         case .unrecordedSlots:
             TrajectoryFindingFraming(
                 kind: kind,
-                title: "An empty slot is not a missed prayer",
-                body: "Ihsan keeps the two apart on purpose. A slot with no record means nothing was entered and the app does not know what happened. Missed means you told it the prayer was not prayed inside its window. Prayer is fixed on the believers at appointed times, so each slot is a real appointment — but only the ones you fill in can tell you anything.",
+                title: "No record is not a missed prayer",
+                body: "Ihsan keeps the two apart on purpose. No record means nothing was entered and the app does not know what happened. Missed means you told it the prayer was not prayed inside its window. Prayer is fixed on the believers at appointed times, so each one is a real appointment — but only the ones you fill in can tell you anything.",
                 citation: "Qur’an 4:103"
             )
 

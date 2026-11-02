@@ -77,9 +77,17 @@ final class GalleryCaptureUITests: XCTestCase {
             Frame(name: "03-today-afternoon", arguments: [
                 "-IhsanNowOverride", Self.chicagoAfternoon
             ]),
-            Frame(name: "04-log-sheet", arguments: [
+            // The card records in place: four seals on a closed
+            // window, then a record being changed.
+            Frame(name: "04-card-seals", arguments: [
                 "-IhsanNowOverride", Self.chicagoAfternoon,
-                "-IhsanDebugPresentLogSheet", "dhuhr"
+                "-IhsanDebugFocusPrayer", "dhuhr"
+            ], settle: 3.0),
+            Frame(name: "04b-card-change", arguments: [
+                "-IhsanNowOverride", Self.chicagoAfternoon,
+                "-IhsanDebugLogPrayer", "dhuhr:onTime",
+                "-IhsanDebugFocusPrayer", "dhuhr",
+                "-IhsanDebugChangeCard"
             ], settle: 3.0),
             Frame(name: "05-path", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
@@ -159,8 +167,7 @@ final class GalleryCaptureUITests: XCTestCase {
                 "-IhsanDebugTab", "trajectory",
                 "-IhsanDebugPeriod", "7",
                 "-IhsanDebugSeedVoluntary", "10",
-                "-IhsanDebugLogPrayer", Self.mixedWeek,
-                "-IhsanDebugExpandPracticeDay", "0"
+                "-IhsanDebugLogPrayer", Self.mixedWeek
             ], settle: 3.0, scrollsToBottom: true),
             Frame(name: "11-dhikr", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,
@@ -180,9 +187,9 @@ final class GalleryCaptureUITests: XCTestCase {
         let sizes = ["UICTContentSizeCategoryAccessibilityXXXL"]
         let surfaces: [Frame] = [
             Frame(name: "a5-today", arguments: ["-IhsanNowOverride", Self.chicagoNight]),
-            Frame(name: "a5-log-sheet", arguments: [
+            Frame(name: "a5-card-seals", arguments: [
                 "-IhsanNowOverride", Self.chicagoAfternoon,
-                "-IhsanDebugPresentLogSheet", "dhuhr"
+                "-IhsanDebugFocusPrayer", "dhuhr"
             ], settle: 3.0),
             Frame(name: "a5-set", arguments: [
                 "-IhsanNowOverride", Self.chicagoNight,

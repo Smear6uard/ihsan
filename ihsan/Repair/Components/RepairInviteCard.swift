@@ -8,7 +8,7 @@ struct RepairInviteCard: View {
     let onBegin: () -> Void
     let onDismiss: () -> Void
 
-    /// The Returning card carries the Repair identity on every
+    /// This card carries the Repair identity on every
     /// ground: the sunset family's deep plum, deliberately darker
     /// than the sunset panel itself, with the sunset ink and gold.
     /// A fixed identity — the card does not follow the page's hour.
@@ -18,9 +18,8 @@ struct RepairInviteCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            Text("RETURNING")
-                .font(IhsanFont.inscription)
-                .tracking(1.6)
+            Text("Prayers to make up")
+                .font(IhsanFont.bodyEnglishBold)
                 .foregroundStyle(tokens.metal)
 
             Text("If you carry prayers from another season, there is a gentle way to return to them.")

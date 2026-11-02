@@ -882,7 +882,7 @@ struct FocusedPrayerCard: View {
 /// it. It is both the record's jamāʿah state and the control that
 /// changes it, and a tap applies at once — jamāʿah describes what
 /// happened, so it is set after the commit, not staged before it.
-private struct JamaahChip: View {
+struct JamaahChip: View {
     let isOn: Bool
     let tokens: SkyPaletteTokens
     let action: () -> Void

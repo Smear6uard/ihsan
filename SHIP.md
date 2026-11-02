@@ -138,7 +138,8 @@ names.
    under the status bar clock. **Frame 3 (logging) pictures the card's
    seals since 31 Oct** — the log sheet it used to show no longer opens
    from Today, so a frame of it would picture a screen the app does not
-   have. Its caption changed with it.
+   have. Its caption changed with it. **Frame 6 was recaptured on 1 Nov
+   2026** when Path was rebuilt.
    App Store Connect has no caption field — `docs/app-store-captions.md`
    says what to do with the lines written there.
 5. **Review notes.** The "Notes for App Review" section of

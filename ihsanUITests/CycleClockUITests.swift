@@ -110,21 +110,55 @@ final class CycleClockUITests: XCTestCase {
         attach(name: "k3-path-midday")
     }
 
-    /// A 1 AM Isha is loggable, and the sheet offers the in-window
-    /// choices — because the window really is open.
+    /// A 1 AM Isha is loggable, and the card offers the in-window
+    /// seals — because the window really is open.
     @MainActor
     func testIshaIsLoggableAtOneAm() {
         let app = launch(
-            at: Self.oneAm, extra: ["-IhsanDebugPresentLogSheet", "isha"]
+            at: Self.oneAm, extra: ["-IhsanDebugFocusPrayer", "isha"]
         )
-        let onTime = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS[c] 'On time'"))
-            .firstMatch
+        let onTime = app.buttons["Log as On Time"]
         XCTAssertTrue(
             onTime.waitForExistence(timeout: 20),
             "Isha must still be loggable on time at 1 AM"
         )
-        attach(name: "k4-log-sheet-isha-1am")
+        XCTAssertTrue(app.buttons["Log as Delayed"].exists)
+        XCTAssertFalse(
+            app.buttons["Log as Qadā"].exists,
+            "Qadā is after the window; at 1 AM Isha's window is still open"
+        )
+        attach(name: "k4-card-isha-1am")
+    }
+
+    /// From Isha's opening the plate's Fajr is the dawn ahead: the
+    /// marker's time is the one the header's NEXT names, not the
+    /// morning's, on either side of midnight.
+    @MainActor
+    func testThePlateNamesTheFajrTheHeaderNames() {
+        for instant in [Self.lateEvening, Self.oneAm] {
+            let app = launch(at: instant)
+            let header = app.descendants(matching: .any)
+                .matching(NSPredicate(format: "label CONTAINS[c] 'Next prayer: Fajr at'"))
+                .firstMatch
+            XCTAssertTrue(header.waitForExistence(timeout: 20), "No NEXT: Fajr at \(instant)")
+            guard
+                let range = header.label.range(of: "Next prayer: Fajr at "),
+                let time = header.label[range.upperBound...]
+                    .split(separator: ".").first.map(String.init)
+            else {
+                XCTFail("Unreadable header: \(header.label)")
+                return
+            }
+            let marker = app.buttons.matching(
+                NSPredicate(format: "label BEGINSWITH 'Fajr at'")
+            ).firstMatch
+            XCTAssertTrue(marker.waitForExistence(timeout: 10))
+            XCTAssertTrue(
+                marker.label.hasPrefix("Fajr at \(time), upcoming"),
+                "At \(instant) the header says \(time) but the plate says: \(marker.label)"
+            )
+            app.terminate()
+        }
     }
 
     // MARK: - Clock 2: the Hijri day turned at Maghrib
@@ -213,8 +247,7 @@ final class CycleClockUITests: XCTestCase {
 
     // MARK: - The voluntary rows, spoken
 
-    /// One day of the pattern card and its table detail, as VoiceOver
-    /// reads them.
+    /// The pattern and the day card's detail, as VoiceOver reads them.
     ///
     /// The presence rows are marks; without a spoken summary they are
     /// nothing at all to a person using VoiceOver, which is how a
@@ -225,20 +258,19 @@ final class CycleClockUITests: XCTestCase {
             "-IhsanDebugTab", "trajectory",
             "-IhsanDebugPeriod", "7",
             "-IhsanDebugSeedVoluntary", "7",
-            "-IhsanDebugLogPrayer", "fajr:onTime",
-            "-IhsanDebugExpandPracticeDay", "0"
+            "-IhsanDebugLogPrayer", "fajr:onTime"
         ])
 
         let pattern = app.descendants(matching: .any)
-            .matching(NSPredicate(format: "label CONTAINS[c] 'Pattern of prayer'"))
+            .matching(NSPredicate(format: "label CONTAINS[c] 'Your prayers across'"))
             .firstMatch
         XCTAssertTrue(pattern.waitForExistence(timeout: 20), "The pattern card is unlabelled")
         XCTAssertTrue(
-            pattern.label.contains("labelled NAFL"),
+            pattern.label.contains("labelled Nafl"),
             "The nafl row is not named to VoiceOver: \(pattern.label)"
         )
         XCTAssertTrue(
-            pattern.label.contains("labelled DHIKR"),
+            pattern.label.contains("labelled Dhikr"),
             "The dhikr row is not named to VoiceOver: \(pattern.label)"
         )
         // A presence row counts days, never shares of them.

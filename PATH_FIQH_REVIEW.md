@@ -62,13 +62,13 @@ For each of the nine readings below, please check:
 **Shown when:** more than half of the elapsed, non-paused prayer slots
 in the period carry no record at all.
 
-**Title:** An empty slot is not a missed prayer
+**Title:** No record is not a missed prayer
 
-**Body:** Ihsan keeps the two apart on purpose. A slot with no record
-means nothing was entered and the app does not know what happened.
-Missed means you told it the prayer was not prayed inside its window.
-Prayer is fixed on the believers at appointed times, so each slot is a
-real appointment — but only the ones you fill in can tell you anything.
+**Body:** Ihsan keeps the two apart on purpose. No record means nothing
+was entered and the app does not know what happened. Missed means you
+told it the prayer was not prayed inside its window. Prayer is fixed on
+the believers at appointed times, so each one is a real appointment —
+but only the ones you fill in can tell you anything.
 
 **Citation:** Qur’an 4:103
 

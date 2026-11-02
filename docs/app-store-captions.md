@@ -37,7 +37,7 @@ register. No exclamation, no imperative, no promise.
 | `store-3-logging` | One tap records a prayer in its window. One more takes it back. |
 | `store-4-repair` | A ledger for what you carry, and a pace you set yourself. |
 | `store-5-qibla` | The direction, drawn rather than pointed at. |
-| `store-6-path` | A month of prayer as a pattern of days. No streaks, no score. |
+| `store-6-path` | A month of prayer at a glance, and any day a tap away. No streaks, no score. |
 
 ## Required sizes
 

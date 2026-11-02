@@ -1,7 +1,7 @@
 import SwiftUI
 import IhsanDesignSystem
 
-/// Shown the first time someone opens Trajectory before any prayers are
+/// Shown the first time someone opens Path before any prayers are
 /// logged. The tone is invitational, not corrective: "Begin your record."
 /// — not "You haven't logged anything yet."
 struct TrajectoryEmptyState: View {
@@ -18,7 +18,7 @@ struct TrajectoryEmptyState: View {
                 Text("Begin your record.")
                     .font(.system(size: 24, weight: .medium, design: .serif))
                     .foregroundStyle(tokens.ink)
-                Text("Log your first prayer on the Today screen to start your trajectory.")
+                Text("Log your first prayer on Today, and your days will appear here.")
                     .font(IhsanFont.bodyEnglish)
                     .foregroundStyle(tokens.inkSecondary)
                     .multilineTextAlignment(.center)

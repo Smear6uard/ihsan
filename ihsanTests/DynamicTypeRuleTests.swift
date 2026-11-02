@@ -26,15 +26,13 @@ struct DynamicTypeRuleTests {
             .deletingLastPathComponent()
     }
 
-    /// The two places a cap is defensible, each with its reason.
+    /// The one place a cap is defensible, with its reason.
     ///
-    /// Both are data matrices: a grid of dots or a month of days
-    /// cannot reflow per-glyph, and growing the type past a point
-    /// breaks the grid rather than helping anyone read it. Both carry
-    /// the same information to VoiceOver in full, and both open a
-    /// breakdown that scales the whole way.
+    /// A data matrix: a month of days cannot reflow per-glyph, and
+    /// growing the type past a point breaks the grid rather than helping
+    /// anyone read it. It carries the same information to VoiceOver in
+    /// full, and opens a breakdown that scales the whole way.
     private static let matrixExemptions: Set<String> = [
-        "ihsan/Trajectory/Components/DailyPracticeGrid.swift",
         "ihsan/Today/Components/HijriMonthSheet.swift"
     ]
 
@@ -51,7 +49,7 @@ struct DynamicTypeRuleTests {
             .replacingOccurrences(of: repoRoot.path + "/", with: "")
     }
 
-    @Test("Nothing caps Dynamic Type except the two data matrices")
+    @Test("Nothing caps Dynamic Type except the data matrix")
     func typeIsNotCapped() {
         for root in ["ihsan", "Packages/IhsanDesignSystem/Sources"] {
             for url in swiftFiles(under: root) {

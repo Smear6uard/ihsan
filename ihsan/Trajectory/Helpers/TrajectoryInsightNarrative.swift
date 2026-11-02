@@ -3,19 +3,14 @@ import IhsanCore
 
 /// The line under the finding.
 ///
-/// It used to restate the period totals, which the quiet summary row
-/// already prints two inches above it and the gestalt grid already
-/// draws. So it says the two things neither of those can: how much of
-/// the period is actually covered, and which prayers hold versus which
-/// move around. No score, prediction, diagnosis, or religious reading —
-/// the finding above carries the point, and the cited context below it
-/// carries the fiqh.
-///
-/// It counts the same elapsed, unpaused days the finding counts. Two
-/// adjacent sentences disagreeing about how long the week was — "4 of 6
-/// days" over "across 7 active days" — reads as a bug even when both
-/// numbers are defensible, and one of them always was: today's later
-/// prayers are not late, they have not happened.
+/// The key above already counts the period and the grid already draws
+/// it, so this says only what neither of those can: which prayers were
+/// steady and which varied, the make-ups that have no mark of their own,
+/// and the days left out. No score, prediction, diagnosis, or religious
+/// reading — the finding above carries the point, and the cited context
+/// below it carries the fiqh. It states no coverage figure: a second
+/// count of the same prayers on a different basis is how "132 recorded"
+/// came to sit one line above "129 of 145".
 enum TrajectoryInsightNarrative {
     /// A prayer at or above this share of elapsed days reads as settled.
     private static let holdsThreshold = 0.7
@@ -26,42 +21,34 @@ enum TrajectoryInsightNarrative {
         days: [DayCompletion],
         aggregate: TrajectoryAggregate,
         now: Date,
+        recordBegan: Date? = nil,
         calendar: Calendar = .current
     ) -> String {
         let today = calendar.startOfDay(for: now)
-        let elapsed = days.filter { !$0.isPaused && $0.date < today }
-        var sentences: [String] = []
-
-        if !elapsed.isEmpty {
-            let slots = elapsed.count * 5
-            let recorded = elapsed.reduce(0) { total, day in
-                total + day.prayerCompletions.filter { $0.status != nil }.count
-            }
-            let dayWord = elapsed.count == 1 ? "day" : "days"
-            sentences.append(
-                "\(recorded) of \(slots) slots across \(elapsed.count) elapsed \(dayWord) "
-                    + "carry a record."
-            )
+        let elapsed = days.filter {
+            !$0.isPaused && $0.date < today && $0.date >= (recordBegan ?? .distantPast)
         }
+        var sentences: [String] = []
 
         if let shape = shapeSentence(from: elapsed) {
             sentences.append(shape)
         }
 
-        if aggregate.qadaCount > 0 {
-            let noun = aggregate.qadaCount == 1 ? "makeup is" : "makeups are"
-            sentences.append("\(aggregate.qadaCount) later \(noun) tracked separately.")
+        let makeups = PathTally.separateMakeups(qadaCount: aggregate.qadaCount, days: days)
+        if makeups > 0 {
+            let noun = makeups == 1 ? "earlier prayer was" : "earlier prayers were"
+            sentences.append("\(makeups) \(noun) made up in this period.")
         }
         if aggregate.pausedDays > 0 {
-            let noun = aggregate.pausedDays == 1 ? "day was" : "days were"
-            sentences.append("\(aggregate.pausedDays) paused \(noun) excluded from these counts.")
+            let noun = aggregate.pausedDays == 1 ? "day isn’t" : "days aren’t"
+            sentences.append("\(aggregate.pausedDays) paused \(noun) counted.")
         }
         return sentences.joined(separator: " ")
     }
 
-    /// Which prayers sit still and which move. Named only when the two
-    /// groups actually differ — on a uniform period there is no shape
-    /// to report, and inventing one would be the old problem again.
+    /// Which prayers were steady and which varied. Named only when the
+    /// two groups actually differ — on a uniform period there is no
+    /// shape to report, and inventing one would be the old problem again.
     private static func shapeSentence(from elapsed: [DayCompletion]) -> String? {
         guard !elapsed.isEmpty else { return nil }
         let days = Double(elapsed.count)
@@ -92,16 +79,17 @@ enum TrajectoryInsightNarrative {
         }
     }
 
-    /// One prayer holds ITS time; three hold THEIR time. English
-    /// agreement, which the first draft of this got wrong on screen.
+    /// One prayer WAS; three WERE. English agreement, which the first
+    /// draft of this got wrong on screen.
     private static func clause(_ prayers: [Prayer], verb: String) -> String {
-        let names = join(prayers.map(\.displayNameEnglish))
-        let isPlural = prayers.count > 1
+        let names = prayers.count == Prayer.allCases.count
+            ? "All five prayers"
+            : join(prayers.map(\.displayNameEnglish))
         switch verb {
         case "hold":
-            return "\(names) \(isPlural ? "hold their" : "holds its") time"
+            return "\(names) \(prayers.count > 1 ? "were" : "was") usually on time"
         default:
-            return "\(names) \(isPlural ? "move" : "moves") around"
+            return "\(names) varied"
         }
     }
 

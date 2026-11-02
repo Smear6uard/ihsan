@@ -145,7 +145,7 @@
     "trajectoryEmptyTitle": "Begin your record.",
     "trajectoryEmptySubtitle": "Log your first prayer on the Today screen to start your trajectory.",
     "trajectoryInsight": {
-      "title": "How this ledger uses timing",
+      "title": "How Ihsan records timing",
       "body": "The five prayers have appointed times. In Ihsan, ‘On Time’ and ‘Delayed’ both describe a prayer performed within its valid window; ‘Delayed’ is a personal tracking distinction, not a separate legal ruling. A prayer performed after its window is recorded separately as qadāʾ.",
       "citation": "Qur’an 4:103 · Ṣaḥīḥ al-Bukhārī 597 · Ṣaḥīḥ Muslim 684d"
     }
