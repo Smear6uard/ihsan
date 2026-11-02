@@ -16,6 +16,8 @@ enum WidgetDeeplinkRouter {
         case today
         case qibla
         case hijri
+        /// That prayer, brought to the Today card to be recorded there.
+        /// Named for the sheet it used to open.
         case logSheet(Prayer)
     }
 

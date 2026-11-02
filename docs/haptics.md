@@ -56,6 +56,8 @@ feedback generators of its own.
   the shoulder for the passage of time.
 - **Never on a notification arriving.** iOS owns that.
 - **Never repeated.** One event, one haptic. The qibla's alignment is
-  rate-limited to a single arrival per approach.
+  rate-limited to a single arrival per approach. The Today card settles
+  under the thumb and the view model behind it stays silent; until the
+  one-tap card it settled a second time when the write returned.
 - **Never in place of a visual.** Nothing is communicated by haptic
   alone; every one accompanies something on screen.

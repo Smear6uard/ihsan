@@ -22,6 +22,13 @@ public struct LogPrayerWithStatusIntent: AppIntent {
     @Parameter(title: "Date")
     public var date: Date?
 
+    /// The jamāʿah axis, written with the status in the same save. Nil
+    /// leaves an existing record's jamāʿah as it is (and a new one
+    /// without it) — the Today card's Undo passes it, so putting a
+    /// record back is one write rather than a status and a toggle.
+    @Parameter(title: "In Jamāʿah")
+    public var withJamaah: Bool?
+
     private static let logger = Logger(
         subsystem: "com.sameerstudios.ihsan.intents",
         category: "LogPrayerWithStatusIntent"
@@ -33,10 +40,16 @@ public struct LogPrayerWithStatusIntent: AppIntent {
 
     public init() {}
 
-    public init(prayer: Prayer, status: PrayerStatus, date: Date? = nil) {
+    public init(
+        prayer: Prayer,
+        status: PrayerStatus,
+        date: Date? = nil,
+        withJamaah: Bool? = nil
+    ) {
         self.prayer = PrayerEntity(prayer: prayer)
         self.status = PrayerStatusEntity(status: status)
         self.date = date
+        self.withJamaah = withJamaah
     }
 
     @MainActor
@@ -61,6 +74,8 @@ public struct LogPrayerWithStatusIntent: AppIntent {
         let log = try service.logPrayer(
             prayer,
             status: status,
+            // A missed prayer was not offered in congregation.
+            withJamaah: status == .missed ? false : withJamaah,
             prayerDate: date,
             sourceSurface: .app,
             in: context

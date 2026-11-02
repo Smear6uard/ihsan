@@ -4,29 +4,31 @@ import IhsanPrayerTimes
 import SwiftUI
 
 /// The focused-prayer card on the celestial Today screen — an
-/// illuminated v2 panel that shares the plate's ornament language.
+/// illuminated panel that shares the plate's ornament language.
 ///
 /// One panel at the bottom of the screen showing a single prayer at a
-/// time; tapping a prayer marker on the celestial scene above swaps
-/// the focused prayer. Logging happens inline — no modal sheet for
-/// the 90% case.
+/// time; tapping a prayer marker on the plate swaps the focused prayer.
 ///
-/// State hierarchy (per the corrective spec):
+/// **The card is the commit.** Every recording happens here, in one tap,
+/// and every recording can be taken back in one tap:
 ///
-/// 1. **Upcoming** — the prayer's *time* is the primary numeral; the
-///    countdown ticks quietly as an inscription ("OPENS IN · 2:14:09").
-/// 2. **Active** — the prayer *name* (Latin + Arabic pair) is primary;
-///    the window is described in small caps inkSecondary
-///    ("NOW · UNTIL 6:15 AM"). No giant ticking numerals.
-/// 3. **Expanded** — on card tap: the window line, two timing commits
-///    (On Time and Delayed, both in-window states), the jamāʿah chip,
-///    and the ways onward. Swiping the card up opens the full log sheet
-///    for the long tail (qadā, missed, edit); swiping down closes it.
-///    The grabber at the top is what says the card can be dragged, and
-///    the MORE link is the same door for anyone who does not swipe.
-/// 4. **Logged** — the prayer's ornament renders in its logged state
-///    and the inscription summarises ("JAMĀ'AH · ON TIME · 4:18 PM").
-///    Tapping the card opens the edit sheet.
+/// 1. **Upcoming** — the prayer's *time* is the primary numeral and the
+///    countdown an inscription ("OPENS IN · 2:14:09"). Nothing to press:
+///    a window that has not opened has nothing to record.
+/// 2. **Open, unrecorded** — the window line ("NOW · UNTIL 6:15 AM") and
+///    two seals on the card itself: On Time, gilded as the default, and
+///    Delayed. Both are inside the window; one tap records.
+/// 3. **Closed, unrecorded** (a marker tapped, a widget's link) — four
+///    seals, each the ornament in the state it would leave on the plate.
+///    No default: memory, not the clock, decides what happened.
+/// 4. **Recorded** — the ornament in its recorded state, a summary, a
+///    jamāʿah chip that applies at once, and for a few seconds Undo.
+///    Tapping the card changes the record in place: the same seals with
+///    the record's own marked, and Remove.
+///
+/// It replaced a card that had to be opened before it could commit, set
+/// jamāʿah *before* the commit, folded itself away after twelve seconds,
+/// and sent everything else up a hidden swipe to a separate sheet.
 ///
 /// Copy rule: the card describes the *window*, never the user's act —
 /// "NOW", not "PRAYING NOW".
@@ -79,13 +81,18 @@ struct FocusedPrayerCard: View {
     /// Resolved v2 palette tokens for this moment.
     let tokens: SkyPaletteTokens
     let currentStatus: PrayerStatus?
-    /// When the existing log was recorded — shown in the logged
+    /// When the existing log was recorded — shown in the recorded
     /// inscription instead of ever reading a clock.
     let loggedAt: Date?
     let isJamaah: Bool
     /// The exact temporal state from the shared resolver. The card
     /// performs no independent boundary comparisons.
     let windowState: PrayerWindowState
+    /// The timings that can be true at this moment for this prayer —
+    /// `TimingAvailability`'s answer for an unrecorded prayer. The seals
+    /// are exactly these, so the card can never offer what the clock
+    /// rules out.
+    let availableStatuses: Set<PrayerStatus>
 
     /// The congregation's time for this prayer, already resolved and
     /// formatted — "IQAMAH · 1:30 PM", or "KHUTBAH · 1:15 PM" on Friday.
@@ -106,22 +113,25 @@ struct FocusedPrayerCard: View {
     var nightSet: NightChips?
     var onToggleNafl: ((NaflKind) -> Void)?
 
-    /// Commit a `(timing, jamaʿah)` pair. The parent translates this
-    /// into a `setStatus` + `toggleJamaah` pair against the view
-    /// model.
-    let onCommit: (PrayerStatus, Bool) -> Void
+    /// Records a timing for this prayer — one tap, through the parent's
+    /// funnel. Changing a record arrives here too.
+    let onCommit: (PrayerStatus) -> Void
+    /// Flips jamāʿah on the existing record, at once — a modifier of
+    /// what happened, so it is set after the fact, not before.
+    var onToggleJamaah: () -> Void = {}
+    /// Takes the record away.
+    var onRemove: () -> Void = {}
+    /// Puts back what the last change to this prayer replaced. Non-nil
+    /// only while that is still on offer.
+    var onUndo: (() -> Void)? = nil
+    /// Begins an excused pause. Offered from the card's long-press menu;
+    /// it used to live only in the footer of a sheet behind a swipe.
+    var onBeginPause: (() -> Void)? = nil
+    /// Any touch on the card. The parent holds a marker-tapped focus for
+    /// as long as the card is in use.
+    var onInteraction: () -> Void = {}
 
-    /// Opens the full log sheet for edge cases (qadā, retroactive
-    /// missed, edit, notes) — reached from the logged card's tap and
-    /// the expanded state's MORE OPTIONS link.
-    let onMoreOptions: () -> Void
-
-    /// Mirrors the parent's sheet selection so the source card can
-    /// hold its upward momentum until the destination has arrived,
-    /// then return to rest only after the sheet is dismissed.
-    var isMoreOptionsPresented: Bool = false
-
-    /// Opens the tasbīḥ instrument — the logged card's quiet link,
+    /// Opens the tasbīḥ instrument — the recorded card's quiet link,
     /// the natural post-prayer moment. `nil` renders no link.
     var onTasbih: (() -> Void)? = nil
 
@@ -132,28 +142,12 @@ struct FocusedPrayerCard: View {
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
-    @State private var mode: Mode = DebugLaunch.flag("-IhsanDebugExpandCard")
-        ? .expanded : .collapsed
-    @State private var jamaahPending: Bool = false
-    @State private var autoCollapseTask: Task<Void, Never>?
-    @State private var rawatibRevealed: Bool = false
-    /// Live vertical translation of the expanded card's drag, in
-    /// points. Negative is upward, toward the sheet.
-    @State private var dragOffset: CGFloat = 0
-    /// True after an upward commit and until the sheet is dismissed.
-    /// This prevents the source card from bouncing back down before
-    /// the native presentation begins its own upward travel.
-    @State private var isHandingOffToSheet = false
-
-    /// Time the user must be idle in the expanded state before the
-    /// card auto-collapses without committing. 12 sec per spec.
-    private static let autoCollapseInterval: TimeInterval = 12
-
-    enum Mode { case collapsed, expanded }
+    /// Changing a record in place. Debug: `-IhsanDebugChangeCard` opens
+    /// a recorded card in this state for the capture harness.
+    @State private var isChanging = DebugLaunch.flag("-IhsanDebugChangeCard")
 
     /// The card's resting height, and the one the celestial composition
-    /// above is measured against. Every non-expanded state lays out
-    /// within this bound, so switching prayers never moves the card.
+    /// above is measured against.
     static let cardHeight: CGFloat = 140
 
     /// What a congregation line costs: one inscription row plus the
@@ -163,44 +157,43 @@ struct FocusedPrayerCard: View {
     /// least room in — `.upcoming`, which already carries a title-scale
     /// numeral above its inscription — is exactly the state where the
     /// iqamah is most useful: it is what a person plans their departure
-    /// around. Absorbing the line by shrinking the numeral or letting it
-    /// clip would take the room from the wrong place.
+    /// around.
     static let iqamahLineHeight: CGFloat = 20
 
-    /// The resting height for a card that may carry a congregation line.
-    /// The scene above is measured against this same number, so the page
-    /// stays one composition instead of the card quietly covering more sky.
+    /// What the open card's sunnah row costs beneath its seals. A
+    /// recorded card carries the same chips inside its resting height.
+    static let naflRowHeight: CGFloat = 26
+
+    /// The resting height for the card the screen is about to draw. The
+    /// scene above is measured against this same number, so the page
+    /// stays one composition instead of the card quietly covering more
+    /// sky.
     static func cardHeight(
         hasIqamah: Bool,
         hasKhatam: Bool = false,
+        hasNaflRow: Bool = false,
         accessibilityLayout: Bool = false
     ) -> CGFloat {
         cardHeight
             + (hasIqamah ? iqamahLineHeight : 0)
             + (hasKhatam ? (accessibilityLayout ? 46 : 26) : 0)
+            + (hasNaflRow ? naflRowHeight : 0)
     }
 
-    static func expandedCardHeight(hasIqamah: Bool) -> CGFloat {
-        hasIqamah ? expandedCardHeight + iqamahLineHeight : expandedCardHeight
+    /// Whether an open, unrecorded card carries the sunnah row beneath
+    /// its seals — asked by the screen, which lays the plate out against
+    /// the answer.
+    static func carriesNaflRow(
+        phase: FocusedCardModel.Phase,
+        rawatib: RawatibChips?,
+        nightSet: NightChips?
+    ) -> Bool {
+        guard case .active = phase else { return false }
+        let hasRawatib = rawatib.map {
+            FocusedCardModel.showsRawatibChips(phase: phase, hasConfiguredSlot: $0.hasAnySlot)
+        } ?? false
+        return hasRawatib || nightSet != nil
     }
-
-    /// The expanded height. Taller than the resting card on purpose:
-    /// the growth is a direct answer to a tap, animated, and it is what
-    /// buys the commit buttons and the jamāʿah chip room to be read.
-    /// The scene above is still laid out against `cardHeight`, so it
-    /// does not reflow when the card opens — the card simply covers a
-    /// little more sky while it is open.
-    ///
-    /// Sized to the content and no further. The point of the rebuild
-    /// was that the old expanded state was crowded; answering that with
-    /// a card of slack would only have moved the problem, and a void
-    /// above a lone trailing link reads as an unfinished layout.
-    static let expandedCardHeight: CGFloat = 176
-
-    /// How far the card must travel before the gesture commits. Short
-    /// enough to feel willing, long enough that a wobble during a tap
-    /// on ON TIME is not read as a swipe.
-    private static let swipeThreshold: CGFloat = 40
 
     private var isLogged: Bool { currentStatus != nil }
 
@@ -220,211 +213,83 @@ struct FocusedPrayerCard: View {
     }
 
     private var phase: FocusedCardModel.Phase {
-        FocusedCardModel.resolve(
-            windowState: windowState,
-            isLogged: isLogged
-        )
+        FocusedCardModel.resolve(windowState: windowState, isLogged: isLogged)
+    }
+
+    /// The window's own phase, record aside — what a change is offered
+    /// against.
+    private var windowPhase: FocusedCardModel.Phase {
+        FocusedCardModel.resolve(windowState: windowState, isLogged: false)
     }
 
     private var isInWindow: Bool { windowState.isCurrent }
 
-    private var inscription: String {
-        FocusedCardModel.inscription(
-            for: phase,
-            status: currentStatus,
-            loggedAt: loggedAt,
-            isJamaah: isJamaah,
-            windowEndTime: windowEndTime,
-            scheduledTime: scheduledTime,
-            now: now,
-            timeZone: timeZone,
-            windowEndDescriptor: PrayerWindowRule.windowEndDescriptor(for: prayer)
-        )
-    }
-
-    /// True when the expanded controls are the ones on screen. Drives
-    /// the height, the grabber, and whether the swipe is listening.
-    private var isExpandedLayout: Bool {
-        !isLogged
-            && !isWindowClosed
-            && mode == .expanded
-            && FocusedCardModel.allowsLogging(phase)
+    private var carriesNaflRow: Bool {
+        Self.carriesNaflRow(phase: phase, rawatib: rawatib, nightSet: nightSet)
     }
 
     var body: some View {
-        contentForMode
+        content
             .padding(14)
             .frame(maxWidth: .infinity)
             .frame(
-                height: isExpandedLayout
-                    ? Self.expandedCardHeight(hasIqamah: iqamahInscription != nil)
-                    : Self.cardHeight(
-                        hasIqamah: iqamahInscription != nil,
-                        hasKhatam: showsKhatamOffer,
-                        accessibilityLayout: dynamicTypeSize.isAccessibilitySize
-                    )
+                height: Self.cardHeight(
+                    hasIqamah: iqamahInscription != nil,
+                    hasKhatam: showsKhatamOffer,
+                    hasNaflRow: carriesNaflRow,
+                    accessibilityLayout: dynamicTypeSize.isAccessibilitySize
+                )
             )
             .celestialPanel(tokens: tokens, cornerRadius: 20, isActive: isInWindow)
             .padding(.horizontal, IhsanSpacing.md)
-            // The card follows the finger a little on the way to its
-            // destination, so the sheet does not arrive out of nowhere.
-            .offset(y: reduceMotion ? 0 : dragOffset)
-            .opacity(dragFade)
-            .scaleEffect(
-                isHandingOffToSheet && !reduceMotion ? 0.985 : 1,
-                anchor: .bottom
-            )
-            .gesture(expandGesture, isEnabled: isExpandedLayout)
-            .animation(
-                reduceMotion ? nil : .smooth(duration: 0.28),
-                value: mode
-            )
-            .animation(
-                reduceMotion ? nil : .smooth(duration: 0.30),
-                value: isLogged
-            )
-            .onChange(of: mode) { _, newMode in
-                dragOffset = 0
-                if newMode == .expanded {
-                    jamaahPending = isJamaah
-                    scheduleAutoCollapse()
-                } else {
-                    autoCollapseTask?.cancel()
-                    rawatibRevealed = false
-                }
-            }
-            .onChange(of: prayer) { _, _ in
-                // Marker tap switches the focused prayer; collapse
-                // any in-progress expansion since the controls now
-                // reference a different prayer.
-                rawatibRevealed = false
-                dragOffset = 0
-                if mode == .expanded {
-                    mode = .collapsed
-                }
-            }
-            .onChange(of: isMoreOptionsPresented) { _, isPresented in
-                if isPresented {
-                    autoCollapseTask?.cancel()
-                } else if isHandingOffToSheet {
-                    // Return to the expanded source after the native
-                    // sheet has completed its downward dismissal.
-                    // The reverse transition therefore ends where the
-                    // forward transition began, without a hidden reset.
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.24)) {
-                        dragOffset = 0
-                        isHandingOffToSheet = false
-                    }
-                    scheduleAutoCollapse()
-                }
-            }
+            .contextMenu { menu }
+            .animation(reduceMotion ? nil : .smooth(duration: 0.28), value: isChanging)
+            .animation(reduceMotion ? nil : .smooth(duration: 0.30), value: isLogged)
+            .onChange(of: prayer) { _, _ in isChanging = false }
+            // A record that arrives or leaves — from this card, a widget,
+            // the watch — ends a change in progress.
+            .onChange(of: currentStatus) { _, _ in isChanging = false }
             .accessibilityElement(children: .contain)
-            // Nobody using VoiceOver or Switch Control can swipe this
-            // card, so both destinations are actions as well. The
-            // visible MORE link is the third way in.
-            .accessibilityAction(named: "More options") { presentMoreOptions() }
-            .accessibilityAction(named: "Collapse") { mode = .collapsed }
-    }
-
-    // MARK: - The swipe
-
-    /// One vertical axis, two destinations: up opens the full log
-    /// sheet, down closes the card. The grabber at the top of the
-    /// expanded state is what says so.
-    ///
-    /// Threshold-based with a continuous handoff: the card tracks the
-    /// finger, preserves that upward momentum across the release, and
-    /// lets the native sheet finish the same movement from below.
-    private var expandGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
-            .onChanged { value in
-                guard !isHandingOffToSheet else { return }
-                // Damped, so the card reads as resisting rather than
-                // sliding away, and the finger never outruns it.
-                dragOffset = value.translation.height * 0.45
-                // A slow, deliberate drag must not be interrupted by
-                // the idle timer firing underneath it.
-                scheduleAutoCollapse()
-            }
-            .onEnded { value in
-                let travel = value.translation.height
-                if travel <= -Self.swipeThreshold {
-                    Haptics.impact(.light)
-                    presentMoreOptions()
-                } else if travel >= Self.swipeThreshold {
-                    Haptics.impact(.light)
-                    mode = .collapsed
-                } else {
-                    withAnimation(reduceMotion ? nil : .smooth(duration: 0.20)) {
-                        dragOffset = 0
-                    }
+            .accessibilityActions {
+                if isLogged {
+                    Button("Change") { beginChange() }
+                    Button("Remove record") { remove() }
+                }
+                if let onUndo {
+                    Button("Undo") { undo(onUndo) }
+                }
+                if let onBeginPause {
+                    Button("Begin a pause") { onBeginPause() }
                 }
             }
-    }
-
-    /// Carries the card farther in the direction of the committed
-    /// gesture instead of snapping it back to zero before presentation.
-    /// The offset is deliberately bounded: enough to connect the two
-    /// surfaces, never enough to make the source disappear.
-    private func presentMoreOptions() {
-        autoCollapseTask?.cancel()
-        if isExpandedLayout, !reduceMotion {
-            withAnimation(.smooth(duration: 0.18)) {
-                isHandingOffToSheet = true
-                dragOffset = max(-88, min(-56, dragOffset - 18))
-            }
-        }
-        onMoreOptions()
-    }
-
-    /// The card dims slightly as it travels — the visual half of "this
-    /// is on its way somewhere", and it caps well short of invisible.
-    private var dragFade: Double {
-        guard !reduceMotion, dragOffset != 0 else { return 1 }
-        let progress = min(1, abs(dragOffset) / Self.swipeThreshold)
-        return 1 - 0.15 * progress
-    }
-
-    private var isWindowClosed: Bool {
-        if case .windowClosed = phase { return true }
-        return false
     }
 
     @ViewBuilder
-    private var contentForMode: some View {
-        if isLogged {
-            loggedContent
+    private var content: some View {
+        if isLogged && isChanging {
+            changingContent
                 .transition(.opacity)
-                .onTapGesture {
-                    Haptics.impact(.light)
-                    presentMoreOptions()
-                }
-        } else if isWindowClosed {
-            // A passed, unlogged prayer goes straight to the sheet —
-            // the expanded quick buttons speak the open window's
-            // language (On Time), which can no longer be true here.
-            // The sheet's tiles carry the temporal-availability rule.
-            defaultContent
-                .transition(.opacity)
-                .onTapGesture {
-                    Haptics.impact(.light)
-                    presentMoreOptions()
-                }
-        } else if mode == .expanded, FocusedCardModel.allowsLogging(phase) {
-            expandedContent
+        } else if isLogged {
+            recordedContent
                 .transition(.opacity)
         } else if FocusedCardModel.allowsLogging(phase) {
-            defaultContent
+            unrecordedContent
                 .transition(.opacity)
-                .onTapGesture {
-                    Haptics.impact(.light)
-                    mode = .expanded
-                }
         } else {
-            // Pre-window: the upcoming state replaces commit controls
-            // entirely — no expansion, no sheet, nothing to press.
-            defaultContent
+            upcomingContent
                 .transition(.opacity)
+        }
+    }
+
+    /// The long press: the record's two edits, and the excused pause.
+    @ViewBuilder
+    private var menu: some View {
+        if isLogged && !isChanging {
+            Button("Change", systemImage: "pencil") { beginChange() }
+            Button("Remove record", systemImage: "trash", role: .destructive) { remove() }
+        }
+        if let onBeginPause {
+            Button("Begin a pause", systemImage: "drop") { onBeginPause() }
         }
     }
 
@@ -453,35 +318,271 @@ struct FocusedPrayerCard: View {
         .accessibilityHidden(true)
     }
 
-    // MARK: - Default (collapsed) state
+    // MARK: - Upcoming
 
     @ViewBuilder
-    private var defaultContent: some View {
+    private var upcomingContent: some View {
         VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-            VStack(alignment: .leading, spacing: IhsanSpacing.sm) {
-                HStack(spacing: IhsanSpacing.md) {
-                    ornament
-                    prayerNameRow
-                    Spacer()
-                }
-                phaseDetail
+            HStack(spacing: IhsanSpacing.md) {
+                ornament
+                prayerNameRow
+                Spacer()
             }
-            .accessibilityElement(children: .combine)
-            .accessibilityLabel(accessibilityLabelForDefaultState)
-            .accessibilityHint("Double-tap to log this prayer.")
+            VStack(alignment: .leading, spacing: 4) {
+                Text(PlateTimeFormat.time(scheduledTime, in: timeZone))
+                    .font(.system(.title, design: .monospaced).monospacedDigit())
+                    .fontWeight(.light)
+                    .foregroundStyle(tokens.ink)
+                    .inkKeyline(tokens)
+                    .contentTransition(.numericText())
+                inscriptionText(inscription(for: phase))
+                    .contentTransition(.numericText())
+                iqamahLine
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxHeight: .infinity, alignment: .top)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(accessibilityLabelForWindow)
+    }
 
-            if let nightSet {
-                nightRow(nightSet)
+    // MARK: - Unrecorded: the seals
+
+    private var commitSeals: [PrayerStatus] {
+        FocusedCardModel.seals(available: availableStatuses)
+    }
+
+    @ViewBuilder
+    private var unrecordedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header(
+                inscription: inscription(for: phase),
+                accessibilityLabel: accessibilityLabelForWindow
+            ) {
+                if let onUndo { undoButton(onUndo) }
+            }
+
+            Spacer(minLength: IhsanSpacing.sm)
+
+            TimingSealRow(
+                prayer: prayer,
+                seals: commitSeals,
+                tokens: tokens,
+                prominent: FocusedCardModel.prominentSeal(among: commitSeals),
+                onChoose: commit
+            )
+
+            if carriesNaflRow {
+                HStack(spacing: IhsanSpacing.sm) {
+                    if let rawatib, rawatib.hasAnySlot {
+                        rawatibChipSet(rawatib)
+                    }
+                    if let nightSet {
+                        nightChipSet(nightSet)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .frame(height: 22)
+                .padding(.top, 6)
             }
         }
     }
 
+    // MARK: - Recorded
+
+    @ViewBuilder
+    private var recordedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header(
+                inscription: inscription(for: .logged),
+                accessibilityLabel: accessibilityLabelForRecord,
+                accessibilityHint: "Double-tap to change.",
+                onTap: beginChange
+            ) {
+                if let onUndo {
+                    undoButton(onUndo)
+                } else if showsTasbihOffer {
+                    postPrayerColumn
+                }
+            }
+
+            Spacer(minLength: IhsanSpacing.xs)
+
+            HStack(spacing: IhsanSpacing.sm) {
+                // A missed prayer was not offered, so it was not offered
+                // in congregation.
+                if currentStatus != .missed {
+                    JamaahChip(isOn: isJamaah, tokens: tokens) {
+                        Haptics.impact(.light)
+                        onInteraction()
+                        onToggleJamaah()
+                    }
+                }
+                if showsRecordedRawatib, let rawatib {
+                    rawatibChipSet(rawatib)
+                }
+                Spacer(minLength: 0)
+            }
+            .frame(height: 28)
+
+            // The sunnah stays reachable after the fard is recorded —
+            // the after-rawatib is prayed exactly then, and Isha's card
+            // carries the night.
+            if let nightSet {
+                HStack(spacing: IhsanSpacing.sm) {
+                    nightChipSet(nightSet)
+                    Spacer(minLength: 0)
+                }
+                .frame(height: 22)
+                .padding(.top, 6)
+            }
+        }
+    }
+
+    private var showsRecordedRawatib: Bool {
+        guard let rawatib else { return false }
+        return FocusedCardModel.showsRawatibChips(
+            phase: phase, hasConfiguredSlot: rawatib.hasAnySlot
+        )
+    }
+
+    @ViewBuilder
+    private var postPrayerColumn: some View {
+        VStack(alignment: .trailing, spacing: 5) {
+            if let onTasbih {
+                quietButton(
+                    label: "TASBĪḤ",
+                    accessibilityLabel: "Continue with tasbīḥ",
+                    accessibilityHint: "Opens the tasbīḥ counter after this prayer.",
+                    marked: true
+                ) {
+                    onTasbih()
+                }
+            }
+            if showsKhatamOffer, let khatamMoment, let onKhatam {
+                quietButton(
+                    label: khatamMoment.inscription,
+                    accessibilityLabel: "Log \(khatamMoment.count) \(khatamMoment.unit.pluralLabel) after \(prayer.displayNameEnglish)",
+                    accessibilityHint: "Opens the numeric Khatam stepper, prefilled with this amount.",
+                    marked: true
+                ) {
+                    onKhatam()
+                }
+            }
+        }
+    }
+
+    // MARK: - Changing a record
+
+    /// The seals for a change: what the window allows now, and the
+    /// record's own timing whatever the window says — re-affirming what
+    /// is recorded can never be blocked by the clock.
+    private var changeSeals: [PrayerStatus] {
+        var available = availableStatuses
+        if let currentStatus { available.insert(currentStatus) }
+        return FocusedCardModel.seals(available: available)
+    }
+
+    @ViewBuilder
+    private var changingContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            header(
+                inscription: inscription(for: windowPhase),
+                accessibilityLabel: "Changing \(prayer.displayNameEnglish). \(accessibilityLabelForRecord)"
+            ) {
+                HStack(spacing: 2) {
+                    Button {
+                        remove()
+                    } label: {
+                        Text("REMOVE")
+                            .font(IhsanFont.inscription)
+                            .tracking(1.4)
+                            .foregroundStyle(tokens.inkSecondary)
+                            .frame(minHeight: 32)
+                            .padding(.horizontal, 8)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Remove record")
+                    .accessibilityHint("Clears \(prayer.displayNameEnglish)'s record. Undo stays on offer for a few seconds.")
+
+                    Button {
+                        Haptics.impact(.light)
+                        isChanging = false
+                    } label: {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(tokens.metal.opacity(0.85))
+                            .frame(width: 32, height: 32)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Done")
+                }
+            }
+
+            Spacer(minLength: IhsanSpacing.sm)
+
+            TimingSealRow(
+                prayer: prayer,
+                seals: changeSeals,
+                tokens: tokens,
+                selected: currentStatus,
+                onChoose: change
+            )
+        }
+    }
+
+    // MARK: - Shared rows
+
+    /// Ornament, name pair, the state line and the congregation's line,
+    /// with one trailing slot. `onTap` makes the text block a door (the
+    /// recorded card opens its change); the trailing controls are their
+    /// own buttons either way.
+    private func header<Trailing: View>(
+        inscription: String,
+        accessibilityLabel: String,
+        accessibilityHint: String? = nil,
+        onTap: (() -> Void)? = nil,
+        @ViewBuilder trailing: () -> Trailing
+    ) -> some View {
+        HStack(alignment: .top, spacing: IhsanSpacing.sm) {
+            HStack(alignment: .top, spacing: IhsanSpacing.sm) {
+                ornament
+                VStack(alignment: .leading, spacing: 2) {
+                    prayerNameRow
+                    inscriptionText(inscription)
+                    iqamahLine
+                }
+                Spacer(minLength: 0)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onTap?()
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(accessibilityLabel)
+            .accessibilityHint(accessibilityHint ?? "")
+            .accessibilityAddTraits(onTap == nil ? [] : .isButton)
+
+            trailing()
+        }
+    }
+
+    private func inscriptionText(_ text: String) -> some View {
+        Text(text.uppercased())
+            .font(IhsanFont.inscription)
+            .tracking(1.4)
+            .monospacedDigit()
+            .foregroundStyle(tokens.inkSecondary)
+            .lineLimit(1)
+            .minimumScaleFactor(0.75)
+            .inkKeyline(tokens)
+    }
+
     /// The congregation's time, joining the state line's register.
-    ///
-    /// One definition, used by the collapsed, expanded, and logged
-    /// layouts, so the line cannot drift between them. Hidden from
-    /// VoiceOver here because each layout combines its children into a
-    /// single spoken label that already carries it.
+    /// Hidden from VoiceOver here because each layout combines its
+    /// children into a single spoken label that already carries it.
     @ViewBuilder
     private var iqamahLine: some View {
         if let iqamahInscription {
@@ -497,217 +598,76 @@ struct FocusedPrayerCard: View {
         }
     }
 
-    /// The card's second line, per the state hierarchy: upcoming keeps
-    /// the prayer time as the primary numeral with the countdown as an
-    /// inscription; the active window is described in small caps only.
-    /// The congregation's line, when there is one, sits beneath.
     @ViewBuilder
-    private var phaseDetail: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            phaseDetailPrimary
-            iqamahLine
-        }
-    }
-
-    @ViewBuilder
-    private var phaseDetailPrimary: some View {
-        switch phase {
-        case .upcoming:
-            VStack(alignment: .leading, spacing: 4) {
-                Text(PlateTimeFormat.time(scheduledTime, in: timeZone))
-                    .font(.system(.title, design: .monospaced).monospacedDigit())
-                    .fontWeight(.light)
-                    .foregroundStyle(tokens.ink)
-                    .inkKeyline(tokens)
-                    .contentTransition(.numericText())
-                Text(inscription.uppercased())
-                    .font(IhsanFont.inscription)
-                    .monospacedDigit()
-                    .tracking(1.4)
-                    .foregroundStyle(tokens.inkSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .inkKeyline(tokens)
-                    .contentTransition(.numericText())
-            }
-        case .windowClosed:
-            // The passed prayer still asks to be recorded: the
-            // inscription states the fact, and a gilded LOG chip
-            // makes the affordance unmistakable — the card is a way
-            // in, not a status plaque.
-            HStack(spacing: IhsanSpacing.sm) {
-                Text(inscription.uppercased())
-                    .font(IhsanFont.inscription)
-                    .tracking(1.4)
-                    .foregroundStyle(tokens.inkSecondary)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-                    .inkKeyline(tokens)
-                Text("LOG")
-                    .font(IhsanFont.inscription)
-                    .tracking(1.8)
-                    .foregroundStyle(tokens.keyline)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 3)
-                    .background { Capsule().fill(tokens.leafGold) }
-                    .overlay {
-                        Capsule().strokeBorder(
-                            tokens.keyline.opacity(0.55), lineWidth: 0.8
-                        )
-                    }
-            }
-        case .active, .logged:
-            Text(inscription.uppercased())
-                .font(IhsanFont.inscription)
-                .tracking(1.4)
-                .foregroundStyle(tokens.inkSecondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
+    private var prayerNameRow: some View {
+        HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
+            Text(prayer.displayNameEnglish)
+                .font(IhsanFont.heroPrayerName)
+                .foregroundStyle(tokens.ink)
                 .inkKeyline(tokens)
+            // Keylined on its own so the 0.72 can sit OUTSIDE the
+            // modifier: it draws its content twice, so a translucent
+            // foreground composites with itself and takes a near-black
+            // wash from the upper copy's ring. Fading the finished mark
+            // — glyph and rings together — is what was meant anyway.
+            Text(prayer.displayNameArabic)
+                .font(IhsanFont.bodyArabic)
+                .foregroundStyle(tokens.ink)
+                .inkKeyline(tokens)
+                .opacity(0.72)
         }
     }
 
-    /// Combined VoiceOver label for the default-state card, phrased by
-    /// the same copy rule the visual inscription follows.
-    private var accessibilityLabelForDefaultState: String {
-        var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
-        switch phase {
-        case .active(let until):
-            if let descriptor = PrayerWindowRule.windowEndDescriptor(for: prayer) {
-                parts.append("in its window until \(descriptor) at \(PlateTimeFormat.time(until, in: timeZone))")
-            } else {
-                parts.append("in its window until \(PlateTimeFormat.time(until, in: timeZone))")
-            }
-        case .upcoming(let opensAt):
-            parts.append("opens in \(FocusedCardModel.spokenCountdown(until: opensAt, now: now))")
-            parts.append("scheduled at \(PlateTimeFormat.time(scheduledTime, in: timeZone))")
-        case .windowClosed(let end):
-            if let end {
-                parts.append("window closed at \(PlateTimeFormat.time(end, in: timeZone))")
-            } else {
-                parts.append("window closed")
-            }
-        case .logged:
-            break
-        }
-        if let iqamahSpoken {
-            parts.append(iqamahSpoken)
-        }
-        return parts.joined(separator: ", ")
-    }
-
-    // MARK: - Expanded state
-
-    /// Expanded, rebuilt to breathe.
-    ///
-    /// Reading order top to bottom: what prayer and until when, the two
-    /// commits, the one modifier, then the ways onward. Each band does
-    /// one job and is left-aligned to the same rule, which the previous
-    /// version's centred jamāʿah pill broke for no reason.
-    ///
-    /// The window line is the piece that was missing: On Time versus
-    /// Delayed is only a real choice if you can see how much window is
-    /// left.
-    @ViewBuilder
-    private var expandedContent: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            grabber
-                .padding(.bottom, 6)
-
-            HStack(alignment: .top, spacing: IhsanSpacing.sm) {
-                ornament
-                VStack(alignment: .leading, spacing: 2) {
-                    prayerNameRow
-                    Text(inscription.uppercased())
-                        .font(IhsanFont.inscription)
-                        .tracking(1.4)
-                        .monospacedDigit()
-                        .foregroundStyle(tokens.inkSecondary)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.75)
-                        .inkKeyline(tokens)
-                    iqamahLine
-                }
-                Spacer(minLength: 0)
-                Button {
-                    Haptics.impact(.light)
-                    mode = .collapsed
-                } label: {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(tokens.metal.opacity(0.85))
-                        .frame(width: 28, height: 28)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Close")
-            }
-
-            Spacer(minLength: IhsanSpacing.xxs)
-
-            HStack(spacing: IhsanSpacing.sm) {
-                TimingCommitButton(
-                    label: PrayerStatus.onTime.displayName,
-                    prominent: true,
-                    tokens: tokens
-                ) {
-                    commit(.onTime)
-                }
-                TimingCommitButton(
-                    label: PrayerStatus.late.displayName,
-                    prominent: false,
-                    tokens: tokens
-                ) {
-                    commit(.late)
-                }
-            }
-
-            JamaahChip(isOn: $jamaahPending, tokens: tokens)
-                .padding(.top, IhsanSpacing.xs + 2)
-                .onChange(of: jamaahPending) { _, _ in
-                    scheduleAutoCollapse()
-                }
-
-            Spacer(minLength: IhsanSpacing.xxs)
-
-            HStack(spacing: IhsanSpacing.sm) {
-                if let rawatib, FocusedCardModel.showsRawatibChips(
-                    phase: phase, hasConfiguredSlot: rawatib.hasAnySlot
-                ) {
-                    rawatibStrip(rawatib)
-                }
-                Spacer(minLength: 0)
-                Button {
-                    Haptics.impact(.light)
-                    presentMoreOptions()
-                } label: {
-                    HStack(spacing: 4) {
-                        Text("MORE")
-                            .font(IhsanFont.inscription)
-                            .tracking(1.6)
-                        Image(systemName: "chevron.up")
-                            .font(.system(size: 8, weight: .semibold))
-                    }
-                    .foregroundStyle(tokens.metal.opacity(0.70))
-                    .padding(.leading, IhsanSpacing.sm)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("More options")
-                .accessibilityHint("Opens the full prayer log sheet. You can also swipe the card up.")
-            }
-            .frame(height: 18)
+    private func undoButton(_ action: @escaping () -> Void) -> some View {
+        quietButton(
+            label: "UNDO",
+            accessibilityLabel: "Undo",
+            accessibilityHint: "Puts back \(prayer.displayNameEnglish)'s record as it was.",
+            marked: false
+        ) {
+            undo(action)
         }
     }
 
-    /// The grabber: the one mark that says this card can be dragged.
-    /// Without it the swipe is a secret, and a secret gesture is not an
-    /// affordance.
-    private var grabber: some View {
-        Capsule()
-            .fill(tokens.metal.opacity(0.45))
-            .frame(width: 34, height: 3.5)
-            .frame(maxWidth: .infinity, alignment: .center)
-            .accessibilityHidden(true)
+    /// The quiet capsule the post-prayer links and Undo share: metal
+    /// edge, a faint metal wash, inscription register. A leaf dot marks
+    /// the forward offers; Undo goes without it.
+    private func quietButton(
+        label: String,
+        accessibilityLabel: String,
+        accessibilityHint: String,
+        marked: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button {
+            Haptics.impact(.light)
+            onInteraction()
+            action()
+        } label: {
+            HStack(spacing: 6) {
+                if marked {
+                    Circle()
+                        .fill(tokens.leafGold)
+                        .frame(width: 5, height: 5)
+                }
+                Text(label)
+                    .font(IhsanFont.inscription)
+                    .tracking(1.35)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+            }
+            .foregroundStyle(tokens.ink)
+            .padding(.horizontal, 10)
+            .frame(minHeight: 34)
+            .background(tokens.metal.opacity(0.11), in: Capsule())
+            .overlay {
+                Capsule().strokeBorder(tokens.metal.opacity(0.34), lineWidth: 0.7)
+            }
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(accessibilityLabel)
+        .accessibilityHint(accessibilityHint)
     }
 
     // MARK: - Sunnah chips
@@ -717,38 +677,8 @@ struct FocusedPrayerCard: View {
     // second tap removes. Filled ornament = recorded, outline = not —
     // the same vocabulary as the plate's markers.
 
-    /// One slim row inside the expanded state. Collapsed by default: a
-    /// small inscription affordance; revealed: the before/after ornament
-    /// chips in place.
-    @ViewBuilder
-    private func rawatibStrip(_ rawatib: RawatibChips) -> some View {
-        HStack(spacing: IhsanSpacing.sm) {
-            if rawatibRevealed {
-                rawatibChipSet(rawatib)
-            } else {
-                Button {
-                    Haptics.impact(.light)
-                    rawatibRevealed = true
-                    scheduleAutoCollapse()
-                } label: {
-                    HStack(spacing: 5) {
-                        Text("RAWATIB")
-                            .font(IhsanFont.inscription)
-                            .tracking(1.6)
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 8, weight: .semibold))
-                    }
-                    .foregroundStyle(tokens.metal.opacity(0.60))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Rawatib")
-                .accessibilityHint("Shows the before and after chips.")
-            }
-        }
-    }
-
-    /// The before/after chips alone — shared by the expanded strip's
-    /// revealed state and the logged card's nafl row.
+    /// The before/after chips alone — shared by the open card's sunnah
+    /// row and the recorded card's modifier row.
     @ViewBuilder
     private func rawatibChipSet(_ rawatib: RawatibChips) -> some View {
         if rawatib.beforeCount > 0 {
@@ -767,15 +697,6 @@ struct FocusedPrayerCard: View {
                 caption: "\(rawatib.afterCount) AFTER"
             )
         }
-    }
-
-    @ViewBuilder
-    private func nightRow(_ nightSet: NightChips) -> some View {
-        HStack(spacing: IhsanSpacing.sm) {
-            nightChipSet(nightSet)
-            Spacer(minLength: 0)
-        }
-        .frame(height: 20)
     }
 
     @ViewBuilder
@@ -819,6 +740,7 @@ struct FocusedPrayerCard: View {
     ) -> some View {
         Button {
             Haptics.settle()
+            onInteraction()
             onToggleNafl?(kind)
         } label: {
             HStack(spacing: 5) {
@@ -829,10 +751,7 @@ struct FocusedPrayerCard: View {
                         GildedOrnamentGlyph(prayer: ornament, size: 14, tokens: tokens)
                     } else {
                         PrayerOrnamentShape(prayer: ornament, mode: .outline)
-                            .stroke(
-                                tokens.metal.opacity(0.55),
-                                lineWidth: 0.9
-                            )
+                            .stroke(tokens.metal.opacity(0.55), lineWidth: 0.9)
                     }
                 }
                 .frame(width: 14, height: 14)
@@ -840,9 +759,7 @@ struct FocusedPrayerCard: View {
                 Text(caption)
                     .font(IhsanFont.inscription)
                     .tracking(1.2)
-                    .foregroundStyle(
-                        tokens.metal.opacity(logged ? 0.95 : 0.65)
-                    )
+                    .foregroundStyle(tokens.metal.opacity(logged ? 0.95 : 0.65))
             }
             .padding(.horizontal, 8)
             .padding(.vertical, 3)
@@ -860,124 +777,91 @@ struct FocusedPrayerCard: View {
         .accessibilityHint("Double-tap to \(logged ? "remove" : "record").")
     }
 
-    // MARK: - Logged state
+    // MARK: - Acts
 
-    @ViewBuilder
-    private var loggedContent: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: IhsanSpacing.md) {
-                HStack(spacing: IhsanSpacing.md) {
-                    ornament
-                    VStack(alignment: .leading, spacing: 4) {
-                        prayerNameRow
-                        Text(inscription.uppercased())
-                            .font(IhsanFont.inscription)
-                            .tracking(1.4)
-                            .foregroundStyle(tokens.inkSecondary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.8)
-                            .inkKeyline(tokens)
-                        iqamahLine
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(accessibilityLabelForLoggedState)
-                .accessibilityHint("Double-tap to edit.")
-
-                Spacer()
-
-                if showsTasbihOffer {
-                    VStack(alignment: .trailing, spacing: 5) {
-                        if let onTasbih {
-                            postPrayerButton(
-                                label: "TASBĪḤ",
-                                accessibilityLabel: "Continue with tasbīḥ",
-                                accessibilityHint: "Opens the tasbīḥ counter after this prayer."
-                            ) {
-                                onTasbih()
-                            }
-                        }
-                        if showsKhatamOffer,
-                           let khatamMoment,
-                           let onKhatam {
-                            postPrayerButton(
-                                label: khatamMoment.inscription,
-                                accessibilityLabel: "Log \(khatamMoment.count) \(khatamMoment.unit.pluralLabel) after \(prayer.displayNameEnglish)",
-                                accessibilityHint: "Opens the numeric Khatam stepper, prefilled with this amount."
-                            ) {
-                                onKhatam()
-                            }
-                        }
-                    }
-                }
-            }
-
-            // The sunnah stays reachable after the fard is recorded —
-            // the after-rawatib is prayed exactly then. One shared row
-            // so an Isha card carries its rawatib and the night set
-            // within the same 20-point band.
-            if showsLoggedRawatib || nightSet != nil {
-                HStack(spacing: IhsanSpacing.sm) {
-                    if showsLoggedRawatib, let rawatib {
-                        rawatibChipSet(rawatib)
-                    }
-                    if let nightSet {
-                        nightChipSet(nightSet)
-                    }
-                    Spacer(minLength: 0)
-                }
-                .frame(height: 20)
-            }
-        }
+    private func commit(_ status: PrayerStatus) {
+        Haptics.settle()
+        onInteraction()
+        onCommit(status)
     }
 
-    private var showsLoggedRawatib: Bool {
-        guard let rawatib else { return false }
-        return FocusedCardModel.showsRawatibChips(
-            phase: phase, hasConfiguredSlot: rawatib.hasAnySlot
+    private func change(_ status: PrayerStatus) {
+        guard status != currentStatus else {
+            isChanging = false
+            return
+        }
+        Haptics.settle()
+        onInteraction()
+        onCommit(status)
+        isChanging = false
+    }
+
+    private func beginChange() {
+        Haptics.impact(.light)
+        onInteraction()
+        isChanging = true
+    }
+
+    private func remove() {
+        Haptics.impact(.light)
+        onInteraction()
+        isChanging = false
+        onRemove()
+    }
+
+    private func undo(_ action: () -> Void) {
+        isChanging = false
+        action()
+    }
+
+    // MARK: - Copy
+
+    private func inscription(for phase: FocusedCardModel.Phase) -> String {
+        FocusedCardModel.inscription(
+            for: phase,
+            status: currentStatus,
+            loggedAt: loggedAt,
+            // The chip beneath carries jamāʿah now, in both senses.
+            isJamaah: false,
+            windowEndTime: windowEndTime,
+            scheduledTime: scheduledTime,
+            now: now,
+            timeZone: timeZone,
+            windowEndDescriptor: PrayerWindowRule.windowEndDescriptor(for: prayer)
         )
     }
 
-    private func postPrayerButton(
-        label: String,
-        accessibilityLabel: String,
-        accessibilityHint: String,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button {
-            Haptics.impact(.light)
-            action()
-        } label: {
-            HStack(spacing: 6) {
-                Circle()
-                    .fill(tokens.leafGold)
-                    .frame(width: 5, height: 5)
-                Text(label)
-                    .font(IhsanFont.inscription)
-                    .tracking(1.35)
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.75)
+    /// The spoken window, phrased by the same copy rule the visual
+    /// inscription follows.
+    private var accessibilityLabelForWindow: String {
+        var parts: [String] = ["\(prayer.displayNameEnglish) prayer"]
+        switch windowPhase {
+        case .active(let until):
+            if let descriptor = PrayerWindowRule.windowEndDescriptor(for: prayer) {
+                parts.append("in its window until \(descriptor) at \(PlateTimeFormat.time(until, in: timeZone))")
+            } else {
+                parts.append("in its window until \(PlateTimeFormat.time(until, in: timeZone))")
             }
-            .foregroundStyle(tokens.ink)
-            .padding(.horizontal, 10)
-            .frame(minHeight: 34)
-            .background(tokens.metal.opacity(0.11), in: Capsule())
-            .overlay {
-                Capsule().strokeBorder(
-                    tokens.metal.opacity(0.34), lineWidth: 0.7
-                )
+        case .upcoming(let opensAt):
+            parts.append("opens in \(FocusedCardModel.spokenCountdown(until: opensAt, now: now))")
+            parts.append("scheduled at \(PlateTimeFormat.time(scheduledTime, in: timeZone))")
+        case .windowClosed(let end):
+            if let end {
+                parts.append("window closed at \(PlateTimeFormat.time(end, in: timeZone))")
+            } else {
+                parts.append("window closed")
             }
-            .contentShape(Capsule())
+        case .logged:
+            break
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(accessibilityLabel)
-        .accessibilityHint(accessibilityHint)
+        if let iqamahSpoken {
+            parts.append(iqamahSpoken)
+        }
+        return parts.joined(separator: ", ")
     }
 
-    private var accessibilityLabelForLoggedState: String {
-        var parts: [String] = []
-        parts.append("\(prayer.displayNameEnglish) prayer")
-        parts.append("logged")
+    private var accessibilityLabelForRecord: String {
+        var parts: [String] = ["\(prayer.displayNameEnglish) prayer", "logged"]
         if isJamaah {
             parts.append("in \(IhsanVocabulary.jamaah)")
         }
@@ -989,73 +873,22 @@ struct FocusedPrayerCard: View {
         }
         return parts.joined(separator: ", ")
     }
-
-    // MARK: - Shared subviews
-
-    @ViewBuilder
-    private var prayerNameRow: some View {
-        HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
-            Text(prayer.displayNameEnglish)
-                .font(IhsanFont.heroPrayerName)
-                .foregroundStyle(tokens.ink)
-                .inkKeyline(tokens)
-            // Keylined on its own so the 0.72 can sit OUTSIDE the
-            // modifier: it draws its content twice, so a translucent
-            // foreground composites with itself and takes a near-black
-            // wash from the upper copy's ring. Fading the finished mark
-            // — glyph and rings together — is what was meant anyway.
-            Text(prayer.displayNameArabic)
-                .font(IhsanFont.bodyArabic)
-                .foregroundStyle(tokens.ink)
-                .inkKeyline(tokens)
-                .opacity(0.72)
-        }
-    }
-
-    // MARK: - State transitions
-
-    private func commit(_ status: PrayerStatus) {
-        Haptics.settle()
-        let jamaah = jamaahPending
-        onCommit(status, jamaah)
-        mode = .collapsed
-    }
-
-    private func scheduleAutoCollapse() {
-        autoCollapseTask?.cancel()
-        autoCollapseTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(Self.autoCollapseInterval * 1_000_000_000))
-            if !Task.isCancelled && mode == .expanded {
-                mode = .collapsed
-            }
-        }
-    }
 }
 
 // MARK: - Jamaʿah chip
 
 /// The congregation modifier, in the app's own marker vocabulary: a
 /// hollow ring when off, the gilded ring when on, with its name beside
-/// it. Left-aligned like everything else in the expanded card.
-///
-/// It replaced a centred pill whose entire state was a background fill
-/// — off read as "a button", on read as "a slightly different button",
-/// and neither read as a setting. Filled-versus-hollow is the same
-/// distinction the plate's markers and the nafl chips already make, so
-/// there is nothing new to learn here.
+/// it. It is both the record's jamāʿah state and the control that
+/// changes it, and a tap applies at once — jamāʿah describes what
+/// happened, so it is set after the commit, not staged before it.
 private struct JamaahChip: View {
-    @Binding var isOn: Bool
+    let isOn: Bool
     let tokens: SkyPaletteTokens
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let action: () -> Void
 
     var body: some View {
-        Button {
-            Haptics.impact(.light)
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.18)) {
-                isOn.toggle()
-            }
-        } label: {
+        Button(action: action) {
             HStack(spacing: 7) {
                 ZStack {
                     Circle()
@@ -1075,7 +908,7 @@ private struct JamaahChip: View {
                     .foregroundStyle(isOn ? tokens.ink : tokens.inkSecondary)
             }
             .padding(.horizontal, 11)
-            .padding(.vertical, 6)
+            .frame(minHeight: 28)
             .overlay {
                 Capsule()
                     .strokeBorder(
@@ -1089,81 +922,10 @@ private struct JamaahChip: View {
         .accessibilityLabel(IhsanVocabulary.inJamaahTitle)
         .accessibilityValue(isOn ? "on" : "off")
         .accessibilityAddTraits(.isToggle)
-        .accessibilityHint("Double-tap to toggle \(IhsanVocabulary.jamaah) selection.")
+        .accessibilityHint("Double-tap to record whether this prayer was in \(IhsanVocabulary.jamaah).")
     }
 }
 
-// MARK: - Timing commit button
-
-/// One of the two commit buttons in the expanded state — labels only,
-/// no glyphs, in the panel language.
-///
-/// **On Time rests filled**: leaf gold bounded by the keyline, with
-/// keyline ink on top — the same recipe the log sheet's commit bar
-/// uses, so the two surfaces read as one system. Previously both
-/// buttons rested as identical outlined capsules and the `prominent`
-/// flag did not become visible until the finger was already down,
-/// which is exactly too late for a hierarchy to be useful.
-///
-/// Delayed rests as a plain metal outline and fills on press. Its press
-/// fill plays just ahead of the logged transition, synchronised with
-/// the ornament's materialize pour.
-private struct TimingCommitButton: View {
-    let label: String
-    let prominent: Bool
-    let tokens: SkyPaletteTokens
-    let action: () -> Void
-
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var isPressing: Bool = false
-
-    var body: some View {
-        Button {
-            withAnimation(reduceMotion ? nil : .smooth(duration: 0.15)) {
-                isPressing = true
-            }
-            // Slight delay so the press is visible before the card
-            // transitions to the logged state.
-            Task { @MainActor in
-                try? await Task.sleep(nanoseconds: 120_000_000)
-                action()
-            }
-        } label: {
-            Text(label.uppercased())
-                .font(IhsanFont.inscription)
-                .tracking(1.8)
-                .foregroundStyle(foreground)
-                .padding(.vertical, 10)
-                .frame(maxWidth: .infinity)
-                .background {
-                    Capsule()
-                        .fill(prominent ? AnyShapeStyle(tokens.leafGold) : AnyShapeStyle(tokens.metal))
-                        .opacity(prominent || isPressing ? 1 : 0)
-                }
-                .overlay {
-                    Capsule()
-                        .strokeBorder(
-                            prominent
-                                ? tokens.keyline.opacity(0.55)
-                                : tokens.metal.opacity(0.75),
-                            lineWidth: prominent ? 1.1 : 1
-                        )
-                }
-                .scaleEffect(isPressing && !reduceMotion ? 0.97 : 1)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Log as \(label)")
-        .accessibilityHint("Double-tap to log as \(label.lowercased()).")
-    }
-
-    /// Gold demands the keyline on top; the outlined secondary keeps
-    /// plain ink until its own fill arrives beneath it.
-    private var foreground: Color {
-        if prominent { return tokens.keyline }
-        return isPressing ? tokens.panelFill : tokens.ink
-    }
-}
-
-// The spoken labels now come from `PrayerStatus`'s own vocabulary in
+// The spoken labels come from `PrayerStatus`'s own vocabulary in
 // IhsanCore, so the card, the sheet, the Path counts, and Siri all say
 // the same word.

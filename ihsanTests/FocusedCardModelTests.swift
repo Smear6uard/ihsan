@@ -390,4 +390,71 @@ struct FocusedCardModelTests {
         #expect(text.hasPrefix("Delayed ·"))
         #expect(!text.hasPrefix("Late ·"))
     }
+
+    // MARK: - Seals: the card is the commit
+
+    /// The seals are exactly the timings the clock allows, in the
+    /// axis's order — the card can never offer what the moment rules
+    /// out, and never hides what it allows.
+    @Test("Seals follow the timing rule, in order")
+    func sealsFollowTheTimingRule() {
+        #expect(FocusedCardModel.seals(available: [.late, .onTime]) == [.onTime, .late])
+        #expect(
+            FocusedCardModel.seals(available: [.missed, .qada, .late, .onTime])
+                == [.onTime, .late, .qada, .missed]
+        )
+        #expect(FocusedCardModel.seals(available: []).isEmpty)
+    }
+
+    /// Only an open window has a default. A closed window's truth is in
+    /// memory, not on the clock, so no seal there is pre-gilded.
+    @Test("On Time is the default only while the window is open")
+    func onlyAnOpenWindowHasADefault() {
+        #expect(FocusedCardModel.prominentSeal(among: [.onTime, .late]) == .onTime)
+        #expect(FocusedCardModel.prominentSeal(among: [.onTime, .late, .qada, .missed]) == nil)
+        #expect(FocusedCardModel.prominentSeal(among: []) == nil)
+    }
+
+    /// The seals agree with the sheet's rule at every window state —
+    /// the card took over the sheet's job, so it takes its truth too.
+    @Test("Open offers two seals, closed four, upcoming none")
+    func sealsAtEachWindowState() {
+        let day = scheduled
+        func seals(_ state: PrayerWindowState) -> [PrayerStatus] {
+            FocusedCardModel.seals(available: TimingAvailability.allowedStatuses(
+                cycleDate: day, dayBeingLogged: day, windowState: state, currentStatus: nil
+            ))
+        }
+        #expect(seals(.current(startedAt: scheduled, endsAt: windowEnd)) == [.onTime, .late])
+        #expect(seals(.closed(startedAt: scheduled, endedAt: windowEnd)).count == 4)
+        #expect(seals(.upcoming(opensAt: scheduled)).isEmpty)
+    }
+
+    @Test("Undo is offered for six seconds, and only after the act")
+    func undoWindow() {
+        let act = scheduled
+        #expect(FocusedCardModel.offersUndo(actionAt: act, now: act))
+        #expect(FocusedCardModel.offersUndo(actionAt: act, now: act.addingTimeInterval(5.9)))
+        #expect(!FocusedCardModel.offersUndo(actionAt: act, now: act.addingTimeInterval(6)))
+        #expect(!FocusedCardModel.offersUndo(actionAt: act, now: act.addingTimeInterval(-1)))
+    }
+
+    /// VoiceOver walks to Undo instead of glancing at it; the offer
+    /// waits for the walk.
+    @Test("Undo waits longer under VoiceOver")
+    func undoWaitsForVoiceOver() {
+        let act = scheduled
+        #expect(FocusedCardModel.offersUndo(actionAt: act, now: act.addingTimeInterval(15), voiceOver: true))
+        #expect(!FocusedCardModel.offersUndo(actionAt: act, now: act.addingTimeInterval(15), voiceOver: false))
+    }
+
+    /// A marker-tapped focus outlasts the Undo it may be carrying, so
+    /// the card never returns to the moment under a live Undo.
+    @Test("Focus holds longer than Undo lasts", arguments: [false, true])
+    func focusOutlastsUndo(voiceOver: Bool) {
+        #expect(
+            FocusedCardModel.focusHoldInterval(voiceOver: voiceOver)
+                > FocusedCardModel.undoInterval(voiceOver: voiceOver)
+        )
+    }
 }

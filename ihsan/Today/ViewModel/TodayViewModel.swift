@@ -306,13 +306,47 @@ final class TodayViewModel {
         return night(for: now)
     }
 
+    /// Silent by design: the card that records has already settled
+    /// under the thumb, and one tap makes one haptic.
     func setStatus(_ status: PrayerStatus, for prayer: Prayer) async {
         do {
             let intent = LogPrayerWithStatusIntent(prayer: prayer, status: status)
             _ = try await intent.perform()
-            Haptics.settle()
         } catch {
             Self.logger.error("setStatus failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Takes a prayer's record for the cycle in progress away, through
+    /// the funnel's one way back.
+    func removeRecord(of prayer: Prayer) async {
+        do {
+            _ = try await RemovePrayerLogIntent(prayer: prayer).perform()
+        } catch {
+            Self.logger.error("removeRecord failed: \(String(describing: error), privacy: .public)")
+        }
+    }
+
+    /// Undo for the Today card: puts a prayer's record back as it was
+    /// before the card changed it — no record at all, or a timing with
+    /// its jamāʿah, written together in one save so nothing read in
+    /// between can be stale.
+    func restore(
+        _ prayer: Prayer,
+        to previous: (status: PrayerStatus, withJamaah: Bool)?
+    ) async {
+        do {
+            guard let previous else {
+                _ = try await RemovePrayerLogIntent(prayer: prayer).perform()
+                return
+            }
+            _ = try await LogPrayerWithStatusIntent(
+                prayer: prayer,
+                status: previous.status,
+                withJamaah: previous.withJamaah
+            ).perform()
+        } catch {
+            Self.logger.error("restore failed: \(String(describing: error), privacy: .public)")
         }
     }
 
@@ -328,11 +362,12 @@ final class TodayViewModel {
         }
     }
 
+    /// Silent for the same reason as `setStatus`: the chip answers the
+    /// tap itself.
     func toggleJamaah(for prayer: Prayer) async {
         do {
             let intent = ToggleJamaahIntent(prayer: prayer)
             _ = try await intent.perform()
-            Haptics.impact(.light)
         } catch {
             Self.logger.error("toggleJamaah failed: \(String(describing: error), privacy: .public)")
         }

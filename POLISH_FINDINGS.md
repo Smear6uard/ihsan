@@ -1479,3 +1479,53 @@ logs are retained in build/launch-verification/ (ignored by git).
   significant-day line all showing at once — the plate gives up the
   most height there.
 
+
+## The dawn ahead, and the one-tap card (31 Oct 2026)
+
+Spec: `docs/superpowers/specs/2026-10-31-dawn-ahead-and-the-one-tap-card-design.md`.
+
+- **The night daylight saving ends is the test night.** From Isha's
+  opening every surface now names the Fajr ahead — the plate's Fajr
+  label and its sunrise, the card, the header, the widgets, the watch
+  caption and list complication. On the simulator at 10 PM on 31 Oct
+  (Chicago) all of them read 5:05 AM and sunrise 6:23 AM, where the
+  plate used to say 6:04. Still owed: the same check on a real lock
+  screen and watch face that night, and once at 1 AM.
+- **After Isha the morning's Fajr leaves the plate.** The marker turns
+  to the outline of the dawn ahead; an unlogged morning Fajr is named by
+  the next day's Yesterday line and stays on Path. Watch whether anyone
+  reads the outline as their morning record disappearing.
+- **The seals at the extremes.** Four seals share 333 pt on the 17 Pro;
+  check the closed-window row on the smallest supported phone, and both
+  rows with Bold Text on. The card's type is fixed-size like the rest of
+  Today, so the largest accessibility sizes change only the khatam rail.
+- **Undo under VoiceOver.** The offer lasts 20 s while VoiceOver runs
+  (6 s otherwise) and every recording is announced with "Undo is
+  available". Walk it on device: record, find Undo, use it, and confirm
+  the card's custom actions (Change, Remove record, Undo, Begin a pause)
+  are reachable from the rotor.
+- **One tap, one haptic.** The card's seal settles under the thumb and
+  the view model no longer settles again when the write returns.
+  Confirm on device that a commit is a single soft weight, and that the
+  jamāʿah chip is a single light tap.
+- **The long press.** Change, Remove record and Begin a pause live in the
+  card's context menu; the pause used to live only in the old sheet's
+  footer. Check the menu's lifted preview against the plate by day and
+  by night.
+- **Widgets: sunrise is printed now.** The medium strip inscribes
+  `SUNRISE · 5:42 AM` under Fajr's time; the large plate gained a
+  six-column almanac row (hour:minute without AM/PM, in the order of the
+  day). Check both on a real home screen in full colour, tinted and
+  clear, and the large one on the smallest phone.
+- **Remove waits out its Undo.** Removing a record from the card hides it
+  at once but writes the deletion only when the Undo offer expires (or
+  the app leaves the foreground), so Undo after Remove restores the very
+  same row. Widgets and the watch keep showing the record for those few
+  seconds. Known limit: a mis-tapped record that ended the prayer's Live
+  Activity does not bring the activity back on Undo — the scheduler
+  starts activities by time and nothing re-asks it after a removal.
+- **Opened before dawn, back after Fajr.** Today now rebuilds itself when
+  the prayer cycle turns under a window built before dawn; before this,
+  the day's prayers showed the previous night's records until the next
+  Fajr. Worth one real check: open the app around 4 AM, lock the phone,
+  open it after Fajr.

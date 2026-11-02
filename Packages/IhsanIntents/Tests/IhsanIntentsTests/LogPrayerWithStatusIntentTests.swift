@@ -70,4 +70,36 @@ final class LogPrayerWithStatusIntentTests: XCTestCase {
         XCTAssertEqual(logs.first { $0.prayer == .asr }?.status, .qada)
         XCTAssertEqual(logs.first { $0.prayer == .maghrib }?.status, .missed)
     }
+
+    /// Undo's write: the status and the jamāʿah land in one save.
+    @MainActor
+    func testJamaahTravelsWithTheStatusWhenGiven() async throws {
+        let context = try await makeContext()
+
+        _ = try await LogPrayerWithStatusIntent(
+            prayer: .asr, status: .late, withJamaah: true
+        ).perform()
+
+        let logs = try fetchLogs(in: context)
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertEqual(logs.first?.status, .late)
+        XCTAssertEqual(logs.first?.withJamaah, true)
+    }
+
+    /// A prayer not offered was not offered in congregation: recording
+    /// Missed clears the axis, whatever the record carried before.
+    @MainActor
+    func testMissedClearsJamaah() async throws {
+        let context = try await makeContext()
+
+        _ = try await LogPrayerWithStatusIntent(
+            prayer: .asr, status: .onTime, withJamaah: true
+        ).perform()
+        _ = try await LogPrayerWithStatusIntent(prayer: .asr, status: .missed).perform()
+
+        let logs = try fetchLogs(in: context)
+        XCTAssertEqual(logs.count, 1)
+        XCTAssertEqual(logs.first?.status, .missed)
+        XCTAssertEqual(logs.first?.withJamaah, false)
+    }
 }

@@ -177,19 +177,25 @@ struct WidgetSnapshotResolverTests {
         }
     }
 
-    /// Built at 2 am — before today's Fajr — the bracketing rule
-    /// keeps the civil day and lets yesterday's Isha own the pre-dawn
-    /// stretch, exactly as `scheduleWindow` resolves it for the app.
+    /// Built at 2 am — before today's Fajr — the snapshot leads with the
+    /// CYCLE's day, yesterday's, as the Today screen does: its logs, its
+    /// five, and the night still in progress travel together. The
+    /// prayer answers stay exactly the app's.
     @Test
-    func preFajrBuildKeepsTheCivilDayWithYesterdaysIsha() throws {
+    func preFajrBuildLeadsWithTheCycleInProgress() throws {
         let site = Self.chicago
         let builtAt = date(site, 2026, 7, 30, 2, 0)
         let snapshot = try snapshot(site, builtAt: builtAt)
 
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = site.timeZone
-        #expect(calendar.component(.day, from: snapshot.today.civilDayStart) == 30)
-        // Pre-dawn resolves against yesterday's Isha, not a guess.
+        #expect(calendar.component(.day, from: snapshot.today.civilDayStart) == 29)
+        #expect(snapshot.cycleDayStart == snapshot.today.civilDayStart)
+        #expect(snapshot.cycleRollsAt == snapshot.tomorrow.fajr)
+        // The night face speaks about the night it is, not the next one.
+        #expect(snapshot.tonight.contains(builtAt))
+        #expect(snapshot.relevantNight(at: builtAt) == snapshot.tonight)
+
         let widgetSchedule = try #require(snapshot.resolverSchedule(containing: builtAt))
         let resolution = PrayerStateResolver.resolve(prayerTimes: widgetSchedule, now: builtAt)
         #expect(resolution.currentPrayer?.prayer == .isha)
@@ -197,6 +203,46 @@ struct WidgetSnapshotResolverTests {
         try expectEquivalence(site, snapshot: snapshot, at: builtAt)
         // And it still covers all of the 30th.
         try expectEquivalence(site, snapshot: snapshot, at: date(site, 2026, 7, 30, 23, 0))
+    }
+
+    /// A widget pinned to one prayer prints that prayer's next
+    /// occurrence. Leading with the cycle means a pre-dawn publish
+    /// carries yesterday and today, so without the third day every
+    /// prayer ran out of occurrences on the day of the publish.
+    @Test
+    func everyPrayerHasANextOccurrenceAcrossCoverage() throws {
+        let site = Self.chicago
+        for builtAt in [date(site, 2026, 7, 30, 2, 0), date(site, 2026, 7, 30, 21, 0)] {
+            let snapshot = try snapshot(site, builtAt: builtAt)
+            let days = try [snapshot.today, snapshot.tomorrow, #require(snapshot.dayAfterTomorrow)]
+            #expect(snapshot.dayAfterTomorrow?.fajr == snapshot.dayAfterTomorrowFajr)
+            var instant = builtAt
+            while snapshot.freshness(at: instant) == .fresh {
+                for times in [\WidgetSnapshot.DayTable.fajr, \.dhuhr, \.asr, \.maghrib, \.isha] {
+                    #expect(
+                        days.contains { $0[keyPath: times] >= instant },
+                        "No next occurrence at \(instant) for a publish at \(builtAt)"
+                    )
+                }
+                instant = instant.addingTimeInterval(30 * 60)
+            }
+        }
+    }
+
+    /// Wherever the snapshot was built, the sunrise it hands a face
+    /// beside a Fajr is that Fajr's own — including the dawn after
+    /// next, which a face prints late on day two.
+    @Test
+    func everyCarriedFajrHasItsSunrise() throws {
+        let site = Self.chicago
+        for builtAt in [date(site, 2026, 7, 30, 2, 0), date(site, 2026, 7, 30, 21, 0)] {
+            let snapshot = try snapshot(site, builtAt: builtAt)
+            for fajr in [snapshot.today.fajr, snapshot.tomorrow.fajr, snapshot.dayAfterTomorrowFajr] {
+                let sunrise = try #require(snapshot.sunrise(following: fajr))
+                #expect(sunrise > fajr)
+                #expect(sunrise.timeIntervalSince(fajr) < 3 * 3600)
+            }
+        }
     }
 
     // MARK: - Staleness refuses to resolve

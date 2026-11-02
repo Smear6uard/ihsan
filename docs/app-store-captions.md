@@ -34,7 +34,7 @@ register. No exclamation, no imperative, no promise.
 | --- | --- |
 | `store-1-night-plate` | The day as a single instrument. Five prayers on one arc. |
 | `store-2-dawn` | The page follows the sun, from first light to the last third of the night. |
-| `store-3-logging` | Two questions, one tap: when you prayed, and whether you prayed with others. |
+| `store-3-logging` | One tap records a prayer in its window. One more takes it back. |
 | `store-4-repair` | A ledger for what you carry, and a pace you set yourself. |
 | `store-5-qibla` | The direction, drawn rather than pointed at. |
 | `store-6-path` | A month of prayer as a pattern of days. No streaks, no score. |

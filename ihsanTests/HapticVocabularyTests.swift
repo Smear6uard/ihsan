@@ -41,7 +41,9 @@ struct HapticVocabularyTests {
         "ihsan/Today/Components/FocusedPrayerCard.swift",
         "ihsan/Today/Components/YesterdaySheet.swift",
         "ihsan/Reflection/Helpers/ReflectionHaptics.swift",
-        "ihsan/Today/ViewModel/TodayViewModel.swift",
+        // Not TodayViewModel: it is the funnel behind the card, not a
+        // surface, and it used to settle a second time after the
+        // card's own — one tap, two haptics.
         "ihsan/Today/TodayScreen.swift",
         "ihsan/Dhikr/DhikrScreen.swift",
         "ihsan/Qibla/ViewModel/QiblaViewModel.swift",

@@ -30,6 +30,7 @@ extension PrayerTimelineEntry.LiveDay {
                 return WidgetDayModel.Slot(
                     prayer: $0.prayer,
                     time: $0.scheduledTime,
+                    displayTime: $0.displayTime,
                     // An excused pause shows times, never absence: a
                     // passed mark stands as the neutral outline, the
                     // same form the future wears.
@@ -42,6 +43,7 @@ extension PrayerTimelineEntry.LiveDay {
             currentPrayer: currentPrayer,
             currentWindow: currentWindow,
             sunrise: sunrise,
+            displayedSunrise: displayedSunrise,
             cityName: cityName,
             timeZoneIdentifier: timeZoneIdentifier,
             isPaused: isPaused,
@@ -71,7 +73,7 @@ extension PrayerTimelineEntry.LiveDay {
     private var fastingModel: WidgetFastingModel? {
         guard let fasting, fasting.isFasting || fasting.isRamadan else { return nil }
         guard
-            let fajr = slots.first(where: { $0.prayer == .fajr })?.scheduledTime,
+            let fajr = slots.first(where: { $0.prayer == .fajr })?.displayTime,
             let maghrib = slots.first(where: { $0.prayer == .maghrib })?.scheduledTime
         else { return nil }
         return WidgetFastingModel(

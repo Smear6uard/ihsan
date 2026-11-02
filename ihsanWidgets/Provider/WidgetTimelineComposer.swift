@@ -65,31 +65,52 @@ struct WidgetTimelineComposer {
             currentWindow = nil
         }
 
-        // The strip shows the bracket day's five prayers. Logged
-        // states only exist for the snapshot's "today" — tomorrow's
-        // slots are simply unlogged, which is the truth.
+        // The strip shows the bracket day's five prayers — the cycle's,
+        // since the snapshot leads with the cycle. Logged states only
+        // exist for that cycle; tomorrow's slots are simply unlogged,
+        // which is the truth.
+        //
+        // From the cycle's Isha onward the Fajr it prints is the dawn
+        // ahead — the Fajr the countdown is counting to — exactly as
+        // the Today plate does. Its ornament stays where the day's
+        // Fajr sits on the arc; its record does not follow it.
         let table = schedule
         let isToday = table.fajr.scheduledTime == snapshot.today.fajr
+        let fajrLooksAhead = PrayerCycleClock.namesClosingFajr(
+            at: instant,
+            ishaStart: table.isha.scheduledTime,
+            closingFajr: table.tomorrowFajr.scheduledTime
+        )
         let slots = table.dayPrayerTimes.map { prayerTime in
-            PrayerTimelineEntry.LiveDay.PrayerSlot(
+            let looksAhead = prayerTime.prayer == .fajr && fajrLooksAhead
+            let carriesRecord = isToday && !looksAhead
+            return PrayerTimelineEntry.LiveDay.PrayerSlot(
                 prayer: prayerTime.prayer,
                 scheduledTime: prayerTime.scheduledTime,
-                status: isToday
+                displayTime: looksAhead
+                    ? table.tomorrowFajr.scheduledTime
+                    : prayerTime.scheduledTime,
+                status: carriesRecord
                     ? snapshot.loggedStatusByPrayerRaw[prayerTime.prayer.rawValue]
                         .flatMap(PrayerStatus.init(rawValue:))
                     : nil,
-                withJamaah: isToday
+                withJamaah: carriesRecord
                     ? (snapshot.jamaahByPrayerRaw[prayerTime.prayer.rawValue] ?? false)
                     : false
             )
         }
+        let displayedSunrise = fajrLooksAhead
+            ? snapshot.sunrise(following: table.tomorrowFajr.scheduledTime)
+            : table.sunrise
 
+        // Three days, not two: the snapshot leads with the cycle, so a
+        // publish made before dawn carries yesterday and today, and a
+        // widget pinned to Dhuhr would otherwise have no next Dhuhr from
+        // the moment today's passed.
         var nextOccurrences: [String: Date] = [:]
         for prayer in Prayer.allCases {
-            let candidates = [
-                time(of: prayer, in: snapshot.today),
-                time(of: prayer, in: snapshot.tomorrow),
-            ]
+            let candidates = [snapshot.today, snapshot.tomorrow, snapshot.dayAfterTomorrow]
+                .compactMap { $0.map { time(of: prayer, in: $0) } }
             nextOccurrences[prayer.rawValue] = candidates.first { $0 >= instant }
         }
 
@@ -102,6 +123,7 @@ struct WidgetTimelineComposer {
                 currentWindow: currentWindow,
                 slots: slots,
                 sunrise: table.sunrise,
+                displayedSunrise: displayedSunrise,
                 cityName: snapshot.cityName,
                 timeZoneIdentifier: snapshot.timeZoneIdentifier,
                 qiblaBearingDegrees: snapshot.qiblaBearingDegrees,

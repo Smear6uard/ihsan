@@ -4,8 +4,9 @@ import IhsanCore
 /// The congregation line, in the state line's own register.
 ///
 /// `IqamahResolver` decides *which* time a prayer keeps; this only dresses
-/// it. Both the card and the log sheet read this one function, so the two
-/// surfaces cannot phrase the same fact differently.
+/// it. Every surface that prints a congregation time — the Today card in
+/// each of its states — reads this one function, so none of them can
+/// phrase the same fact differently.
 ///
 /// The line always states the resolved time and never the rule that
 /// produced it: "IQAMAH · 1:30 PM", never "Fajr + 20 min". A person

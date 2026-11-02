@@ -33,12 +33,12 @@ struct CelestialPlateScene: View {
     /// One prayer on the plate: which ornament, when, and what
     /// lifecycle state it is in.
     ///
-    /// `time` places the marker on the arc — always today's instant,
-    /// so the arc's engraved scale stays the civil day. `displayTime`
+    /// `time` places the marker on the arc — always the cycle's own
+    /// instant, so the arc's engraved scale stays the day. `displayTime`
     /// is what the label prints: the caller passes the same display
-    /// instant the header and card show (post-Isha, Fajr's label
-    /// rolls to tomorrow's Fajr), so no two surfaces can disagree
-    /// about a time to the minute.
+    /// instant the header and card show (from Isha's opening, Fajr's
+    /// label is the Fajr ahead — `TodayDisplaySchedule`), so no two
+    /// surfaces can disagree about a time to the minute.
     struct Marker: Identifiable, Equatable {
         let prayer: Prayer
         let time: Date
@@ -93,6 +93,11 @@ struct CelestialPlateScene: View {
     /// span — between Maghrib and the next true Fajr. `nil`, or any
     /// daytime instant, renders exactly the pre-night plate.
     var night: NightIntervals?
+    /// The sunrise the inscription prints, when it is not the day's own:
+    /// from Isha's opening the Fajr label names the dawn ahead, and the
+    /// sunrise beside it follows. The mark's position still comes from
+    /// `solarEvents`, whose ratios are what place it on the arc.
+    var displayedSunrise: Date?
     /// Marker tap — the Today screen swaps the focused card to this
     /// prayer. `nil` makes the plate non-interactive.
     var onMarkerTap: ((Prayer) -> Void)?
@@ -550,7 +555,7 @@ struct CelestialPlateScene: View {
         .allowsHitTesting(false)
         .accessibilityHidden(true)
 
-        Text("SUNRISE · \(Self.timeString(solarEvents.sunrise, in: timeZone).uppercased())")
+        Text("SUNRISE · \(Self.timeString(displayedSunrise ?? solarEvents.sunrise, in: timeZone).uppercased())")
             .font(Self.labelFont)
             .tracking(1.2)
             .foregroundStyle(tokens.inkSecondary)

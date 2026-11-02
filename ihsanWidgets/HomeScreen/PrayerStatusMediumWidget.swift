@@ -8,8 +8,9 @@ import WidgetKit
 /// Medium (4×2). The day strip: five ornaments along the day's arc
 /// with their times inscribed beneath, the current prayer one tap
 /// from logged On Time. A passed prayer's status is a question — its
-/// mark deep-links into the app's sheet instead of answering it
-/// silently. During an excused pause nothing is a button.
+/// mark deep-links to that prayer on the Today card, whose seals ask it,
+/// instead of answering it silently. During an excused pause nothing is
+/// a button.
 struct PrayerStatusMediumWidgetView: View {
     let entry: PrayerTimelineEntry
 

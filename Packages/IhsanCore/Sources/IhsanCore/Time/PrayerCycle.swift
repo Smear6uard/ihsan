@@ -75,6 +75,28 @@ public enum PrayerCycleClock {
         return PrayerCycle(date: previous, rollsAt: civilDayFajr)
     }
 
+    /// The display half of clock 1: whether a surface that prints
+    /// "Fajr" with a time should print the Fajr that CLOSES the cycle.
+    ///
+    /// The record never moves — this morning's Fajr belongs to this
+    /// cycle all night, and its log stays filed there. But once the
+    /// cycle's Isha has opened, the only Fajr a person can still be
+    /// waiting for is the one ahead, and it is the one the header's
+    /// NEXT already names. A plate that kept printing the morning's
+    /// put two Fajr times on one screen — a minute apart most nights,
+    /// an hour apart on the night daylight saving ends.
+    ///
+    /// Half-open at the closing Fajr: at that instant the next cycle
+    /// begins, and its own Fajr is the same instant, so the name a
+    /// surface prints changes once a day, at Isha, and never at dawn.
+    public static func namesClosingFajr(
+        at instant: Date,
+        ishaStart: Date,
+        closingFajr: Date
+    ) -> Bool {
+        instant >= ishaStart && instant < closingFajr
+    }
+
     /// Just the key, for callers that only need to know which row an
     /// instant belongs to.
     public static func cycleDate(

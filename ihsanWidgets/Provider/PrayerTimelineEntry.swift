@@ -37,7 +37,13 @@ struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
         let currentWindow: ClosedRange<Date>?
         /// Today's five prayers in order, with their logged states.
         let slots: [PrayerSlot]
+        /// The day's sunrise — where the arc's tick sits.
         let sunrise: Date
+        /// The sunrise a face prints: the one after the printed Fajr.
+        /// Nil only late on day two of a payload written before the
+        /// snapshot carried the third sunrise; the face then prints the
+        /// day's own until the app next publishes.
+        let displayedSunrise: Date?
         let cityName: String?
         let timeZoneIdentifier: String
         let qiblaBearingDegrees: Double?
@@ -56,7 +62,11 @@ struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
 
         struct PrayerSlot: Sendable, Equatable, Identifiable {
             let prayer: Prayer
+            /// The cycle's own instant — the slot's place on the arc.
             let scheduledTime: Date
+            /// The instant the slot prints and is judged by: the dawn
+            /// ahead for Fajr after Isha, otherwise `scheduledTime`.
+            let displayTime: Date
             let status: PrayerStatus?
             let withJamaah: Bool
 
@@ -72,7 +82,7 @@ struct PrayerTimelineEntry: TimelineEntry, Sendable, Equatable {
         func markerState(for slot: PrayerSlot, at date: Date) -> PrayerMarkerState {
             if currentPrayer == slot.prayer { return .current }
             if let status = slot.status, status != .missed { return .logged }
-            return slot.scheduledTime <= date ? .passedUnlogged : .upcoming
+            return slot.displayTime <= date ? .passedUnlogged : .upcoming
         }
 
         /// Wall-clock text in the place's timezone — never the

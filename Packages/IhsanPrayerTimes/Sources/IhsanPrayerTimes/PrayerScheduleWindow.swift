@@ -327,13 +327,19 @@ public enum PrayerResolverDiagnostics {
 public struct PrayerScheduleWindow: Sendable, Equatable {
     public let yesterday: DayPrayerTimes
     public let day: DayPrayerTimes
-    public let tomorrowFajr: PrayerTime
+    /// Tomorrow whole, for the same reason yesterday is: after Isha the
+    /// surfaces name tomorrow's Fajr, and the sunrise beside it has to
+    /// be tomorrow's too or the morning pair stops adding up.
+    public let tomorrow: DayPrayerTimes
 
-    public init(yesterday: DayPrayerTimes, day: DayPrayerTimes, tomorrowFajr: PrayerTime) {
+    public init(yesterday: DayPrayerTimes, day: DayPrayerTimes, tomorrow: DayPrayerTimes) {
         self.yesterday = yesterday
         self.day = day
-        self.tomorrowFajr = tomorrowFajr
+        self.tomorrow = tomorrow
     }
+
+    /// The Fajr that ends this civil day's cycle.
+    public var tomorrowFajr: PrayerTime { tomorrow.fajr }
 
     /// The previous day's Isha — the window that owns the hours before
     /// dawn.
@@ -387,6 +393,43 @@ public struct PrayerScheduleWindow: Sendable, Equatable {
     /// `instant`.
     public func scheduledTime(of prayer: Prayer, inCycleAt instant: Date) -> Date {
         cycleDayTimes(at: instant).time(for: prayer)
+    }
+
+    // MARK: - What a surface names
+
+    /// Whether, at `instant`, "Fajr" on a glanceable surface means the
+    /// Fajr that closes the cycle rather than the one that opened it.
+    /// See `PrayerCycleClock.namesClosingFajr`.
+    public func namesClosingFajr(at instant: Date) -> Bool {
+        PrayerCycleClock.namesClosingFajr(
+            at: instant,
+            ishaStart: cycleDayTimes(at: instant).isha.scheduledTime,
+            closingFajr: cycle(at: instant).rollsAt
+        )
+    }
+
+    /// The instance of `prayer` a surface prints at `instant`: the
+    /// cycle's own, except Fajr once Isha has opened, which is the dawn
+    /// ahead. The returned value is the same `PrayerTime` the resolver
+    /// hands out, so a surface can ask it for that instance's state.
+    ///
+    /// The record does not follow this. A log filed under the cycle's
+    /// Fajr never attaches to the rolled one — callers check
+    /// `namesClosingFajr` before looking a log up.
+    public func displayedPrayerTime(of prayer: Prayer, at instant: Date) -> PrayerTime {
+        guard prayer == .fajr, namesClosingFajr(at: instant) else {
+            return cycleDayTimes(at: instant).allFardh.first { $0.prayer == prayer }!
+        }
+        return instant < day.fajr.scheduledTime ? day.fajr : tomorrow.fajr
+    }
+
+    /// The sunrise printed beside the displayed Fajr — the one that
+    /// closes that Fajr's window.
+    public func displayedSunrise(at instant: Date) -> Date {
+        guard namesClosingFajr(at: instant) else {
+            return cycleDayTimes(at: instant).sunrise
+        }
+        return instant < day.fajr.scheduledTime ? day.sunrise : tomorrow.sunrise
     }
 
     // MARK: - Clock 2
@@ -454,8 +497,8 @@ public extension PrayerTimesProviding {
         var offset = 0
         for _ in 0..<4 {
             let day = try times(offset)
-            let tomorrowFajr = try times(offset + 1).fajr
-            if date >= tomorrowFajr.scheduledTime {
+            let tomorrow = try times(offset + 1)
+            if date >= tomorrow.fajr.scheduledTime {
                 offset += 1
                 continue
             }
@@ -467,7 +510,7 @@ public extension PrayerTimesProviding {
             return PrayerScheduleWindow(
                 yesterday: yesterday,
                 day: day,
-                tomorrowFajr: tomorrowFajr
+                tomorrow: tomorrow
             )
         }
         throw PrayerTimesError.invalidDate(

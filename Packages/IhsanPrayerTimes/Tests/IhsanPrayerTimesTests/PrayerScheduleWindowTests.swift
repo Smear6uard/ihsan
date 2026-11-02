@@ -207,6 +207,95 @@ struct PrayerScheduleWindowTests {
         )
         #expect(forenoonCurrent == nil)
     }
+
+    // MARK: - The displayed instance: the dawn ahead
+
+    private func chicago(_ month: Int, _ day: Int, _ hour: Int, _ minute: Int = 0) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Chicago")!
+        return calendar.date(
+            from: DateComponents(year: 2026, month: month, day: day, hour: hour, minute: minute)
+        )!
+    }
+
+    /// Through the day every prayer shows its own cycle's instance —
+    /// including Fajr, which is the day's record until Isha opens.
+    @Test
+    func beforeIshaEveryPrayerShowsItsCycleInstance() throws {
+        let w = try window(at: referenceNoon)
+        var instant = w.day.fajr.scheduledTime
+        while instant < w.day.isha.scheduledTime {
+            for prayer in Prayer.allCases {
+                #expect(
+                    w.displayedPrayerTime(of: prayer, at: instant).scheduledTime
+                        == w.day.time(for: prayer)
+                )
+            }
+            #expect(w.displayedSunrise(at: instant) == w.day.sunrise)
+            instant = instant.addingTimeInterval(15 * 60)
+        }
+    }
+
+    /// From Isha's opening, Fajr and sunrise name tomorrow's — the
+    /// same Fajr the resolver already calls next — while the record's
+    /// other four stay on the cycle.
+    @Test
+    func fromIshaFajrAndSunriseLookAhead() throws {
+        let w = try window(at: referenceNoon)
+        for instant in [w.day.isha.scheduledTime, w.tomorrowFajr.scheduledTime - 1] {
+            let fajr = w.displayedPrayerTime(of: .fajr, at: instant)
+            #expect(fajr == w.tomorrowFajr)
+            #expect(fajr == resolve(w, at: instant).nextPrayer)
+            #expect(w.displayedSunrise(at: instant) == w.tomorrow.sunrise)
+            for prayer in [Prayer.dhuhr, .asr, .maghrib, .isha] {
+                #expect(
+                    w.displayedPrayerTime(of: prayer, at: instant).scheduledTime
+                        == w.day.time(for: prayer)
+                )
+            }
+        }
+    }
+
+    /// Before dawn the cycle is yesterday's, and the Fajr ahead is this
+    /// civil day's — whichever side of midnight the window was built.
+    @Test
+    func beforeDawnFajrIsTheOneAboutToOpen() throws {
+        let lateEvening = chicago(7, 20, 23, 30)
+        let preDawn = chicago(7, 21, 3, 0)
+        let built = try window(at: lateEvening)
+        let rebuilt = try window(at: preDawn)
+
+        let fromEvening = built.displayedPrayerTime(of: .fajr, at: preDawn)
+        let fromNight = rebuilt.displayedPrayerTime(of: .fajr, at: preDawn)
+        #expect(fromEvening == fromNight)
+        #expect(fromNight == rebuilt.day.fajr)
+        #expect(built.displayedSunrise(at: preDawn) == rebuilt.displayedSunrise(at: preDawn))
+        #expect(rebuilt.displayedPrayerTime(of: .isha, at: preDawn) == rebuilt.yesterday.isha)
+    }
+
+    /// The instance a surface names does not move at dawn: the closing
+    /// Fajr one second before is the opening Fajr one second after.
+    @Test
+    func theDisplayedFajrDoesNotJumpAtDawn() throws {
+        let w = try window(at: referenceNoon)
+        let dawn = w.day.fajr.scheduledTime
+        let before = try window(at: dawn - 1)
+        #expect(before.displayedPrayerTime(of: .fajr, at: dawn - 1).scheduledTime == dawn)
+        #expect(w.displayedPrayerTime(of: .fajr, at: dawn).scheduledTime == dawn)
+    }
+
+    /// The night daylight saving ends in Chicago (1 November 2026):
+    /// this morning's Fajr is CDT, tomorrow's is CST, an hour apart on
+    /// the wall clock. After Isha only tomorrow's may be printed.
+    @Test
+    func fallBackNightNamesTomorrowsFajr() throws {
+        let tenPM = chicago(10, 31, 22, 0)
+        let w = try window(at: tenPM)
+        let shown = w.displayedPrayerTime(of: .fajr, at: tenPM).scheduledTime
+        #expect(shown == w.tomorrowFajr.scheduledTime)
+        #expect(shown > tenPM)
+        #expect(w.day.fajr.scheduledTime < tenPM)
+    }
 }
 
 /// Deterministic RNG so the 50 samples are the same 50 samples on

@@ -13,12 +13,15 @@ final class MasjidFinderViewModel {
     private let searchService: any MasjidSearching
     private var currentCoordinates: Coordinates?
 
+    /// The default service is built in the body, not as a default
+    /// argument: default arguments are evaluated outside the main actor,
+    /// and on the Xcode 27 toolchain building the service there warned.
     init(
         locationProvider: any LocationProviding = CoreLocationCoordinator.shared,
-        searchService: any MasjidSearching = MasjidSearchService()
+        searchService: (any MasjidSearching)? = nil
     ) {
         self.locationProvider = locationProvider
-        self.searchService = searchService
+        self.searchService = searchService ?? MasjidSearchService()
     }
 
     func bootstrap() async {

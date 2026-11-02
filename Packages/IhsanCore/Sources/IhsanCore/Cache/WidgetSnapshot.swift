@@ -167,6 +167,13 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
     public let tomorrow: DayTable
     /// Fajr of the day after tomorrow — tomorrow's terminal boundary.
     public let dayAfterTomorrowFajr: Date
+    /// The day after tomorrow, whole. Late on day two the faces print
+    /// the dawn ahead and its sunrise, and a widget pinned to one prayer
+    /// needs that prayer's next occurrence after both carried days have
+    /// passed it — which, since the snapshot leads with the cycle, is
+    /// most of the day after a publish made before dawn. Optional so
+    /// payloads written before it existed still decode.
+    public let dayAfterTomorrow: DayTable?
 
     public let tonight: NightTable
     public let tomorrowNight: NightTable
@@ -204,6 +211,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         today: DayTable,
         tomorrow: DayTable,
         dayAfterTomorrowFajr: Date,
+        dayAfterTomorrow: DayTable? = nil,
         tonight: NightTable,
         tomorrowNight: NightTable,
         hijri: [HijriStamp],
@@ -225,6 +233,7 @@ public struct WidgetSnapshot: Codable, Sendable, Equatable {
         self.today = today
         self.tomorrow = tomorrow
         self.dayAfterTomorrowFajr = dayAfterTomorrowFajr
+        self.dayAfterTomorrow = dayAfterTomorrow
         self.tonight = tonight
         self.tomorrowNight = tomorrowNight
         self.hijri = hijri
@@ -270,6 +279,16 @@ public extension WidgetSnapshot {
     func dayTable(containing instant: Date) -> DayTable? {
         guard freshness(at: instant) == .fresh else { return nil }
         return instant < tomorrow.fajr ? today : tomorrow
+    }
+
+    /// The sunrise that ends the window of the Fajr at `fajr` — the one
+    /// a face prints beside that Fajr. Nil for a Fajr this snapshot
+    /// does not carry.
+    func sunrise(following fajr: Date) -> Date? {
+        if fajr == today.fajr { return today.sunrise }
+        if fajr == tomorrow.fajr { return tomorrow.sunrise }
+        if fajr == dayAfterTomorrowFajr { return dayAfterTomorrow?.sunrise }
+        return nil
     }
 
     /// The night containing `instant`, when it is night at all.
@@ -388,6 +407,7 @@ public extension WidgetSnapshot {
             today: today,
             tomorrow: tomorrow,
             dayAfterTomorrowFajr: dayAfterTomorrowFajr,
+            dayAfterTomorrow: dayAfterTomorrow,
             tonight: tonight,
             tomorrowNight: tomorrowNight,
             hijri: hijri,

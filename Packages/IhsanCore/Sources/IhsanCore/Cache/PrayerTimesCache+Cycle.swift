@@ -57,6 +57,35 @@ public extension PrayerTimesCache {
     func scheduledTime(for prayer: Prayer, at instant: Date) -> Date? {
         cycleEntries(at: instant).flatMap { Self.time(of: prayer, in: $0) }
     }
+
+    /// Whether a face reading this cache at `instant` should print the
+    /// Fajr that closes the cycle — see `PrayerCycleClock.namesClosingFajr`.
+    func namesClosingFajr(at instant: Date) -> Bool {
+        guard
+            let cycle = cycle(at: instant),
+            let isha = scheduledTime(for: .isha, at: instant)
+        else { return false }
+        return PrayerCycleClock.namesClosingFajr(
+            at: instant, ishaStart: isha, closingFajr: cycle.rollsAt
+        )
+    }
+
+    /// The five instants a glanceable face prints at `instant`: the
+    /// cycle's own, with Fajr naming the dawn ahead once the cycle's
+    /// Isha has opened — the same five the phone's plate prints.
+    func displayedTimes(at instant: Date) -> [Prayer: Date]? {
+        guard let cycleEntries = cycleEntries(at: instant) else { return nil }
+        var times: [Prayer: Date] = [:]
+        for entry in cycleEntries {
+            if let prayer = Prayer(rawValue: entry.prayerRaw) {
+                times[prayer] = entry.scheduledTime
+            }
+        }
+        if namesClosingFajr(at: instant), let cycle = cycle(at: instant) {
+            times[.fajr] = cycle.rollsAt
+        }
+        return times
+    }
 }
 
 public extension PrayerCycleClock {

@@ -193,7 +193,7 @@ public struct AccessoryDayRowFace: View {
                     )
                     .opacity(slot.state == .passedUnlogged ? 0.75 : 1)
 
-                    Text(hourOnly(slot.time, timeZoneIdentifier))
+                    Text(hourOnly(slot.displayTime, timeZoneIdentifier))
                         .font(.system(size: 10, weight: slot.state == .current ? .semibold : .regular, design: .rounded).monospacedDigit())
                         .foregroundStyle(slot.state == .current ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
                         .lineLimit(1)
@@ -207,7 +207,7 @@ public struct AccessoryDayRowFace: View {
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(
             slots.map {
-                "\($0.prayer.displayNameEnglish) \(clockShort($0.time, timeZoneIdentifier)), \($0.state.spokenDescription)"
+                "\($0.prayer.displayNameEnglish) \(clockShort($0.displayTime, timeZoneIdentifier)), \($0.state.spokenDescription)"
             }.joined(separator: ", ")
         )
     }

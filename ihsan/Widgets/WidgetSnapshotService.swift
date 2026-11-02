@@ -157,19 +157,19 @@ enum WidgetSnapshotService {
             highLatitudeRule: settings.highLatitudeRule,
             tuning: settings.calculationTuning
         )
+        // Each covered day's own Maghrib. Before dawn the first covered
+        // day is the cycle's — yesterday — so none of them can be read
+        // off `window.day` by position.
+        var eveningTurns: [Date: Date] = [:]
+        for day in [covered.today, covered.tomorrow, covered.dayAfterTomorrow] {
+            eveningTurns[day] = try maghrib(
+                on: day, provider: provider, coordinates: coordinates,
+                timeZone: timeZone, settings: settings
+            )
+        }
         return try facts(
             coveringDays: [covered.today, covered.tomorrow, covered.dayAfterTomorrow],
-            eveningTurns: [
-                covered.today: window.day.maghrib.scheduledTime,
-                covered.tomorrow: try maghrib(
-                    on: covered.tomorrow, provider: provider, coordinates: coordinates,
-                    timeZone: timeZone, settings: settings
-                ),
-                covered.dayAfterTomorrow: try maghrib(
-                    on: covered.dayAfterTomorrow, provider: provider, coordinates: coordinates,
-                    timeZone: timeZone, settings: settings
-                ),
-            ],
+            eveningTurns: eveningTurns,
             cycleDate: window.cycle(at: now).date,
             timeZone: timeZone,
             settings: settings,

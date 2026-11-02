@@ -133,9 +133,12 @@ names.
    That answer is true, and the manifest says the same.
 4. **Screenshots.** Six frames in `docs/app-store/`, regenerated at
    6.9" (1320 × 2868) on iPhone 17 Pro Max with a pinned 9:41 status
-   bar, 30 Oct 2026, after the status bar fix merged (the daytime
-   logging frame shows the dark clock and the lighter sheet dim). Frame 6 is now Path; it used to be the debug
-   widget gallery with a section label under the status bar clock.
+   bar, 31 Oct 2026, after the one-tap card landed. Frame 6 is now
+   Path; it used to be the debug widget gallery with a section label
+   under the status bar clock. **Frame 3 (logging) pictures the card's
+   seals since 31 Oct** — the log sheet it used to show no longer opens
+   from Today, so a frame of it would picture a screen the app does not
+   have. Its caption changed with it.
    App Store Connect has no caption field — `docs/app-store-captions.md`
    says what to do with the lines written there.
 5. **Review notes.** The "Notes for App Review" section of
@@ -177,9 +180,10 @@ names.
 
 | | |
 | --- | --- |
-| Package tests | Launch sweep: IhsanNotifications 45, IhsanLocation 18, IhsanFiqhConfig 27, IhsanIntents 44 passed; other package totals are not recertified by this sweep |
-| App tests | 312 tests in 51 suites passed on the final handoff tree, 6 Sep 2026 |
-| UI tests | Granted-location comparison: all three RetroactiveLog tests passed on baseline and changed trees; both PrayerLogCommit tests failed with identical assertions on both. Onboarding and sound-delivery failures also reproduced on baseline. Device acceptance remains open. |
+| Package tests | 31 Oct 2026, all eight: IhsanCore 284 + 13, IhsanPrayerTimes 95, IhsanDesignSystem 230 (widget face pins included), IhsanIntents 50, IhsanNotifications 45, IhsanLocation 18, IhsanFiqhConfig 27, IhsanInsights 14 |
+| App tests | 324 tests in 52 suites passed, 31 Oct 2026 |
+| Toolchain | Xcode 27.2, iOS 27.2 SDK: the app builds with zero warnings (FoundationModels' renamed sampling initializer, four Swift 6.2 isolation diagnostics fixed). Only the iOS 26.5 simulator runtime is installed, so nothing has yet run on iOS 27 |
+| UI tests | 31 Oct 2026, the suites this pass touched: FocusedCardCommit 7/7, CycleClock 7/7 (incl. the plate and header naming one Fajr at 23:50 and 1 AM), RetroactiveLog 3/3, KhatamPrayerMoment 1/1, VoiceOverWalk 4/4. PrayerLogCommit and FocusedCardSwipe were retired with the sheet they drove. The rest of the bundle was not re-run; Onboarding and sound-delivery failures reproduced on baseline earlier. Device acceptance remains open. |
 | Archive | Unsigned archive layout verified: one top-level ihsan.app with embedded watch app. Existing actor-isolation warnings remain; signing and upload require the developer account. |
 | Migration chain | V1 → V11 migration chain; seeded migration tests cover frozen V1 through V10 stores (not rerun in this sweep) |
 | Time fixtures | no surface enters a prayer early, across 50 random locations and dates; countdown target strictly future at every boundary; window closed at the exact instant of sunrise |

@@ -19,18 +19,15 @@ final class KhatamPrayerMomentUITests: XCTestCase {
             "-IhsanDebugResetStore",
             "-IhsanNowOverride", Self.dhuhrWindow,
             "-IhsanDebugSeedKhatam", "active",
-            "-IhsanDebugPresentLogSheet", "dhuhr"
+            "-IhsanDebugFocusPrayer", "dhuhr"
         ]
         app.launch()
         allowLocationIfAsked(app)
 
-        let onTime = app.buttons["On Time, prayed in its window"]
+        // One tap on the card's seal records Dhuhr in its window.
+        let onTime = app.buttons["Log as On Time"]
         XCTAssertTrue(onTime.waitForExistence(timeout: 20))
         onTime.tap()
-        let logPrayer = app.buttons["Log Dhuhr"]
-        XCTAssertTrue(logPrayer.waitForExistence(timeout: 3))
-        XCTAssertTrue(logPrayer.isEnabled)
-        logPrayer.tap()
 
         let offer = app.buttons["Log 4 pages after Dhuhr"]
         XCTAssertTrue(

@@ -75,7 +75,8 @@ struct PrayerListRectangularView: View {
                     .foregroundStyle(
                         isNext ? IhsanColor.textPrimary : IhsanColor.textMuted
                     )
-                if let status = entry.loggedStatuses[prayer] {
+                if let status = entry.loggedStatuses[prayer],
+                   !(prayer == .fajr && entry.fajrLooksAhead) {
                     Circle()
                         .fill(statusFill(status))
                         .frame(width: 4, height: 4)

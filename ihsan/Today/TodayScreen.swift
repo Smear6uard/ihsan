@@ -218,24 +218,23 @@ private struct TodayReadyView: View {
         pauses.first(where: \.isActive)
     }
 
-    @State private var focusedPrayer: Prayer?
-    @State private var sheetSelection: LogSheetSelection? = {
-        // `-IhsanDebugPresentLogSheet <prayer>` — the screenshot
-        // harness. Every debug affordance compiles out of release; a
-        // shipped binary must not read launch arguments an attacker
-        // or a curious user could set.
-        #if DEBUG
-        let arguments = ProcessInfo.processInfo.arguments
-        guard let index = arguments.firstIndex(of: "-IhsanDebugPresentLogSheet"),
-              index + 1 < arguments.count,
-              let prayer = Prayer(rawValue: arguments[index + 1])
-        else { return nil }
-        return LogSheetSelection(prayer: prayer)
-        #else
-        return nil
-        #endif
-    }()
+    /// A marker-tapped prayer holding the card. `-IhsanDebugFocusPrayer
+    /// <prayer>` sets it for the capture harness; the focus then holds
+    /// until a touch elsewhere lets it go (`focusHoldInterval`).
+    @State private var focusedPrayer: Prayer? = DebugLaunch
+        .value(after: "-IhsanDebugFocusPrayer")
+        .flatMap(Prayer.init(rawValue:))
     @State private var revertFocusTask: Task<Void, Never>?
+    /// The open run of changes made from the card, for Undo — what the
+    /// record was before it, and when it last changed.
+    @State private var lastCardChange: CardChange?
+    /// A removal made from the card, waiting out its Undo before it is
+    /// written.
+    @State private var pendingRemoval: PendingRemoval?
+    /// The card's writes, chained: each waits for the one before, so an
+    /// Undo tapped while its record is still being written lands after
+    /// it rather than racing it.
+    @State private var cardWrites: Task<Void, Never>?
     @State private var isCelestialReferencePresented = DebugLaunch.flag("-IhsanDebugPresentQibla")
     @State private var isHijriSheetPresented = DebugLaunch.flag("-IhsanDebugPresentHijriSheet")
 
@@ -248,7 +247,9 @@ private struct TodayReadyView: View {
         case .hijri:
             isHijriSheetPresented = true
         case .logSheet(let prayer):
-            sheetSelection = LogSheetSelection(prayer: prayer)
+            // A widget's unrecorded mark links here. The card records
+            // in place now, so the link brings that prayer to it.
+            focus(prayer)
         }
     }
     @State private var isMasjidFinderPresented = DebugLaunch.flag("-IhsanDebugPresentMasjids")
@@ -272,6 +273,7 @@ private struct TodayReadyView: View {
     @State private var headerHeight: CGFloat = 0
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @State private var prayerNotificationRoute = PrayerNotificationRoute.shared
     @State private var adhkarNotificationRoute = AdhkarNotificationRoute.shared
     /// A nafl waiting on the rak'ah dialog — only ever set when the user
@@ -314,9 +316,6 @@ private struct TodayReadyView: View {
     /// race, and loses it about half the time.
     @State private var pendingRemembrance: RemembranceMenu.Entry.Destination?
 
-    /// Time the focused-prayer card stays on a marker-tapped prayer
-    /// before reverting to the next-upcoming prayer per spec.
-    private static let focusRevertInterval: TimeInterval = 8
     /// Absence long enough that returning replays the entrance.
     private static let entranceReplayInterval: TimeInterval = 30 * 60
 
@@ -404,6 +403,15 @@ private struct TodayReadyView: View {
         tokens: SkyPaletteTokens
     ) -> some View {
         let windowExhausted = resolution.isScheduleExhausted
+        // The cycle this moment is in, and the one this view's queries
+        // were keyed to when it was built. They part company when the
+        // window was built before dawn: it stays valid through the whole
+        // of the next day, so it is never "exhausted" at Fajr, but every
+        // query here still names the night before's cycle.
+        let cycleNow = snapshot.scheduleWindow.cycle(at: now).date
+        let needsReanchor = TodayDisplaySchedule.needsReanchor(
+            window: snapshot.scheduleWindow, dayAnchor: dayAnchor, now: now
+        )
 
         GeometryReader { proxy in
             // The proxy is safe-area-bounded (the tab bar adds a
@@ -427,6 +435,9 @@ private struct TodayReadyView: View {
                     hasKhatam: focusedKhatamMoment(
                         now: now, resolution: resolution
                     ) != nil,
+                    hasNaflRow: focusedCarriesNaflRow(
+                        now: now, resolution: resolution
+                    ),
                     accessibilityLayout: dynamicTypeSize.isAccessibilitySize
                 ),
                 hasDuhaCard: activeDuhaWindow(at: now) != nil && activePause == nil,
@@ -445,6 +456,9 @@ private struct TodayReadyView: View {
                     bottomInset: metrics.plateBottomInset,
                     horizonFraction: metrics.plateHorizonFraction,
                     night: snapshot.night,
+                    displayedSunrise: TodayDisplaySchedule.sunrise(
+                        window: snapshot.scheduleWindow, now: now
+                    ),
                     onMarkerTap: handleMarkerTap,
                     weather: plateWeather(at: now),
                     entrance: entranceProgress
@@ -553,17 +567,6 @@ private struct TodayReadyView: View {
                     )
                 }
                 .padding(.bottom, IhsanSpacing.md)
-            }
-            // The log sheet owns its presentation: a content-sized
-            // medium detent, drag indicator, and SkyPhase-backed glass
-            // are applied inside `PrayerLogSheet`.
-            .sheet(item: $sheetSelection) { selection in
-                logSheet(
-                    for: selection.prayer,
-                    now: now,
-                    resolution: resolution
-                )
-                .preferredColorScheme(.dark)
             }
             .sheet(item: $khatamLogRequest) { request in
                 KhatamLogSheet(
@@ -692,6 +695,16 @@ private struct TodayReadyView: View {
                 try? await viewModel.refreshSnapshot()
             }
         }
+        // ...and refresh as soon as the cycle turns under a window that
+        // is not exhausted. Without this, opening the app before dawn
+        // and returning after Fajr showed today's prayers with last
+        // night's records for the whole day — and the card's Remove
+        // would have acted on today's record while showing yesterday's.
+        .task(id: cycleNow) {
+            if needsReanchor {
+                try? await viewModel.refreshSnapshot()
+            }
+        }
         // The weather cadence: once when this id first resolves, then
         // once per hour turn. The policy inside decides whether the
         // network is actually asked; most firings serve the cache.
@@ -704,7 +717,7 @@ private struct TodayReadyView: View {
         // when returning to the foreground after a long absence.
         .task {
             if let prayer = prayerNotificationRoute.consume() {
-                focusedPrayer = prayer
+                focus(prayer)
             }
             if let category = adhkarNotificationRoute.consume(),
                AdhkarAvailability.isAvailable {
@@ -717,7 +730,7 @@ private struct TodayReadyView: View {
         }
         .onChange(of: prayerNotificationRoute.pendingPrayer) { _, prayer in
             if let prayer = prayerNotificationRoute.consume() {
-                focusedPrayer = prayer
+                focus(prayer)
             }
         }
         .onChange(of: adhkarNotificationRoute.pendingCategory) { _, category in
@@ -743,6 +756,9 @@ private struct TodayReadyView: View {
                 Task { await viewModel.refreshWeather() }
             } else {
                 lastActiveAt = now
+                // A removal waiting out its Undo is settled before the
+                // app can be suspended or killed with it unwritten.
+                commitPendingRemoval()
             }
         }
     }
@@ -777,7 +793,7 @@ private struct TodayReadyView: View {
         )
         let windowState = resolution.state(for: prayerTime)
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
-        let log = log(for: prayer)
+        let log = displayedLog(for: prayer, now: now)
         let khatamMoment = focusedKhatamMoment(now: now, resolution: resolution)
         FocusedPrayerCard(
             prayer: prayer,
@@ -790,18 +806,31 @@ private struct TodayReadyView: View {
             loggedAt: log?.loggedAt,
             isJamaah: log?.withJamaah ?? false,
             windowState: windowState,
+            // The truth rule the sheet used, now the card's: what can
+            // be true at this moment for this prayer decides the seals.
+            availableStatuses: TimingAvailability.allowedStatuses(
+                cycleDate: cycleDay(at: now),
+                dayBeingLogged: cycleDay(at: now),
+                windowState: windowState,
+                currentStatus: nil
+            ),
             iqamahInscription: iqamahInscription(for: prayer, adhan: prayerTime.scheduledTime),
             iqamahSpoken: iqamahSpoken(for: prayer, adhan: prayerTime.scheduledTime),
             rawatib: rawatibChips(for: prayer, now: now),
             nightSet: prayer == .isha ? nightChips(now: now) : nil,
             onToggleNafl: { kind in handleNaflTap(kind) },
-            onCommit: { status, isJamaah in
-                commit(status: status, isJamaah: isJamaah, for: prayer)
+            onCommit: { status in
+                record(status, for: prayer, at: now)
             },
-            onMoreOptions: {
-                sheetSelection = LogSheetSelection(prayer: prayer)
+            onToggleJamaah: {
+                toggleJamaah(of: prayer, at: now)
             },
-            isMoreOptionsPresented: sheetSelection?.prayer == prayer,
+            onRemove: {
+                removeRecord(of: prayer, at: now)
+            },
+            onUndo: undoOffer(for: prayer, at: now),
+            onBeginPause: { togglePause() },
+            onInteraction: { holdFocus() },
             onTasbih: {
                 // The natural post-prayer moment. With the
                 // after-prayer set turned on there are two things a
@@ -821,6 +850,31 @@ private struct TodayReadyView: View {
         )
     }
 
+    /// Whether the focused card carries its sunnah row beneath the
+    /// seals — asked where the page's geometry is decided, like the
+    /// congregation line and the khatam rail.
+    private func focusedCarriesNaflRow(
+        now: Date,
+        resolution: PrayerResolution
+    ) -> Bool {
+        let prayer = effectiveFocusedPrayer(resolution: resolution)
+        let prayerTime = TodayDisplaySchedule.prayerTime(
+            for: prayer,
+            window: snapshot.scheduleWindow,
+            now: now
+        )
+        let windowState = resolution.state(for: prayerTime)
+            ?? .upcoming(opensAt: prayerTime.scheduledTime)
+        return FocusedPrayerCard.carriesNaflRow(
+            phase: FocusedCardModel.resolve(
+                windowState: windowState,
+                isLogged: displayedLog(for: prayer, now: now) != nil
+            ),
+            rawatib: rawatibChips(for: prayer, now: now),
+            nightSet: prayer == .isha ? nightChips(now: now) : nil
+        )
+    }
+
     private func focusedKhatamMoment(
         now: Date,
         resolution: PrayerResolution
@@ -835,7 +889,7 @@ private struct TodayReadyView: View {
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
         guard FocusedCardModel.offersPostPrayerTasbih(
             windowState: windowState,
-            status: log(for: prayer)?.status,
+            status: displayedLog(for: prayer, now: now)?.status,
             isAvailable: true
         ), let offer = khatamPrayerOffer(at: now) else {
             return nil
@@ -1568,7 +1622,8 @@ private struct TodayReadyView: View {
                 state: markerState(
                     for: time.prayer,
                     prayerTime: displayPrayerTime,
-                    resolution: resolution
+                    resolution: resolution,
+                    now: now
                 )
             )
         }
@@ -1583,7 +1638,8 @@ private struct TodayReadyView: View {
     private func markerState(
         for prayer: Prayer,
         prayerTime: PrayerTime,
-        resolution: PrayerResolution
+        resolution: PrayerResolution,
+        now: Date
     ) -> PrayerMarkerState {
         // During an excused pause every marker rests in the neutral outline
         // state — no glow, no passed-unlogged ink. Times stay readable;
@@ -1592,7 +1648,7 @@ private struct TodayReadyView: View {
         let state = resolution.state(for: prayerTime)
             ?? .upcoming(opensAt: prayerTime.scheduledTime)
         if state.isCurrent { return .current }
-        if log(for: prayer) != nil { return .logged }
+        if displayedLog(for: prayer, now: now) != nil { return .logged }
         switch state {
         case .upcoming: return .upcoming
         case .current: return .current
@@ -1612,22 +1668,37 @@ private struct TodayReadyView: View {
     // MARK: - Focused prayer resolution
 
     /// The prayer the focused card is currently displaying. The user
-    /// can override the default by tapping a marker on the scene; the
-    /// override reverts to the next-upcoming after 8 sec per spec.
+    /// can override the default by tapping a marker on the plate; the
+    /// override holds while the card is in use and lets go
+    /// `FocusedCardModel.focusHoldInterval` after the last touch.
     private func effectiveFocusedPrayer(resolution: PrayerResolution) -> Prayer {
         focusedPrayer ?? defaultFocusPrayer(resolution: resolution)
     }
 
     private func handleMarkerTap(_ prayer: Prayer) {
         Haptics.impact(.light)
-        focusedPrayer = prayer
-        scheduleFocusRevert()
+        focus(prayer)
     }
 
-    private func scheduleFocusRevert() {
+    /// Brings `prayer` to the card — a marker tap, or a widget's link.
+    private func focus(_ prayer: Prayer) {
+        focusedPrayer = prayer
+        holdFocus()
+    }
+
+    /// Restarts the hold on a marker-tapped focus. Every touch on the
+    /// card calls this, so the card returns to the moment only once the
+    /// person has stopped using it — never in the middle of a choice,
+    /// and never under a live Undo.
+    private func holdFocus() {
+        guard focusedPrayer != nil else { return }
         revertFocusTask?.cancel()
         revertFocusTask = Task { @MainActor in
-            try? await Task.sleep(nanoseconds: UInt64(Self.focusRevertInterval * 1_000_000_000))
+            try? await Task.sleep(
+                nanoseconds: UInt64(
+                    FocusedCardModel.focusHoldInterval(voiceOver: voiceOverEnabled) * 1_000_000_000
+                )
+            )
             if !Task.isCancelled {
                 focusedPrayer = nil
             }
@@ -1636,79 +1707,173 @@ private struct TodayReadyView: View {
 
     // MARK: - Prayer time / log lookups
 
+    /// The cycle's record for `prayer` — what was logged in the cycle in
+    /// progress, whichever instance the surfaces are showing.
     private func log(for prayer: Prayer) -> PrayerLog? {
         todaysLogs.first { $0.prayer == prayer }
     }
 
-    // MARK: - Commit
+    /// The record that belongs to the instance on screen. After Isha
+    /// the Fajr on screen is tomorrow's, and the morning's log is not
+    /// its log.
+    private func displayedLog(for prayer: Prayer, now: Date) -> PrayerLog? {
+        guard !TodayDisplaySchedule.looksAhead(
+            prayer, window: snapshot.scheduleWindow, now: now
+        ) else { return nil }
+        // Removed from the card and waiting out its Undo: gone, as far
+        // as anything on screen is concerned.
+        guard !isPendingRemoval(prayer, at: now) else { return nil }
+        return log(for: prayer)
+    }
 
-    /// Translate the orthogonal `(timing, jamaʿah)` commit into the
-    /// existing `setStatus` + `toggleJamaah` view-model methods.
-    private func commit(status: PrayerStatus, isJamaah: Bool, for prayer: Prayer) {
-        let existingJamaah = log(for: prayer)?.withJamaah ?? false
-        Task {
-            await viewModel.setStatus(status, for: prayer)
-            if isJamaah != existingJamaah {
-                await viewModel.toggleJamaah(for: prayer)
+    // MARK: - Recording from the card
+
+    /// A run of changes to one prayer made from the card, for Undo.
+    ///
+    /// The run keeps the record as it stood BEFORE its first change, so
+    /// Undo always returns there — a double tap on a seal, or Remove
+    /// then a fresh seal, is put back to where the person started, not
+    /// to the mis-tap in between.
+    private struct CardChange {
+        let prayer: Prayer
+        /// The cycle the run belongs to.
+        let cycleDate: Date
+        /// The record before the run's first change; nil when there was
+        /// none.
+        let previous: (status: PrayerStatus, withJamaah: Bool)?
+        /// Whether anything in the run reached the store. A removal on
+        /// its own writes nothing until its Undo expires.
+        var wrote: Bool
+        /// The latest change in the run — Undo counts from here.
+        var at: Date
+    }
+
+    /// A removal waiting out its Undo. The record stays in the store and
+    /// the card shows it gone; it is deleted when the offer expires or
+    /// the app leaves the foreground. So Undo after Remove puts back
+    /// exactly what was there — the same row, its time, its note — and
+    /// a removal interrupted by the app being killed leaves the record
+    /// in place rather than half-gone.
+    private struct PendingRemoval {
+        let prayer: Prayer
+        let cycleDate: Date
+        let task: Task<Void, Never>
+    }
+
+    /// One tap, one funnel. The settle already fired under the thumb;
+    /// the @Query re-render carries the truth.
+    private func record(_ status: PrayerStatus, for prayer: Prayer, at now: Date) {
+        // The record still exists while a removal waits; this write
+        // supersedes the removal rather than racing it.
+        cancelPendingRemoval(of: prayer)
+        beginChange(to: prayer, at: now, writes: true)
+        announce("\(prayer.displayNameEnglish) recorded, \(status.spokenLabel).")
+        enqueueCardWrite { await viewModel.setStatus(status, for: prayer) }
+    }
+
+    private func toggleJamaah(of prayer: Prayer, at now: Date) {
+        beginChange(to: prayer, at: now, writes: true)
+        enqueueCardWrite { await viewModel.toggleJamaah(for: prayer) }
+    }
+
+    private func removeRecord(of prayer: Prayer, at now: Date) {
+        beginChange(to: prayer, at: now, writes: false)
+        commitPendingRemoval()
+        let interval = FocusedCardModel.undoInterval(voiceOver: voiceOverEnabled)
+        pendingRemoval = PendingRemoval(
+            prayer: prayer,
+            cycleDate: cycleDay(at: now),
+            task: Task { @MainActor in
+                try? await Task.sleep(nanoseconds: UInt64(interval * 1_000_000_000))
+                guard !Task.isCancelled else { return }
+                commitPendingRemoval()
             }
+        )
+        announce("\(prayer.displayNameEnglish) record removed.")
+    }
+
+    /// Writes a waiting removal now. Safe to call with none waiting.
+    private func commitPendingRemoval() {
+        guard let pending = pendingRemoval else { return }
+        pendingRemoval = nil
+        pending.task.cancel()
+        let prayer = pending.prayer
+        enqueueCardWrite { await viewModel.removeRecord(of: prayer) }
+    }
+
+    private func cancelPendingRemoval(of prayer: Prayer) {
+        guard let pending = pendingRemoval, pending.prayer == prayer else { return }
+        pending.task.cancel()
+        pendingRemoval = nil
+    }
+
+    /// Whether `prayer`'s record is hidden by a removal waiting out its
+    /// Undo.
+    private func isPendingRemoval(_ prayer: Prayer, at now: Date) -> Bool {
+        guard let pending = pendingRemoval else { return false }
+        return pending.prayer == prayer && pending.cycleDate == cycleDay(at: now)
+    }
+
+    private func enqueueCardWrite(_ write: @escaping @MainActor () async -> Void) {
+        let previous = cardWrites
+        cardWrites = Task { @MainActor in
+            await previous?.value
+            await write()
         }
     }
 
-    // MARK: - Log sheet (the long tail: qadā, missed, edit)
+    /// Said aloud under VoiceOver, with the way back named: the card's
+    /// change is otherwise only seen.
+    private func announce(_ message: String) {
+        guard voiceOverEnabled else { return }
+        AccessibilityNotification.Announcement("\(message) Undo is available.").post()
+    }
 
-    @ViewBuilder
-    private func logSheet(
-        for prayer: Prayer,
-        now: Date,
-        resolution: PrayerResolution
-    ) -> some View {
-        let log = log(for: prayer)
-        // Presentation-time palette — the sheet lives on the same
-        // SkyPhase and consumes the same per-tick resolution as the
-        // plate, header, and card behind it.
-        let tokens = PaletteState.resolved(
-            for: SkyPhase.resolve(at: now, events: solarEvents)
-        )
-
-        let displayPrayerTime = TodayDisplaySchedule.prayerTime(
-            for: prayer,
-            window: snapshot.scheduleWindow,
-            now: now
-        )
-        let windowState = resolution.state(for: displayPrayerTime)
-            ?? .upcoming(opensAt: displayPrayerTime.scheduledTime)
-        PrayerLogSheet(
+    /// Starts a run of changes to `prayer`, or extends the one already
+    /// open for it — keeping the run's original record either way.
+    private func beginChange(to prayer: Prayer, at now: Date, writes: Bool) {
+        let cycle = cycleDay(at: now)
+        if var run = lastCardChange,
+           run.prayer == prayer,
+           run.cycleDate == cycle,
+           FocusedCardModel.offersUndo(actionAt: run.at, now: now, voiceOver: voiceOverEnabled) {
+            run.at = now
+            run.wrote = run.wrote || writes
+            lastCardChange = run
+            return
+        }
+        let existing = displayedLog(for: prayer, now: now)
+        lastCardChange = CardChange(
             prayer: prayer,
-            // The same display instant the plate label, header,
-            // and card show — one source, one formatter.
-            scheduledTime: displayPrayerTime.scheduledTime,
-            windowEndTime: windowState.windowEnd,
-            timeZone: snapshot.place.timeZone,
-            tokens: tokens,
-            currentStatus: log?.status,
-            isJamaah: log?.withJamaah ?? false,
-            isPaused: activePause != nil,
-            // The truth rule: what can be true at this moment for
-            // this prayer today decides which tiles are live.
-            availableStatuses: TimingAvailability.allowedStatuses(
-                cycleDate: cycleDay(at: now),
-                dayBeingLogged: cycleDay(at: now),
-                windowState: windowState,
-                currentStatus: log?.status
-            ),
-            windowState: windowState,
-            iqamahInscription: iqamahInscription(
-                for: prayer, adhan: displayPrayerTime.scheduledTime
-            ),
-            iqamahSpoken: iqamahSpoken(
-                for: prayer, adhan: displayPrayerTime.scheduledTime
-            ),
-            onCommit: { status, jamaah in
-                commit(status: status, isJamaah: jamaah, for: prayer)
-            },
-            onTogglePause: { togglePause() },
-            onCancel: {}
+            cycleDate: cycle,
+            previous: existing?.status.map { ($0, existing?.withJamaah ?? false) },
+            wrote: writes,
+            at: now
         )
+    }
+
+    /// Undo for the card while it is still on offer: the last change
+    /// was to this prayer, in this cycle, a few seconds ago.
+    private func undoOffer(for prayer: Prayer, at now: Date) -> (() -> Void)? {
+        guard
+            let run = lastCardChange,
+            run.prayer == prayer,
+            run.cycleDate == cycleDay(at: now),
+            FocusedCardModel.offersUndo(actionAt: run.at, now: now, voiceOver: voiceOverEnabled)
+        else { return nil }
+        return {
+            lastCardChange = nil
+            guard run.wrote else {
+                // Only a removal, still waiting: nothing reached the
+                // store, so calling it off is the whole of Undo.
+                cancelPendingRemoval(of: run.prayer)
+                return
+            }
+            cancelPendingRemoval(of: run.prayer)
+            enqueueCardWrite {
+                await viewModel.restore(run.prayer, to: run.previous)
+            }
+        }
     }
 
     /// The congregation's line for this prayer, or nil when no masjid is
@@ -1762,13 +1927,6 @@ private struct TodayReadyView: View {
         WidgetSnapshotService.republish(using: modelContext)
     }
 
-}
-
-/// Identifies which prayer's log sheet is currently presented.
-/// Hashable so it works as `sheet(item:)`'s identifier.
-private struct LogSheetSelection: Identifiable, Hashable {
-    let prayer: Prayer
-    var id: Prayer { prayer }
 }
 
 private struct KhatamPrayerLogRequest: Identifiable {

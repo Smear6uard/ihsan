@@ -222,7 +222,10 @@ extension WidgetFaceSnapshotTests {
         )
     }
 
-    /// Late night: Isha current and logged day behind.
+    /// Late night: Isha current and logged day behind. Fajr is printed
+    /// as the dawn ahead — the composer hands the face tomorrow's Fajr
+    /// and its sunrise from Isha's opening, unlogged and upcoming, while
+    /// the ornament keeps the day's place on the arc.
     private func nightDay() -> WidgetDayModel {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "America/Chicago")!
@@ -234,7 +237,7 @@ extension WidgetFaceSnapshotTests {
         return WidgetDayModel(
             date: date,
             slots: [
-                .init(prayer: .fajr, time: at(4, 10), state: .logged),
+                .init(prayer: .fajr, time: at(4, 10), displayTime: at(28, 11), state: .upcoming),
                 .init(prayer: .dhuhr, time: at(12, 58), state: .logged),
                 .init(prayer: .asr, time: at(16, 53), state: .logged),
                 .init(prayer: .maghrib, time: at(20, 11), state: .logged),
@@ -246,6 +249,7 @@ extension WidgetFaceSnapshotTests {
             currentPrayer: .isha,
             currentWindow: at(21, 43)...at(28, 11),
             sunrise: at(5, 42),
+            displayedSunrise: at(29, 43),
             cityName: "Madinah",
             timeZoneIdentifier: "America/Chicago",
             isPaused: false,

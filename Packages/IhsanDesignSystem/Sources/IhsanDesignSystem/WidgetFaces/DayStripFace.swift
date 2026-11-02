@@ -124,11 +124,40 @@ public struct DayStripFace: View {
         return tiers
     }
 
+    /// The width a prayer's time label is given when deciding tiers.
+    static let timeLabelWidth: CGFloat = 56
+    /// The sunrise inscription's budget — "SUNRISE · 12:00 AM" at the
+    /// inscription size, with room to spare.
+    static let sunriseLabelWidth: CGFloat = 100
+
+    /// Where the sunrise inscription sits: centred under its tick where
+    /// the face allows, on the first tier no prayer label occupies
+    /// there. Sunrise follows Fajr by an hour or so, which on any arc
+    /// puts it under Fajr's own time — so in practice it reads as the
+    /// second line of Fajr: when its window ends.
+    static func sunriseLabelPlacement(
+        tickX: CGFloat,
+        centers: [CGPoint],
+        tiers: [Int],
+        bandWidth: CGFloat
+    ) -> (x: CGFloat, tier: Int) {
+        let half = sunriseLabelWidth / 2
+        let x = min(max(tickX, half), max(half, bandWidth - half))
+        for tier in 0...1 {
+            let collides = zip(centers, tiers).contains { center, labelTier in
+                labelTier == tier
+                    && abs(center.x - x) < half + timeLabelWidth / 2
+            }
+            if !collides { return (x, tier) }
+        }
+        return (x, 1)
+    }
+
     private var strip: some View {
         GeometryReader { proxy in
             let band = CGSize(width: proxy.size.width, height: proxy.size.height - 28)
             let centers = Self.ornamentCenters(slots: model.slots, in: band)
-            let tiers = Self.labelTiers(centers: centers, labelWidth: 56)
+            let tiers = Self.labelTiers(centers: centers, labelWidth: Self.timeLabelWidth)
             let arc = ArcGeometry(size: band, ornamentSize: Self.ornamentSize)
 
             ZStack(alignment: .topLeading) {
@@ -146,6 +175,25 @@ public struct DayStripFace: View {
                         path.addLine(to: CGPoint(x: point.x, y: point.y + 3))
                     }
                     .stroke(sunriseStroke, lineWidth: 1)
+
+                    // Sunrise is not a prayer, so it takes no ornament
+                    // and the quieter register — but it is the end of
+                    // Fajr's window, and a face that prints Fajr owes
+                    // the person the time it closes.
+                    let placement = Self.sunriseLabelPlacement(
+                        tickX: point.x, centers: centers, tiers: tiers, bandWidth: band.width
+                    )
+                    Text(sunriseInscription)
+                        .font(.system(size: 9, weight: .semibold).smallCaps())
+                        .tracking(0.8)
+                        .monospacedDigit()
+                        .foregroundStyle(faceSecondary)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .position(
+                            x: placement.x,
+                            y: band.height + 8 + CGFloat(placement.tier) * 13
+                        )
                 }
 
                 ForEach(Array(model.slots.enumerated()), id: \.element.id) { index, slot in
@@ -160,7 +208,7 @@ public struct DayStripFace: View {
                         .widgetFaceAccent(mode)
                         .position(center)
 
-                        Text(model.clock(slot.time))
+                        Text(model.clock(slot.displayTime))
                             .font(.system(size: 11, weight: slot.state == .current ? .semibold : .regular, design: .rounded).monospacedDigit())
                             .foregroundStyle(slot.state == .current ? facePrimary : faceSecondary)
                             .lineLimit(1)
@@ -173,6 +221,12 @@ public struct DayStripFace: View {
                 }
             }
         }
+    }
+
+    /// "SUNRISE · 5:40 AM" — the app plate's own inscription, printing
+    /// the sunrise after the Fajr this face prints.
+    private var sunriseInscription: String {
+        "SUNRISE · \(model.clock(model.displayedSunrise).uppercased())"
     }
 
     private var sunriseFraction: CGFloat? {
@@ -216,8 +270,9 @@ public struct DayStripFace: View {
 
     private var accessibilityText: String {
         var lines = model.slots.map {
-            "\($0.prayer.displayNameEnglish) at \(model.clock($0.time)), \($0.state.spokenDescription)"
+            "\($0.prayer.displayNameEnglish) at \(model.clock($0.displayTime)), \($0.state.spokenDescription)"
         }
+        lines.insert("sunrise at \(model.clock(model.displayedSunrise))", at: min(1, lines.count))
         if let fastingLine {
             lines.insert(fastingLine.capitalized, at: 0)
         }

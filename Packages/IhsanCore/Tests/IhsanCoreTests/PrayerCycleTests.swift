@@ -141,4 +141,42 @@ struct PrayerCycleTests {
         #expect(cycle.date == march(7, 0, 0))
         #expect(cycle.rollsAt == march(8, 6, 21))
     }
+
+    // MARK: - The display half: which Fajr a surface names
+
+    private static let aug4Isha = at(day: 4, 22, 5)
+
+    @Test("Before the cycle's Isha opens, Fajr is the one that opened the day")
+    func fajrStaysOnTheCycleUntilIsha() {
+        for instant in [Self.aug4Fajr, Self.at(day: 4, 13, 0), Self.aug4Isha.addingTimeInterval(-1)] {
+            #expect(!PrayerCycleClock.namesClosingFajr(
+                at: instant, ishaStart: Self.aug4Isha, closingFajr: Self.aug5Fajr
+            ))
+        }
+    }
+
+    @Test("From Isha's opening to the closing Fajr, Fajr names the dawn ahead")
+    func fajrLooksAheadThroughTheNight() {
+        let night = [
+            Self.aug4Isha,
+            Self.at(day: 4, 23, 59),
+            Self.at(day: 5, 0, 1),
+            Self.aug5Fajr.addingTimeInterval(-1)
+        ]
+        for instant in night {
+            #expect(PrayerCycleClock.namesClosingFajr(
+                at: instant, ishaStart: Self.aug4Isha, closingFajr: Self.aug5Fajr
+            ))
+        }
+    }
+
+    /// Half-open at the closing Fajr: that instant belongs to the next
+    /// cycle, whose own Fajr is the same instant — so the name never
+    /// jumps at dawn, only at Isha.
+    @Test("At the closing Fajr the next cycle's own Fajr takes over")
+    func theClosingFajrBelongsToTheNextCycle() {
+        #expect(!PrayerCycleClock.namesClosingFajr(
+            at: Self.aug5Fajr, ishaStart: Self.aug4Isha, closingFajr: Self.aug5Fajr
+        ))
+    }
 }

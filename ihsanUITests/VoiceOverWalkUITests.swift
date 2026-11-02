@@ -25,7 +25,8 @@ final class VoiceOverWalkUITests: XCTestCase {
     func testNothingInteractiveIsUnlabelled() throws {
         let surfaces: [(name: String, arguments: [String])] = [
             ("Today", []),
-            ("logging", ["-IhsanDebugPresentLogSheet", "maghrib"]),
+            ("logging", ["-IhsanDebugFocusPrayer", "maghrib"]),
+            ("changing", ["-IhsanDebugLogPrayer", "maghrib:onTime", "-IhsanDebugChangeCard"]),
             ("yesterday", ["-IhsanDebugPresentYesterday"]),
             ("Path", ["-IhsanDebugTab", "trajectory"]),
             ("Set", ["-IhsanDebugTab", "settings"]),

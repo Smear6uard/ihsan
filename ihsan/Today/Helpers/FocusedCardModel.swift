@@ -31,13 +31,61 @@ enum FocusedCardModel {
         return true
     }
 
+    // MARK: - Seals
+
+    /// The timing axis in the order the card lays it out.
+    static let sealOrder: [PrayerStatus] = [.onTime, .late, .qada, .missed]
+
+    /// The seals the card offers: exactly the timings that can be true
+    /// at this moment (`TimingAvailability`), in the axis's order. An
+    /// open window offers On Time and Delayed; a closed one, all four;
+    /// a window that has not opened, none.
+    static func seals(available: Set<PrayerStatus>) -> [PrayerStatus] {
+        sealOrder.filter(available.contains)
+    }
+
+    /// The seal that carries the gold before anything is chosen. Only
+    /// an open window has one: On Time, the commonest truth and the one
+    /// the card exists to make a single tap. A closed window has no
+    /// default — memory, not the clock, decides what happened there.
+    static func prominentSeal(among seals: [PrayerStatus]) -> PrayerStatus? {
+        seals == [.onTime, .late] ? .onTime : nil
+    }
+
+    /// How long a just-made change can be taken back in one tap.
+    static let undoInterval: TimeInterval = 6
+    /// The same offer under VoiceOver, where reaching the button is a
+    /// walk through the card rather than a glance and a tap. Six
+    /// seconds would be a timeout no one asked for.
+    static let spokenUndoInterval: TimeInterval = 20
+
+    static func undoInterval(voiceOver: Bool) -> TimeInterval {
+        voiceOver ? spokenUndoInterval : undoInterval
+    }
+
+    /// Whether Undo is still on offer for an action made at `actionAt`.
+    static func offersUndo(actionAt: Date, now: Date, voiceOver: Bool = false) -> Bool {
+        now >= actionAt && now.timeIntervalSince(actionAt) < undoInterval(voiceOver: voiceOver)
+    }
+
+    /// How long a marker-tapped prayer holds the card after the last
+    /// touch on it. Measured from the last touch, not the first: the
+    /// card is a deadline only for someone who has walked away.
+    static let focusHoldInterval: TimeInterval = 10
+
+    /// The hold always outlasts the Undo it may be carrying, so the card
+    /// never returns to the moment from under a live Undo.
+    static func focusHoldInterval(voiceOver: Bool) -> TimeInterval {
+        max(focusHoldInterval, undoInterval(voiceOver: voiceOver) + 4)
+    }
+
     /// Which phases carry the rawatib chips. `.logged` is the
     /// load-bearing row: the after-rawatib follows the fard, so
     /// recording the fard must never take the sunnah's controls away —
     /// the chips once lived only in the expanded pre-log layout, and
     /// logging made them unreachable. `.upcoming` precedes the window;
-    /// a closed, unlogged window routes to the sheet instead of
-    /// carrying chips.
+    /// a closed, unlogged window carries its four seals and nothing
+    /// else.
     static func showsRawatibChips(
         phase: Phase,
         hasConfiguredSlot: Bool

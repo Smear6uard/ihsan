@@ -64,15 +64,14 @@ final class AppStoreShotsUITests: XCTestCase {
             "-IhsanDebugLogPrayer", Self.seededMonth
         ])
 
-        // 3. Logging: the two axes, with an open window and the
-        // answer being given. Dhuhr is left unlogged so the sheet opens
-        // fresh — a seeded log lands after the sheet has read its
-        // state, which framed "Save Changes" over an empty choice.
+        // 3. Logging: an open window and its two seals on the card —
+        // On Time gilded as the one-tap default, Delayed beside it.
+        // Dhuhr is left unlogged so the seals are what the frame shows.
         capture("store-3-logging", arguments: [
             "-IhsanNowOverride", Self.afternoon,
             "-IhsanDebugLogPrayer", Self.seededMonthBeforeDhuhr,
-            "-IhsanDebugPresentLogSheet", "dhuhr"
-        ], settle: 3.5, tapLabelPrefix: "On Time")
+            "-IhsanDebugFocusPrayer", "dhuhr"
+        ], settle: 3.5)
 
         // 4. Repair — the makeup thread.
         capture("store-4-repair", arguments: [

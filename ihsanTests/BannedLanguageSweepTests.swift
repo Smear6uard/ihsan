@@ -22,6 +22,10 @@ struct BannedLanguageSweepTests {
         "ihsan/Today/Helpers/FastingDayModel.swift",
         "ihsan/Today/Components/HijriMonthSheet.swift",
         "ihsan/Today/Components/TodayHeader.swift",
+        // The card that records — every word on it is said at the
+        // moment of worship.
+        "ihsan/Today/Components/FocusedPrayerCard.swift",
+        "ihsan/Today/Components/TimingSeal.swift",
         "ihsan/MasjidFinder/Components/MasjidEmptyState.swift",
         "ihsan/MasjidFinder/Components/MasjidResultRow.swift",
         "ihsan/MasjidFinder/Components/MasjidSheetHeader.swift",

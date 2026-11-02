@@ -254,6 +254,56 @@ internal struct PrayerLogService: Sendable {
         )
     }
 
+    /// What a removal took away, so the surface that asked can put it
+    /// back exactly.
+    struct RemovedLog: Sendable, Equatable {
+        let status: PrayerStatus
+        let withJamaah: Bool
+        let prayerDate: Date
+    }
+
+    /// Removes the cycle's own record of `prayer` (the cycle in progress
+    /// when `prayerDate` is nil). Idempotent: nothing to remove is not
+    /// an error.
+    ///
+    /// Two things are never removed from here. A make-up act shares its
+    /// prayer's key but belongs to the qadā ledger, not the cycle's
+    /// record. And a record a make-up points back at is part of that
+    /// ledger too — deleting it would leave the make-up linked to
+    /// nothing — so it stays, and the call returns nil.
+    @MainActor
+    func removeLog(
+        for prayer: Prayer,
+        prayerDate explicitPrayerDate: Date? = nil,
+        in context: ModelContext
+    ) throws -> RemovedLog? {
+        let now = clock.now()
+        let prayerDate = explicitPrayerDate.map { Calendar.current.startOfDay(for: $0) }
+            ?? PrayerCycleClock.sharedCycleDate(at: now)
+        let dedupKey = Self.makeDedupKey(prayer: prayer, prayerDate: prayerDate)
+        let descriptor = FetchDescriptor<PrayerLog>(
+            predicate: #Predicate { $0.dedupKey == dedupKey && $0.qadaForPrayerLogID == nil }
+        )
+        guard let record = try context.fetch(descriptor).first,
+              let status = record.status
+        else { return nil }
+
+        let recordID: UUID? = record.id
+        let linked = FetchDescriptor<PrayerLog>(
+            predicate: #Predicate { $0.qadaForPrayerLogID == recordID }
+        )
+        guard try context.fetchCount(linked) == 0 else { return nil }
+
+        let removed = RemovedLog(
+            status: status,
+            withJamaah: record.withJamaah,
+            prayerDate: record.prayerDate
+        )
+        context.delete(record)
+        try context.save()
+        return removed
+    }
+
     /// Marks a previously missed prayer as qada while preserving the original log.
     @MainActor
     func markAsQada(

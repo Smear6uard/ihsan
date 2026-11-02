@@ -164,11 +164,10 @@ struct TodayView: View {
                 .ihsanGlassHero()
                 .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                 .onTapGesture {
-                    sheetPrayer = selectedPrayer
-                    WatchHaptics.click()
+                    openSelectedPrayer(snapshot, now: now)
                 }
 
-                PrayerDots(snapshot: snapshot, selectedPrayer: selectedPrayer)
+                PrayerDots(snapshot: snapshot, selectedPrayer: selectedPrayer, now: now)
                     .padding(.horizontal, 4)
                     .focusable(true)
                     .digitalCrownRotation(
@@ -181,14 +180,13 @@ struct TodayView: View {
                         isHapticFeedbackEnabled: true
                     )
                     .onTapGesture {
-                        sheetPrayer = selectedPrayer
-                        WatchHaptics.click()
+                        openSelectedPrayer(snapshot, now: now)
                     }
                     .accessibilityAction(named: "Log selected prayer") {
-                        sheetPrayer = selectedPrayer
+                        openSelectedPrayer(snapshot, now: now)
                     }
 
-                selectedPrayerCaption(snapshot: snapshot)
+                selectedPrayerCaption(snapshot: snapshot, now: now)
             }
             .padding(.horizontal, 6)
             .padding(.top, 4)
@@ -233,17 +231,18 @@ struct TodayView: View {
         .padding(.horizontal, 2)
     }
 
-    private func selectedPrayerCaption(snapshot: TodayState.Snapshot) -> some View {
-        let formatter: DateFormatter = {
-            let f = DateFormatter()
-            f.dateFormat = "h:mm a"
-            return f
-        }()
-        let scheduled = snapshot.scheduleWindow.day.time(for: selectedPrayer)
-        let status = snapshot.status(for: selectedPrayer)
+    /// The selected prayer's time and record, for the instance the
+    /// shared rule names — the dawn ahead for Fajr after Isha — in the
+    /// place's timezone, the same clock the phone prints.
+    private func selectedPrayerCaption(
+        snapshot: TodayState.Snapshot,
+        now: Date
+    ) -> some View {
+        let shown = snapshot.displayedPrayerTime(for: selectedPrayer, at: now)
+        let status = snapshot.status(for: selectedPrayer, at: now)
 
         return VStack(spacing: 1) {
-            Text(formatter.string(from: scheduled))
+            Text(PrayerWindowText.time(shown.scheduledTime, in: snapshot.place.timeZone))
                 .font(.system(size: 13, weight: .regular, design: .rounded).monospacedDigit())
                 .foregroundStyle(IhsanColor.textSecondary)
 
@@ -251,13 +250,31 @@ struct TodayView: View {
                 Text("Logged \(label(status))")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(IhsanColor.textMuted)
+            } else if !canOpen(selectedPrayer, snapshot: snapshot, now: now) {
+                Text("Not yet open")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(IhsanColor.textMuted.opacity(0.7))
             } else {
                 Text("Tap to log")
                     .font(.system(size: 10, weight: .medium))
                     .foregroundStyle(IhsanColor.textMuted.opacity(0.7))
             }
         }
-        .accessibilityLabel(captionAccessibility(snapshot: snapshot))
+        .accessibilityLabel(captionAccessibility(snapshot: snapshot, now: now))
+    }
+
+    /// Whether the selected prayer can be recorded now. A window that
+    /// has not opened has nothing to record — the phone's card offers
+    /// no controls there, and the watch now agrees. That includes the
+    /// Fajr ahead after Isha, whose time is tomorrow's.
+    private func canOpen(_ prayer: Prayer, snapshot: TodayState.Snapshot, now: Date) -> Bool {
+        snapshot.displayedPrayerTime(for: prayer, at: now).scheduledTime <= now
+    }
+
+    private func openSelectedPrayer(_ snapshot: TodayState.Snapshot, now: Date) {
+        guard canOpen(selectedPrayer, snapshot: snapshot, now: now) else { return }
+        sheetPrayer = selectedPrayer
+        WatchHaptics.click()
     }
 
     private func actionSheet(for prayer: Prayer) -> some View {
@@ -305,15 +322,15 @@ struct TodayView: View {
         status.spokenLabel
     }
 
-    private func captionAccessibility(snapshot: TodayState.Snapshot) -> String {
-        let formatter = DateFormatter()
-        formatter.dateStyle = .none
-        formatter.timeStyle = .short
-        let scheduled = snapshot.scheduleWindow.day.time(for: selectedPrayer)
-        let timeStr = formatter.string(from: scheduled)
+    private func captionAccessibility(snapshot: TodayState.Snapshot, now: Date) -> String {
+        let shown = snapshot.displayedPrayerTime(for: selectedPrayer, at: now)
+        let timeStr = PrayerWindowText.time(shown.scheduledTime, in: snapshot.place.timeZone)
         let prayerName = selectedPrayer.displayNameEnglish
-        if let status = snapshot.status(for: selectedPrayer) {
+        if let status = snapshot.status(for: selectedPrayer, at: now) {
             return "\(prayerName) at \(timeStr), logged \(label(status))"
+        }
+        if !canOpen(selectedPrayer, snapshot: snapshot, now: now) {
+            return "\(prayerName) at \(timeStr), not yet open"
         }
         return "\(prayerName) at \(timeStr), not yet logged"
     }

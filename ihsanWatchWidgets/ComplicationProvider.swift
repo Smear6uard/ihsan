@@ -26,8 +26,15 @@ struct ComplicationEntry: TimelineEntry {
     let nextPrayer: Prayer?
     let nextPrayerTime: Date?
     let currentPrayer: Prayer?
+    /// The five the list face prints: the cycle's own, with Fajr naming
+    /// the dawn ahead once the cycle's Isha has opened.
     let dayPrayerTimes: [Prayer: Date]
+    /// The cycle's record — what the ring counts. The morning's Fajr
+    /// stays counted all night even after the list's Fajr looks ahead.
     let loggedStatuses: [Prayer: PrayerStatus]
+    /// True when the printed Fajr is the dawn ahead, whose record does
+    /// not exist yet; the list face draws no status mark beside it.
+    var fajrLooksAhead: Bool = false
     let cityName: String?
     let timeZoneIdentifier: String
     let isStale: Bool
@@ -135,10 +142,15 @@ struct ComplicationProvider: TimelineProvider {
         schedule: PrayerStateSchedule,
         logs: [Prayer: PrayerStatus]
     ) -> ComplicationEntry {
-        var times: [Prayer: Date] = [:]
-        for entry in cache.entries {
-            if let prayer = Prayer(rawValue: entry.prayerRaw) {
-                times[prayer] = entry.scheduledTime
+        // The cycle's five as the phone's plate prints them. A cache that
+        // no longer covers `date` falls back to its own day, which the
+        // stale flag below already marks for the "Open Ihsan" face.
+        var times: [Prayer: Date] = cache.displayedTimes(at: date) ?? [:]
+        if times.isEmpty {
+            for entry in cache.entries {
+                if let prayer = Prayer(rawValue: entry.prayerRaw) {
+                    times[prayer] = entry.scheduledTime
+                }
             }
         }
 
@@ -168,6 +180,7 @@ struct ComplicationProvider: TimelineProvider {
             currentPrayer: displayedCurrent,
             dayPrayerTimes: times,
             loggedStatuses: logs,
+            fajrLooksAhead: cache.namesClosingFajr(at: date),
             cityName: cache.cityName,
             timeZoneIdentifier: cache.timeZoneIdentifier,
             isStale: isStale

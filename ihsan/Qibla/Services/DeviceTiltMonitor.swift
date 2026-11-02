@@ -28,7 +28,9 @@ final class DeviceTiltMonitor {
         #endif
         guard manager.isDeviceMotionAvailable else { return }
         manager.deviceMotionUpdateInterval = 0.25
-        manager.startDeviceMotionUpdates(to: .main) { motion, _ in
+        // Weak at the handler itself: the manager holds the handler, so
+        // a strong capture here would keep the monitor alive through it.
+        manager.startDeviceMotionUpdates(to: .main) { [weak self] motion, _ in
             guard let gravity = motion?.gravity else { return }
             let flatness = abs(gravity.z)
             Task { @MainActor [weak self] in

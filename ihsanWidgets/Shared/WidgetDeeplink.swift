@@ -32,8 +32,10 @@ enum WidgetDeeplink {
         URL(string: "\(scheme)://today?night=1")!
     }
 
-    /// The log sheet for one prayer — the destination of a passed
-    /// prayer's mark, where the app asks the status question properly.
+    /// One prayer on the Today card — the destination of a passed
+    /// prayer's mark, where the card's seals ask the status question
+    /// properly. The name predates the card recording in place; the URL
+    /// is kept so widgets already on a home screen keep working.
     static func logSheet(for prayer: Prayer) -> URL {
         URL(string: "\(scheme)://today?log=\(prayer.rawValue)")!
     }

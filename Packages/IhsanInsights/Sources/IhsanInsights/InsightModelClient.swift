@@ -12,7 +12,7 @@ struct FoundationInsightModelClient: InsightModelResponding {
         let response = try await session.respond(
             to: prompt,
             generating: WeeklyInsight.self,
-            options: GenerationOptions(sampling: .greedy, temperature: 0, maximumResponseTokens: 320)
+            options: GenerationOptions(samplingMode: .greedy, temperature: 0, maximumResponseTokens: 320)
         )
         return response.content
     }
@@ -22,7 +22,7 @@ struct FoundationInsightModelClient: InsightModelResponding {
         let response = try await session.respond(
             to: prompt,
             generating: MonthlyInsight.self,
-            options: GenerationOptions(sampling: .greedy, temperature: 0, maximumResponseTokens: 520)
+            options: GenerationOptions(samplingMode: .greedy, temperature: 0, maximumResponseTokens: 520)
         )
         return response.content
     }

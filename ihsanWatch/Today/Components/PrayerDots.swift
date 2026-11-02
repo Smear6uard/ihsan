@@ -10,16 +10,19 @@ import IhsanDesignSystem
 struct PrayerDots: View {
     let snapshot: TodayState.Snapshot
     let selectedPrayer: Prayer
+    /// The moment from the screen's one clock — after Isha the Fajr dot
+    /// is the dawn ahead, and carries no record yet.
+    let now: Date
 
     var body: some View {
         HStack(spacing: 12) {
             ForEach(PrayerListOrder.all, id: \.self) { prayer in
                 VStack(spacing: 2) {
                     PrayerStatusGlyph(
-                        status: snapshot.status(for: prayer),
+                        status: snapshot.status(for: prayer, at: now),
                         size: 7,
                         isSelected: prayer == selectedPrayer,
-                        isJamaah: snapshot.isJamaah(for: prayer)
+                        isJamaah: snapshot.isJamaah(for: prayer, at: now)
                     )
 
                     Text(prayer.displayNameEnglish.prefix(1))
@@ -40,7 +43,7 @@ struct PrayerDots: View {
 
     private var accessibilitySummary: String {
         let logged = PrayerListOrder.all.compactMap { prayer -> String? in
-            guard let status = snapshot.status(for: prayer) else { return nil }
+            guard let status = snapshot.status(for: prayer, at: now) else { return nil }
             return "\(prayer.displayNameEnglish) \(statusLabel(status))"
         }
         if logged.isEmpty {

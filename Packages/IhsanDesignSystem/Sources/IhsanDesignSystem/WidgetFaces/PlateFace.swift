@@ -43,7 +43,10 @@ public struct PlateFace: View {
                 focusedBlock
                     .padding(.top, IhsanSpacing.sm)
 
-                Spacer(minLength: 0)
+                Spacer(minLength: IhsanSpacing.xs)
+
+                almanacRow
+                    .padding(.bottom, IhsanSpacing.sm)
 
                 baseRow
             }
@@ -212,6 +215,68 @@ public struct PlateFace: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    // MARK: - The day's times
+
+    /// One entry of the almanac row.
+    private struct AlmanacEntry: Identifiable {
+        let id: String
+        let name: String
+        let time: Date
+        let isCurrent: Bool
+        let isSunrise: Bool
+    }
+
+    /// The day's six times in order — the five, and sunrise after Fajr.
+    /// Fajr and sunrise are the ones the face prints: from Isha onward,
+    /// tomorrow's, the dawn the countdown above is counting to.
+    private var almanac: [AlmanacEntry] {
+        var entries = model.slots.map {
+            AlmanacEntry(
+                id: $0.prayer.rawValue,
+                name: $0.prayer.displayNameEnglish,
+                time: $0.displayTime,
+                isCurrent: $0.state == .current,
+                isSunrise: false
+            )
+        }
+        entries.insert(
+            AlmanacEntry(
+                id: "sunrise",
+                name: "Sunrise",
+                time: model.displayedSunrise,
+                isCurrent: false,
+                isSunrise: true
+            ),
+            at: min(1, entries.count)
+        )
+        return entries
+    }
+
+    /// The face used to print one time — the next. The almanac carries
+    /// the rest in the plate's inscription register: names in small
+    /// caps over their hours, the open window in full ink, sunrise a
+    /// step quieter than the prayers because it is not one.
+    private var almanacRow: some View {
+        HStack(alignment: .top, spacing: 0) {
+            ForEach(almanac) { entry in
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(entry.name.uppercased())
+                        .font(.system(size: 9, weight: .semibold).smallCaps())
+                        .tracking(0.9)
+                        .foregroundStyle(entry.isCurrent ? facePrimary : faceSecondary)
+                    Text(model.compactClock(entry.time))
+                        .font(.system(size: 12, weight: entry.isCurrent ? .semibold : .regular, design: .rounded).monospacedDigit())
+                        .foregroundStyle(entry.isCurrent ? facePrimary : faceSecondary)
+                        .opacity(entry.isSunrise ? 0.8 : 1)
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .widgetFaceAccent(mode)
+    }
+
     @ViewBuilder
     private var baseRow: some View {
         HStack(alignment: .firstTextBaseline, spacing: IhsanSpacing.sm) {
@@ -263,9 +328,11 @@ public struct PlateFace: View {
 
     private var accessibilityText: String {
         var text = "\(model.nextPrayer.displayNameEnglish) at \(model.clock(model.nextTime)). "
-        text += model.slots.map {
-            "\($0.prayer.displayNameEnglish) \(model.clock($0.time)), \($0.state.spokenDescription)"
-        }.joined(separator: ", ")
+        var lines = model.slots.map {
+            "\($0.prayer.displayNameEnglish) \(model.clock($0.displayTime)), \($0.state.spokenDescription)"
+        }
+        lines.insert("sunrise \(model.clock(model.displayedSunrise))", at: min(1, lines.count))
+        text += lines.joined(separator: ", ")
         if let hijri = model.hijri {
             text += ". \(hijri.monthName) \(hijri.day)"
         }
