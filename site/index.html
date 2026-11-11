@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" class="no-js">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -12,208 +12,247 @@
 <meta property="og:type" content="website">
 <link rel="icon" href="assets/icon-180.png">
 <link rel="apple-touch-icon" href="assets/icon-180.png">
+<link rel="preload" href="fonts/source-serif-4-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/day.js">
+<link rel="modulepreload" href="js/plate.js">
+<link rel="modulepreload" href="vendor/adhan.esm.min.js">
 </head>
 <body>
+<a class="skip" href="#main">Skip to what the app does</a>
 
 <header class="hero" id="top">
-  <div class="stars" aria-hidden="true"></div>
+  <div class="firmament">
+    <canvas class="stars" id="stars" aria-hidden="true"></canvas>
+    <div class="grain" aria-hidden="true"></div>
 
-  <nav class="masthead" aria-label="Ihsan">
-    <a class="wordmark" href="#top">
-      <img src="assets/icon-180.png" alt="" width="36" height="36">
-      <span>Ihsan</span>
-      <span class="wordmark-ar" lang="ar" dir="rtl">إحسان</span>
-    </a>
-    <!-- When the app is live, replace this span with:
-         <a class="store" href="https://apps.apple.com/app/idXXXXXXXXXX">Get Ihsan on the App Store</a> -->
-    <span class="store store-pending">Coming to the App Store</span>
-  </nav>
+    <nav class="masthead" aria-label="Ihsan">
+      <a class="wordmark" href="#top">
+        <img src="assets/icon-180.png" alt="" width="36" height="36">
+        <span>Ihsan</span>
+        <span class="wordmark-ar" lang="ar" dir="rtl">إحسان</span>
+      </a>
+      <div class="masthead-links">
+        <a href="#privacy">Privacy</a>
+        <!-- When the app is live, replace this span (and the one in the footer) with:
+             <a class="store" href="https://apps.apple.com/app/idXXXXXXXXXX">Get Ihsan on the App Store</a> -->
+        <span class="store store-pending">Coming to the App Store</span>
+      </div>
+    </nav>
 
-  <div class="hero-grid">
-    <div class="hero-copy">
-      <h1>The day as a single instrument.</h1>
-      <p class="lede">Ihsan is a prayer companion for iPhone and Apple Watch. It draws your five prayers on one arc, follows the sun from first light to the last third of the night, and keeps your record on your own devices.</p>
+    <h1>The day as a <br>single instrument.</h1>
+
+    <div class="sky" id="sky">
+      <div class="horizon-glow" aria-hidden="true"></div>
+      <!-- main.js draws the plate here: the arc, the five prayers, the sun and the moon -->
     </div>
-
-    <figure class="instrument">
-      <svg viewBox="0 0 660 420" role="img" aria-labelledby="arc-title">
-        <title id="arc-title">The five prayers of a July day in Chicago, set along the arc of the sun.</title>
-        <defs>
-          <radialGradient id="halo">
-            <stop offset="0" stop-color="var(--glow)" stop-opacity=".55"/>
-            <stop offset=".45" stop-color="var(--glow)" stop-opacity=".16"/>
-            <stop offset="1" stop-color="var(--glow)" stop-opacity="0"/>
-          </radialGradient>
-          <radialGradient id="sunhalo">
-            <stop offset="0" stop-color="#FFFBEE"/>
-            <stop offset=".2" stop-color="#FFF3CF"/>
-            <stop offset=".34" stop-color="var(--glow)" stop-opacity=".7"/>
-            <stop offset=".7" stop-color="var(--glow)" stop-opacity=".18"/>
-            <stop offset="1" stop-color="var(--glow)" stop-opacity="0"/>
-          </radialGradient>
-        </defs>
-
-        <!-- inner arcs: the night's road -->
-        <path class="arc-faint" d="M 189 321 A 150 150 0 0 1 471 321"/>
-
-        <!-- the day's arc, Fajr to Isha; pathLength is in degrees -->
-        <path class="arc-track" d="M 54.3 323.4 A 280 280 0 0 1 608.5 342.7"/>
-        <path class="arc-travelled" id="travelled" pathLength="164" d="M 54.3 323.4 A 280 280 0 0 1 608.5 342.7"/>
-
-        <text class="sunrise" x="94" y="262">Sunrise 5:42 AM</text>
-
-        <g id="orb" transform="translate(330 222)">
-          <circle class="orb-halo" r="54" fill="url(#halo)"/>
-          <circle class="orb-sun" r="46" fill="url(#sunhalo)"/>
-          <circle class="orb-moon" r="15"/>
-        </g>
-
-        <g class="prayer" data-prayer="fajr" transform="translate(54.3 323.4)">
-          <circle class="now-halo" r="50" fill="url(#halo)"/>
-          <g class="glyph">
-            <ellipse cy="-8.5" rx="4.6" ry="8"/>
-            <ellipse cy="-8.5" rx="4.6" ry="8" transform="rotate(60)"/>
-            <ellipse cy="-8.5" rx="4.6" ry="8" transform="rotate(120)"/>
-            <ellipse cy="-8.5" rx="4.6" ry="8" transform="rotate(180)"/>
-            <ellipse cy="-8.5" rx="4.6" ry="8" transform="rotate(240)"/>
-            <ellipse cy="-8.5" rx="4.6" ry="8" transform="rotate(300)"/>
-          </g>
-          <text class="p-name" y="40">Fajr</text>
-          <text class="p-time" y="58">4:10 AM</text>
-        </g>
-
-        <g class="prayer" data-prayer="dhuhr" transform="translate(330 92)">
-          <circle class="now-halo" r="50" fill="url(#halo)"/>
-          <g class="glyph">
-            <rect x="-11" y="-11" width="22" height="22"/>
-            <rect x="-11" y="-11" width="22" height="22" transform="rotate(30)"/>
-            <rect x="-11" y="-11" width="22" height="22" transform="rotate(60)"/>
-            <circle class="glyph-eye" r="6"/>
-          </g>
-          <text class="p-name" y="40">Dhuhr</text>
-          <text class="p-time" y="58">12:58 PM</text>
-        </g>
-
-        <g class="prayer" data-prayer="asr" transform="translate(502.4 151.4)">
-          <circle class="now-halo" r="50" fill="url(#halo)"/>
-          <g class="glyph">
-            <rect x="-11.5" y="-11.5" width="23" height="23"/>
-            <rect x="-11.5" y="-11.5" width="23" height="23" transform="rotate(45)"/>
-          </g>
-          <text class="p-name" y="40">Asr</text>
-          <text class="p-time" y="58">4:53 PM</text>
-        </g>
-
-        <g class="prayer" data-prayer="maghrib" transform="translate(589.6 267.1)">
-          <circle class="now-halo" r="50" fill="url(#halo)"/>
-          <g class="glyph">
-            <path d="M0-18C10-6 10 6 0 18C-10 6-10-6 0-18Z"/>
-            <path class="glyph-vein" d="M0-11C2.6-4 2.6 4 0 11C-2.6 4-2.6-4 0-11Z"/>
-          </g>
-          <text class="p-name" x="-30" y="-2" text-anchor="end">Maghrib</text>
-          <text class="p-time" x="-30" y="16" text-anchor="end">8:11 PM</text>
-        </g>
-
-        <g class="prayer" data-prayer="isha" transform="translate(608.5 342.7)">
-          <circle class="now-halo" r="50" fill="url(#halo)"/>
-          <g class="glyph glyph-open">
-            <circle r="15.5"/>
-            <rect x="-8" y="-8" width="16" height="16"/>
-            <rect x="-8" y="-8" width="16" height="16" transform="rotate(45)"/>
-          </g>
-          <text class="p-name" y="40">Isha</text>
-          <text class="p-time" y="58">9:43 PM</text>
-        </g>
-      </svg>
-    </figure>
   </div>
 
-  <div class="dial">
-    <p class="readout">
-      <span class="readout-name" id="r-name">Maghrib</span>
-      <span class="readout-ar" id="r-ar" lang="ar" dir="rtl">المغرب</span>
-      <span class="readout-line" id="r-line">8:20 PM. Now, until 9:43 PM.</span>
-    </p>
+  <div class="ground">
     <div class="scrub">
-      <label for="clock">A July day in Chicago, set to your clock. Drag to move through it.</label>
-      <input id="clock" type="range" min="0" max="1439" step="5" value="1220">
+      <div class="scrub-head">
+        <label id="scrub-label" for="clock">Today. Drag this line to move through the day.</label>
+        <output id="clock-read" for="clock"></output>
+        <button type="button" class="btn-text" id="to-now" hidden>Back to now</button>
+      </div>
+      <div class="track-wrap">
+        <div class="track" id="track"></div>
+        <div class="track-marks" id="track-marks" aria-hidden="true"></div>
+        <input id="clock" type="range" min="0" max="1439" step="1" value="720">
+      </div>
     </div>
-  </div>
 
-  <div class="horizon" aria-hidden="true"></div>
+    <div class="ground-grid">
+      <div class="intro">
+        <p class="lede">Ihsan is a prayer companion for iPhone and Apple Watch. It draws your five prayers on one arc, follows the sun from first light to the last third of the night, and keeps your record on your own devices.</p>
+
+        <div class="place">
+          <p class="place-date" id="date-line"></p>
+          <div class="place-controls">
+            <label for="city">City</label>
+            <select id="city"></select>
+            <button type="button" class="btn-text" id="locate">Use my position</button>
+          </div>
+          <p class="fine" id="place-note"></p>
+          <p class="fine" id="method-note"></p>
+        </div>
+      </div>
+
+      <div class="now">
+        <div class="now-card" id="now-card" tabindex="-1"></div>
+        <p class="fine">A working copy of the app’s Today card, with a sample of the day so far. Nothing you tap on this page is kept.</p>
+      </div>
+    </div>
+    <noscript><p class="fine">With JavaScript on, this page draws today’s prayer times for where you are, in your browser.</p></noscript>
+  </div>
 </header>
 
-<main>
-  <section class="folios" aria-label="Inside the app">
-    <ul class="frieze">
-      <li>
-        <img src="assets/store-3-logging.jpg" width="720" height="1564" loading="lazy"
-             alt="The Today screen with the Maghrib card and its On time and Delayed buttons.">
-        <h2>One tap records a prayer in its window.</h2>
-        <p>One more takes it back. Mark it on time or delayed, alone or in jamāʿah, from the app, a widget, your watch, or Siri.</p>
-      </li>
-      <li>
-        <img src="assets/store-6-path.jpg" width="720" height="1564" loading="lazy"
-             alt="The Path screen: thirty days of prayers as a grid of dots, with today's five listed below.">
-        <h2>A month of prayer at a glance.</h2>
-        <p>Every day is a column and every prayer a dot. Tap any day to read it or correct it. There are no streaks and no score.</p>
-      </li>
-      <li>
-        <img src="assets/store-4-repair.jpg" width="720" height="1564" loading="lazy"
-             alt="The Repair sheet counting Isha prayers and fasts still owed, each with a plus-one made up button.">
-        <h2>A ledger for what you carry.</h2>
-        <p>Count the prayers and fasts you owe, then make them up beside your daily prayers at a pace you set yourself.</p>
-      </li>
-      <li>
-        <img src="assets/store-5-qibla.jpg" width="720" height="1564" loading="lazy"
-             alt="The qibla compass: a ring of degree marks with a gold marker on its rim at 49 degrees north-east.">
-        <h2>The direction, drawn rather than pointed at.</h2>
-        <p>A compass that holds true north and marks the qibla on its rim, with the distance to Makkah beneath it.</p>
-      </li>
+<main id="main">
+
+  <section class="name" aria-labelledby="name-title">
+    <h2 class="quiet" id="name-title">The name</h2>
+    <p class="name-ar" lang="ar" dir="rtl">أَنْ تَعْبُدَ اللَّهَ كَأَنَّكَ تَرَاهُ، فَإِنْ لَمْ تَكُنْ تَرَاهُ فَإِنَّهُ يَرَاكَ</p>
+    <blockquote>
+      <p>To worship Allah as though you see Him; and if you do not see Him, He sees you.</p>
+    </blockquote>
+    <p class="name-source">The Prophet <span lang="ar">ﷺ</span>, asked what iḥsān is. Ṣaḥīḥ Muslim 8.</p>
+    <p class="name-body">The app is named for that kind of attention. It tells you the time, keeps what you record, and stays out of the way. There are no streaks to protect and no score to raise, and there is no company on the other end reading your record.</p>
+  </section>
+
+  <section class="chapter" id="path" aria-labelledby="path-title">
+    <div class="chapter-text">
+      <h2 id="path-title">A month of prayer at a glance.</h2>
+      <p>Every day is a column and every prayer a dot. Tap any day to read it or correct it.</p>
+      <p>There are no streaks and no score. The grid shows what happened and leaves the reading to you.</p>
+      <p class="fine">A sample month ending today. Whatever you record on the card above lands in the last column.</p>
+    </div>
+    <div class="chapter-plate">
+      <div class="specimen path" id="path-specimen"></div>
+    </div>
+  </section>
+
+  <section class="chapter" id="repair" aria-labelledby="repair-title">
+    <div class="chapter-text">
+      <h2 id="repair-title">A ledger for what you carry.</h2>
+      <p>Count the prayers and fasts you owe, then make them up beside your daily prayers at a pace you set yourself.</p>
+      <p class="fine">The counts here are invented. Yours stay on your devices.</p>
+    </div>
+    <div class="chapter-plate">
+      <div class="specimen repair" id="repair-specimen"></div>
+    </div>
+  </section>
+
+  <section class="chapter" id="qibla" aria-labelledby="qibla-title">
+    <div class="chapter-text">
+      <h2 id="qibla-title">The direction, drawn rather than pointed at.</h2>
+      <p>A compass that holds true north and marks the qibla on its rim, with the distance to Makkah beneath it.</p>
+      <p class="fine">Drawn here from the same arithmetic the app uses. Drag the ring to turn, as you would turn yourself.</p>
+    </div>
+    <div class="chapter-plate">
+      <div class="specimen qibla" id="qibla-specimen"></div>
+    </div>
+  </section>
+
+  <section class="frames" aria-labelledby="frames-title">
+    <div class="frames-head">
+      <h2 id="frames-title">The app, as it is.</h2>
+      <p>Eight frames from the app itself, on real data. Nothing is composited, retouched or staged.</p>
+    </div>
+    <ul class="strip" tabindex="0" aria-label="Screens from the app. Scroll sideways for more.">
+      <li><figure>
+        <img src="assets/store-1-night-plate.jpg" width="720" height="1564" loading="lazy" alt="The Today screen at Maghrib: five prayers on an arc over a dark red horizon, the moon rising, and a card offering On time and Delayed.">
+        <figcaption><b>Today, at Maghrib.</b> The day as a single instrument, five prayers on one arc.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/store-2-dawn.jpg" width="720" height="1564" loading="lazy" alt="The Today screen before sunrise, in deep blue, with Fajr recorded on time and an offer to begin the morning remembrance.">
+        <figcaption><b>Today, at Fajr.</b> The page follows the sun, from first light to the last third of the night.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/store-3-logging.jpg" width="720" height="1564" loading="lazy" alt="The Today screen at midday under a pale sky, with the Dhuhr card and its On time and Delayed buttons.">
+        <figcaption><b>Recording.</b> One tap records a prayer in its window. One more takes it back.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/store-6-path.jpg" width="720" height="1564" loading="lazy" alt="The Path screen: thirty days of prayers as a grid of dots, with today’s five listed below.">
+        <figcaption><b>Path.</b> A month of prayer at a glance, and any day a tap away.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/store-4-repair.jpg" width="720" height="1564" loading="lazy" alt="The Repair sheet counting Isha prayers and fasts still owed, each with a plus-one made up button.">
+        <figcaption><b>Repair.</b> A ledger for what you carry, and a pace you set yourself.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/store-5-qibla.jpg" width="720" height="1564" loading="lazy" alt="The qibla compass: a ring of degree marks with a gold marker on its rim at 49 degrees north-east.">
+        <figcaption><b>Qibla.</b> The direction, drawn rather than pointed at.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/screen-reflect.jpg" width="720" height="1564" loading="lazy" alt="The Reflect screen, titled The day’s quiet account, with a prompt for the day, a field to write in and a Record button.">
+        <figcaption><b>Reflect.</b> A prompt for the day, and room to write or speak an answer.</figcaption>
+      </figure></li>
+      <li><figure>
+        <img src="assets/screen-tasbih.jpg" width="720" height="1564" loading="lazy" alt="The tasbīḥ counter: Subḥānallāh above a ring of marks around a large zero.">
+        <figcaption><b>Tasbīḥ.</b> A counter with nothing on it but the count.</figcaption>
+      </figure></li>
     </ul>
   </section>
 
-  <section class="also">
-    <h2>Also in the app</h2>
+  <section class="chapter" id="surfaces" aria-labelledby="surfaces-title">
+    <div class="chapter-text">
+      <h2 id="surfaces-title">The same day, wherever you look.</h2>
+      <p>The arc travels with you. Widgets, the Lock Screen, StandBy and Apple Watch all read from the one record. You can log a prayer from a widget, a Live Activity, your watch or Siri.</p>
+      <dl class="surfaces-list">
+        <div><dt>Widgets</dt><dd>The next prayer, the Hijri day, the day as a strip, or the whole plate with the true phase of the moon.</dd></div>
+        <div><dt>Live Activities</dt><dd>While a prayer’s window is open it waits on the Lock Screen and in the Dynamic Island, with a button to record it.</dd></div>
+        <div><dt>Apple Watch</dt><dd>Times, qibla and one-tap logging on your wrist, with complications for the next prayer.</dd></div>
+        <div><dt>Siri and Shortcuts</dt><dd>Every way of logging goes through the same door, so a prayer is never counted twice.</dd></div>
+      </dl>
+    </div>
+    <div class="chapter-plate">
+      <ul class="wall">
+        <li class="w-large"><img src="assets/widgets/plate-face-night.png" width="676" height="708" loading="lazy" alt="The large widget at night: the arc with all five ornaments, the moon above it, the next prayer in large numerals and the six times of the day beneath."></li>
+        <li class="w-small"><img src="assets/widgets/next-prayer-face-night.png" width="316" height="316" loading="lazy" alt="The small widget: Fajr, 4:11 AM, in Madinah."></li>
+        <li class="w-small"><img src="assets/widgets/hijri-day-face-afternoon.png" width="316" height="316" loading="lazy" alt="The Hijri day widget: the 13th of Safar 1448, marked as a white day."></li>
+        <li class="w-medium"><img src="assets/widgets/day-strip-face-afternoon.png" width="676" height="316" loading="lazy" alt="The medium widget in the afternoon: the five ornaments along an arc with their times, and Asr about to begin."></li>
+        <li class="w-banner"><img src="assets/live-activity.jpg" width="1118" height="322" loading="lazy" alt="A Live Activity on the Lock Screen: Isha, now, until 11:31 PM, with an I prayed button."></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="also" aria-labelledby="also-title">
+    <h2 id="also-title">Also in the app</h2>
     <dl>
-      <div><dt>Widgets and Live Activities</dt><dd>The arc on your Home Screen, Lock Screen and StandBy, and the current prayer in the Dynamic Island.</dd></div>
-      <div><dt>Apple Watch</dt><dd>Times, qibla and one-tap logging on your wrist, with complications for the next prayer.</dd></div>
-      <div><dt>Reflections</dt><dd>Write or speak a few lines after a prayer. Voice notes are transcribed on your phone.</dd></div>
+      <div><dt>Reflections</dt><dd>Write or speak a few lines after a prayer. Voice notes are transcribed on your phone, and the recording stays on the phone that made it.</dd></div>
       <div><dt>Remembrance</dt><dd>Morning and evening adhkār, a tasbīḥ counter, and duas for the weather outside your window.</dd></div>
       <div><dt>Masjids nearby</dt><dd>Find one close to you and keep its jamāʿah times next to your own.</dd></div>
       <div><dt>Fasting, pause and travel</dt><dd>A log for your fasts, and Pause and Travel modes that set a stretch of days apart. Ihsan does not ask why.</dd></div>
+      <div><dt>Your own method</dt><dd>Choose the calculation method your community follows and the Asr ruling you keep, or set the angles yourself.</dd></div>
+      <div><dt>On-device summaries</dt><dd>Where Apple Intelligence is available, a short summary of your record is written on the phone. Where it is not, nothing appears in its place.</dd></div>
     </dl>
   </section>
 
-  <section class="privacy" id="privacy">
+  <section class="privacy" id="privacy" aria-labelledby="privacy-title">
     <div class="privacy-lead">
-      <h2>What you record stays yours.</h2>
+      <h2 id="privacy-title">What you record stays yours.</h2>
       <p>Ihsan has no account, no analytics and no server of its own. Your prayer log lives on your devices and in your private iCloud, where only you can read it. Your location is used in the moment to work out times and direction, and is never written down.</p>
+      <p><a href="https://github.com/Smear6uard/ihsan/blob/main/docs/privacy-policy.md">Read the privacy policy</a></p>
     </div>
     <div class="privacy-list">
       <p>The app makes four kinds of network request. This is all of them.</p>
-      <ul>
+      <ol>
         <li><strong>A city name.</strong> Apple turns your position into “Chicago” so the app can show it.</li>
         <li><strong>Masjids nearby.</strong> An Apple Maps search, only while that sheet is open.</li>
-        <li><strong>The weather.</strong> A reading from Apple, only if you use the living sky or the weather duas.</li>
+        <li><strong>The weather.</strong> A reading from Apple, only while the living sky or the weather duas are in use.</li>
         <li><strong>Prayer thresholds.</strong> A small settings file from our public GitHub repository. The same file ships inside the app.</li>
-      </ul>
-      <p class="fine">None of them carries anything that identifies you. This page loads no fonts, scripts or trackers from anyone else, either.</p>
-      <p><a href="https://github.com/Smear6uard/ihsan/blob/main/docs/privacy-policy.md">Read the privacy policy</a></p>
+      </ol>
+      <p class="fine">None of them carries anything that identifies you.</p>
+
+      <div class="ledger">
+        <h3>And this page</h3>
+        <p id="ledger-live">This page loads its fonts, scripts and images from its own address and from nowhere else.</p>
+        <p class="fine">No analytics, no fonts from a font service, no embedded video. The prayer times at the top were worked out in your browser; the city was a guess from your clock.</p>
+      </div>
     </div>
   </section>
 </main>
 
-<footer class="colophon">
-  <a class="wordmark" href="#top">
-    <img src="assets/icon-180.png" alt="" width="36" height="36">
-    <span>Ihsan</span>
-  </a>
-  <p>For iPhone and Apple Watch. Requires iOS 26 or watchOS 26.</p>
-  <p>© 2026 Sameer Studios LLC</p>
+<footer class="close">
+  <div class="close-inner">
+    <p class="close-next" id="times-next"></p>
+    <ul class="times" id="times"></ul>
+    <p class="close-ar" lang="ar" dir="rtl" aria-hidden="true">إحسان</p>
+    <h2>Ihsan, for iPhone and Apple Watch.</h2>
+    <p class="close-req">It needs iOS 26 or watchOS 26.</p>
+    <span class="store store-pending">Coming to the App Store</span>
+  </div>
+  <div class="colophon">
+    <a class="wordmark" href="#top">
+      <img src="assets/icon-180.png" alt="" width="32" height="32" loading="lazy">
+      <span>Ihsan</span>
+    </a>
+    <p>Set in Source Serif 4 and Amiri. Prayer times by Adhan, the arithmetic the app itself uses.</p>
+    <p>© 2026 Sameer Studios LLC</p>
+  </div>
 </footer>
 
-<script src="main.js" defer></script>
+<script type="module" src="js/main.js"></script>
 </body>
 </html>
